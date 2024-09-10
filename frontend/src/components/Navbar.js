@@ -1,9 +1,9 @@
 // src/components/Navbar.js
 import Link from 'next/link';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCogs, faEye, faClipboardCheck, faBrain } from '@fortawesome/free-solid-svg-icons';
+import { faCogs, faEye, faClipboardCheck, faBrain, faUser } from '@fortawesome/free-solid-svg-icons';
 
-const Navbar = ({ isAuthenticated, user }) => {
+const Navbar = ({ isAuthenticated, user, windowsUsername, fullName, connectionStatus }) => {
   const menuItems = [
     { href: '/measset-generation', icon: faCogs, text: 'MeasSet Generation' },
     { href: '/viewer', icon: faEye, text: 'Viewer' },
@@ -11,6 +11,7 @@ const Navbar = ({ isAuthenticated, user }) => {
     { href: '/machine-learning', icon: faBrain, text: 'Machine Learning' },
   ];
 
+  
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-light">
       <div className="container-fluid">
@@ -29,9 +30,12 @@ const Navbar = ({ isAuthenticated, user }) => {
               </li>
             ))}
           </ul>
-          {/* 인증 상태에 따른 사용자 정보 표시 */}
           {isAuthenticated ? (
-            <span className="navbar-text">Welcome, {user?.name}</span>
+            <div className="navbar-text">
+              <FontAwesomeIcon icon={faUser} className="me-2" />
+              <span>{fullName}</span>
+              <span className="ms-2 badge bg-success">{connectionStatus || 'Connected'}</span>
+            </div>
           ) : (
             <Link href="/login" className="btn btn-primary">Login</Link>
           )}

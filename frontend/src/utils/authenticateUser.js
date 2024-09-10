@@ -1,21 +1,144 @@
-// src/utils/authenticateUser.js
-export const authenticateUser = async (setUser, setIsAuthenticated) => {
-    try {
-      const response = await fetch('http://localhost:5000/api/authenticate', {
-        method: 'POST',
-        credentials: 'include', // 쿠키를 포함하여 요청
-      });
+// // src/utils/authenticateUser.js
+// export const authenticateUser = async (setUser, setIsAuthenticated, setWindowsUsername, setFullName, setConnectionStatus) => {
+//   try {
+//     const response = await fetch('http://localhost:5000/api/authenticate', {
+//       method: 'POST',
+//       credentials: 'include',
+//     });
+    
+//     if (response.ok) {
+//       const data = await response.json();
+//       console.log('Authentication response:', data);
+//       setUser(data.user);
+//       setIsAuthenticated(data.authenticated);
       
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user); // 사용자 정보 설정
-        setIsAuthenticated(data.authenticated); // 인증 상태 업데이트
-      } else {
-        setIsAuthenticated(false); // 인증 실패 시 false로 설정
-      }
-    } catch (error) {
-      console.error('Authentication error:', error);
-      setIsAuthenticated(false); // 오류 발생 시 인증 실패 처리
+//       // 인증 성공 후 Windows 사용자 정보 가져오기
+//       await fetchWindowsUserInfo(setWindowsUsername, setFullName, setConnectionStatus);
+//     } else {
+//       console.error('Authentication failed:', await response.text());
+//       setIsAuthenticated(false);
+//       throw new Error('Authentication failed');
+//     }
+//   } catch (error) {
+//     console.error('Authentication error:', error);
+//     setIsAuthenticated(false);
+//     throw error;
+//   }
+// };
+
+// export const fetchWindowsUserInfo = async (setWindowsUsername, setFullName, setConnectionStatus) => {
+//   try {
+//     const response = await fetch('http://localhost:5000/api/get_windows_user', {
+//       credentials: 'include'
+//     });
+//     if (response.ok) {
+//       const data = await response.json();
+//       console.log('Windows user info:', data);
+//       if (typeof setWindowsUsername === 'function') setWindowsUsername(data.user || '');
+//       if (typeof setFullName === 'function') setFullName(data.full_name || '');
+//       if (typeof setConnectionStatus === 'function') setConnectionStatus(data.connection_status || 'Connected');
+//     } else {
+//       console.error('Failed to fetch Windows user info:', await response.text());
+//       if (typeof setConnectionStatus === 'function') setConnectionStatus('연결 실패');
+//       throw new Error('Failed to fetch Windows user info');
+//     }
+//   } catch (error) {
+//     console.error('Error fetching Windows user info:', error);
+//     if (typeof setConnectionStatus === 'function') setConnectionStatus('연결 실패');
+//     throw error;
+//   }
+// };
+
+// export const fetchDatabases = async (setDatabases, setSelectedDatabase) => {
+//   try {
+//     const response = await fetch('http://localhost:5000/api/get_databases', {
+//       credentials: 'include'
+//     });
+//     if (response.ok) {
+//       const data = await response.json();
+//       setDatabases(data.data);
+//       if (data.data.length > 0) {
+//         setSelectedDatabase(data.data[0]);
+//       }
+//     } else {
+//       console.error('데이터베이스 가져오기 실패');
+//     }
+//   } catch (error) {
+//     console.error('오류:', error);
+//   }
+// };
+
+
+// src/utils/authenticateUser.js
+export const authenticateUser = async (setUser, setIsAuthenticated, setWindowsUsername, setFullName, setConnectionStatus) => 
+  {
+  try {
+    const response = await fetch('http://localhost:5000/api/authenticate', {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Authentication response:', data);
+
+      // 사용자가 있는지 확인 후 상태 업데이트
+      setUser(data.user || null);
+      setIsAuthenticated(data.authenticated || false);
+
+      // 인증 성공 후 Windows 사용자 정보 가져오기
+      await fetchWindowsUserInfo(setWindowsUsername, setFullName, setConnectionStatus);
+    } else {
+      console.error('Authentication failed:', await response.text());
+      setIsAuthenticated(false);
     }
-  };
-  
+  } catch (error) {
+    console.error('Authentication error:', error);
+    setIsAuthenticated(false);
+  }
+};
+
+export const fetchWindowsUserInfo = async (setWindowsUsername, setFullName, setConnectionStatus) => 
+  {
+  try {
+    const response = await fetch('http://localhost:5000/api/get_windows_user', {
+      credentials: 'include',
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Windows user info:', data);
+
+      // 상태 업데이트가 함수로 제공된 경우에만 업데이트 진행
+      if (setWindowsUsername) setWindowsUsername(data.user || '');
+      if (setFullName) setFullName(data.full_name || '');
+      if (setConnectionStatus) setConnectionStatus(data.connection_status || 'Connected');
+    } else {
+      console.error('Failed to fetch Windows user info:', await response.text());
+      if (setConnectionStatus) setConnectionStatus('연결 실패');
+    }
+  } catch (error) {
+    console.error('Error fetching Windows user info:', error);
+    if (setConnectionStatus) setConnectionStatus('연결 실패');
+  }
+};
+
+export const fetchDatabases = async (setDatabases, setSelectedDatabase) => {
+  try {
+    const response = await fetch('http://localhost:5000/api/get_databases', {
+      credentials: 'include',
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      setDatabases(data.data || []);
+      if (data.data.length > 0) {
+        setSelectedDatabase(data.data[0]);
+      }
+    } else {
+      console.error('데이터베이스 가져오기 실패');
+    }
+  } catch (error) {
+    console.error('오류:', error);
+  }
+};

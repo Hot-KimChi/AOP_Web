@@ -1,6 +1,16 @@
-// src/app/layout.js
-import Layout from '../components/Layout';
+import Layout from "../components/layout";
 
+// src/app/layout.js
 export default function AppLayout({ children }) {
-  return <Layout>{children}</Layout>;
+  return (
+    <html lang="en">
+      <head>
+      </head>
+      <body>
+        <Layout>
+          {children}
+        </Layout>
+      </body>
+    </html>    
+  );  
 }
