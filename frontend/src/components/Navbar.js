@@ -11,7 +11,6 @@ const Navbar = ({ isAuthenticated, user, windowsUsername, fullName, connectionSt
     { href: '/machine-learning', icon: faBrain, text: 'Machine Learning' },
   ];
 
-  
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-light">
       <div className="container-fluid">
@@ -33,7 +32,7 @@ const Navbar = ({ isAuthenticated, user, windowsUsername, fullName, connectionSt
           {isAuthenticated ? (
             <div className="navbar-text">
               <FontAwesomeIcon icon={faUser} className="me-2" />
-              <span>{fullName}</span>
+              <span>{fullName || windowsUsername || 'User'}</span>
               <span className="ms-2 badge bg-success">{connectionStatus || 'Connected'}</span>
             </div>
           ) : (
