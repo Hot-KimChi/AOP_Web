@@ -42,9 +42,9 @@ const Layout = ({ children }) => {
     }
   }, [isAuthenticated]);
 
-  useEffect(() => {
-    console.log('User state:', { user, isAuthenticated, windowsUsername, fullName, connectionStatus });
-  }, [user, isAuthenticated, windowsUsername, fullName, connectionStatus]);
+  // useEffect(() => {
+  //   console.log('User state:', { user, isAuthenticated, windowsUsername, fullName, connectionStatus });
+  // }, [user, isAuthenticated, windowsUsername, fullName, connectionStatus]);
 
   return (
     <>

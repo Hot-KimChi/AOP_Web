@@ -8,6 +8,7 @@ from functools import wraps
 import win32api, win32security
 
 from pkg_SQL.database import SQL
+from pkg_MeasSetGen.meas_generation import MeasSetGen
 
 # from pkg_MeasSetGen.meas_generation import MeasSetGen
 # from pkg_Viewer.viewer import Viewer
@@ -135,15 +136,15 @@ def get_windows_user():
         )
 
 
-@app.route("/api/get_databases", methods=["GET"])
+@app.route("/api/get_list_database", methods=["GET"])
 @handle_exceptions
 @require_auth
-def get_databases():
+def get_list_database():
     databases = os.environ.get("DATABASE_NAME", "").split(",")
-    return jsonify({"status": "success", "data": databases})
+    return jsonify({"status": "success", "databases": databases})
 
 
-@app.route("/api/process-file", methods=["POST"])
+@app.route("/api/measset-generation", methods=["POST"])
 @handle_exceptions
 @require_auth
 def upload_file():
@@ -168,27 +169,27 @@ def upload_file():
         return jsonify({"status": "success", "data": result})
 
 
-@app.route("/api/verify_report", methods=["POST"])
-@handle_exceptions
-@require_auth
-def verify_report():
-    data = request.json
-    database = data.get("database")
-    list_probe = data.get("list_probe")
-    verify_report = Verify_Report(database, list_probe)
-    result = verify_report.generate()
-    return jsonify({"status": "success", "data": result})
+# @app.route("/api/verify_report", methods=["POST"])
+# @handle_exceptions
+# @require_auth
+# def verify_report():
+#     data = request.json
+#     database = data.get("database")
+#     list_probe = data.get("list_probe")
+#     verify_report = Verify_Report(database, list_probe)
+#     result = verify_report.generate()
+#     return jsonify({"status": "success", "data": result})
 
 
-@app.route("/api/machine_learning", methods=["POST"])
-@handle_exceptions
-@require_auth
-def machine_learning():
-    data = request.json
-    database = data.get("database")
-    ml = Machine_Learning(database)
-    result = ml.process()
-    return jsonify({"status": "success", "data": result})
+# @app.route("/api/machine_learning", methods=["POST"])
+# @handle_exceptions
+# @require_auth
+# def machine_learning():
+#     data = request.json
+#     database = data.get("database")
+#     ml = Machine_Learning(database)
+#     result = ml.process()
+#     return jsonify({"status": "success", "data": result})
 
 
 @app.route("/api/get_probes", methods=["GET"])
@@ -199,12 +200,11 @@ def get_probes():
     if not database:
         return jsonify({"error": "No database specified"}), 400
 
-    print(database)
     connect = SQL(windows_auth=True, database=database)
     query = "SELECT probeId, probeName FROM probe_geo"
     df = connect.execute_query(query)
     probes = [{"probeId": row[0], "probeName": row[1]} for row in df.values.tolist()]
-    return jsonify({"status": "success", "data": probes})
+    return jsonify({"status": "success", "probes": probes})
 
 
 if __name__ == "__main__":
