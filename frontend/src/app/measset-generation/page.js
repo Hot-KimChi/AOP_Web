@@ -66,53 +66,54 @@ export default function MeasSetGen() {
 
   return (
     <div className="container mt-5">
-        <h4 className="mb-4">MeasSet Generation</h4>
-
-        {/* Database 선택 */}
-        <div className="mb-3">
+      <h4 className="mb-4">MeasSet Generation</h4>
+    
+        <div className="row align-items-end">
+          {/* Database 선택 */}
+          <div className="col-md-5 mb-3">
             <label htmlFor="databaseSelect" className="form-label">
-            Select Database
+              Select Database
             </label>
             <select
-            id="databaseSelect"
-            className="form-select"
-            value={selectedDatabase}
-            onChange={(e) => setSelectedDatabase(e.target.value)}
+              id="databaseSelect"
+              className="form-select"
+              value={selectedDatabase}
+              onChange={(e) => setSelectedDatabase(e.target.value)}
             >
-            <option value="">Select a database</option>
-            {databases.map((db, index) => (
+              <option value="">Select a database</option>
+              {databases.map((db, index) => (
                 <option key={index} value={db}>
-                {db}
+                  {db}
                 </option>
-            ))}
+              ))}
             </select>
         </div>
-
-        {/* 선택된 Database 표시 */}
-        <div className="alert alert-info">
-            Selected Database: {selectedDatabase || 'None'}
-        </div>
-
         
         {/* Probe 선택 */}
-        <div className="mb-3">
-            <label htmlFor="probeSelect" className="form-label">
+        <div className="col-md-5 mb-3">
+          <label htmlFor="probeSelect" className="form-label">
             Select Probe
-            </label>
-            <select
+          </label>
+          <select
             id="probeSelect"
             className="form-select"
             value={selectedProbe}
             onChange={(e) => setSelectedProbe(e.target.value)}
-            >
+          >
             <option value="">Select a probe</option>
             {probes.map((probe) => (
-                <option key={probe.probeId} value={probe.probeId}>
+              <option key={probe.probeId} value={probe.probeId}>
                 {probe.probeName} ({probe.probeId})
-                </option>
+              </option>
             ))}
-            </select>
+          </select>
         </div>
+
+        <div className="col-md-2 mb-3">
+          <button className="btn btn-primary w-100">File Upload</button>
+        </div>
+
     </div>
+  </div>
   );
 }
