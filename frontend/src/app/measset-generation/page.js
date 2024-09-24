@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 
 export default function MeasSetGen() {
-  const [probes, setProbes] = useState([]); // Probe 목록 상태
-  const [selectedProbe, setSelectedProbe] = useState(''); // 선택된 Probe 상태
-  const [databases, setDatabases] = useState([]); // Database 목록 상태
+  const [probes, setProbes] = useState([]);                     // Probe 목록 상태
+  const [selectedProbe, setSelectedProbe] = useState('');       // 선택된 Probe 상태
+  const [databases, setDatabases] = useState([]);               // Database 목록 상태
   const [selectedDatabase, setSelectedDatabase] = useState(''); // 선택된 Database 상태
+  const [file, setFile] = useState(null);                       // 선택된 file의 상태
 
   // 처음 컴포넌트가 렌더링될 때 Database 목록을 가져오는 함수
   useEffect(() => {
@@ -64,6 +65,24 @@ export default function MeasSetGen() {
     }
   }, [selectedDatabase]);
 
+  // file handler event
+  const handleFileChange = (event) => {
+    setFile(event.target.files[0]);
+  };
+
+  const handleFileUpload = async () => {
+    if (file && selectedDatabase && selectedProbe) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('database', selectedDatabase);
+      formData.append('probe', selectedProbe);
+
+
+
+      
+    }
+  }
+  
   return (
     <div className="container mt-5">
       <h4 className="mb-4">MeasSet Generation</h4>
