@@ -165,9 +165,10 @@ def upload_file():
 
         # MeasSetGen 실행
         database = request.form.get("database")
-        probe = request.form.get("probe")
-        print(database, probe)
-        meas_gen = MeasSetGen(database, probe)
+        probeId = request.form.get("probeId")
+        probeName = request.form.get("probeName")
+        print(database, probeId, probeName)
+        meas_gen = MeasSetGen(database, probeId)
         result = meas_gen.generate()
 
         return jsonify({"status": "success", "data": result})

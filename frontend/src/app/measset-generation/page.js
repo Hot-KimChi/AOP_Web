@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 
 export default function MeasSetGen() {
-  const [probes, setProbes] = useState([]);
-  const [selectedProbe, setSelectedProbe] = useState('');
-  const [databases, setDatabases] = useState([]);
+  const [probeList, setProbeList] = useState([]);
+  const [ListDB, setListDB] = useState([]);
   const [selectedDatabase, setSelectedDatabase] = useState('');
+  const [selectedProbe, setSelectedProbe] = useState('');
   const [file, setFile] = useState(null);
   const [processedData, setProcessedData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,18 +25,20 @@ export default function MeasSetGen() {
         }
 
         const data = await response.json();
-        setDatabases(data.databases || []);
+        setListDB(data.databases || []);
       } catch (error) {
         console.error('Failed to fetch databases:', error);
-        setDatabases([]);
+        setListDB([]);
       }
     };
 
     fetchDatabases();
   }, []);
 
+
   useEffect(() => {
     if (selectedDatabase) {
+      setIsLoading(true);
       const fetchProbes = async () => {
         try {
           const response = await fetch(
@@ -53,16 +55,18 @@ export default function MeasSetGen() {
 
           const data = await response.json();
 
-          setProbes(data.probes || []);
+          setProbeList(data.probes || []);
         } catch (error) {
           console.error('Failed to fetch probes:', error);
-          setProbes([]);
+          setProbeList([]);
+        } finally {
+          setIsLoading(false);
         }
       };
 
       fetchProbes();
     } else {
-      setProbes([]);
+      setProbeList([]);
     }
   }, [selectedDatabase]);
 
@@ -72,6 +76,7 @@ export default function MeasSetGen() {
 
   const handleFileUpload = async () => {
     if (file && selectedDatabase && selectedProbe) {
+      setIsLoading(true);
       const formData = new FormData();
       formData.append('file', file);
       formData.append('database', selectedDatabase);
@@ -92,6 +97,8 @@ export default function MeasSetGen() {
         }
       } catch (error) {
         console.error('Error:', error);
+      } finally {
+        setIsLoading(false);
       }
     } else {
       alert('Please select a database, probe, and file before uploading.');
@@ -115,7 +122,7 @@ export default function MeasSetGen() {
             disabled={isLoading}
           >
             <option value="">Select a database</option>
-            {databases.map((db, index) => (
+            {ListDB.map((db, index) => (
               <option key={index} value={db}>
                 {db}
               </option>
@@ -135,7 +142,7 @@ export default function MeasSetGen() {
             disabled={isLoading || !selectedDatabase}
           >
             <option value="">Select a probe</option>
-            {probes.map((probe) => (
+            {probeList.map((probe) => (
               <option key={probe.probeId} value={probe.probeId}>
                 {probe.probeName} ({probe.probeId})
               </option>
