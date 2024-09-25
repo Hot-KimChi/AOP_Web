@@ -20,34 +20,6 @@ class MeasSetGen:
         self.database = database
         self.list_probe = list_probe
 
-        self.window = tk.Toplevel()
-        self.window.title(f"{self.database}" + " / MeasSet_generation")
-        self.window.geometry("570x200")
-        self.window.resizable(False, False)
-
-        # 고정 폭 글꼴 설정
-        self.window.option_add("*Font", "Consolas 10")
-
-        frame = tk.Frame(self.window, relief="solid", bd=2)
-        frame.pack(side="top", fill="both", expand=True)
-
-        label_probename = tk.Label(frame, text="Probe Name")
-        label_probename.place(x=5, y=5)
-        self.combo_probe = ttk.Combobox(
-            frame, value=self.list_probe, height=0, state="readonly", width=25
-        )
-        self.combo_probe.place(x=5, y=25)
-
-        btn_load = tk.Button(
-            frame, width=15, height=2, text="Select & Load", command=self._get_sequence
-        )
-        btn_load.place(x=260, y=5)
-
-        btn_insert = tk.Button(
-            frame, width=15, height=2, text="To MS-SQL", command=loadfile
-        )
-        btn_insert.place(x=410, y=5)
-
     def _get_sequence(self):
 
         ## probename / probeid 로 구분

@@ -3,13 +3,15 @@
 import { useState, useEffect } from 'react';
 
 export default function MeasSetGen() {
-  const [probes, setProbes] = useState([]);                     // Probe 목록 상태
-  const [selectedProbe, setSelectedProbe] = useState('');       // 선택된 Probe 상태
-  const [databases, setDatabases] = useState([]);               // Database 목록 상태
-  const [selectedDatabase, setSelectedDatabase] = useState(''); // 선택된 Database 상태
-  const [file, setFile] = useState(null);                       // 선택된 file의 상태
+  const [probes, setProbes] = useState([]);
+  const [selectedProbe, setSelectedProbe] = useState('');
+  const [databases, setDatabases] = useState([]);
+  const [selectedDatabase, setSelectedDatabase] = useState('');
+  const [file, setFile] = useState(null);
+  const [processedData, setProcessedData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // 처음 컴포넌트가 렌더링될 때 Database 목록을 가져오는 함수
+
   useEffect(() => {
     const fetchDatabases = async () => {
       try {
@@ -23,17 +25,16 @@ export default function MeasSetGen() {
         }
 
         const data = await response.json();
-        setDatabases(data.databases || []); // 데이터가 없으면 빈 배열로 설정
+        setDatabases(data.databases || []);
       } catch (error) {
         console.error('Failed to fetch databases:', error);
-        setDatabases([]); // 에러 발생 시에도 빈 배열로 설정하여 에러 방지
+        setDatabases([]);
       }
     };
 
     fetchDatabases();
   }, []);
 
-  // selectedDatabase가 변경될 때마다 Probe 목록을 가져오는 함수
   useEffect(() => {
     if (selectedDatabase) {
       const fetchProbes = async () => {
@@ -52,20 +53,19 @@ export default function MeasSetGen() {
 
           const data = await response.json();
 
-          setProbes(data.probes || []); // 데이터가 없으면 빈 배열로 설정
+          setProbes(data.probes || []);
         } catch (error) {
           console.error('Failed to fetch probes:', error);
-          setProbes([]); // 에러 발생 시 빈 배열로 설정하여 안정성 유지
+          setProbes([]);
         }
       };
 
       fetchProbes();
     } else {
-      setProbes([]); // Database가 선택되지 않았을 경우 Probe 목록을 비웁니다.
+      setProbes([]);
     }
   }, [selectedDatabase]);
 
-  // file handler event
   const handleFileChange = (event) => {
     setFile(event.target.files[0]);
   };
@@ -77,39 +77,53 @@ export default function MeasSetGen() {
       formData.append('database', selectedDatabase);
       formData.append('probe', selectedProbe);
 
+      try {
+        const response = await fetch(`http://localhost:5000/api/measset-generation`, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        })
 
-
-      
+        if (response.ok) {
+          const data = await response.json();
+          setProcessedData(data.data)
+        } else {
+          console.error('Failed to process the file');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    } else {
+      alert('Please select a database, probe, and file before uploading.');
     }
-  }
+  };
   
   return (
     <div className="container mt-5">
       <h4 className="mb-4">MeasSet Generation</h4>
     
-        <div className="row align-items-end">
-          {/* Database 선택 */}
-          <div className="col-md-5 mb-3">
-            <label htmlFor="databaseSelect" className="form-label">
-              Select Database
-            </label>
-            <select
-              id="databaseSelect"
-              className="form-select"
-              value={selectedDatabase}
-              onChange={(e) => setSelectedDatabase(e.target.value)}
-            >
-              <option value="">Select a database</option>
-              {databases.map((db, index) => (
-                <option key={index} value={db}>
-                  {db}
-                </option>
-              ))}
-            </select>
+      <div className="row align-items-end">
+        <div className="col-md-4 mb-3">
+          <label htmlFor="databaseSelect" className="form-label">
+            Select Database
+          </label>
+          <select
+            id="databaseSelect"
+            className="form-select"
+            value={selectedDatabase}
+            onChange={(e) => setSelectedDatabase(e.target.value)}
+            disabled={isLoading}
+          >
+            <option value="">Select a database</option>
+            {databases.map((db, index) => (
+              <option key={index} value={db}>
+                {db}
+              </option>
+            ))}
+          </select>
         </div>
         
-        {/* Probe 선택 */}
-        <div className="col-md-5 mb-3">
+        <div className="col-md-4 mb-3">
           <label htmlFor="probeSelect" className="form-label">
             Select Probe
           </label>
@@ -118,6 +132,7 @@ export default function MeasSetGen() {
             className="form-select"
             value={selectedProbe}
             onChange={(e) => setSelectedProbe(e.target.value)}
+            disabled={isLoading || !selectedDatabase}
           >
             <option value="">Select a probe</option>
             {probes.map((probe) => (
@@ -128,11 +143,38 @@ export default function MeasSetGen() {
           </select>
         </div>
 
-        <div className="col-md-2 mb-3">
-          <button className="btn btn-primary w-100">File Upload</button>
+        <div className="col-md-4 mb-3">
+          <label htmlFor="fileInput" className="form-label">
+            Select File
+          </label>
+          <input
+            type="file"
+            id="fileInput"
+            className="form-control"
+            onChange={handleFileChange}
+            disabled={isLoading}
+          />
         </div>
 
+        <div className="col-12 mb-3">
+          <button 
+            className="btn btn-primary w-100"
+            onClick={handleFileUpload}
+            disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
+          >
+            {isLoading ? 'Processing...' : 'Upload & Process File'}
+          </button>
+        </div>
+      </div>
+
+      {processedData && (
+        <div className="mt-4">
+          <h3>Processed Data:</h3>
+          <pre className="bg-light p-3 rounded">
+            {JSON.stringify(processedData, null, 2)}
+          </pre>
+        </div>
+      )}    
     </div>
-  </div>
   );
 }

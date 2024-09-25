@@ -148,6 +148,9 @@ def get_list_database():
 @handle_exceptions
 @require_auth
 def upload_file():
+    if not os.path.exists(app.config["UPLOAD_FOLDER"]):
+        os.makedirs(app.config["UPLOAD_FOLDER"])
+
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
 
@@ -163,6 +166,7 @@ def upload_file():
         # MeasSetGen 실행
         database = request.form.get("database")
         probe = request.form.get("probe")
+        print(database, probe)
         meas_gen = MeasSetGen(database, probe)
         result = meas_gen.generate()
 
