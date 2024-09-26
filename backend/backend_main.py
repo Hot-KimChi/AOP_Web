@@ -167,8 +167,8 @@ def upload_file():
         database = request.form.get("database")
         probeId = request.form.get("probeId")
         probeName = request.form.get("probeName")
-        print(database, probeId, probeName)
-        meas_gen = MeasSetGen(database, probeId)
+
+        meas_gen = MeasSetGen(database, probeId, probeName, file)
         result = meas_gen.generate()
 
         return jsonify({"status": "success", "data": result})

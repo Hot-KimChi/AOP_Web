@@ -122,3 +122,4 @@ wrapt==1.16.0
 XlsxWriter==3.2.0
 zipp==3.18.1
 pywin32
+sqlalchemy

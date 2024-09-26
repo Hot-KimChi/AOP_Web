@@ -4,13 +4,12 @@ import { useState, useEffect } from 'react';
 
 export default function MeasSetGen() {
   const [probeList, setProbeList] = useState([]);
-  const [ListDB, setListDB] = useState([]);
+  const [DBList, setDBList] = useState([]);
   const [selectedDatabase, setSelectedDatabase] = useState('');
-  const [selectedProbe, setSelectedProbe] = useState('');
+  const [selectedProbe, setSelectedProbe] = useState(null); // 초기값을 null로 변경
   const [file, setFile] = useState(null);
   const [processedData, setProcessedData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-
 
   useEffect(() => {
     const fetchDatabases = async () => {
@@ -25,16 +24,15 @@ export default function MeasSetGen() {
         }
 
         const data = await response.json();
-        setListDB(data.databases || []);
+        setDBList(data.databases || []);
       } catch (error) {
         console.error('Failed to fetch databases:', error);
-        setListDB([]);
+        setDBList([]);
       }
     };
 
     fetchDatabases();
   }, []);
-
 
   useEffect(() => {
     if (selectedDatabase) {
@@ -54,7 +52,6 @@ export default function MeasSetGen() {
           }
 
           const data = await response.json();
-
           setProbeList(data.probes || []);
         } catch (error) {
           console.error('Failed to fetch probes:', error);
@@ -77,21 +74,24 @@ export default function MeasSetGen() {
   const handleFileUpload = async () => {
     if (file && selectedDatabase && selectedProbe) {
       setIsLoading(true);
+      const { id: probeId, name: probeName } = selectedProbe; // JSON에서 probeId와 probeName 추출
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('database', selectedDatabase);
-      formData.append('probe', selectedProbe);
+      formData.append('probeId', probeId); // probeId 전송
+      formData.append('probeName', probeName); // probeName 전송
 
       try {
         const response = await fetch(`http://localhost:5000/api/measset-generation`, {
           method: 'POST',
           body: formData,
           credentials: 'include',
-        })
+        });
 
         if (response.ok) {
           const data = await response.json();
-          setProcessedData(data.data)
+          setProcessedData(data.data);
         } else {
           console.error('Failed to process the file');
         }
@@ -104,11 +104,10 @@ export default function MeasSetGen() {
       alert('Please select a database, probe, and file before uploading.');
     }
   };
-  
+
   return (
     <div className="container mt-5">
       <h4 className="mb-4">MeasSet Generation</h4>
-    
       <div className="row align-items-end">
         <div className="col-md-4 mb-3">
           <label htmlFor="databaseSelect" className="form-label">
@@ -122,14 +121,14 @@ export default function MeasSetGen() {
             disabled={isLoading}
           >
             <option value="">Select a database</option>
-            {ListDB.map((db, index) => (
+            {DBList.map((db, index) => (
               <option key={index} value={db}>
                 {db}
               </option>
             ))}
           </select>
         </div>
-        
+
         <div className="col-md-4 mb-3">
           <label htmlFor="probeSelect" className="form-label">
             Select Probe
@@ -137,13 +136,13 @@ export default function MeasSetGen() {
           <select
             id="probeSelect"
             className="form-select"
-            value={selectedProbe}
-            onChange={(e) => setSelectedProbe(e.target.value)}
+            value={selectedProbe ? JSON.stringify(selectedProbe) : ''}      // JSON 문자열로 설정
+            onChange={(e) => setSelectedProbe(JSON.parse(e.target.value))}  // 선택한 값을 JSON으로 파싱하여 저장
             disabled={isLoading || !selectedDatabase}
           >
             <option value="">Select a probe</option>
             {probeList.map((probe) => (
-              <option key={probe.probeId} value={probe.probeId}>
+              <option key={probe.probeId} value={JSON.stringify({ id: probe.probeId, name: probe.probeName })}>
                 {probe.probeName} ({probe.probeId})
               </option>
             ))}
@@ -181,7 +180,7 @@ export default function MeasSetGen() {
             {JSON.stringify(processedData, null, 2)}
           </pre>
         </div>
-      )}    
+      )}
     </div>
   );
 }
