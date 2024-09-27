@@ -1,9 +1,9 @@
 from pkg_MeasSetGen.data_inout import loadfile
+from pkg_MeasSetGen.param_update import ParamUpdate
+from pkg_MeasSetGen.param_gen import ParamGen
+from pkg_MeasSetGen.predictML import PredictML
 
 # from pkg_MeasSetGen.data_inout import DataOut
-# from pkg_MeasSetGen.param_update import ParamUpdate
-# from pkg_MeasSetGen.param_gen import ParamGen
-# from pkg_MeasSetGen.predictML import PredictML
 
 
 class MeasSetGen:
@@ -22,29 +22,25 @@ class MeasSetGen:
 
     def generate(self):
 
-        ## probename / probeid 로 구분
-
         ## 파일 선택할 수 있는 algorithm / 중복 데이터 삭제 및 group_index
         raw_data = loadfile(self.file)
 
-        print(raw_data)
+        param_update = ParamUpdate(raw_data)  ## 클래스 인스턴스 생성
+        df_total = param_update.remove_duplicate()  ## [B / M] [C / D] 중복 데이터 삭제
+        df_total = param_update.createGroupIdx(df_total)
+        self.selected_df = param_update.updateDuplicate(df_total)
+        self.selected_df.fillna("NULL")
 
-        # param_update = ParamUpdate(raw_data)  ## 클래스 인스턴스 생성
-        # df_total = param_update.remove_duplicate()  ## [B / M] [C / D] 중복 데이터 삭제
-        # df_total = param_update.createGroupIdx(df_total)
-        # self.selected_df = param_update.updateDuplicate(df_total)
-        # self.selected_df.fillna("NULL")
+        ## 선택한 데이터를 기반으로 parameter 생성.
+        param_gen = ParamGen(
+            data=self.selected_df, probeid=self.probeId, probename=self.probeName
+        )
+        self.gen_df = param_gen.gen_sequence()
 
-        # ## 선택한 데이터를 기반으로 parameter 생성.
-        # param_gen = ParamGen(
-        #     data=self.selected_df, probeid=probeid, probename=probename
-        # )
-        # self.gen_df = param_gen.gen_sequence()
-        # self.gen_df.to_csv("measSetGen_df.csv")
-
-        # ## predictML for intensity case
-        # predictionML = PredictML(self.gen_df, probeid)
-        # self.gen_df = predictionML.intensity_zt_est()
+        ## predictML for intensity case
+        predictionML = PredictML(self.database, self.gen_df, self.probeId)
+        self.gen_df = predictionML.intensity_zt_est()
+        self.gen_df.to_csv("measSetGen_df.csv")
 
         # ## 클래스 인스턴스를 데이터프레임으로 변환 / DataOut 클래스 이용하여 csv 파일로 추출.
         # dataout = DataOut(

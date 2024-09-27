@@ -1,6 +1,5 @@
 import joblib
 import pandas as pd
-
 from pkg_SQL.database import SQL
 
 
@@ -12,11 +11,13 @@ class PredictML:
     3) Power case: find to set-up PRF for preventing of transducer damage
     """
 
-    def __init__(self, df, probe):
-
+    def __init__(self, database, df, probeId):
+        self.database = database
         self.df = df
-        self.probe = probe
+        self.probeId = probeId
+        self._preParams()
 
+    def _preParams(self):
         ## take parameters for ML from measSet_gen file.
         self.est_params = self.df[
             [
@@ -31,8 +32,15 @@ class PredictML:
         ]
 
         ## load parameters from SQL database
-        connect = SQL(command=4, selected_probeId=self.probe)
-        est_geo = connect.sql_get()
+        connect = SQL(windows_auth=True, database=self.database)
+        query = f"""
+            SELECT [probePitchCm], [probeRadiusCm], [probeElevAperCm0], [probeElevAperCm1], [probeElevFocusRangCm], [probeElevFocusRangCm1]
+            FROM probe_geo 
+            WHERE probeid = {self.probeId}
+            ORDER BY 1
+            """
+
+        est_geo = connect.execute_query(query)
 
         self.est_params[["probePitchCm"]] = est_geo["probePitchCm"]
         self.est_params[["probeRadiusCm"]] = est_geo["probeRadiusCm"]
