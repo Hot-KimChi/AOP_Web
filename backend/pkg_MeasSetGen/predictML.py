@@ -42,21 +42,24 @@ class PredictML:
 
         est_geo = connect.execute_query(query)
 
-        self.est_params[["probePitchCm"]] = est_geo["probePitchCm"]
-        self.est_params[["probeRadiusCm"]] = est_geo["probeRadiusCm"]
-        self.est_params[["probeElevAperCm0"]] = est_geo["probeElevAperCm0"]
-        self.est_params[["probeElevAperCm1"]] = est_geo["probeElevAperCm1"]
-        self.est_params[["probeElevFocusRangCm"]] = est_geo["probeElevFocusRangCm"]
-        self.est_params[["probeElevFocusRangCm1"]] = est_geo["probeElevFocusRangCm1"]
+        # .assign()을 사용하여 열을 안전하게 추가
+        self.est_params = self.est_params.assign(
+            probePitchCm=est_geo["probePitchCm"],
+            probeRadiusCm=est_geo["probeRadiusCm"],
+            probeElevAperCm0=est_geo["probeElevAperCm0"],
+            probeElevAperCm1=est_geo["probeElevAperCm1"],
+            probeElevFocusRangCm=est_geo["probeElevFocusRangCm"],
+            probeElevFocusRangCm1=est_geo["probeElevFocusRangCm1"],
+        )
 
     def intensity_zt_est(self):
         ## predict zt by Machine Learning model.
 
         loaded_model = joblib.load(
-            r".\backend\Model\RandomForestRegressor_v1_python310_sklearn1.4.2.pkl"
+            r".\backend\ML_Models\RandomForestRegressor_v1_python310_sklearn1.4.2.pkl"
         )
 
-        zt_est = loaded_model.predict(self.est_params)
+        zt_est = loaded_model.predict(self.est_params.values)
         df_est = pd.DataFrame(zt_est, columns=["zt_est"])
 
         self.df["zt_est"] = round(df_est, 1)
