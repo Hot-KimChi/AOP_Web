@@ -25,7 +25,7 @@ CORS(
     },
 )
 
-UPLOAD_FOLDER = "./uploads"
+UPLOAD_FOLDER = "./1_uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.secret_key = os.urandom(24)  # 세션을 위한 시크릿 키 설정
 app.config["SESSION_COOKIE_SAMESITE"] = "None"

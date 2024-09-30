@@ -78,11 +78,11 @@ class DataOut:
         if self.case == 0:
             ## MeasSetGen_files
             self.df = df1
-            self.directory = f"./backend/0_MeasSetGen_files/{self.database}"
+            self.directory = f"./1_uploads/0_MeasSetGen_files/{self.database}"
 
         elif self.case == 1:
             ## Verification_reports
-            self.directory = f"./backend/1_Verification_Reports/{self.database}"
+            self.directory = f"./1_uploads/1_Verification_Reports/{self.database}"
 
     def make_dir(self):
         if not os.path.exists(self.directory):

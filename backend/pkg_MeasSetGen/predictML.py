@@ -2,6 +2,9 @@ import joblib
 import pandas as pd
 from pkg_SQL.database import SQL
 
+# Pandas 다운캐스팅 옵션 설정
+pd.set_option("future.no_silent_downcasting", True)
+
 
 class PredictML:
     """
@@ -29,7 +32,7 @@ class PredictML:
                 "ElevAperIndex",
                 "IsTxChannelModulationEn",
             ]
-        ]
+        ].copy()
 
         ## load parameters from SQL database
         connect = SQL(windows_auth=True, database=self.database)
@@ -41,16 +44,27 @@ class PredictML:
             """
 
         est_geo = connect.execute_query(query)
+        est_geo = est_geo.fillna(0).infer_objects()
 
-        # .assign()을 사용하여 열을 안전하게 추가
+        if len(est_geo) == 1:
+            est_geo = pd.concat([est_geo] * len(self.est_params), ignore_index=True)
+
+        # Assigning est_geo columns to est_params, broadcasting if necessary
         self.est_params = self.est_params.assign(
-            probePitchCm=est_geo["probePitchCm"],
-            probeRadiusCm=est_geo["probeRadiusCm"],
-            probeElevAperCm0=est_geo["probeElevAperCm0"],
-            probeElevAperCm1=est_geo["probeElevAperCm1"],
-            probeElevFocusRangCm=est_geo["probeElevFocusRangCm"],
-            probeElevFocusRangCm1=est_geo["probeElevFocusRangCm1"],
+            probePitchCm=est_geo["probePitchCm"].values,
+            probeRadiusCm=est_geo["probeRadiusCm"].values,
+            probeElevAperCm0=est_geo["probeElevAperCm0"].values,
+            probeElevAperCm1=est_geo["probeElevAperCm1"].values,
+            probeElevFocusRangCm=est_geo["probeElevFocusRangCm"].values,
+            probeElevFocusRangCm1=est_geo["probeElevFocusRangCm1"].values,
         )
+
+        # # Check the final DataFrame before saving to CSV
+        # print("Final est_params: ", self.est_params)
+
+        # # DataFrame을 CSV로 저장
+        # self.est_params.to_csv("measSetGen_df.csv", index=False, encoding="utf-8-sig")
+        # print("CSV file saved as measSetGen_df.csv")
 
     def intensity_zt_est(self):
         ## predict zt by Machine Learning model.
