@@ -10,7 +10,6 @@ import win32api, win32security
 from pkg_SQL.database import SQL
 from pkg_MeasSetGen.meas_generation import MeasSetGen
 
-# from pkg_MeasSetGen.meas_generation import MeasSetGen
 # from pkg_Viewer.viewer import Viewer
 # from pkg_Verify_Report.verify_report import Verify_Report
 # from pkg_MachineLearning.machine_learning import Machine_Learning
