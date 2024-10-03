@@ -35,7 +35,7 @@
 #             raise
 
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import pandas as pd
 import os
 
@@ -64,4 +64,24 @@ class SQL:
                 return pd.read_sql(query, connection)
         except Exception as e:
             print(f"Query execution error: {str(e)}")
+            raise
+
+    def insert_data(self, table_name, data):
+        """
+        MS-SQL 테이블에 데이터를 삽입하는 함수
+        :param table_name: 데이터를 삽입할 테이블 이름
+        :param data: 삽입할 데이터. 예: {'column1': value1, 'column2': value2, ...}
+        """
+        try:
+            with self.connect() as connection:
+                # INSERT 쿼리 작성
+                columns = ", ".join(data.keys())
+                values = ", ".join([f":{key}" for key in data.keys()])
+                query = f"INSERT INTO {table_name} ({columns}) VALUES ({values})"
+
+                # SQLAlchemy text 객체로 쿼리 실행
+                connection.execute(text(query), **data)
+                print(f"Data inserted into {table_name}")
+        except Exception as e:
+            print(f"Data insertion error: {str(e)}")
             raise
