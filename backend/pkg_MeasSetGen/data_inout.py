@@ -3,7 +3,6 @@ import io
 from tkinter import filedialog
 import pandas as pd
 from datetime import datetime
-import xlsxwriter
 
 
 def loadfile(file):
@@ -38,13 +37,13 @@ def arrangeParam(func):
             "IsTxChannelModulationEn",
             "dumpSwVersion",
             "DTxFreqIndex",
-            "VTxIndex",
             "IsPresetCpaEn",
             "TxPulseRle",
-            "SystemPulserSel",
             "CpaDelayOffsetClk",
-            "groupIndex",
+            "VTxIndex",
+            "SystemPulserSel",
             "zt_est",
+            "groupIndex",
             "probeName",
             "Mode",
             "SubModeIndex",

@@ -37,13 +37,8 @@ class SQL:
         """
         try:
             with self.connect() as connection:
-                # INSERT 쿼리 작성
-                columns = ", ".join(data.keys())
-                values = ", ".join([f":{key}" for key in data.keys()])
-                query = f"INSERT INTO {table_name} ({columns}) VALUES ({values})"
-
-                # SQLAlchemy text 객체로 쿼리 실행
-                connection.execute(text(query), **data)
+                # pandas를 사용하여 데이터프레임을 SQL 테이블에 삽입
+                data.to_sql(table_name, connection, if_exists="append", index=False)
                 print(f"Data inserted into {table_name}")
         except Exception as e:
             print(f"Data insertion error: {str(e)}")

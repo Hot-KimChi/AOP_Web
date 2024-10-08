@@ -1,0 +1,2 @@
+measSetComments,probeId,beamstyleIndex,bsIndexTrace,txFrequencyHz,focusRangeCm,maxTxVoltageVolt,ceilTxVoltageVolt,profTxVoltageVolt,totalVoltagePt,numMeasVoltage,numTxElements,txpgWaveformStyle,numTxCycles,elevAperIndex,zStartDistCm,zMeasNum,IsTxAperModulationEn,dumpSwVersion,DTxFreqIndex,IsCPAEn,MeasTxPulseRleA,CpaDelayOffsetClkA,VTxIndex,SysPulserSelA
+test,10787112,10,0,4444400,19,90,90,56.04,20,8,104,2,4,0,0.5,135,0,1st,0,0,0,0,0,0
