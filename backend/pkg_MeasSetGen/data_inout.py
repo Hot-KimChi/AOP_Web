@@ -1,6 +1,5 @@
 import os
 import io
-from tkinter import filedialog
 import pandas as pd
 from datetime import datetime
 
@@ -64,7 +63,6 @@ class DataOut:
     """
 
     def __init__(self, case, database, df1, df2=None, probename=None):
-
         self.database = database
 
         current_datetime = datetime.now()

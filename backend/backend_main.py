@@ -157,7 +157,7 @@ def upload_file():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    if file:
+    if file and file.filename:
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
@@ -167,10 +167,15 @@ def upload_file():
         probeId = request.form.get("probeId")
         probeName = request.form.get("probeName")
 
-        meas_gen = MeasSetGen(database, probeId, probeName, file)
+        meas_gen = MeasSetGen(database, probeId, probeName, file_path)
         result = meas_gen.generate()
 
-        return jsonify({"status": "success", "data": result})
+        if result:
+            return jsonify({"status": "success", "data": result}), 200
+        else:
+            return jsonify({"error": "Generation failed"}), 500
+
+    return jsonify({"error": "File handling issue"}), 400
 
 
 # @app.route("/api/verify_report", methods=["POST"])
