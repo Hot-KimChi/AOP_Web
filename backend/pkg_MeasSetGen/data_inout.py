@@ -4,11 +4,8 @@ import pandas as pd
 from datetime import datetime
 
 
-def loadfile(file):
-    file.seek(0)  # 파일의 처음으로 포인터 이동
-    file_data = io.StringIO(file.read().decode("cp949"))  # 파일의 내용을 문자열로 읽기
-    encoding_data = pd.read_csv(file_data, sep="\t", encoding="cp949")
-
+def loadfile(file_path):
+    encoding_data = pd.read_csv(file_path, sep="\t", encoding="cp949")
     return encoding_data
 
 

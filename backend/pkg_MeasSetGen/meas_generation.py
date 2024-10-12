@@ -13,18 +13,18 @@ class MeasSetGen:
     2) To MS-SQL / To Excel / protocol check
     """
 
-    def __init__(self, database, probeId, probeName, file):
+    def __init__(self, database, probeId, probeName, file_path):
 
         self.database = database
         self.probeId = probeId
         self.probeName = probeName
-        self.file = file
+        self.file_path = file_path
         self.sql = SQL(database=self.database, windows_auth=True)
 
     def generate(self):
 
         ## 파일 선택할 수 있는 algorithm / 중복 데이터 삭제 및 group_index
-        raw_data = loadfile(self.file)
+        raw_data = loadfile(self.file_path)
 
         param_update = ParamUpdate(raw_data)  ## 클래스 인스턴스 생성
         df_total = param_update.remove_duplicate()  ## [B / M] [C / D] 중복 데이터 삭제
