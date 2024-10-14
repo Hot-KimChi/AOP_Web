@@ -4,6 +4,7 @@ from pkg_MeasSetGen.param_gen import ParamGen
 from pkg_MeasSetGen.predictML import PredictML
 from pkg_MeasSetGen.data_inout import DataOut
 from pkg_SQL.database import SQL
+import pandas as pd
 
 
 class MeasSetGen:
@@ -52,8 +53,6 @@ class MeasSetGen:
         )
         dataout.make_dir()
         dataout.save_excel()
-
-        import pandas as pd
 
         ## 만들어진 데이터, insert data to MS-SQL
         df = pd.read_csv("test.csv")
