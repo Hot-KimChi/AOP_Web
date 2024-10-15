@@ -1,5 +1,5 @@
 import os
-import io
+import numpy as np
 import pandas as pd
 from datetime import datetime
 
@@ -98,7 +98,9 @@ class DataOut:
             df_Temperature = pd.DataFrame(self.df2)
 
             probename = df_Intensity["ProbeName"][0]
-            probename = probename.strip()  ##문자열 앞뒤의 공백만 제거.
+            if isinstance(probename, np.ndarray):
+                probename = probename.item()
+            probename = str(probename).strip()  ##문자열 앞뒤의 공백만 제거.
 
             # 엑셀 파일로 출력
             output_file = f"./backend/1_Verification_Reports/{self.database}/{probename}_{self.formatted_datetime}_result.xlsx"

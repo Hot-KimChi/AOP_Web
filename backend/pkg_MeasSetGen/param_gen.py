@@ -1,10 +1,8 @@
-import numpy as np
 from datetime import datetime
 
 
 class ParamGen:
     def __init__(self, data, probeid, probename):
-
         today = datetime.today()
 
         self.df = data
@@ -23,7 +21,6 @@ class ParamGen:
         self.df["measSetComments"] = f"Beamstyle_{self.probename}_Intensity"
 
     def gen_sequence(self):
-
         self.numvoltpt()
         self.findOrgIdx()
         self.bsIdx()
