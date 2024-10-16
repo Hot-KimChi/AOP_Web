@@ -38,7 +38,7 @@ def arrangeParam(func):
             "CpaDelayOffsetClk",
             "VTxIndex",
             "SystemPulserSel",
-            "zt_est",
+            "AI_param",
             "groupIndex",
             "probeName",
             "Mode",
@@ -49,6 +49,27 @@ def arrangeParam(func):
         ]
 
         self.df = self.df.reindex(columns=arrange_param)
+        return func(self)
+
+    return wrapper
+
+
+def renameColumns(func):
+    def wrapper(self):
+        self.df = self.df.rename(
+            columns={
+                "OrgBeamstyleIdx": "beamstyleIndex",
+                "TxFocusLocCm": "focusRangeCm",
+                "ProbeNumTxCycles": "numTxCycles",
+                "IsTxChannelModulationEn": "IsTxAperModulationEn",
+                "IsPresetCpaEn": "IsCPAEn",
+                "TxPulseRle": "MeasTxPulseRleA",
+                "CpaDelayOffsetClk": "CpaDelayOffsetClkA",
+                "SystemPulserSel": "SysPulserSelA",
+            }
+        )
+
+        self.df = self.df.iloc[:, :27]
         return func(self)
 
     return wrapper
@@ -87,13 +108,16 @@ class DataOut:
                 print(f"디렉토리 '{self.directory}' 생성 중 오류가 발생했습니다:", e)
 
     @arrangeParam
+    @renameColumns
     def save_excel(self):
+        ## meas_setting 알고리즘
         if self.case == 0:
-            self.df.to_csv(
-                f"{self.directory}/meas_setting_{self.probename}_{self.formatted_datetime}_result.csv"
-            )
+            file_path = f"{self.directory}/meas_setting_{self.probename}_{self.formatted_datetime}_result.csv"
 
-        if self.case == 1:
+            self.df.to_csv(file_path, index=False)
+
+        ## verification_reports
+        elif self.case == 1:
             df_Intensity = pd.DataFrame(self.df1)
             df_Temperature = pd.DataFrame(self.df2)
 
@@ -103,8 +127,10 @@ class DataOut:
             probename = str(probename).strip()  ##문자열 앞뒤의 공백만 제거.
 
             # 엑셀 파일로 출력
-            output_file = f"./backend/1_Verification_Reports/{self.database}/{probename}_{self.formatted_datetime}_result.xlsx"
+            file_path = f"./backend/1_Verification_Reports/{self.database}/{probename}_{self.formatted_datetime}_result.xlsx"
 
-            with pd.ExcelWriter(output_file, engine="xlsxwriter") as writer:
+            with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
                 df_Intensity.to_excel(writer, sheet_name="Intensity", index=False)
                 df_Temperature.to_excel(writer, sheet_name="Temperature", index=False)
+
+        return file_path

@@ -15,7 +15,6 @@ class MeasSetGen:
     """
 
     def __init__(self, database, probeId, probeName, file_path):
-
         self.database = database
         self.probeId = probeId
         self.probeName = probeName
@@ -23,15 +22,16 @@ class MeasSetGen:
         self.sql = SQL(database=self.database, windows_auth=True)
 
     def generate(self):
-
         ## 파일 선택할 수 있는 algorithm / 중복 데이터 삭제 및 group_index
         raw_data = loadfile(self.file_path)
 
-        param_update = ParamUpdate(raw_data)  ## 클래스 인스턴스 생성
-        df_total = param_update.remove_duplicate()  ## [B / M] [C / D] 중복 데이터 삭제
+        ## 클래스 인스턴스 생성
+        param_update = ParamUpdate(raw_data)
+
+        ## [B / M] [C / D] 중복 데이터 삭제
+        df_total = param_update.remove_duplicate()
         df_total = param_update.createGroupIdx(df_total)
         selected_df = param_update.updateDuplicate(df_total)
-        selected_df.fillna("NULL")
 
         ## 선택한 데이터를 기반으로 parameter 생성.
         param_gen = ParamGen(
@@ -42,7 +42,7 @@ class MeasSetGen:
         ## predictML for intensity case
         predictionML = PredictML(self.database, gen_df, self.probeId)
         gen_df = predictionML.intensity_zt_est()
-        # self.gen_df.to_csv("measSetGen_df_predict.csv")
+        # gen_df.to_csv("measSetGen_df_predict.csv")
 
         ## 클래스 인스턴스를 데이터프레임으로 변환 / DataOut 클래스 이용하여 csv 파일로 추출.
         dataout = DataOut(
@@ -52,8 +52,9 @@ class MeasSetGen:
             df1=gen_df,
         )
         dataout.make_dir()
-        dataout.save_excel()
+        file_path = dataout.save_excel()
 
         ## 만들어진 데이터, insert data to MS-SQL
-        df = pd.read_csv("test.csv")
+        df = pd.read_csv(file_path)
+        df.fillna("NULL")
         self.sql.insert_data(table_name="meas_setting", data=df)

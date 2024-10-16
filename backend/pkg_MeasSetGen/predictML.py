@@ -68,15 +68,17 @@ class PredictML:
 
     def intensity_zt_est(self):
         ## predict zt by Machine Learning model.
-
         loaded_model = joblib.load(
             r".\backend\ML_Models\RandomForestRegressor_v1_python310_sklearn1.4.2.pkl"
         )
 
         zt_est = loaded_model.predict(self.est_params.values)
-        df_est = pd.DataFrame(zt_est, columns=["zt_est"])
 
-        self.df["zt_est"] = round(df_est, 1)
+        # AI_param을 Series로 변환하고 이름을 지정
+        self.df["AI_param"] = pd.Series(zt_est, name="AI_param")
+
+        # 반올림 적용
+        self.df["AI_param"] = self.df["AI_param"].round(1)
 
         return self.df
 
