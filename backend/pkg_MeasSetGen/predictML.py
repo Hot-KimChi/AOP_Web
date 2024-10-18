@@ -87,6 +87,17 @@ class PredictML:
 
         loaded_model = joblib.load("")
 
-        PRF_est = loaded_model.predict(self.est_params)
+        prf_est = loaded_model.predict(self.est_params)
+
+        self.df["AI_param"] = pd.Series(prf_est, name="AI_param")
+
+        return self.df
+
+    def power_PRF_est(self):
+        loaded_model = joblib.load("")
+
+        prf_est = loaded_model.predict(self.est_params)
+
+        self.df["AI_param"] = pd.Series(prf_est, name="AI_param")
 
         return self.df
