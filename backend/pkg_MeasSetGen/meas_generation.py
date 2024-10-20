@@ -41,9 +41,9 @@ class MeasSetGen:
 
         ## predictML for intensity case
         predictionML = PredictML(self.database, gen_df, self.probeId)
-        gen_df = predictionML.intensity_zt_est()
+        gen_df_inten = predictionML.intensity_zt_est()
 
-        gen_df = predictionML.temperature_PRF_est()
+        gen_df_temp = predictionML.temperature_PRF_est()
         # gen_df.to_csv("measSetGen_df_predict.csv")
 
         ## 클래스 인스턴스를 데이터프레임으로 변환 / DataOut 클래스 이용하여 csv 파일로 추출.
