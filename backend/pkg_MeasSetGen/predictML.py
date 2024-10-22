@@ -91,6 +91,9 @@ class PredictML:
 
         self.df["AI_param"] = pd.Series(prf_est, name="AI_param")
 
+        # 반올림 적용
+        self.df["AI_param"] = self.df["AI_param"].round(1)
+
         return self.df
 
     def power_PRF_est(self):
@@ -99,5 +102,8 @@ class PredictML:
         prf_est = loaded_model.predict(self.est_params)
 
         self.df["AI_param"] = pd.Series(prf_est, name="AI_param")
+
+        # 반올림 적용
+        self.df["AI_param"] = self.df["AI_param"].round(1)
 
         return self.df
