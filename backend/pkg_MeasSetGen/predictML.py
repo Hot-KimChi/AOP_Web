@@ -85,15 +85,20 @@ class PredictML:
     def temperature_PRF_est(self):
         ## predict PRF by ML model.
 
-        loaded_model = joblib.load("")
+        self.df = self.df.loc[self.df.groupby("groupIndex")["TxFocusLocCm"].idxmax()]
 
-        prf_est = loaded_model.predict(self.est_params)
+        self.df["AI_param"] = pd.Series(610, name="AI_param")
 
-        self.df["AI_param"] = pd.Series(prf_est, name="AI_param")
-
-        # 반올림 적용
-        self.df["AI_param"] = self.df["AI_param"].round(1)
-
+        # loaded_model = joblib.load("")
+        #
+        #
+        # prf_est = loaded_model.predict(self.est_params)
+        #
+        # self.df["AI_param"] = pd.Series(prf_est, name="AI_param")
+        #
+        # # 반올림 적용
+        # self.df["AI_param"] = self.df["AI_param"].round(1)
+        #
         return self.df
 
     def power_PRF_est(self):
