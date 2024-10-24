@@ -53,7 +53,7 @@ class MeasSetGen:
             [gen_df_inten, gen_df_temp, gen_df_power], axis=0, ignore_index=True
         )
 
-        # gen_df.to_csv("meassetgen_df_predict.csv")
+        df_total.to_csv("meassetgen_df_predict.csv")
 
         ## 클래스 인스턴스를 데이터프레임으로 변환 / DataOut 클래스 이용하여 csv 파일로 추출.
         dataout = DataOut(

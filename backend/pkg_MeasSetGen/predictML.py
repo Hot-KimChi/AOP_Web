@@ -43,20 +43,22 @@ class PredictML:
             ORDER BY 1
             """
 
-        est_geo = connect.execute_query(query)
-        est_geo = est_geo.fillna(0).infer_objects()
+        probeGeo_df = connect.execute_query(query)
+        probeGeo_df = probeGeo_df.fillna(0).infer_objects()
 
-        if len(est_geo) == 1:
-            est_geo = pd.concat([est_geo] * len(self.est_params), ignore_index=True)
+        if len(probeGeo_df) == 1:
+            probeGeo_df = pd.concat(
+                [probeGeo_df] * len(self.est_params), ignore_index=True
+            )
 
         # Assigning est_geo columns to est_params, broadcasting if necessary
         self.est_params = self.est_params.assign(
-            probePitchCm=est_geo["probePitchCm"].values,
-            probeRadiusCm=est_geo["probeRadiusCm"].values,
-            probeElevAperCm0=est_geo["probeElevAperCm0"].values,
-            probeElevAperCm1=est_geo["probeElevAperCm1"].values,
-            probeElevFocusRangCm=est_geo["probeElevFocusRangCm"].values,
-            probeElevFocusRangCm1=est_geo["probeElevFocusRangCm1"].values,
+            probePitchCm=probeGeo_df["probePitchCm"].values,
+            probeRadiusCm=probeGeo_df["probeRadiusCm"].values,
+            probeElevAperCm0=probeGeo_df["probeElevAperCm0"].values,
+            probeElevAperCm1=probeGeo_df["probeElevAperCm1"].values,
+            probeElevFocusRangCm=probeGeo_df["probeElevFocusRangCm"].values,
+            probeElevFocusRangCm1=probeGeo_df["probeElevFocusRangCm1"].values,
         )
 
         # # Check the final DataFrame before saving to CSV
@@ -86,14 +88,10 @@ class PredictML:
         ## predict PRF by ML model.
 
         self.df = self.df.loc[self.df.groupby("groupIndex")["TxFocusLocCm"].idxmax()]
-
-        self.df["AI_param"] = pd.Series(610, name="AI_param")
+        self.df["AI_param"] = 610
 
         # loaded_model = joblib.load("")
-        #
-        #
         # prf_est = loaded_model.predict(self.est_params)
-        #
         # self.df["AI_param"] = pd.Series(prf_est, name="AI_param")
         #
         # # 반올림 적용
@@ -102,13 +100,31 @@ class PredictML:
         return self.df
 
     def power_PRF_est(self):
-        loaded_model = joblib.load("")
+        ## predict PRF by ML model.
 
-        prf_est = loaded_model.predict(self.est_params)
+        ## load parameters from SQL database for transducer pitch
+        connect = SQL(windows_auth=True, database=self.database)
+        query = f"""
+            SELECT [probePitchCm]
+            FROM probe_geo 
+            WHERE probeid = {self.probeId}
+            ORDER BY 1
+            """
 
-        self.df["AI_param"] = pd.Series(prf_est, name="AI_param")
+        pitchCm_df = connect.execute_query(query)
+        oneCmElement = 1 / pitchCm_df["probePitchCm"].iloc[0]
+        print(oneCmElement)
 
-        # 반올림 적용
-        self.df["AI_param"] = self.df["AI_param"].round(1)
+        self.df = self.df.loc[self.df.groupby("groupIndex")["TxFocusLocCm"].idxmax()]
+        self.df["NumTxElements"] = oneCmElement
 
+        self.df["AI_param"] = 610
+
+        # loaded_model = joblib.load("")
+        # prf_est = loaded_model.predict(self.est_params)
+        # self.df["AI_param"] = pd.Series(prf_est, name="AI_param")
+        #
+        # # 반올림 적용
+        # self.df["AI_param"] = self.df["AI_param"].round(1)
+        #
         return self.df
