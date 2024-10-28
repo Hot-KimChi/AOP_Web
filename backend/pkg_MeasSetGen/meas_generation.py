@@ -39,8 +39,9 @@ class MeasSetGen:
         )
         gen_df = param_gen.gen_sequence()
 
+        predictionML = PredictML(self.database, gen_df, self.probeId, self.probeName)
+
         ## predictML for intensity case
-        predictionML = PredictML(self.database, gen_df, self.probeId)
         gen_df_inten = predictionML.intensity_zt_est()
 
         ## predictML for tempeature case
@@ -53,14 +54,14 @@ class MeasSetGen:
             [gen_df_inten, gen_df_temp, gen_df_power], axis=0, ignore_index=True
         )
 
-        df_total.to_csv("meassetgen_df_predict.csv")
+        """ df_total.to_csv("meassetgen_df_predict.csv") """
 
         ## 클래스 인스턴스를 데이터프레임으로 변환 / DataOut 클래스 이용하여 csv 파일로 추출.
         dataout = DataOut(
             case=0,
             database=self.database,
             probename=self.probeName,
-            df1=gen_df,
+            df1=df_total,
         )
         dataout.make_dir()
         file_path = dataout.save_excel()
