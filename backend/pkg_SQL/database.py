@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 import pandas as pd
 import os
 
@@ -39,7 +39,7 @@ class SQL:
             with self.connect() as connection:
                 # pandas를 사용하여 데이터프레임을 SQL 테이블에 삽입
                 data.to_sql(table_name, connection, if_exists="append", index=False)
-                print(f"Data inserted into {table_name}")
+                print(f"Data inserted into [{table_name}] table")
         except Exception as e:
             print(f"Data insertion error: {str(e)}")
             raise

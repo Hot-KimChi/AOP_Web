@@ -39,22 +39,17 @@ class MeasSetGen:
         )
         gen_df = param_gen.gen_sequence()
 
+        ## To use machine learning, ready to data and params
         predictionML = PredictML(self.database, gen_df, self.probeId, self.probeName)
-
-        ## predictML for intensity case
         gen_df_inten = predictionML.intensity_zt_est()
-
-        ## predictML for tempeature case
         gen_df_temp = predictionML.temperature_PRF_est()
-
-        ## predictML for power case
         gen_df_power = predictionML.power_PRF_est()
 
         df_total = pd.concat(
             [gen_df_inten, gen_df_temp, gen_df_power], axis=0, ignore_index=True
         )
-
-        """ df_total.to_csv("meassetgen_df_predict.csv") """
+        df_total.fillna("NULL")
+        df_total.to_csv("meassetgen_df_predict.csv")
 
         ## 클래스 인스턴스를 데이터프레임으로 변환 / DataOut 클래스 이용하여 csv 파일로 추출.
         dataout = DataOut(
@@ -68,5 +63,4 @@ class MeasSetGen:
 
         ## 만들어진 데이터, insert data to MS-SQL
         df = pd.read_csv(file_path)
-        df.fillna("NULL")
         self.sql.insert_data(table_name="meas_setting", data=df)
