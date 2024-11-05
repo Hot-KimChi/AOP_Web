@@ -6,29 +6,28 @@ from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from functools import wraps
 import win32api, win32security
+from datetime import timedelta
 
 from pkg_SQL.database import SQL
 from pkg_MeasSetGen.meas_generation import MeasSetGen
 
-# from pkg_Viewer.viewer import Viewer
-# from pkg_Verify_Report.verify_report import Verify_Report
-# from pkg_MachineLearning.machine_learning import Machine_Learning
-
-
 app = Flask(__name__)
+
+# 모든 출처에서의 접근 허용
 CORS(
     app,
     supports_credentials=True,
-    resources={
-        r"/api/*": {"origins": ["http://localhost:3000", "http://10.82.216.206:3000"]}
-    },
+    resources={r"/api/*": {"origins": "*"}},
 )
 
 UPLOAD_FOLDER = "./1_uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.secret_key = os.urandom(24)  # 세션을 위한 시크릿 키 설정
-app.config["SESSION_COOKIE_SAMESITE"] = "None"
-app.config["SESSION_COOKIE_SECURE"] = True
+
+# 세션 설정
+app.config["SESSION_COOKIE_SAMESITE"] = "None"  # 다른 도메인 접근 허용
+app.config["SESSION_COOKIE_SECURE"] = True  # HTTPS에서만 쿠키 전달 허용
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=1)  # 세션 유효 시간 1시간
 
 
 def load_config():
@@ -38,13 +37,11 @@ def load_config():
 
     for section in config.sections():
         for key, value in config[section].items():
-            # 섹션 이름과 키에서 공백 제거 및 대문자 변환
             env_var_name = (
                 f"{section.replace(' ', '_').upper()}_{key.replace(' ', '_').upper()}"
             )
             os.environ[env_var_name] = value
 
-    # 데이터베이스 이름은 쉼표로 구분된 리스트이므로 별도 처리
     if "database" in config and "name" in config["database"]:
         os.environ["DATABASE_NAME"] = config["database"]["name"]
 
@@ -79,15 +76,12 @@ def require_auth(f):
 def authenticate():
     user = getpass.getuser()
     try:
-        # MSSQL 서버에 연결 시도
         connect = SQL(windows_auth=True)
-        # 연결 성공 시 세션에 인증 정보 저장
         session["authenticated"] = True
         session["user"] = user
         session.permanent = True  # 세션을 영구적으로 유지
         return jsonify({"status": "success", "authenticated": True, "user": user})
     except Exception as e:
-        # 연결 실패 시
         return (
             jsonify({"status": "error", "authenticated": False, "message": str(e)}),
             401,
@@ -100,7 +94,6 @@ def get_windows_user():
     if "authenticated" in session and session["authenticated"]:
         user = session["user"]
         try:
-            # 사용자의 전체 이름(Full Name) 가져오기
             sid = win32security.LookupAccountName(None, user)[0]
             full_name = win32api.GetUserNameEx(win32api.NameDisplay)
             return jsonify(
@@ -162,7 +155,6 @@ def upload_file():
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
 
-        # MeasSetGen 실행
         database = request.form.get("database")
         probeId = request.form.get("probeId")
         probeName = request.form.get("probeName")
@@ -176,29 +168,6 @@ def upload_file():
             return jsonify({"error": "Generation failed"}), 500
 
     return jsonify({"error": "File handling issue"}), 400
-
-
-# @app.route("/api/verify_report", methods=["POST"])
-# @handle_exceptions
-# @require_auth
-# def verify_report():
-#     data = request.json
-#     database = data.get("database")
-#     list_probe = data.get("list_probe")
-#     verify_report = Verify_Report(database, list_probe)
-#     result = verify_report.generate()
-#     return jsonify({"status": "success", "data": result})
-
-
-# @app.route("/api/machine_learning", methods=["POST"])
-# @handle_exceptions
-# @require_auth
-# def machine_learning():
-#     data = request.json
-#     database = data.get("database")
-#     ml = Machine_Learning(database)
-#     result = ml.process()
-#     return jsonify({"status": "success", "data": result})
 
 
 @app.route("/api/get_probes", methods=["GET"])
@@ -218,4 +187,14 @@ def get_probes():
 
 if __name__ == "__main__":
     load_config()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+
+    # SSL 인증서를 통해 HTTPS로 서버 실행
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=True,
+        # ssl_context=(
+        #     "/path/to/certfile.crt",  # SSL 인증서 파일 경로
+        #     "/path/to/keyfile.key",  # SSL 키 파일 경로
+        # ),
+    )
