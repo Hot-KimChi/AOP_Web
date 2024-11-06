@@ -76,7 +76,6 @@ def require_auth(f):
 def authenticate():
     user = getpass.getuser()
     try:
-        connect = SQL(windows_auth=True)
         session["authenticated"] = True
         session["user"] = user
         session.permanent = True  # 세션을 영구적으로 유지
@@ -95,6 +94,7 @@ def get_windows_user():
         user = session["user"]
         try:
             sid = win32security.LookupAccountName(None, user)[0]
+            print(sid)
             full_name = win32api.GetUserNameEx(win32api.NameDisplay)
             return jsonify(
                 {
