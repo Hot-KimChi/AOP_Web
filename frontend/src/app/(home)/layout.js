@@ -1,4 +1,4 @@
-import Layout from "../components/layout";
+import Layout from "../../components/Layout";
 
 // src/app/layout.js
 export default function AppLayout({ children }) {

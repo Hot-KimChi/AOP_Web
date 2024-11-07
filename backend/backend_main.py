@@ -44,7 +44,12 @@ def load_config():
 
     if "database" in config and "name" in config["database"]:
         os.environ["DATABASE_NAME"] = config["database"]["name"]
+    if "password" in config and "PW" in config["password"]["PW"]:
+        os.environ["VALID_PASSWORD"] = config["password"]["PW"]
 
+
+def get_userId():
+    
 
 def handle_exceptions(f):
     @wraps(f)
@@ -71,6 +76,16 @@ def require_auth(f):
     return decorated_function
 
 
+@app.route("/api/auth/login", methods=["POST"])
+@handle_exceptions
+def login():
+    data = request.get_json()
+    username = data['username']
+    password = data['password']
+    
+    
+    
+    
 @app.route("/api/authenticate", methods=["POST"])
 @handle_exceptions
 def authenticate():

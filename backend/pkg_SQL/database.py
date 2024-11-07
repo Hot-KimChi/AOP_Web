@@ -10,6 +10,12 @@ class SQL:
         self.windows_auth = windows_auth
         self.connection_string = self.create_connection_string()
 
+    def get_userId(self):
+        
+        
+        
+        
+        
     def create_connection_string(self):
         # SQLAlchemy용 연결 문자열 생성
         if self.windows_auth:
