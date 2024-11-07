@@ -94,7 +94,6 @@ def get_windows_user():
         user = session["user"]
         try:
             sid = win32security.LookupAccountName(None, user)[0]
-            print(sid)
             full_name = win32api.GetUserNameEx(win32api.NameDisplay)
             return jsonify(
                 {
