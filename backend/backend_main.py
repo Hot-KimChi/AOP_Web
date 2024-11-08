@@ -44,12 +44,7 @@ def load_config():
 
     if "database" in config and "name" in config["database"]:
         os.environ["DATABASE_NAME"] = config["database"]["name"]
-    if "password" in config and "PW" in config["password"]["PW"]:
-        os.environ["VALID_PASSWORD"] = config["password"]["PW"]
 
-
-def get_userId():
-    
 
 def handle_exceptions(f):
     @wraps(f)
@@ -76,16 +71,36 @@ def require_auth(f):
     return decorated_function
 
 
-@app.route("/api/auth/login", methods=["POST"])
+@app.route("/api/auth/login", methods=["post"])
 @handle_exceptions
 def login():
     data = request.get_json()
-    username = data['username']
-    password = data['password']
-    
-    
-    
-    
+    username = data["username"]
+    password = data["password"]
+
+    valid_password = os.environ("PASSWORD_PW")
+
+    connect = SQL(windows_auth=True, database="master")
+    user = connect.get_userinfor(username=username)
+
+    if user and password == valid_password:
+        # 로그인 성공
+        session["authenticated"] = True
+        session["username"] = username
+        return (
+            jsonify(
+                {"status": "success", "message": "Login successful", "user": username}
+            ),
+            200,
+        )
+    else:
+        # 로그인 실패
+        return (
+            jsonify({"status": "error", "message": "Invalid username or password"}),
+            401,
+        )
+
+
 @app.route("/api/authenticate", methods=["POST"])
 @handle_exceptions
 def authenticate():

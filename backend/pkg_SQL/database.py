@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import pandas as pd
 import os
 
@@ -10,12 +10,6 @@ class SQL:
         self.windows_auth = windows_auth
         self.connection_string = self.create_connection_string()
 
-    def get_userId(self):
-        
-        
-        
-        
-        
     def create_connection_string(self):
         # SQLAlchemy용 연결 문자열 생성
         if self.windows_auth:
@@ -25,6 +19,16 @@ class SQL:
         # SQLAlchemy 엔진을 사용한 연결 생성
         engine = create_engine(self.connection_string)
         return engine.connect()
+
+    def get_userInfor(self, username):
+        query = text(
+            """
+            SELECT * FROM master.sys.server_principals
+            WHERE name = :username
+        """
+        )
+        result = self.execute_query(query, {"username": username})
+        return result.fetchone() if result else None
 
     def execute_query(self, query):
         try:
