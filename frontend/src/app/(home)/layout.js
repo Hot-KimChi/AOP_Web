@@ -1,7 +1,6 @@
 import Layout from "../../components/Layout";
 
-// src/app/layout.js
-export default function AppLayout({ children }) {
+export default function HomeLayout({ children }) {
   return (
     <html lang="en">
       <head>

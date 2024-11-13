@@ -1,4 +1,5 @@
 // src/utils/authenticateUser.js
+
 export const authenticateUser = async (setUser, setIsAuthenticated, setWindowsUsername, setFullName, setConnectionStatus) => 
   {
   try {
