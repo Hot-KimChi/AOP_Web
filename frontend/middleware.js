@@ -1,22 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 export function middleware(request) {
-  const isAuthPage = request.nextUrl.pathname.startsWith('/auth');
-  const token = request.cookies.get('auth_token');
+    // 보호된 경로 정의
+    const protectedPaths = ['/measset-generation']
+    const path = request.nextUrl.pathname
 
-  // 인증이 필요한 페이지에서 토큰이 없는 경우
-  if (!isAuthPage && !token) {
-    return NextResponse.redirect(new URL('/auth/login', request.url));
-  }
+    // 로그인 페이지는 미들웨어 검사에서 제외
+    if (path === `/auth/login`) {
+        return NextResponse.next()
+    }
 
-  // 이미 로그인된 사용자가 로그인/회원가입 페이지 접근 시
-  if (isAuthPage && token) {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
+    // 보호된 경로에 대한 접근 검사 진행
+    if (protectedPaths.some(prefix => path.startWith(prefix))) {
+        const authToken = request.cookies.get('auth_token')
 
-  return NextResponse.next();
+        if (!authToken) {
+        return NextResponse.redirect(new URL('/auth/login', request.url))
+        }
+    }
 }
-
-export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)',],
-};
