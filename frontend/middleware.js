@@ -18,4 +18,8 @@ export function middleware(request) {
         return NextResponse.redirect(new URL('/auth/login', request.url))
         }
     }
+
+    return NextResponse.next()
 }
+
+// 미들웨어가 적용될 경로 설정.
