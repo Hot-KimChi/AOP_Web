@@ -22,4 +22,11 @@ export function middleware(request) {
     return NextResponse.next()
 }
 
-// 미들웨어가 적용될 경로 설정.
+
+// 미들웨어가 적용될 경로 설정
+export const config = {
+    matcher: [
+        '/measset-generation/:path*',
+        '/auth/login'
+    ]
+}
