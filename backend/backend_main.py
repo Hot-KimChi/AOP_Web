@@ -78,10 +78,10 @@ def login():
     username = data["username"]
     password = data["password"]
 
-    valid_password = os.environ("PASSWORD_PW")
+    valid_password = os.environ["PASSWORD_PW"]
 
     connect = SQL(windows_auth=True, database="master")
-    user = connect.get_userinfor(username=username)
+    user = connect.get_userInfor(username=username)
 
     if user and password == valid_password:
         # 로그인 성공
