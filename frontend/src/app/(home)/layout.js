@@ -1,3 +1,4 @@
+// frontend\src\app\(home)\layout.js
 import Layout from "../../components/Layout";
 
 export default function HomeLayout({ children }) {

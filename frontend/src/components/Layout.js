@@ -1,3 +1,4 @@
+// frontend\src\components\Layout.js
 'use client';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
