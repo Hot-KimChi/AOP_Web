@@ -5,8 +5,9 @@ from werkzeug.utils import secure_filename
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from functools import wraps
+import jwt
 import win32api, win32security
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from pkg_SQL.database import SQL
 from pkg_MeasSetGen.meas_generation import MeasSetGen
@@ -78,27 +79,28 @@ def login():
     username = data["username"]
     password = data["password"]
 
-    valid_password = os.environ["PASSWORD_PW"]
+    SECRET_KEY = os.environ.get("AUTH_SECRET_KEY")
+    EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME"))
 
-    connect = SQL(windows_auth=True, database="master")
-    user = connect.get_userInfor(username=username)
+    sql = SQL(windows_auth=True, database="master")
+    user_info = sql.get_userInfor(username=username)
 
-    if user and password == valid_password:
-        # 로그인 성공
-        session["authenticated"] = True
-        session["username"] = username
-        return (
-            jsonify(
-                {"status": "success", "message": "Login successful", "user": username}
-            ),
-            200,
-        )
+    if user_info:
+        # 비밀번호 일치 여부 확인
+        if sql.verify_password(password, user_info["password"]):
+            # JWT 토큰 발급
+            payload = {
+                "id": user_info["id"],
+                "username": user_info["username"],
+                "exp": datetime.datetime.utcnow()
+                + datetime.timedelta(seconds=EXPIRE_TIME),
+            }
+            token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+            return jsonify({"token": token})
+        else:
+            return jsonify({"error": "Invalid username or password"}), 401
     else:
-        # 로그인 실패
-        return (
-            jsonify({"status": "error", "message": "Invalid username or password"}),
-            401,
-        )
+        return jsonify({"error": "Invalid username or password"}), 401
 
 
 @app.route("/api/authenticate", methods=["POST"])

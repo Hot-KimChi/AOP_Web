@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, text
 import pandas as pd
 import os
+import bcrypt
 
 
 class SQL:
@@ -20,15 +21,43 @@ class SQL:
         engine = create_engine(self.connection_string)
         return engine.connect()
 
-    def get_userInfor(self, username):
+    def get_user_info(self, username):
+        """
+        사용자 정보를 데이터베이스에서 조회하는 함수
+        :param username: 조회할 사용자의 username
+        :return: 사용자 정보 딕셔너리 또는 None
+        """
         query = text(
             """
-            SELECT * FROM master.sys.server_principals
-            WHERE name = :username
-        """
+            SELECT id, username, password 
+            FROM users
+            WHERE username = :username
+            """
         )
-        result = self.execute_query(query, {"username": username})
-        return result.fetchone() if result else None
+        try:
+            with self.connect() as connection:
+                result = connection.execute(query, {"username": username})
+                user = result.fetchone()
+                if user:
+                    return {
+                        "id": user.id,
+                        "username": user.username,
+                        "password": user.password,
+                    }
+                else:
+                    return None
+        except Exception as e:
+            print(f"Query execution error: {str(e)}")
+            raise
+
+    def verify_password(self, password, hashed_password):
+        """
+        비밀번호 일치 여부를 확인하는 함수
+        :param password: 입력된 비밀번호
+        :param hashed_password: 데이터베이스에 저장된 해시된 비밀번호
+        :return: 비밀번호 일치 여부
+        """
+        return bcrypt.checkpw(password.encode(), hashed_password.encode())
 
     def execute_query(self, query):
         try:
