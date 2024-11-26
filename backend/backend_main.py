@@ -72,7 +72,7 @@ def require_auth(f):
     return decorated_function
 
 
-@app.route("/api/auth/login", methods=["post"])
+@app.route("/api/auth/login", methods=["POST"])
 @handle_exceptions
 def login():
     data = request.get_json()
@@ -83,15 +83,15 @@ def login():
     EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME"))
 
     sql = SQL(windows_auth=True, database="master")
-    user_info = sql.get_userInfor(username=username)
+    user_infor = sql.get_userInfor(username=username)
 
-    if user_info:
+    if user_infor:
         # 비밀번호 일치 여부 확인
-        if sql.verify_password(password, user_info["password"]):
+        if sql.verify_password(password, user_infor["password"]):
             # JWT 토큰 발급
             payload = {
-                "id": user_info["id"],
-                "username": user_info["username"],
+                "id": user_infor["id"],
+                "username": user_infor["username"],
                 "exp": datetime.datetime.utcnow()
                 + datetime.timedelta(seconds=EXPIRE_TIME),
             }
