@@ -1,6 +1,8 @@
+// src/app/auth/login/page.js
+// src/app/auth/login/page.js
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 const LoginPage = () => {
@@ -8,75 +10,99 @@ const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // 로그인 핸들러 함수
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = async () => {
+    if (!username || !password) {
+      setError('Please enter both username and password.');
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch('http://localhost:5000/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ username, password }),
-        credentials: 'include', // 쿠키 포함
+        credentials: 'include',
       });
 
-      if (response.ok) {
-        router.push('/');
-      } else {
-        const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const data = await response.json();
         setError(data?.message || 'Login failed');
+        return;
       }
+
+      // 로그인 성공 시
+      router.push('/');
     } catch (error) {
       console.error('Login error:', error);
-      setError('An unexpected error occurred. Please try again.');
+      setError('Unable to connect to the server.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   return (
-      <div className="d-flex justify-content-center align-items-center vh-100">
-        <div className="card shadow-sm p-4" style={{ maxWidth: '400px', width: '100%' }}>
-          <h2 className="text-center mb-4">Login</h2>
-          {error && (
-            <div className="alert alert-danger" role="alert">
-              {error}
-            </div>
-          )}
-          <form onSubmit={handleLogin}>
-            <div className="mb-3">
-              <label htmlFor="username" className="form-label">
-                Username
-              </label>
-              <input
-                type="text"
-                className="form-control"
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <label htmlFor="password" className="form-label">
-                Password
-              </label>
-              <input
-                type="password"
-                className="form-control"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <button type="submit" className="btn btn-primary w-100">
-              Login
-            </button>
-          </form>
+    <div className="container mt-5">
+      <h4 className="mb-4">Login</h4>
+
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          {error}
+        </div>
+      )}
+
+      <div className="row align-items-center">
+        <div className="col-md-6 mb-3">
+          <label htmlFor="usernameInput" className="form-label">
+            Username
+          </label>
+          <input
+            type="text"
+            id="usernameInput"
+            className="form-control"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+
+        <div className="col-md-6 mb-3">
+          <label htmlFor="passwordInput" className="form-label">
+            Password
+          </label>
+          <input
+            type="password"
+            id="passwordInput"
+            className="form-control"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+
+        <div className="col-12 mb-3">
+          <button
+            className="btn btn-primary w-100"
+            onClick={handleLogin}
+            disabled={isLoading || !username || !password}
+          >
+            {isLoading ? 'Logging in...' : 'Login'}
+          </button>
         </div>
       </div>
+    </div>
   );
 };
 

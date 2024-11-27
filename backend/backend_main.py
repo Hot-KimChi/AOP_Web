@@ -72,7 +72,7 @@ def require_auth(f):
     return decorated_function
 
 
-@app.route("/api/auth/login", methods=["POST"])
+@app.route("/api/login", methods=["POST"])
 @handle_exceptions
 def login():
     data = request.get_json()
@@ -83,7 +83,7 @@ def login():
     EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME"))
 
     sql = SQL(windows_auth=True, database="master")
-    user_infor = sql.get_userInfor(username=username)
+    user_infor = sql.get_user_info(username=username)
 
     if user_infor:
         # 비밀번호 일치 여부 확인
