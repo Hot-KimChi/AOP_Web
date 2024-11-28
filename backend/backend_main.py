@@ -72,7 +72,7 @@ def require_auth(f):
     return decorated_function
 
 
-@app.route("/api/login", methods=["POST"])
+@app.route("/api/auth/login", methods=["POST"])
 @handle_exceptions
 def login():
     data = request.get_json()
@@ -85,18 +85,22 @@ def login():
     sql = SQL(windows_auth=True, database="master")
     user_infor = sql.get_user_info(username=username)
 
+    # 비밀번호 확인 로직
     if user_infor:
-        # 비밀번호 일치 여부 확인
-        if sql.verify_password(password, user_infor["password"]):
-            # JWT 토큰 발급
+        if sql.authenticate_user(username=username, password=password):
             payload = {
-                "id": user_infor["id"],
                 "username": user_infor["username"],
-                "exp": datetime.datetime.utcnow()
-                + datetime.timedelta(seconds=EXPIRE_TIME),
+                "id": str(user_infor["sid"]),  # sid를 문자열로 변환
+                "exp": int(
+                    (datetime.utcnow() + timedelta(seconds=EXPIRE_TIME)).timestamp()
+                ),  # datetime을 타임스탬프로 변환
             }
             token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
-            return jsonify({"token": token})
+
+            # PyJWT 버전에 따라 encode의 반환 타입을 확인하고 문자열로 변환
+            token_str = token if isinstance(token, str) else token.decode("utf-8")
+
+            return jsonify({"token": token_str})
         else:
             return jsonify({"error": "Invalid username or password"}), 401
     else:

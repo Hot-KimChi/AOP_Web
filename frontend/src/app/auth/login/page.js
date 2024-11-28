@@ -1,5 +1,4 @@
 // src/app/auth/login/page.js
-// src/app/auth/login/page.js
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,7 +20,7 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/login', {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
