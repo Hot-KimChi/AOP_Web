@@ -1,12 +1,10 @@
 import configparser
 import os
-import getpass
-from werkzeug.utils import secure_filename
+import jwt
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
 from functools import wraps
-import jwt
-import win32api, win32security
 from datetime import datetime, timedelta
 
 from pkg_SQL.database import SQL
@@ -14,40 +12,41 @@ from pkg_MeasSetGen.meas_generation import MeasSetGen
 
 app = Flask(__name__)
 
-# 모든 출처에서의 접근 허용
+# CORS 설정: 허용된 도메인만 설정
 CORS(
     app,
     supports_credentials=True,
-    resources={r"/api/*": {"origins": "*"}},
+    resources={r"/api/*": {"origins": ["http://localhost:3000"]}},
 )
 
+# 업로드 폴더 설정
 UPLOAD_FOLDER = "./1_uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.secret_key = os.urandom(24)  # 세션을 위한 시크릿 키 설정
+app.secret_key = os.urandom(24)
 
-# 세션 설정
-app.config["SESSION_COOKIE_SAMESITE"] = "None"  # 다른 도메인 접근 허용
-app.config["SESSION_COOKIE_SECURE"] = True  # HTTPS에서만 쿠키 전달 허용
-app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=1)  # 세션 유효 시간 1시간
+# JWT 관련 환경 변수
+SECRET_KEY = os.environ.get("AUTH_SECRET_KEY", "your_secret_key")
+EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME", 3600))  # 기본값: 3600초 (1시간)
 
 
 def load_config():
+    """환경설정 파일 로드 및 환경 변수 설정"""
     config_path = os.path.join(".", "backend", "AOP_config.cfg")
     config = configparser.ConfigParser()
     config.read(config_path)
-
     for section in config.sections():
         for key, value in config[section].items():
             env_var_name = (
                 f"{section.replace(' ', '_').upper()}_{key.replace(' ', '_').upper()}"
             )
             os.environ[env_var_name] = value
-
     if "database" in config and "name" in config["database"]:
         os.environ["DATABASE_NAME"] = config["database"]["name"]
 
 
 def handle_exceptions(f):
+    """예외 처리를 위한 데코레이터"""
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
         try:
@@ -60,13 +59,22 @@ def handle_exceptions(f):
 
 
 def require_auth(f):
+    """JWT 인증 검증 데코레이터"""
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if "authenticated" not in session or not session["authenticated"]:
+        token = request.cookies.get("auth_token")
+        if not token:
             return (
                 jsonify({"status": "error", "message": "Authentication required"}),
                 401,
             )
+        try:
+            jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+            return jsonify({"status": "error", "message": "Token expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"status": "error", "message": "Invalid token"}), 401
         return f(*args, **kwargs)
 
     return decorated_function
@@ -75,106 +83,65 @@ def require_auth(f):
 @app.route("/api/auth/login", methods=["POST"])
 @handle_exceptions
 def login():
+    """로그인 처리 및 JWT 발급"""
     data = request.get_json()
-    username = data["username"]
-    password = data["password"]
-
-    SECRET_KEY = os.environ.get("AUTH_SECRET_KEY")
-    EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME"))
+    username = data.get("username")
+    password = data.get("password")
 
     sql = SQL(windows_auth=True, database="master")
-    user_infor = sql.get_user_info(username=username)
+    user_info = sql.get_user_info(username=username)
 
-    # 비밀번호 확인 로직
-    if user_infor:
-        if sql.authenticate_user(username=username, password=password):
-            payload = {
-                "username": user_infor["username"],
-                "id": str(user_infor["sid"]),  # sid를 문자열로 변환
-                "exp": int(
-                    (datetime.utcnow() + timedelta(seconds=EXPIRE_TIME)).timestamp()
-                ),  # datetime을 타임스탬프로 변환
-            }
-            token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+    if user_info and sql.authenticate_user(username=username, password=password):
+        payload = {
+            "username": user_info["username"],
+            "id": str(user_info["sid"]),
+            "exp": datetime.utcnow() + timedelta(seconds=EXPIRE_TIME),
+        }
+        token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
-            # PyJWT 버전에 따라 encode의 반환 타입을 확인하고 문자열로 변환
-            token_str = token if isinstance(token, str) else token.decode("utf-8")
-
-            return jsonify({"token": token_str})
-        else:
-            return jsonify({"error": "Invalid username or password"}), 401
+        response = jsonify({"status": "success", "message": "Login successful"})
+        response.set_cookie("auth_token", token, httponly=True, samesite="Lax")
+        return response
     else:
         return jsonify({"error": "Invalid username or password"}), 401
 
 
-@app.route("/api/authenticate", methods=["POST"])
+@app.route("/api/auth/status", methods=["GET"])
 @handle_exceptions
-def authenticate():
-    user = getpass.getuser()
+def auth_status():
+    """인증 상태 확인"""
+    token = request.cookies.get("auth_token")
+    if not token:
+        return (
+            jsonify({"authenticated": False, "message": "User not authenticated"}),
+            401,
+        )
     try:
-        session["authenticated"] = True
-        session["user"] = user
-        session.permanent = True  # 세션을 영구적으로 유지
-        return jsonify({"status": "success", "authenticated": True, "user": user})
-    except Exception as e:
+        decoded_token = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         return (
-            jsonify({"status": "error", "authenticated": False, "message": str(e)}),
-            401,
+            jsonify({"authenticated": True, "username": decoded_token["username"]}),
+            200,
         )
+    except jwt.ExpiredSignatureError:
+        return jsonify({"authenticated": False, "message": "Token expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"authenticated": False, "message": "Invalid token"}), 401
 
 
-@app.route("/api/get_windows_user", methods=["GET"])
+@app.route("/api/auth/logout", methods=["POST"])
 @handle_exceptions
-def get_windows_user():
-    if "authenticated" in session and session["authenticated"]:
-        user = session["user"]
-        try:
-            sid = win32security.LookupAccountName(None, user)[0]
-            full_name = win32api.GetUserNameEx(win32api.NameDisplay)
-            return jsonify(
-                {
-                    "status": "success",
-                    "authenticated": True,
-                    "user": user,
-                    "full_name": full_name,
-                    "connection_status": "연결 완료",
-                }
-            )
-        except Exception as e:
-            return jsonify(
-                {
-                    "status": "error",
-                    "authenticated": True,
-                    "user": user,
-                    "connection_status": "Admin 문의",
-                    "message": f"Full name retrieval failed: {str(e)}",
-                }
-            )
-    else:
-        return (
-            jsonify(
-                {
-                    "status": "error",
-                    "authenticated": False,
-                    "message": "Not authenticated",
-                }
-            ),
-            401,
-        )
-
-
-@app.route("/api/get_list_database", methods=["GET"])
-@handle_exceptions
-@require_auth
-def get_list_database():
-    databases = os.environ.get("DATABASE_NAME", "").split(",")
-    return jsonify({"status": "success", "databases": databases})
+def logout():
+    """로그아웃 처리"""
+    response = jsonify({"status": "success", "message": "Logged out successfully"})
+    response.set_cookie("auth_token", "", expires=0)
+    return response
 
 
 @app.route("/api/measset-generation", methods=["POST"])
 @handle_exceptions
 @require_auth
 def upload_file():
+    """파일 업로드 및 측정 세트 생성"""
     if not os.path.exists(app.config["UPLOAD_FOLDER"]):
         os.makedirs(app.config["UPLOAD_FOLDER"])
 
@@ -205,10 +172,20 @@ def upload_file():
     return jsonify({"error": "File handling issue"}), 400
 
 
+@app.route("/api/get_list_database", methods=["GET"])
+@handle_exceptions
+@require_auth
+def get_list_database():
+    """데이터베이스 목록 반환"""
+    databases = os.environ.get("DATABASE_NAME", "").split(",")
+    return jsonify({"status": "success", "databases": databases})
+
+
 @app.route("/api/get_probes", methods=["GET"])
 @handle_exceptions
 @require_auth
 def get_probes():
+    """프로브 목록 반환"""
     database = request.args.get("database")
     if not database:
         return jsonify({"error": "No database specified"}), 400
@@ -222,14 +199,4 @@ def get_probes():
 
 if __name__ == "__main__":
     load_config()
-
-    # SSL 인증서를 통해 HTTPS로 서버 실행
-    app.run(
-        host="0.0.0.0",
-        port=5000,
-        debug=True,
-        # ssl_context=(
-        #     "/path/to/certfile.crt",  # SSL 인증서 파일 경로
-        #     "/path/to/keyfile.key",  # SSL 키 파일 경로
-        # ),
-    )
+    app.run(host="0.0.0.0", port=5000, debug=True)

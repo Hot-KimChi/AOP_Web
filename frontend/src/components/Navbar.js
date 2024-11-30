@@ -9,20 +9,13 @@ import {
   faEye, 
   faClipboardCheck, 
   faBrain, 
-  faUser,
-  faSignOutAlt,
   faUserCircle
 } from '@fortawesome/free-solid-svg-icons';
 
 const Navbar = () => {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userData, setUserData] = useState({
-    windowsUsername: '',
-    fullName: '',
-    connectionStatus: 'Connected'
-  });
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [username, setUsername] = useState('');
 
   const menuItems = [
     { href: '/measset-generation', icon: faCogs, text: 'MeasSet Generation' },
@@ -32,56 +25,52 @@ const Navbar = () => {
   ];
 
   useEffect(() => {
-    // Check authentication status on component mount
     checkAuthStatus();
   }, []);
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('/api/auth/status', {
-        credentials: 'include' // Important for cookies
+      const response = await fetch('http://localhost:5000/api/auth/status', {
+        method: 'GET',
+        credentials: 'include'
       });
-      
-      if (response.ok) {
-        const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.authenticated) {
         setIsAuthenticated(true);
-        setUserData({
-          windowsUsername: data.windowsUsername,
-          fullName: data.fullName,
-          connectionStatus: data.connectionStatus || 'Connected'
-        });
+        setUsername(data.username);
       } else {
         setIsAuthenticated(false);
-        setUserData({
-          windowsUsername: '',
-          fullName: '',
-          connectionStatus: 'Disconnected'
-        });
+        setUsername('');
       }
     } catch (error) {
       console.error('Auth status check failed:', error);
       setIsAuthenticated(false);
+      setUsername('');
     }
   };
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('/api/auth/logout', {
+      const response = await fetch('http://localhost:5000/api/auth/logout', {
         method: 'POST',
         credentials: 'include'
       });
 
       if (response.ok) {
         setIsAuthenticated(false);
-        setUserData({
-          windowsUsername: '',
-          fullName: '',
-          connectionStatus: 'Disconnected'
-        });
-        router.push('/login');
+        setUsername('');
+        router.push('/');
+      } else {
+        console.error('Logout failed:', await response.text());
       }
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error('Logout error:', error);
     }
   };
 
@@ -94,6 +83,9 @@ const Navbar = () => {
           type="button" 
           data-bs-toggle="collapse" 
           data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
         >
           <span className="navbar-toggler-icon"></span>
         </button>
@@ -103,7 +95,7 @@ const Navbar = () => {
               <li className="nav-item mx-3" key={index}>
                 <Link 
                   href={item.href} 
-                  className={`nav-link ${!isAuthenticated ? 'disabled' : ''}`}
+                  className={`nav-link ${!isAuthenticated ? 'disabled text-muted' : ''}`}
                   onClick={(e) => !isAuthenticated && e.preventDefault()}
                 >
                   <FontAwesomeIcon icon={item.icon} className="me-2" />
@@ -112,43 +104,27 @@ const Navbar = () => {
               </li>
             ))}
           </ul>
-          
+
           {isAuthenticated ? (
-            <div className="dropdown">
+            <div className="d-flex align-items-center">
+              <div className="d-flex flex-column align-items-end me-3">
+                <small className="text-muted">Logged in as:</small>
+                <strong>{username}</strong>
+              </div>
               <button
-                className="btn btn-light dropdown-toggle d-flex align-items-center"
-                onClick={() => setShowDropdown(!showDropdown)}
+                className="btn btn-danger d-flex align-items-center"
+                onClick={handleLogout}
               >
                 <FontAwesomeIcon icon={faUserCircle} className="me-2" />
-                <span className="me-2">{userData.fullName || userData.windowsUsername || 'User'}</span>
-                <span className={`badge ${userData.connectionStatus === 'Connected' ? 'bg-success' : 'bg-danger'}`}>
-                  {userData.connectionStatus}
-                </span>
+                Logout
               </button>
-              
-              {showDropdown && (
-                <div className="dropdown-menu show position-absolute">
-                  <div className="dropdown-header">
-                    <small className="text-muted">Signed in as</small>
-                    <div>{userData.fullName}</div>
-                  </div>
-                  <div className="dropdown-divider"></div>
-                  <button 
-                    className="dropdown-item text-danger"
-                    onClick={handleLogout}
-                  >
-                    <FontAwesomeIcon icon={faSignOutAlt} className="me-2" />
-                    Logout
-                  </button>
-                </div>
-              )}
             </div>
           ) : (
             <Link 
               href="/auth/login" 
               className="btn btn-primary d-flex align-items-center"
             >
-              <FontAwesomeIcon icon={faUser} className="me-2" />
+              <FontAwesomeIcon icon={faUserCircle} className="me-2" />
               Login
             </Link>
           )}
