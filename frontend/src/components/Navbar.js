@@ -95,7 +95,9 @@ const Navbar = () => {
               <li className="nav-item mx-3" key={index}>
                 <Link 
                   href={item.href} 
-                  className={`nav-link ${!isAuthenticated ? 'disabled text-muted' : ''}`}
+                  className={`nav-link ${
+                    isAuthenticated ? 'text-dark' : 'disabled text-muted'
+                  }`}
                   onClick={(e) => !isAuthenticated && e.preventDefault()}
                 >
                   <FontAwesomeIcon icon={item.icon} className="me-2" />
