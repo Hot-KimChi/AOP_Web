@@ -1,8 +1,8 @@
-// src/app/auth/login/page.js
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import "../../../globals.css"
 
 const LoginPage = () => {
   const router = useRouter();
@@ -53,17 +53,17 @@ const LoginPage = () => {
   }, [error]);
 
   return (
-    <div className="container mt-5">
-      <h4 className="mb-4">Login</h4>
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <h4 className="mb-4">Login</h4>
 
-      {error && (
-        <div className="alert alert-danger" role="alert">
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            {error}
+          </div>
+        )}
 
-      <div className="row align-items-center">
-        <div className="col-md-6 mb-3">
+        <div className="mb-3">
           <label htmlFor="usernameInput" className="form-label">
             Username
           </label>
@@ -77,7 +77,7 @@ const LoginPage = () => {
           />
         </div>
 
-        <div className="col-md-6 mb-3">
+        <div className="mb-3">
           <label htmlFor="passwordInput" className="form-label">
             Password
           </label>
@@ -91,15 +91,13 @@ const LoginPage = () => {
           />
         </div>
 
-        <div className="col-12 mb-3">
-          <button
-            className="btn btn-primary w-100"
-            onClick={handleLogin}
-            disabled={isLoading || !username || !password}
-          >
-            {isLoading ? 'Logging in...' : 'Login'}
-          </button>
-        </div>
+        <button
+          className="btn btn-primary w-100"
+          onClick={handleLogin}
+          disabled={isLoading || !username || !password}
+        >
+          {isLoading ? 'Logging in...' : 'Login'}
+        </button>
       </div>
     </div>
   );

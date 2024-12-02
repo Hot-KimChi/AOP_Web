@@ -89,12 +89,13 @@ export default function MeasSetGen() {
           body: formData,
           credentials: 'include',
         });
-
-        if (response.ok) {
+      
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Failed to process the file. Status: ${response.status}, Message: ${errorText}`);
+        } else {
           const data = await response.json();
           setProcessedData(data.data);
-        } else {
-          console.error('Failed to process the file');
         }
       } catch (error) {
         console.error('Error:', error);

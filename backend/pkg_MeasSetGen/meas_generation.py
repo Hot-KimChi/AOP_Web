@@ -5,6 +5,7 @@ from pkg_MeasSetGen.predictML import PredictML
 from pkg_MeasSetGen.data_inout import DataOut
 from pkg_SQL.database import SQL
 import pandas as pd
+import logging
 
 
 class MeasSetGen:
@@ -22,45 +23,61 @@ class MeasSetGen:
         self.sql = SQL(database=self.database, windows_auth=True)
 
     def generate(self):
-        ## 파일 선택할 수 있는 algorithm / 중복 데이터 삭제 및 group_index
-        raw_data = loadfile(self.file_path)
+        try:
+            # Step 1: 파일 로드
+            raw_data = loadfile(self.file_path)
+            if raw_data.empty:
+                raise ValueError(
+                    "Loaded file contains no data or is not properly formatted."
+                )
+            logging.info("Raw data successfully loaded.")
 
-        ## 클래스 인스턴스 생성
-        param_update = ParamUpdate(raw_data)
+            # Step 2: 중복 데이터 제거 및 인덱스 생성
+            param_update = ParamUpdate(raw_data)
+            df_total = param_update.remove_duplicate()
+            df_total = param_update.createGroupIdx(df_total)
+            selected_df = param_update.updateDuplicate(df_total)
+            logging.info("Duplicate data processing completed.")
 
-        ## [B / M] [C / D] 중복 데이터 삭제
-        df_total = param_update.remove_duplicate()
-        df_total = param_update.createGroupIdx(df_total)
-        selected_df = param_update.updateDuplicate(df_total)
+            # Step 3: Parameter 생성
+            param_gen = ParamGen(
+                data=selected_df, probeid=self.probeId, probename=self.probeName
+            )
+            gen_df = param_gen.gen_sequence()
+            logging.info("Parameter generation completed.")
 
-        ## 선택한 데이터를 기반으로 parameter 생성.
-        param_gen = ParamGen(
-            data=selected_df, probeid=self.probeId, probename=self.probeName
-        )
-        gen_df = param_gen.gen_sequence()
+            # Step 4: 머신러닝 예측
+            predictionML = PredictML(
+                self.database, gen_df, self.probeId, self.probeName
+            )
+            gen_df_inten = predictionML.intensity_zt_est()
+            gen_df_temp = predictionML.temperature_PRF_est()
+            gen_df_power = predictionML.power_PRF_est()
 
-        ## To use machine learning, ready to data and params
-        predictionML = PredictML(self.database, gen_df, self.probeId, self.probeName)
-        gen_df_inten = predictionML.intensity_zt_est()
-        gen_df_temp = predictionML.temperature_PRF_est()
-        gen_df_power = predictionML.power_PRF_est()
+            df_total = pd.concat(
+                [gen_df_inten, gen_df_temp, gen_df_power], axis=0, ignore_index=True
+            )
+            df_total = df_total.fillna(-1)
+            logging.info("Machine learning predictions completed.")
 
-        df_total = pd.concat(
-            [gen_df_inten, gen_df_temp, gen_df_power], axis=0, ignore_index=True
-        )
-        df_total = df_total.fillna(-1)
-        df_total.to_csv("meassetgen_df_predict.csv")
+            # Step 5: 데이터 저장 및 SQL 삽입
+            dataout = DataOut(
+                case=0,
+                database=self.database,
+                probename=self.probeName,
+                df1=df_total,
+            )
+            dataout.make_dir()
+            file_path = dataout.save_excel()
+            logging.info(f"Generated file saved at {file_path}.")
 
-        ## 클래스 인스턴스를 데이터프레임으로 변환 / DataOut 클래스 이용하여 csv 파일로 추출.
-        dataout = DataOut(
-            case=0,
-            database=self.database,
-            probename=self.probeName,
-            df1=df_total,
-        )
-        dataout.make_dir()
-        file_path = dataout.save_excel()
+            # Step 6: 데이터베이스에 삽입
+            df = pd.read_csv(file_path)
+            self.sql.insert_data(table_name="meas_setting", data=df)
+            logging.info("Data successfully inserted into MS-SQL.")
 
-        ## 만들어진 데이터, insert data to MS-SQL
-        df = pd.read_csv(file_path)
-        self.sql.insert_data(table_name="meas_setting", data=df)
+            return {"status": "success", "file_path": file_path}
+
+        except Exception as e:
+            logging.error(f"Error during MeasSetGen.generate: {str(e)}", exc_info=True)
+            raise RuntimeError(f"Failed to generate MeasSet: {str(e)}")

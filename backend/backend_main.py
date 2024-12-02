@@ -114,8 +114,8 @@ def auth_status():
     if not token:
         return (
             jsonify({"authenticated": False, "message": "User not authenticated"}),
-            401,
-        )
+            200,
+        )  # 200으로 변경
     try:
         decoded_token = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         return (
@@ -123,9 +123,15 @@ def auth_status():
             200,
         )
     except jwt.ExpiredSignatureError:
-        return jsonify({"authenticated": False, "message": "Token expired"}), 401
+        return (
+            jsonify({"authenticated": False, "message": "Token expired"}),
+            200,
+        )  # 200으로 변경
     except jwt.InvalidTokenError:
-        return jsonify({"authenticated": False, "message": "Invalid token"}), 401
+        return (
+            jsonify({"authenticated": False, "message": "Invalid token"}),
+            200,
+        )  # 200으로 변경
 
 
 @app.route("/api/auth/logout", methods=["POST"])
@@ -142,34 +148,57 @@ def logout():
 @require_auth
 def upload_file():
     """파일 업로드 및 측정 세트 생성"""
-    if not os.path.exists(app.config["UPLOAD_FOLDER"]):
-        os.makedirs(app.config["UPLOAD_FOLDER"])
+    try:
+        if not os.path.exists(app.config["UPLOAD_FOLDER"]):
+            os.makedirs(app.config["UPLOAD_FOLDER"])
 
-    if "file" not in request.files:
-        return jsonify({"error": "No file part"}), 400
+        if "file" not in request.files:
+            return jsonify({"error": "No file part"}), 400
 
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "No selected file"}), 400
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "No selected file"}), 400
 
-    if file and file.filename:
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-        file.save(file_path)
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            file.save(file_path)
 
-        database = request.form.get("database")
-        probeId = request.form.get("probeId")
-        probeName = request.form.get("probeName")
+            database = request.form.get("database")
+            probeId = request.form.get("probeId")
+            probeName = request.form.get("probeName")
 
-        meas_gen = MeasSetGen(database, probeId, probeName, file_path)
-        result = meas_gen.generate()
+            if not (database and probeId and probeName):
+                return (
+                    jsonify(
+                        {
+                            "error": "Missing required fields: database, probeId, or probeName"
+                        }
+                    ),
+                    400,
+                )
 
-        if result:
-            return jsonify({"status": "success", "data": result}), 200
-        else:
-            return jsonify({"error": "Generation failed"}), 500
+            # MeasSetGen 객체 생성 및 처리
+            meas_gen = MeasSetGen(database, probeId, probeName, file_path)
+            result = meas_gen.generate()
 
-    return jsonify({"error": "File handling issue"}), 400
+            if result:
+                return jsonify({"status": "success", "data": result}), 200
+            else:
+                return (
+                    jsonify(
+                        {
+                            "error": "Generation failed. Please check input data or file integrity."
+                        }
+                    ),
+                    500,
+                )
+
+        return jsonify({"error": "File handling issue"}), 400
+
+    except Exception as e:
+        app.logger.error(f"Unexpected error during file upload: {str(e)}")
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 
 @app.route("/api/get_list_database", methods=["GET"])

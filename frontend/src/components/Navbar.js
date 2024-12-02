@@ -32,21 +32,18 @@ const Navbar = () => {
     try {
       const response = await fetch('http://localhost:5000/api/auth/status', {
         method: 'GET',
-        credentials: 'include'
+        credentials: 'include',
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
+  
       const data = await response.json();
-
-      if (data.authenticated) {
+  
+      if (response.ok && data.authenticated) {
         setIsAuthenticated(true);
         setUsername(data.username);
       } else {
         setIsAuthenticated(false);
         setUsername('');
+        console.warn(data.message); // 인증 실패 메시지 로깅
       }
     } catch (error) {
       console.error('Auth status check failed:', error);
