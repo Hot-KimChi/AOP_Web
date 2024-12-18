@@ -116,7 +116,7 @@ class PredictML:
 
         power_df = self.df.loc[self.df.groupby("groupIndex")["TxFocusLocCm"].idxmax()]
         power_df = power_df.drop_duplicates(subset=["groupIndex"])
-        power_df["measSetComments"] = f"beamstyle_{self.probeName}_power"
+        power_df["measSetComments"] = f"Beamstyle_{self.probeName}_power"
         power_df["NumTxElements"] = oneCmElement
 
         power_df["AI_param"] = 1000

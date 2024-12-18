@@ -1,0 +1,52 @@
+.smallFontTable {
+    font-size: 0.85rem;
+  }
+  
+  .smallFontTable th,
+  .smallFontTable td {
+    padding: 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border: 1px solid #ddd;
+    width: 90px; /* 또는 원하는 너비 */
+    max-width: 100px; /* 최대 너비 설정 */
+  
+  }
+  
+  /* 테이블 간격 조절을 위한 새로운 클래스 */
+  .tableContainer {
+    margin-bottom: 2rem; /* 테이블 아래 여백 */
+  }
+  
+  .tableContainer table {
+    border-collapse: separate;
+    border-spacing: 0.1 0rem; /* 행 간 간격 */
+  }
+  
+  .tableContainer td,
+  .tableContainer th {
+    border: 1px solid #ddd; /* 셀 테두리 */
+    padding: 0.1rem; /* 셀 내부 여백 */
+  }
+  
+  .tableHeader {
+    display: flex;
+    align-items: center;
+  }
+  
+  .tableHeaderTextContainer {
+    flex: 1;
+    overflow: hidden;
+  }
+  
+  .tableHeaderText {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .tableHeaderIcon {
+    margin-left: 5px;
+    cursor: pointer;
+  }
