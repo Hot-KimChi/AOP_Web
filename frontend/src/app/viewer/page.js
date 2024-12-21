@@ -1,131 +1,188 @@
-'use client'
+// src/app/viewer/page.js
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useTable, useFilters, useSortBy } from 'react-table';
-import { FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
-import { fetchViewerData } from '../api/viewer.js';
-import styles from '../../style/viewer.module.css'
+'use client';
 
-// 기본 필터 UI 컴포넌트
-function DefaultColumnFilter({
-  column: { filterValue, setFilter, preFilteredRows }
-}) {
-  const count = preFilteredRows.length;
-
-  return (
-    <input
-      value={filterValue || ''}
-      onChange={e => {
-        setFilter(e.target.value || undefined);
-      }}
-      placeholder={`Search ${count} records...`}
-      className="form-control form-control-sm"
-    />
-  );
-}
-
-function ViewerTable({ columns, data }) {
-  const {
-    getTableProps,
-    getTableBodyProps,
-    headerGroups,
-    rows,
-    prepareRow,
-  } = useTable(
-    {
-      columns,
-      data,
-    },
-    useFilters,
-    useSortBy
-  );
-
-  return (
-    <div className={styles.tableContainer}>
-      <table {...getTableProps()} className={`table table-striped ${styles.smallFontTable}`}>
-        <thead>
-          {headerGroups.map(headerGroup => (
-            <tr {...headerGroup.getHeaderGroupProps()}>
-              {headerGroup.headers.map(column => (
-                <th {...column.getHeaderProps()}>
-                  <div className={styles.header}>
-                    <div className={styles.headerTextContainer}>
-                      <span className={styles.headerText} title={column.render('Header')}>
-                        {column.render('Header')}
-                      </span>
-                    </div>
-                    <span {...column.getSortByToggleProps()} className={styles.headerIcon}>
-                      {column.isSorted
-                        ? column.isSortedDesc
-                          ? <FaSortDown />
-                          : <FaSortUp />
-                        : <FaSort />}
-                    </span>
-                  </div>
-                  <div>{column.canFilter ? column.render('Filter') : null}</div>
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody {...getTableBodyProps()}>
-          {rows.map(row => {
-            prepareRow(row);
-            return (
-              <tr {...row.getRowProps()}>
-                {row.cells.map(cell => (
-                  <td {...cell.getCellProps()} title={String(cell.value)}>
-                    {cell.render('Cell')}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+import { useState, useEffect } from 'react';
+import Layout from '../../components/Layout';
 
 export default function Viewer() {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [DBList, setDBList] = useState([]);                       // 데이터베이스 목록 상태
+  const [selectedDatabase, setSelectedDatabase] = useState('');   // 선택된 데이터베이스 상태
+  const [tableList, setTableList] = useState([]);                 // 테이블 목록 상태
+  const [selectedTable, setSelectedTable] = useState('');         // 선택된 테이블 상태
+  const [data, setData] = useState([]);                           // 데이터 상태
+  const [isLoading, setIsLoading] = useState(false);              // 로딩 상태
+  const [error, setError] = useState(null);                       // 오류 상태
 
+  // 데이터베이스 목록을 가져오는 useEffect
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
+    const fetchDatabases = async () => {
       try {
-        const result = await fetchViewerData();
-        setData(result);
-      } catch (error) {
-        console.error("Fetching data failed:", error);
-        setError(error.message);
-      } finally {
-        setLoading(false);
-      }
-    }
+        const response = await fetch('http://localhost:5000/api/get_list_database', {
+          method: 'GET',
+          credentials: 'include',
+        });
 
-    fetchData();
+        if (!response.ok) {
+          throw new Error('Failed to fetch databases');
+        }
+
+        const data = await response.json();
+        setDBList(data.databases || []);
+      } catch (error) {
+        console.error('Failed to fetch databases:', error);
+        setError('Failed to fetch databases');
+      }
+    };
+
+    fetchDatabases();
   }, []);
 
-  const columns = useMemo(() => {
-    if (data.length === 0) return [];
-    return Object.keys(data[0]).map(key => ({
-      Header: key,
-      accessor: key,
-      Filter: DefaultColumnFilter,
-    }));
-  }, [data]);
+  // 데이터베이스가 선택되었을 때 테이블 목록을 가져오는 useEffect
+  useEffect(() => {
+    if (selectedDatabase) {
+      const fetchTables = async () => {
+        try {
+          setIsLoading(true);
+          const response = await fetch(`http://localhost:5000/api/get_list_table`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch tables');
+          }
+
+          const result = await response.json();
+          setTableList(result.tables || []);
+        } catch (error) {
+          console.error('Failed to fetch tables:', error);
+          setError('Failed to fetch tables');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchTables();
+    }
+  }, [selectedDatabase]);
+
+  // 테이블이 선택되었을 때 데이터를 가져오는 useEffect
+  useEffect(() => {
+    if (selectedTable) {
+      const fetchData = async () => {
+        try {
+          setIsLoading(true);
+          const response = await fetch(`/api/viewer?tableName=${selectedTable}`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch data');
+          }
+
+          const result = await response.json();
+          setData(result.data || []);
+        } catch (error) {
+          console.error('Failed to fetch data:', error);
+          setError('Failed to fetch data');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchData();
+    }
+  }, [selectedTable]);
+
+  // 데이터베이스 선택 변경 시 처리
+  const handleDatabaseChange = (event) => {
+    setSelectedDatabase(event.target.value);
+    setSelectedTable(''); // 테이블 선택 초기화
+    setTableList([]); // 테이블 목록 초기화
+    setData([]); // 이전 데이터 초기화
+    setError(null); // 오류 상태 초기화
+  };
+
+  // 테이블 선택 변경 시 처리
+  const handleTableChange = (event) => {
+    setSelectedTable(event.target.value);
+  };
 
   return (
-    <div className={styles.container}>
-      {loading && <p>Loading data...</p>}
-      {error && <p>Error: {error}</p>}
-      {!loading && !error && data.length === 0 && <p>No data available</p>}
-      {!loading && !error && data.length > 0 && (
-        <ViewerTable columns={columns} data={data} />
-      )}
-    </div>
+    <Layout>
+      <div className="container mt-5">
+        <h4 className="mb-4">SQL Viewer</h4>
+        <div className="row align-items-end">
+          <div className="col-md-4 mb-3">
+            <label htmlFor="databaseSelect" className="form-label">
+              Select Database
+            </label>
+            <select
+              id="databaseSelect"
+              className="form-select"
+              value={selectedDatabase}
+              onChange={handleDatabaseChange}
+              disabled={isLoading}
+            >
+              <option value="">Select a database</option>
+              {DBList.map((db, index) => (
+                <option key={index} value={db}>
+                  {db}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="col-md-6 mb-3">
+            <label htmlFor="tableSelect" className="form-label">
+              Select Table
+            </label>
+            <select
+              id="tableSelect"
+              className="form-select"
+              value={selectedTable}
+              onChange={handleTableChange}
+              disabled={isLoading || !selectedDatabase}
+            >
+              <option value="">Select a table</option>
+              {tableList.map((table, index) => (
+                <option key={index} value={table}>
+                  {table}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {isLoading && <p>Loading data...</p>}
+        {error && <p>Error: {error}</p>}
+        {!isLoading && !error && data.length === 0 && <p>No data available</p>}
+        {!isLoading && !error && data.length > 0 && (
+          <div className="mt-4">
+            <h3>Data:</h3>
+            <table className="table table-striped">
+              <thead>
+                <tr>
+                  {Object.keys(data[0]).map((key) => (
+                    <th key={key}>{key}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((row, index) => (
+                  <tr key={index}>
+                    {Object.values(row).map((value, i) => (
+                      <td key={i}>{value}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </Layout>
   );
 }

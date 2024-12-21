@@ -210,6 +210,15 @@ def get_list_database():
     return jsonify({"status": "success", "databases": databases})
 
 
+@app.route("/api/get_list_table", methods=["GET"])
+@handle_exceptions
+@require_auth
+def get_list_table():
+    """데이터베이스 목록 반환"""
+    tables = os.environ.get("SERVER_TABLE_TABLE", "").split(",")
+    return jsonify({"status": "success", "tables": tables})
+
+
 @app.route("/api/get_probes", methods=["GET"])
 @handle_exceptions
 @require_auth

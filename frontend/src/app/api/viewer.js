@@ -1,5 +1,4 @@
-// app/api/viewer.js
-import sql from 'mssql';
+import sql from 'mssql/msnodesqlv8';
 
 const config = {
   server: process.env.DB_SERVER,
