@@ -73,7 +73,7 @@ export default function Viewer() {
       const fetchData = async () => {
         try {
           setIsLoading(true);
-          const response = await fetch(`/api/viewer?tableName=${selectedTable}`, {
+          const response = await fetch(`/api/viewer/route?tableName=${selectedTable}`, {
             method: 'GET',
             credentials: 'include',
           });
