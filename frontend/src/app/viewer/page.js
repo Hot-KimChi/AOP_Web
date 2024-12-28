@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 
+
 export default function Viewer() {
   const [DBList, setDBList] = useState([]);                       // 데이터베이스 목록 상태
   const [selectedDatabase, setSelectedDatabase] = useState('');   // 선택된 데이터베이스 상태
@@ -67,13 +68,14 @@ export default function Viewer() {
     }
   }, [selectedDatabase]);
 
-  // 테이블이 선택되었을 때 데이터를 가져오는 useEffect
+ 
+  // 데이터베이스와 테이블이 모두 선택되었을 때 데이터를 가져오는 useEffect
   useEffect(() => {
-    if (selectedTable) {
+    if (selectedDatabase && selectedTable) {
       const fetchData = async () => {
         try {
           setIsLoading(true);
-          const response = await fetch(`/api/viewer/route?tableName=${selectedTable}`, {
+          const response = await fetch(`/api/viewer?databaseName=${selectedDatabase}&tableName=${selectedTable}`, {
             method: 'GET',
             credentials: 'include',
           });
@@ -94,7 +96,7 @@ export default function Viewer() {
 
       fetchData();
     }
-  }, [selectedTable]);
+  }, [selectedDatabase, selectedTable]);
 
   // 데이터베이스 선택 변경 시 처리
   const handleDatabaseChange = (event) => {
