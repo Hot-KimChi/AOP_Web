@@ -112,6 +112,14 @@ export default function Viewer() {
     setSelectedTable(event.target.value);
   };
 
+  // 새 창에서 데이터 보기 함수 추가
+  const openDataInNewWindow = () => {
+    if (selectedDatabase && selectedTable) {
+      const url = `/viewer/data-view?databaseName=${selectedDatabase}&tableName=${selectedTable}`;
+      window.open(url, '_blank', 'width=1200,height=800');
+    }
+  };
+
   return (
     <Layout>
       <div className="container mt-5">
@@ -156,32 +164,23 @@ export default function Viewer() {
               ))}
             </select>
           </div>
+
+          <div className="col-md-2 mb-3">
+            <button
+              className="btn btn-primary"
+              onClick={openDataInNewWindow}
+              disabled={!selectedDatabase || !selectedTable || isLoading}
+            >
+              View in New Window
+            </button>
+          </div>
         </div>
 
         {isLoading && <p>Loading data...</p>}
-        {error && <p>Error: {error}</p>}
-        {!isLoading && !error && data.length === 0 && <p>No data available</p>}
-        {!isLoading && !error && data.length > 0 && (
-          <div className="mt-4">
-            <h3>Data:</h3>
-            <table className="table table-striped">
-              <thead>
-                <tr>
-                  {Object.keys(data[0]).map((key) => (
-                    <th key={key}>{key}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((row, index) => (
-                  <tr key={index}>
-                    {Object.values(row).map((value, i) => (
-                      <td key={i}>{value}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {error && <p className="text-danger">Error: {error}</p>}
+        {!isLoading && !error && selectedDatabase && selectedTable && (
+          <div className="alert alert-info mt-3">
+            Select "View in New Window" to see the data in a separate window.
           </div>
         )}
       </div>
