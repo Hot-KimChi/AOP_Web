@@ -1,21 +1,17 @@
 // src/app/viewer/page.js
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 
-
 export default function Viewer() {
-  const [DBList, setDBList] = useState([]);                       // 데이터베이스 목록 상태
-  const [selectedDatabase, setSelectedDatabase] = useState('');   // 선택된 데이터베이스 상태
-  const [tableList, setTableList] = useState([]);                 // 테이블 목록 상태
-  const [selectedTable, setSelectedTable] = useState('');         // 선택된 테이블 상태
-  const [data, setData] = useState([]);                           // 데이터 상태
-  const [isLoading, setIsLoading] = useState(false);              // 로딩 상태
-  const [error, setError] = useState(null);                       // 오류 상태
+  const [DBList, setDBList] = useState([]);
+  const [selectedDatabase, setSelectedDatabase] = useState('');
+  const [tableList, setTableList] = useState([]);
+  const [selectedTable, setSelectedTable] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // 데이터베이스 목록을 가져오는 useEffect
   useEffect(() => {
     const fetchDatabases = async () => {
       try {
@@ -39,7 +35,6 @@ export default function Viewer() {
     fetchDatabases();
   }, []);
 
-  // 데이터베이스가 선택되었을 때 테이블 목록을 가져오는 useEffect
   useEffect(() => {
     if (selectedDatabase) {
       const fetchTables = async () => {
@@ -68,121 +63,84 @@ export default function Viewer() {
     }
   }, [selectedDatabase]);
 
- 
-  // 데이터베이스와 테이블이 모두 선택되었을 때 데이터를 가져오는 useEffect
-  useEffect(() => {
-    if (selectedDatabase && selectedTable) {
-      const fetchData = async () => {
-        try {
-          setIsLoading(true);
-          const response = await fetch(`/api/viewer?databaseName=${selectedDatabase}&tableName=${selectedTable}`, {
-            method: 'GET',
-            credentials: 'include',
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to fetch data');
-          }
-
-          const result = await response.json();
-          setData(result.data || []);
-        } catch (error) {
-          console.error('Failed to fetch data:', error);
-          setError('Failed to fetch data');
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      fetchData();
-    }
-  }, [selectedDatabase, selectedTable]);
-
-  // 데이터베이스 선택 변경 시 처리
   const handleDatabaseChange = (event) => {
     setSelectedDatabase(event.target.value);
-    setSelectedTable(''); // 테이블 선택 초기화
-    setTableList([]); // 테이블 목록 초기화
-    setData([]); // 이전 데이터 초기화
-    setError(null); // 오류 상태 초기화
+    setSelectedTable('');
+    setTableList([]);
+    setError(null);
   };
 
-  // 테이블 선택 변경 시 처리
   const handleTableChange = (event) => {
     setSelectedTable(event.target.value);
   };
 
-  // 새 창에서 데이터 보기 함수 추가
-  const openDataInNewWindow = () => {
+  const handleViewData = () => {
     if (selectedDatabase && selectedTable) {
-      const url = `/viewer/data-view?databaseName=${selectedDatabase}&tableName=${selectedTable}`;
-      window.open(url, '_blank', 'width=1200,height=800');
+      const url = `/viewer/data-view-standalone?database=${selectedDatabase}&table=${selectedTable}`;
+      const windowFeatures = 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no';
+      window.open(url, '_blank', windowFeatures);
     }
   };
 
   return (
     <Layout>
-      <div className="container mt-5">
-        <h4 className="mb-4">SQL Viewer</h4>
-        <div className="row align-items-end">
-          <div className="col-md-4 mb-3">
-            <label htmlFor="databaseSelect" className="form-label">
-              Select Database
-            </label>
-            <select
-              id="databaseSelect"
-              className="form-select"
-              value={selectedDatabase}
-              onChange={handleDatabaseChange}
-              disabled={isLoading}
-            >
-              <option value="">Select a database</option>
-              {DBList.map((db, index) => (
-                <option key={index} value={db}>
-                  {db}
-                </option>
-              ))}
-            </select>
+      <div className="container mt-4">
+        <div className="card shadow-sm">
+          <div className="card-header bg-primary text-white">
+            <h5 className="mb-0">Database Viewer</h5>
           </div>
+          <div className="card-body">
+            <div className="row g-3">
+              <div className="col-md-5">
+                <label htmlFor="database" className="form-label">Database</label>
+                <select
+                  id="database"
+                  className="form-select"
+                  value={selectedDatabase}
+                  onChange={handleDatabaseChange}
+                  disabled={isLoading}
+                >
+                  <option value="">Select Database</option>
+                  {DBList.map((db, index) => (
+                    <option key={index} value={db}>{db}</option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="col-md-6 mb-3">
-            <label htmlFor="tableSelect" className="form-label">
-              Select Table
-            </label>
-            <select
-              id="tableSelect"
-              className="form-select"
-              value={selectedTable}
-              onChange={handleTableChange}
-              disabled={isLoading || !selectedDatabase}
-            >
-              <option value="">Select a table</option>
-              {tableList.map((table, index) => (
-                <option key={index} value={table}>
-                  {table}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div className="col-md-5">
+                <label htmlFor="table" className="form-label">Table</label>
+                <select
+                  id="table"
+                  className="form-select"
+                  value={selectedTable}
+                  onChange={handleTableChange}
+                  disabled={!selectedDatabase || isLoading}
+                >
+                  <option value="">Select Table</option>
+                  {tableList.map((table, index) => (
+                    <option key={index} value={table}>{table}</option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="col-md-2 mb-3">
-            <button
-              className="btn btn-primary"
-              onClick={openDataInNewWindow}
-              disabled={!selectedDatabase || !selectedTable || isLoading}
-            >
-              View in New Window
-            </button>
+              <div className="col-md-2 d-flex align-items-end">
+                <button
+                  className="btn btn-primary w-100"
+                  onClick={handleViewData}
+                  disabled={!selectedDatabase || !selectedTable}
+                >
+                  View Data
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="alert alert-danger mt-3">
+                {error}
+              </div>
+            )}
           </div>
         </div>
-
-        {isLoading && <p>Loading data...</p>}
-        {error && <p className="text-danger">Error: {error}</p>}
-        {!isLoading && !error && selectedDatabase && selectedTable && (
-          <div className="alert alert-info mt-3">
-            Select "View in New Window" to see the data in a separate window.
-          </div>
-        )}
       </div>
     </Layout>
   );
