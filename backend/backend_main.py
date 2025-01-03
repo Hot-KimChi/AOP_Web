@@ -25,7 +25,7 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.secret_key = os.urandom(24)
 
 # JWT 관련 환경 변수
-SECRET_KEY = os.environ.get("AUTH_SECRET_KEY", "your_secret_key")
+SECRET_KEY = os.environ.get("AUTH_SECRET_KEY", "AOP_Admin_Token")
 EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME", 3600))  # 기본값: 3600초 (1시간)
 
 
