@@ -1,10 +1,10 @@
-// src/app/viewer/data-view-standalone/page.js
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function DataViewStandalone() {
+// SearchParams를 사용하는 컴포넌트를 분리
+function DataViewContent() {
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -97,7 +97,21 @@ export default function DataViewStandalone() {
           )}
         </>
       )}
+    </div>
+  );
+}
 
+// 메인 컴포넌트
+export default function DataViewStandalone() {
+  return (
+    <Suspense fallback={
+      <div className="text-center p-5">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    }>
+      <DataViewContent />
       <style jsx global>{`
         @media print {
           .btn-secondary {
@@ -105,6 +119,6 @@ export default function DataViewStandalone() {
           }
         }
       `}</style>
-    </div>
+    </Suspense>
   );
 }
