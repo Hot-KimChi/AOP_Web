@@ -3,7 +3,6 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-// SearchParams를 사용하는 컴포넌트를 분리
 function DataViewContent() {
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,6 +40,28 @@ function DataViewContent() {
     fetchData();
   }, [searchParams]);
 
+  // 숫자 포맷팅 함수
+  const formatNumber = (value) => {
+    if (typeof value === 'number') {
+      // 소수점 이하가 있으면 5자리까지 표시
+      return value % 1 === 0 ? value : parseFloat(value.toFixed(4));
+    }
+    return value?.toString() || '';
+  };
+
+  // 문자열을 10자로 제한하는 함수
+  const truncateText = (text) => {
+    if (!text) return '';
+    const str = text.toString();
+    return str.length > 20 ? `${str.substring(0, 10)}...` : str;
+  };
+
+  // 셀 데이터 표시 함수
+  const renderCellContent = (value) => {
+    const formattedValue = formatNumber(value);
+    return truncateText(formattedValue);
+  };
+
   return (
     <div className="container-fluid p-4">
       {isLoading ? (
@@ -68,12 +89,14 @@ function DataViewContent() {
           </div>
 
           {data.length > 0 ? (
-            <div className="table-responsive bg-white rounded shadow-sm">
+            <div className="table-container">
               <table className="table table-striped table-hover mb-0">
                 <thead>
                   <tr>
                     {Object.keys(data[0]).map((header, index) => (
-                      <th key={index} className="px-3">{header}</th>
+                      <th key={index} className="px-3" title={header}>
+                        {truncateText(header)}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -81,8 +104,12 @@ function DataViewContent() {
                   {data.map((row, rowIndex) => (
                     <tr key={rowIndex}>
                       {Object.values(row).map((value, colIndex) => (
-                        <td key={colIndex} className="px-3">
-                          {value?.toString() || ''}
+                        <td 
+                          key={colIndex} 
+                          className="px-3"
+                          title={formatNumber(value)}
+                        >
+                          {renderCellContent(value)}
                         </td>
                       ))}
                     </tr>
@@ -97,11 +124,42 @@ function DataViewContent() {
           )}
         </>
       )}
+      <style jsx>{`
+        .table-container {
+          width: 100%;
+          overflow-x: auto;
+          white-space: nowrap;
+          background-color: white;
+          border-radius: 0.25rem;
+          box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        
+        .table-container table {
+          margin: 0;
+          min-width: 800px;
+        }
+        
+        .table-container::-webkit-scrollbar {
+          height: 8px;
+        }
+        
+        .table-container::-webkit-scrollbar-track {
+          background: #f1f1f1;
+        }
+        
+        .table-container::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 4px;
+        }
+        
+        .table-container::-webkit-scrollbar-thumb:hover {
+          background: #555;
+        }
+      `}</style>
     </div>
   );
 }
 
-// 메인 컴포넌트
 export default function DataViewStandalone() {
   return (
     <Suspense fallback={
