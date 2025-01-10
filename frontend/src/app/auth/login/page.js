@@ -20,7 +20,10 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      // 환경 변수로 API URL 설정
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/login`;
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
