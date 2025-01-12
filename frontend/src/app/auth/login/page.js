@@ -11,6 +11,8 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+
   const handleLogin = async () => {
     if (!username || !password) {
       setError('Please enter both username and password.');
@@ -20,10 +22,7 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      // 환경 변수로 API URL 설정
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/login`;
-
-      const response = await fetch(apiUrl, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -38,7 +37,6 @@ const LoginPage = () => {
         return;
       }
 
-      // 로그인 성공 시
       router.push('/');
     } catch (error) {
       console.error('Login error:', error);

@@ -13,10 +13,16 @@ from pkg_MeasSetGen.meas_generation import MeasSetGen
 app = Flask(__name__)
 
 # CORS 설정: 허용된 도메인만 설정
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://172.30.1.69:3000",  # Your network URL
+    "http://10.82.218.49:3000",  # Your server URL
+]
+
 CORS(
     app,
     supports_credentials=True,
-    resources={r"/api/*": {"origins": ["http://localhost:3000"]}},
+    resources={r"/api/*": {"origins": ALLOWED_ORIGINS}},
 )
 
 # 업로드 폴더 설정
