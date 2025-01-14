@@ -13,10 +13,12 @@ export default function MeasSetGen() {
   const [processedData, setProcessedData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+
   useEffect(() => {
     const fetchDatabases = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/get_list_database', {
+        const response = await fetch(`${API_BASE_URL}/api/get_list_database`, {
           method: 'GET',
           credentials: 'include',
         });
@@ -42,7 +44,7 @@ export default function MeasSetGen() {
       const fetchProbes = async () => {
         try {
           const response = await fetch(
-            `http://localhost:5000/api/get_probes?database=${selectedDatabase}`,
+            `${API_BASE_URL}/api/get_probes?database=${selectedDatabase}`,
             {
               method: 'GET',
               credentials: 'include',
@@ -85,7 +87,7 @@ export default function MeasSetGen() {
       formData.append('probeName', probeName); // probeName 전송
 
       try {
-        const response = await fetch(`http://localhost:5000/api/measset-generation`, {
+        const response = await fetch(`${API_BASE_URL}/api/measset-generation`, {
           method: 'POST',
           body: formData,
           credentials: 'include',

@@ -11,9 +11,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  console.log(process.env.NEXT_PUBLIC_API_BASE_URL)
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
-  console.log(API_BASE_URL)
 
   const handleLogin = async () => {
     if (!username || !password) {

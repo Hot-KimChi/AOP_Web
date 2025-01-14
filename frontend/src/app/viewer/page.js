@@ -12,10 +12,12 @@ export default function Viewer() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+
   useEffect(() => {
     const fetchDatabases = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/get_list_database', {
+        const response = await fetch(`${API_BASE_URL}/api/get_list_database`, {
           method: 'GET',
           credentials: 'include',
         });
@@ -40,7 +42,7 @@ export default function Viewer() {
       const fetchTables = async () => {
         try {
           setIsLoading(true);
-          const response = await fetch(`http://localhost:5000/api/get_list_table`, {
+          const response = await fetch(`${API_BASE_URL}/api/get_list_table`, {
             method: 'GET',
             credentials: 'include',
           });

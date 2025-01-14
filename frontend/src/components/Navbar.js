@@ -24,13 +24,15 @@ const Navbar = () => {
     { href: '/machine-learning', icon: faBrain, text: 'Machine Learning' },
   ];
 
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+
   useEffect(() => {
     checkAuthStatus();
   }, []);
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/status', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/status`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -54,7 +56,7 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/logout', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
         method: 'POST',
         credentials: 'include'
       });
