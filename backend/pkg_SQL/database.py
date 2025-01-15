@@ -23,7 +23,7 @@ class SQL:
 
     def create_connection_string(self):
         """연결 문자열을 생성합니다."""
-        driver = "ODBC+Driver+17+for+SQL+Server"
+        driver = "ODBC Driver 17 for SQL Server"
 
         if self.windows_auth:
             # 윈도우 인증 사용
