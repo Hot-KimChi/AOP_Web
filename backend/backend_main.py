@@ -103,6 +103,10 @@ def login():
         }
         token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
+        # Save username and password in session
+        session["username"] = username
+        session["password"] = password
+
         response = jsonify({"status": "success", "message": "Login successful"})
         response.set_cookie("auth_token", token, httponly=True, samesite="Lax")
         return response
@@ -232,7 +236,14 @@ def get_probes():
     if not database:
         return jsonify({"error": "No database specified"}), 400
 
-    connect = SQL(windows_auth=True, database=database)
+    # Retrieve username and password from session
+    username = session.get("username")
+    password = session.get("password")
+
+    if not username or not password:
+        return jsonify({"error": "User not authenticated"}), 401
+
+    connect = SQL(username, password, database=database)
     query = "SELECT probeId, probeName FROM probe_geo"
     df = connect.execute_query(query)
     probes = [{"probeId": row[0], "probeName": row[1]} for row in df.values.tolist()]
