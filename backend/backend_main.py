@@ -92,7 +92,7 @@ def login():
     username = data.get("username")
     password = data.get("password")
 
-    sql = SQL(windows_auth=True, database="master")
+    sql = SQL(username, password, database="master")
     user_info = sql.get_user_info(username=username)
 
     if user_info and sql.authenticate_user(username=username, password=password):

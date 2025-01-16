@@ -22,6 +22,7 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
+      console.log(API_BASE_URL)
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {

@@ -4,6 +4,7 @@ import pandas as pd
 import bcrypt
 from sqlalchemy import create_engine, text
 import logging
+from urllib.parse import quote_plus
 
 # 로깅 설정
 logging.basicConfig(
@@ -12,10 +13,11 @@ logging.basicConfig(
 
 
 class SQL:
-    def __init__(self, database=None, windows_auth=False):
+    def __init__(self, username, password, database=None):
         self.server = os.environ.get("SERVER_ADDRESS_ADDRESS")  # 서버 주소 환경 변수
         self.database = database
-        self.windows_auth = windows_auth
+        self.username = username
+        self.password = password
         self.connection_string = self.create_connection_string()
         self.engine = create_engine(
             self.connection_string
@@ -23,14 +25,19 @@ class SQL:
 
     def create_connection_string(self):
         """연결 문자열을 생성합니다."""
-        driver = "ODBC+Driver+17+for+SQL+Server"
+        driver = "ODBC Driver 17 for SQL Server"
 
-        if self.windows_auth:
-            # 윈도우 인증 사용
-            return f"mssql+pyodbc://@{self.server}/{self.database}?driver={driver}&trusted_connection=yes&timeout=30"
-        else:
-            # 사용자 인증 사용
-            return f"mssql+pyodbc://username:password@{self.server}/{self.database}?driver={driver}&timeout=30"
+        # 사용자 인증 사용
+        conn_str = (
+            f"DRIVER={driver};"
+            f"SERVER={self.server};"
+            f"DATABASE={self.database};"
+            f"UID={self.username};"
+            f"PWD={self.password};"
+            "TrustServerCertificate=yes;"
+        )
+
+        return f"mssql+pyodbc:///?odbc_connect={quote_plus(conn_str)}"
 
     def connect(self):
         """SQLAlchemy 엔진을 사용하여 연결을 생성합니다."""
