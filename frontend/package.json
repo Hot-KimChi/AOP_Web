@@ -19,6 +19,7 @@
     "bootstrap": "^5.3.3",
     "framer-motion": "^11.11.13",
     "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.473.0",
     "msnodesqlv8": "^4.4.0",
     "mssql": "^11.0.1",
     "next": "^15.1.1",

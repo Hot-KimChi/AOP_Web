@@ -12,6 +12,7 @@ export default function MeasSetGen() {
   const [file, setFile] = useState(null);
   const [processedData, setProcessedData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
@@ -31,6 +32,7 @@ export default function MeasSetGen() {
         setDBList(data.databases || []);
       } catch (error) {
         console.error('Failed to fetch databases:', error);
+        setError('Failed to fetch databases');
         setDBList([]);
       }
     };
@@ -59,6 +61,7 @@ export default function MeasSetGen() {
           setProbeList(data.probes || []);
         } catch (error) {
           console.error('Failed to fetch probes:', error);
+          setError('Failed to fetch probes');
           setProbeList([]);
         } finally {
           setIsLoading(false);
@@ -96,6 +99,7 @@ export default function MeasSetGen() {
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`Failed to process the file. Status: ${response.status}, Message: ${errorText}`);
+          setError('Failed to process the files');
         } else {
           const data = await response.json();
           setProcessedData(data.data);
@@ -111,81 +115,93 @@ export default function MeasSetGen() {
   };
 
   return (
-    <div className="container mt-5">
-      <h4 className="mb-4">MeasSet Generation</h4>
-      <div className="row align-items-end">
-        <div className="col-md-4 mb-3">
-          <label htmlFor="databaseSelect" className="form-label">
-            Select Database
-          </label>
-          <select
-            id="databaseSelect"
-            className="form-select"
-            value={selectedDatabase}
-            onChange={(e) => setSelectedDatabase(e.target.value)}
-            disabled={isLoading}
-          >
-            <option value="">Select a database</option>
-            {DBList.map((db, index) => (
-              <option key={index} value={db}>
-                {db}
-              </option>
-            ))}
-          </select>
+    <div className="container mt-4">
+      <div className="card shadow-sm">
+        <div className="card-header bg-primary text-white">
+          <h5 className="mb-0">MeasSet Generation</h5>
         </div>
+        <div className="card-body">
+          <div className="row g-3">
+            <div className="col-md-4">
+              <label htmlFor="databaseSelect" className="form-label">
+                Select Database
+              </label>
+              <select
+                id="databaseSelect"
+                className="form-select"
+                value={selectedDatabase}
+                onChange={(e) => setSelectedDatabase(e.target.value)}
+                disabled={isLoading}
+              >
+                <option value="">Select a database</option>
+                {DBList.map((db, index) => (
+                  <option key={index} value={db}>
+                    {db}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="col-md-4 mb-3">
-          <label htmlFor="probeSelect" className="form-label">
-            Select Probe
-          </label>
-          <select
-            id="probeSelect"
-            className="form-select"
-            value={selectedProbe ? JSON.stringify(selectedProbe) : ''}      // JSON 문자열로 설정
-            onChange={(e) => setSelectedProbe(JSON.parse(e.target.value))}  // 선택한 값을 JSON으로 파싱하여 저장
-            disabled={isLoading || !selectedDatabase}
-          >
-            <option value="">Select a probe</option>
-            {probeList.map((probe) => (
-              <option key={probe.probeId} value={JSON.stringify({ id: probe.probeId, name: probe.probeName })}>
-                {probe.probeName} ({probe.probeId})
-              </option>
-            ))}
-          </select>
-        </div>
+            <div className="col-md-4">
+              <label htmlFor="probeSelect" className="form-label">
+                Select Probe
+              </label>
+              <select
+                id="probeSelect"
+                className="form-select"
+                value={selectedProbe ? JSON.stringify(selectedProbe) : ''}
+                onChange={(e) => setSelectedProbe(JSON.parse(e.target.value))}
+                disabled={isLoading || !selectedDatabase}
+              >
+                <option value="">Select a probe</option>
+                {probeList.map((probe) => (
+                  <option key={probe.probeId} value={JSON.stringify({ id: probe.probeId, name: probe.probeName })}>
+                    {probe.probeName} ({probe.probeId})
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="col-md-4 mb-3">
-          <label htmlFor="fileInput" className="form-label">
-            Select File
-          </label>
-          <input
-            type="file"
-            id="fileInput"
-            className="form-control"
-            onChange={handleFileChange}
-            disabled={isLoading}
-          />
-        </div>
+            <div className="col-md-4">
+              <label htmlFor="fileInput" className="form-label">
+                Select File
+              </label>
+              <input
+                type="file"
+                id="fileInput"
+                className="form-control"
+                onChange={handleFileChange}
+                disabled={isLoading}
+              />
+            </div>
 
-        <div className="col-12 mb-3">
-          <button 
-            className="btn btn-primary w-100"
-            onClick={handleFileUpload}
-            disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
-          >
-            {isLoading ? 'Processing...' : 'Upload & Process File'}
-          </button>
+            <div className="col-12">
+              <button
+                className="btn btn-primary w-100"
+                onClick={handleFileUpload}
+                disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
+              >
+                {isLoading ? 'Processing...' : 'Upload & Process File'}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="alert alert-danger mt-3">
+              {error}
+            </div>
+          )}
+
+          {processedData && (
+            <div className="mt-4">
+              <h5>Processed Data:</h5>
+              <pre className="bg-light p-3 rounded">
+                {JSON.stringify(processedData, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       </div>
-
-      {processedData && (
-        <div className="mt-4">
-          <h3>Processed Data:</h3>
-          <pre className="bg-light p-3 rounded">
-            {JSON.stringify(processedData, null, 2)}
-          </pre>
-        </div>
-      )}
     </div>
   );
 }
