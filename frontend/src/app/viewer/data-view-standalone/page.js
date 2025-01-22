@@ -151,9 +151,10 @@ function DataViewContent() {
 
   const formatNumber = (value) => {
     if (typeof value === 'number') {
+      // 0도 포함하여 숫자 처리
       return value % 1 === 0 ? value : parseFloat(value.toFixed(4));
     }
-    return value?.toString() || '';
+    return value?.toString() || ''; // null이나 undefined가 아닌 값만 문자열로 변환
   };
 
   const truncateText = (text) => {
@@ -163,8 +164,16 @@ function DataViewContent() {
   };
 
   const renderCellContent = (value) => {
+    // null이나 undefined일 경우 빈 문자열 반환
+    if (value === null || value === undefined) {
+      return '';
+    }
+  
+    // 0을 빈 문자열로 처리하지 않도록 수정
     const formattedValue = formatNumber(value);
-    return truncateText(formattedValue);
+  
+    // 0을 빈 문자열로 처리하지 않고 그대로 반환
+    return formattedValue === 0 ? '0' : truncateText(formattedValue);
   };
 
   // 콤보박스 옵션을 생성하는 함수
