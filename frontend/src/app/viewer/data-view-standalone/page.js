@@ -218,7 +218,7 @@ function DataViewContent() {
           <div className="table-container">
             <table className="w-full min-w-[800px] border-collapse">
               <thead>
-                <tr className="bg-gray-100">
+                <tr className="bg-gray-100 sticky-header">
                   {Object.keys(displayData[0] || {}).map((header, index) => (
                     <th key={index} className="px-3 py-2 border">
                       <div className="flex items-center justify-between group">
@@ -239,6 +239,8 @@ function DataViewContent() {
                     </th>
                   ))}
                 </tr>
+              </thead>
+              <thead className="sticky-filter">
                 <tr>
                   {Object.keys(displayData[0] || {}).map((header, index) => (
                     <th key={index} className="px-2 py-1 border bg-gray-50">
@@ -300,12 +302,33 @@ function DataViewContent() {
         .table-container {
           width: 100%;
           overflow-x: auto;
+          max-height: 900px;
           white-space: nowrap;
           background-color: white;
           border-radius: 0.25rem;
           box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
         }
-        
+
+        .table-container th, .table-container td {
+          font-size: 12px;
+          text-align: left;
+          border: 1px solid #ddd;
+        }
+
+        .sticky-header {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background-color: white;
+        }
+
+        .sticky-filter {
+          position: sticky;
+          top: 40px; /* Adjust to position it below the header */
+          z-index: 9;
+          background-color: white;
+        }
+
         .table-container::-webkit-scrollbar {
           height: 8px;
         }
