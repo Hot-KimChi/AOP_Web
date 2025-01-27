@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import "../../../globals.css"
+import "../../../globals.css";
 
 const LoginPage = () => {
   const router = useRouter();
@@ -13,7 +13,7 @@ const LoginPage = () => {
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
-  const handleLogin = async () => {
+  const handleLogin = useCallback(async () => {
     if (!username || !password) {
       setError('Please enter both username and password.');
       return;
@@ -22,7 +22,6 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      console.log(API_BASE_URL)
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
@@ -45,7 +44,7 @@ const LoginPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [username, password, router]);
 
   useEffect(() => {
     if (error) {
@@ -76,6 +75,7 @@ const LoginPage = () => {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             disabled={isLoading}
+            autoFocus
           />
         </div>
 
