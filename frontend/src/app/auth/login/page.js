@@ -13,6 +13,7 @@ const LoginPage = () => {
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
+  // 로그인 핸들러 함수
   const handleLogin = useCallback(async () => {
     if (!username || !password) {
       setError('Please enter both username and password.');
