@@ -20,15 +20,7 @@ class MeasSetGen:
         self.probeName = probeName
         self.file_path = file_path
 
-        # username = session.get("username")
-        # password = session.get("password")
-
-        # if not username or not password:
-        #     return jsonify({"error": "User not authenticated"}), 401
-
-        # print(username, password, self.database)
         # self.sql = SQL(username, password, self.database)
-        print("여기")
 
     def generate(self):
         try:
