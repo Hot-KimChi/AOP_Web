@@ -14,10 +14,11 @@ logging.basicConfig(
 
 class SQL:
     def __init__(self, username, password, database=None):
-        self.server = os.environ.get("SERVER_ADDRESS_ADDRESS")  # 서버 주소 환경 변수
-        self.database = database
         self.username = username
         self.password = password
+        self.database = database
+
+        self.server = os.environ.get("SERVER_ADDRESS_ADDRESS")  # 서버 주소 환경 변수
         self.connection_string = self.create_connection_string()
         self.engine = create_engine(
             self.connection_string

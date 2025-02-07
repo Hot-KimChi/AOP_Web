@@ -2,6 +2,7 @@ import joblib
 import pandas as pd
 from pkg_SQL.database import SQL
 import numpy as np
+from flask import jsonify, session
 
 # Pandas 다운캐스팅 옵션 설정
 pd.set_option("future.no_silent_downcasting", True)
@@ -15,11 +16,17 @@ class PredictML:
     3) Power case: find to set-up PRF for preventing of transducer damage
     """
 
-    def __init__(self, database, df, probeId, probeName):
-        self.database = database
+    def __init__(self, df, probeId, probeName, database):
         self.df = df
         self.probeId = probeId
         self.probeName = probeName
+        self.database = database
+
+        self.username = session.get("username")
+        self.password = session.get("password")
+
+        if not self.username or not self.password:
+            return jsonify({"error": "User not authenticated"}), 401
 
     def _paramForIntensity(self):
         ## take parameters for ML from measSet_gen file.
@@ -36,7 +43,9 @@ class PredictML:
         ].copy()
 
         ## load parameters from SQL database
-        connect = SQL(windows_auth=True, database=self.database)
+        connect = SQL(
+            username=self.username, password=self.password, database=self.database
+        )
         query = f"""
             SELECT [probePitchCm], [probeRadiusCm], [probeElevAperCm0], [probeElevAperCm1], [probeElevFocusRangCm], [probeElevFocusRangCm1]
             FROM probe_geo 
@@ -103,7 +112,9 @@ class PredictML:
         ## predict PRF by ML model.
 
         ## load parameters from SQL database for transducer pitch
-        connect = SQL(windows_auth=True, database=self.database)
+        connect = SQL(
+            username=self.username, password=self.password, database=self.database
+        )
         query = f"""
             SELECT [probePitchCm]
             FROM probe_geo 

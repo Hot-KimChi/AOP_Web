@@ -38,6 +38,7 @@ export async function GET(request) {
     const result = await pool.request().query(`
       SELECT TOP 1000 *
       FROM ${tableName}
+      ORDER BY 1 DESC
     `);
 
     return NextResponse.json({ 

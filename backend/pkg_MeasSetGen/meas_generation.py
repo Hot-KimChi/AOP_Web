@@ -3,7 +3,6 @@ from pkg_MeasSetGen.param_update import ParamUpdate
 from pkg_MeasSetGen.param_gen import ParamGen
 from pkg_MeasSetGen.predictML import PredictML
 from pkg_MeasSetGen.data_inout import DataOut
-from pkg_SQL.database import SQL
 import pandas as pd
 import logging
 
@@ -20,7 +19,16 @@ class MeasSetGen:
         self.probeId = probeId
         self.probeName = probeName
         self.file_path = file_path
-        self.sql = SQL(database=self.database, windows_auth=True)
+
+        # username = session.get("username")
+        # password = session.get("password")
+
+        # if not username or not password:
+        #     return jsonify({"error": "User not authenticated"}), 401
+
+        # print(username, password, self.database)
+        # self.sql = SQL(username, password, self.database)
+        print("여기")
 
     def generate(self):
         try:
@@ -48,7 +56,10 @@ class MeasSetGen:
 
             # Step 4: 머신러닝 예측
             predictionML = PredictML(
-                self.database, gen_df, self.probeId, self.probeName
+                df=gen_df,
+                probeId=self.probeId,
+                probeName=self.probeName,
+                database=self.database,
             )
             gen_df_inten = predictionML.intensity_zt_est()
             gen_df_temp = predictionML.temperature_PRF_est()
@@ -73,7 +84,7 @@ class MeasSetGen:
 
             # Step 6: 데이터베이스에 삽입
             df = pd.read_csv(file_path)
-            self.sql.insert_data(table_name="meas_setting", data=df)
+            # self.sql.insert_data(table_name="meas_setting", data=df)
             logging.info("Data successfully inserted into MS-SQL.")
 
             return {"status": "success", "file_path": file_path}
