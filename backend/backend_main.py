@@ -36,7 +36,7 @@ class DatabaseManager:
         """Context manager for database connections"""
         connection = None
         try:
-            connection = SQL(username, password, database=database)
+            connection = SQL(username, password, database)
             yield connection
         finally:
             if connection and hasattr(connection, "close"):
@@ -67,6 +67,11 @@ class Config:
             os.environ["DATABASE_NAME"] = config["database"]["name"]
 
 
+def error_response(message: str, status_code: int):
+    """error feedback to user"""
+    return jsonify({"status": "error", "message": message}), status_code
+
+
 def create_app():
     """Application factory function"""
     app = Flask(__name__)
@@ -78,13 +83,13 @@ def create_app():
         supports_credentials=True,
         resources={r"/api/*": {"origins": Config.ALLOWED_ORIGINS}},
     )
-
     app.secret_key = os.urandom(24)
 
     def get_db():
         """Get database connection from Flask g object"""
         if "db" not in g:
             g.db = DatabaseManager()
+
         return g.db
 
     def handle_exceptions(f):
@@ -96,7 +101,7 @@ def create_app():
                 return f(*args, **kwargs)
             except Exception as e:
                 logger.error(f"Error occurred: {str(e)}", exc_info=True)
-                return jsonify({"status": "error", "message": str(e)}), 500
+                return error_response(str(e), 500)
 
         return decorated_function
 
@@ -107,16 +112,13 @@ def create_app():
         def decorated_function(*args, **kwargs):
             token = request.cookies.get("auth_token")
             if not token:
-                return (
-                    jsonify({"status": "error", "message": "Authentication required"}),
-                    401,
-                )
+                return error_response("Authentication required", 401)
             try:
                 jwt.decode(token, Config.SECRET_KEY, algorithms=["HS256"])
             except jwt.ExpiredSignatureError:
-                return jsonify({"status": "error", "message": "Token expired"}), 401
+                return error_response("Token expired", 401)
             except jwt.InvalidTokenError:
-                return jsonify({"status": "error", "message": "Invalid token"}), 401
+                return error_response("Invalid token", 403)
             return f(*args, **kwargs)
 
         return decorated_function
@@ -131,13 +133,13 @@ def create_app():
                 password = session.get("password")
 
                 if not username or not password:
-                    return jsonify({"error": "User not authenticated"}), 401
+                    return error_response("Username and password are required", 422)
 
                 db_name = (
                     database or kwargs.get("database") or request.args.get("database")
                 )
                 if not db_name:
-                    return jsonify({"error": "No database specified"}), 400
+                    return error_response("No database specified", 400)
 
                 db = get_db()
                 with db.get_connection(username, password, db_name) as conn:
@@ -177,13 +179,14 @@ def create_app():
                 response.set_cookie("auth_token", token, httponly=True, samesite="Lax")
                 return response
 
-        return jsonify({"error": "Invalid username or password"}), 401
+        return error_response("Invalid username or password", 401)
 
     @app.route("/api/auth/status", methods=["GET"])
     @handle_exceptions
     def auth_status():
         """인증 상태 확인"""
         token = request.cookies.get("auth_token")
+
         if not token:
             return (
                 jsonify({"authenticated": False, "message": "User not authenticated"}),
@@ -220,11 +223,11 @@ def create_app():
             os.makedirs(app.config["UPLOAD_FOLDER"])
 
         if "file" not in request.files:
-            return jsonify({"error": "No file part"}), 400
+            return error_response("No file part", 400)
 
         file = request.files["file"]
         if file.filename == "":
-            return jsonify({"error": "No selected file"}), 400
+            return error_response("No selected file", 400)
 
         if file and file.filename:
             filename = secure_filename(file.filename)
@@ -236,13 +239,9 @@ def create_app():
             probeName = request.form.get("probeName")
 
             if not all([database, probeId, probeName]):
-                return (
-                    jsonify(
-                        {
-                            "error": "Missing required fields: database, probeId, or probeName"
-                        }
-                    ),
-                    400,
+
+                return error_response(
+                    "Missing required fields: database, probeId, or probeName", 400
                 )
 
             try:
@@ -252,12 +251,8 @@ def create_app():
                 if result:
                     return jsonify({"status": "success", "data": result}), 200
                 else:
-                    return (
-                        jsonify(
-                            {
-                                "error": "Generation failed. Please check input data or file integrity."
-                            }
-                        ),
+                    return error_response(
+                        "Generation failed. Please check input data or file integrity.",
                         500,
                     )
 
@@ -266,7 +261,7 @@ def create_app():
                 if os.path.exists(file_path):
                     os.remove(file_path)
 
-        return jsonify({"error": "File handling issue"}), 400
+        return error_response("File handling issue", 400)
 
     @app.route("/api/get_list_database", methods=["GET"])
     @handle_exceptions
