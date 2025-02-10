@@ -114,6 +114,12 @@ export default function MeasSetGen() {
     }
   };
 
+  const parseDatabase = async () => {
+    if (selectedDatabase && selectedProbe) {
+      setIsLoading(true);
+    }
+  }
+
   return (
     <div className="container mt-4">
       <div className="card shadow-sm">
@@ -175,13 +181,23 @@ export default function MeasSetGen() {
               />
             </div>
 
-            <div className="col-12">
+            <div className="col-6">
               <button
                 className="btn btn-primary w-100"
                 onClick={handleFileUpload}
                 disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
               >
                 {isLoading ? 'Processing...' : 'Upload & Process File'}
+              </button>
+            </div>
+
+            <div className="col-6">
+              <button
+                className="btn btn-primary w-100"
+                onClick={handleFileUpload}
+                disabled={!selectedDatabase || !selectedProbe || isLoading}
+              >
+                {isLoading ? 'Processing...' : 'To MS-SQL Database'}
               </button>
             </div>
           </div>
