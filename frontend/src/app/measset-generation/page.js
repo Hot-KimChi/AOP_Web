@@ -1,18 +1,18 @@
-// src/app/measset-generation/page.js
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export default function MeasSetGen() {
   const [probeList, setProbeList] = useState([]);
   const [DBList, setDBList] = useState([]);
   const [selectedDatabase, setSelectedDatabase] = useState('');
-  const [selectedProbe, setSelectedProbe] = useState(null); // 초기값을 null로 변경
+  const [selectedProbe, setSelectedProbe] = useState(null);
   const [file, setFile] = useState(null);
+  const [sqlFile, setSqlFile] = useState(null);
   const [processedData, setProcessedData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const sqlFileInputRef = useRef(null);
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
@@ -78,16 +78,20 @@ export default function MeasSetGen() {
     setFile(event.target.files[0]);
   };
 
+  const handleSqlFileChange = (event) => {
+    setSqlFile(event.target.files[0]);
+  };
+
   const handleFileUpload = async () => {
     if (file && selectedDatabase && selectedProbe) {
       setIsLoading(true);
-      const { id: probeId, name: probeName } = selectedProbe; // JSON에서 probeId와 probeName 추출
+      const { id: probeId, name: probeName } = selectedProbe;
 
       const formData = new FormData();
       formData.append('file', file);
       formData.append('database', selectedDatabase);
-      formData.append('probeId', probeId); // probeId 전송
-      formData.append('probeName', probeName); // probeName 전송
+      formData.append('probeId', probeId);
+      formData.append('probeName', probeName);
 
       try {
         const response = await fetch(`${API_BASE_URL}/api/measset-generation`, {
@@ -116,9 +120,44 @@ export default function MeasSetGen() {
 
   const parseDatabase = async () => {
     if (selectedDatabase && selectedProbe) {
+      if (!sqlFile) {
+        sqlFileInputRef.current.click();
+        return;
+      }
+
       setIsLoading(true);
+      const { id: probeId, name: probeName } = selectedProbe;
+
+      const formData = new FormData();
+      formData.append('file', sqlFile);
+      formData.append('database', selectedDatabase);
+      formData.append('probeId', probeId);
+      formData.append('probeName', probeName);
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/insert-sql`, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Failed to insert SQL. Status: ${response.status}, Message: ${errorText}`);
+          setError('Failed to insert SQL data');
+        } else {
+          const data = await response.json();
+          alert('SQL data inserted successfully!');
+          setSqlFile(null);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        setError('Failed to process SQL insertion');
+      } finally {
+        setIsLoading(false);
+      }
     }
-  }
+  };
 
   return (
     <div className="container mt-4">
@@ -181,23 +220,30 @@ export default function MeasSetGen() {
               />
             </div>
 
+            <input
+              type="file"
+              ref={sqlFileInputRef}
+              style={{ display: 'none' }}
+              onChange={handleSqlFileChange}
+            />
+
             <div className="col-6">
               <button
                 className="btn btn-primary w-100"
                 onClick={handleFileUpload}
                 disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
               >
-                {isLoading ? 'Processing...' : 'Upload & Process File'}
+                {isLoading ? 'Processing...' : 'Process File'}
               </button>
             </div>
 
             <div className="col-6">
               <button
                 className="btn btn-primary w-100"
-                onClick={handleFileUpload}
+                onClick={parseDatabase}
                 disabled={!selectedDatabase || !selectedProbe || isLoading}
               >
-                {isLoading ? 'Processing...' : 'To MS-SQL Database'}
+                {isLoading ? 'Processing...' : sqlFile ? 'Insert to SQL Database' : 'To SQL Database'}
               </button>
             </div>
           </div>
