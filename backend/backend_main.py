@@ -239,7 +239,6 @@ def create_app():
             probeName = request.form.get("probeName")
 
             if not all([database, probeId, probeName]):
-
                 return error_response(
                     "Missing required fields: database, probeId, or probeName", 400
                 )

@@ -63,7 +63,7 @@ class MeasSetGen:
             df_total = df_total.fillna(-1)
             logging.info("Machine learning predictions completed.")
 
-            # Step 5: 데이터 저장 및 SQL 삽입
+            # Step 5: 데이터 저장
             dataout = DataOut(
                 case=0,
                 database=self.database,
@@ -75,9 +75,9 @@ class MeasSetGen:
             logging.info(f"Generated file saved at {file_path}.")
 
             # Step 6: 데이터베이스에 삽입
-            df = pd.read_csv(file_path)
+            # df = pd.read_csv(file_path)
             # self.sql.insert_data(table_name="meas_setting", data=df)
-            logging.info("Data successfully inserted into MS-SQL.")
+            # logging.info("Data successfully inserted into MS-SQL.")
 
             return {"status": "success", "file_path": file_path}
 

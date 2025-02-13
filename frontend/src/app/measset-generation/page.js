@@ -126,13 +126,10 @@ export default function MeasSetGen() {
       }
 
       setIsLoading(true);
-      const { id: probeId, name: probeName } = selectedProbe;
-
+      
       const formData = new FormData();
       formData.append('file', sqlFile);
       formData.append('database', selectedDatabase);
-      formData.append('probeId', probeId);
-      formData.append('probeName', probeName);
 
       try {
         const response = await fetch(`${API_BASE_URL}/api/insert-sql`, {
@@ -233,7 +230,7 @@ export default function MeasSetGen() {
                 onClick={handleFileUpload}
                 disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
               >
-                {isLoading ? 'Processing...' : 'Process File'}
+                {isLoading ? 'Processing...' : 'Genarate File'}
               </button>
             </div>
 
