@@ -124,7 +124,8 @@ function DataViewContent() {
     });
 
     setDisplayData(filteredData);
-    setComboBoxOptions(generateComboBoxOptions(filteredData)); // 필터링된 데이터로 콤보박스 옵션 갱신
+    setComboBoxOptions(generateComboBoxOptions(filteredData)); 
+    // 필터링된 데이터로 콤보박스 옵션 갱신
   };
 
   const handleFilterChange = (column, value) => {

@@ -109,7 +109,7 @@ const Navbar = () => {
           {isAuthenticated ? (
             <div className="d-flex align-items-center">
               <div className="d-flex flex-column align-items-end me-3">
-                <small className="text-muted">Logged in as:</small>
+                <small className="text-muted">Log in:</small>
                 <strong>{username}</strong>
               </div>
               <button
