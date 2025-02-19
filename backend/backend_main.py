@@ -1,7 +1,7 @@
 import configparser
 import os
 import jwt
-from flask import Flask, request, jsonify, session, g
+from flask import Flask, request, jsonify, session, g, Response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from functools import wraps
@@ -245,10 +245,10 @@ def create_app():
 
             try:
                 meas_gen = MeasSetGen(database, probeId, probeName, file_path)
-                result = meas_gen.generate()
+                csv_data = meas_gen.generate()
 
-                if result:
-                    return jsonify({"status": "success", "data": result}), 200
+                if csv_data:
+                    return jsonify({"status": "success", "data": csv_data}), 200
                 else:
                     return error_response(
                         "Generation failed. Please check input data or file integrity.",

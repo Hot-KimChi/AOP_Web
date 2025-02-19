@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function MeasSetGen() {
   const [probeList, setProbeList] = useState([]);
@@ -9,10 +10,10 @@ export default function MeasSetGen() {
   const [selectedProbe, setSelectedProbe] = useState(null);
   const [file, setFile] = useState(null);
   const [sqlFile, setSqlFile] = useState(null);
-  const [processedData, setProcessedData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const sqlFileInputRef = useRef(null);
+  const router = useRouter();
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
@@ -101,20 +102,31 @@ export default function MeasSetGen() {
         });
       
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Failed to process the file. Status: ${response.status}, Message: ${errorText}`);
-          setError('Failed to process the files');
+        const errorText = await response.text();
+        console.error(`Failed to process the file. Status: ${response.status}, Message: ${errorText}`);
+        setError("Failed to process the files");
         } else {
           const data = await response.json();
-          setProcessedData(data.data);
-        }
+
+          if (data.status === "success" && data.data) {
+            // CSV 데이터를 localStorage에 저장 (객체로 변환)
+            localStorage.setItem("csvData", JSON.stringify(data.data));
+            console.log("CSV Data Saved:", data.data);
+
+            // CSV 데이터를 표시하는 페이지로 이동
+            router.push("/csv-viewer");
+          } else {
+            setError("CSV data is empty or invalid.");
+          }
+        y}
       } catch (error) {
-        console.error('Error:', error);
+        console.error("Error:", error);
+        setError("An error occurred during file processing");
       } finally {
         setIsLoading(false);
       }
     } else {
-      alert('Please select a database, probe, and file before uploading.');
+      alert("Please select a database, probe, and file before uploading.");
     }
   };
 
@@ -230,7 +242,7 @@ export default function MeasSetGen() {
                 onClick={handleFileUpload}
                 disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
               >
-                {isLoading ? 'Processing...' : 'Genarate File'}
+                {isLoading ? 'Processing...' : 'Generate CSV File'}
               </button>
             </div>
 
@@ -248,15 +260,6 @@ export default function MeasSetGen() {
           {error && (
             <div className="alert alert-danger mt-3">
               {error}
-            </div>
-          )}
-
-          {processedData && (
-            <div className="mt-4">
-              <h5>Processed Data:</h5>
-              <pre className="bg-light p-3 rounded">
-                {JSON.stringify(processedData, null, 2)}
-              </pre>
             </div>
           )}
         </div>

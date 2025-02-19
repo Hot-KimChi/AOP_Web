@@ -71,15 +71,15 @@ class MeasSetGen:
                 df1=df_total,
             )
             dataout.make_dir()
-            file_path = dataout.save_excel()
-            logging.info(f"Generated file saved at {file_path}.")
+            csv_data = dataout.save_excel()
+            logging.info(f"Generated file saved as CSV_file.")
 
             # Step 6: 데이터베이스에 삽입
             # df = pd.read_csv(file_path)
             # self.sql.insert_data(table_name="meas_setting", data=df)
             # logging.info("Data successfully inserted into MS-SQL.")
 
-            return {"status": "success", "file_path": file_path}
+            return csv_data
 
         except Exception as e:
             logging.error(f"Error during MeasSetGen.generate: {str(e)}", exc_info=True)
