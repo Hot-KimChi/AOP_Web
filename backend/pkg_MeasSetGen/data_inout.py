@@ -1,4 +1,4 @@
-import os, io
+import os
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -113,13 +113,8 @@ class DataOut:
         ## meas_setting 알고리즘
         if self.case == 0:
             file_path = f"{self.directory}/meas_setting_{self.probename}_{self.formatted_datetime}_result.csv"
-            self.df.to_csv(file_path, index=False)
 
-            # CSV 데이터를 메모리에 저장
-            csv_buffer = io.StringIO()
-            self.df.to_csv(csv_buffer, index=False)
-            csv_data = csv_buffer.getvalue()
-            return csv_data
+            self.df.to_csv(file_path, index=False)
 
         ## verification_reports
         elif self.case == 1:
@@ -131,10 +126,11 @@ class DataOut:
                 probename = probename.item()
             probename = str(probename).strip()  ##문자열 앞뒤의 공백만 제거.
 
-            # 메모리 내에서 Excel 파일 작성
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            # 엑셀 파일로 출력
+            file_path = f"./backend/1_Verification_Reports/{self.database}/{probename}_{self.formatted_datetime}_result.xlsx"
+
+            with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
                 df_Intensity.to_excel(writer, sheet_name="Intensity", index=False)
                 df_Temperature.to_excel(writer, sheet_name="Temperature", index=False)
-            output.seek(0)  # 버퍼의 시작 위치로 이동
-            return output.getvalue()
+
+        return file_path

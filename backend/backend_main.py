@@ -1,5 +1,5 @@
 import configparser
-import os
+import os, io
 import jwt
 from flask import Flask, request, jsonify, session, g, Response
 from flask_cors import CORS
@@ -221,7 +221,6 @@ def create_app():
         """파일 업로드 및 측정 세트 생성"""
         if not os.path.exists(app.config["UPLOAD_FOLDER"]):
             os.makedirs(app.config["UPLOAD_FOLDER"])
-
         if "file" not in request.files:
             return error_response("No file part", 400)
 
@@ -245,10 +244,13 @@ def create_app():
 
             try:
                 meas_gen = MeasSetGen(database, probeId, probeName, file_path)
-                csv_data = meas_gen.generate()
+                result_file_path = meas_gen.generate()
 
-                if csv_data:
-                    return jsonify({"status": "success", "data": csv_data}), 200
+                if result_file_path:
+                    return (
+                        jsonify({"status": "success", "csv_key": result_file_path}),
+                        200,
+                    )
                 else:
                     return error_response(
                         "Generation failed. Please check input data or file integrity.",
@@ -261,6 +263,24 @@ def create_app():
                     os.remove(file_path)
 
         return error_response("File handling issue", 400)
+
+    @app.route("/api/csv-data", methods=["GET"])
+    @handle_exceptions
+    @require_auth
+    def get_csv_data():
+        """저장된 CSV 데이터 반환"""
+        csv_key = request.args.get("csv_key")
+        if not csv_key:
+            return error_response("csv_key is required", 400)
+
+        csv_file_path = csv_key
+        if not os.path.exists(csv_file_path):
+            return error_response("CSV data not found", 404)
+
+        with open(csv_file_path, "r") as f:
+            csv_data = f.read()
+
+        return jsonify({"status": "success", "data": csv_data}), 200
 
     @app.route("/api/get_list_database", methods=["GET"])
     @handle_exceptions
