@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ArrowUpDown, X } from 'lucide-react';
 
-export default function DataTable({ data }) {
+export default function DataTable({ data, previewMode = false }) {
   const [displayData, setDisplayData] = useState(data || []);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filters, setFilters] = useState({});
@@ -64,7 +64,7 @@ export default function DataTable({ data }) {
   const headers = Object.keys(data[0] || {});
 
   return (
-    <div className="table-container">
+    <div className={`table-container ${previewMode ? 'preview-mode' : ''}`}>
       <table className="w-full min-w-[800px] border-collapse">
         <thead>
           <tr className="bg-gray-100 sticky-header">
@@ -82,34 +82,36 @@ export default function DataTable({ data }) {
               </th>
             ))}
           </tr>
-          <tr className="sticky-filter">
-            {headers.map((header) => (
-              <th key={header} className="px-2 py-1 border bg-gray-50">
-                <div className="relative">
-                  <select
-                    className="w-full px-2 py-1 text-sm border rounded"
-                    value={filters[header]?.[0] || ''}
-                    onChange={(e) => handleFilterChange(header, e.target.value)}
-                  >
-                    <option value="">선택...</option>
-                    {[...new Set(data.map(row => row[header]))].map((option) => (
-                      <option key={option} value={option}>
-                        {truncateText(option)}
-                      </option>
-                    ))}
-                  </select>
-                  {filters[header] && (
-                    <button
-                      className="absolute right-1 top-1/2 -translate-y-1/2"
-                      onClick={() => clearFilter(header)}
+          {!previewMode && (
+            <tr className="sticky-filter">
+              {headers.map((header) => (
+                <th key={header} className="px-2 py-1 border bg-gray-50">
+                  <div className="relative">
+                    <select
+                      className="w-full px-2 py-1 text-sm border rounded"
+                      value={filters[header]?.[0] || ''}
+                      onChange={(e) => handleFilterChange(header, e.target.value)}
                     >
-                      <X size={12} className="text-gray-400" />
-                    </button>
-                  )}
-                </div>
-              </th>
-            ))}
-          </tr>
+                      <option value="">선택...</option>
+                      {[...new Set(data.map(row => row[header]))].map((option) => (
+                        <option key={option} value={option}>
+                          {truncateText(option)}
+                        </option>
+                      ))}
+                    </select>
+                    {filters[header] && (
+                      <button
+                        className="absolute right-1 top-1/2 -translate-y-1/2"
+                        onClick={() => clearFilter(header)}
+                      >
+                        <X size={12} className="text-gray-400" />
+                      </button>
+                    )}
+                  </div>
+                </th>
+              ))}
+            </tr>
+          )}
         </thead>
         <tbody>
           {displayData.map((row, index) => (
@@ -130,6 +132,9 @@ export default function DataTable({ data }) {
           background-color: white;
           border-radius: 0.25rem;
           box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .preview-mode {
+          max-height: 300px;
         }
         .sticky-header {
           position: sticky;

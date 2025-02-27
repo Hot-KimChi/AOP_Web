@@ -18,11 +18,12 @@ class SQL:
         self.password = password
         self.database = database
 
-        self.server = os.environ.get("SERVER_ADDRESS_ADDRESS")  # 서버 주소 환경 변수
+        # 서버 주소 환경 변수
+        self.server = os.environ.get("SERVER_ADDRESS_ADDRESS")
         self.connection_string = self.create_connection_string()
-        self.engine = create_engine(
-            self.connection_string
-        )  # SQLAlchemy 엔진을 초기화 시점에 한 번만 생성
+
+        # SQLAlchemy 엔진을 초기화 시점에 한 번만 생성
+        self.engine = create_engine(self.connection_string)
 
     def create_connection_string(self):
         """연결 문자열을 생성합니다."""
@@ -37,7 +38,6 @@ class SQL:
             f"PWD={self.password};"
             "TrustServerCertificate=yes;"
         )
-
         return f"mssql+pyodbc:///?odbc_connect={quote_plus(conn_str)}"
 
     def connect(self):

@@ -34,9 +34,8 @@ class DatabaseManager:
     @contextmanager
     def get_connection(self, username: str, password: str, database: str):
         """Context manager for database connections"""
-        connection = None
+        connection = SQL(username, password, database)
         try:
-            connection = SQL(username, password, database)
             yield connection
         finally:
             if connection and hasattr(connection, "close"):
@@ -89,7 +88,6 @@ def create_app():
         """Get database connection from Flask g object"""
         if "db" not in g:
             g.db = DatabaseManager()
-
         return g.db
 
     def handle_exceptions(f):
@@ -134,13 +132,17 @@ def create_app():
 
                 if not username or not password:
                     return error_response("Username and password are required", 422)
-
+                # 우선 query parameter에서 찾고 없으면 JSON 본문에서 찾습니다.
                 db_name = (
                     database or kwargs.get("database") or request.args.get("database")
                 )
+                if not db_name and request.is_json:
+                    json_data = request.get_json(silent=True)
+                    if json_data and "database" in json_data:
+                        db_name = json_data["database"]
+
                 if not db_name:
                     return error_response("No database specified", 400)
-
                 db = get_db()
                 with db.get_connection(username, password, db_name) as conn:
                     g.current_db = conn
@@ -263,6 +265,39 @@ def create_app():
                     os.remove(file_path)
 
         return error_response("File handling issue", 400)
+
+    @app.route("/api/insert-sql", methods=["POST"])
+    @handle_exceptions
+    @require_auth
+    @with_db_connection()
+    def insert_sql_measset():
+        data = request.get_json()
+        table_name = data.get("table")
+        records = data.get("data")
+        if not table_name or not records:
+            return error_response(
+                "Invalid data: table and data fields are required", 400
+            )
+        try:
+            import pandas as pd
+            import json
+
+            # 클라이언트에서 전달된 records는 이미 리스트 형태입니다.
+            # 이를 JSON 문자열로 변환한 후, DataFrame으로 재구성합니다.
+            json_str = json.dumps(records)
+            df = pd.read_json(json_str, orient="records")
+        except Exception as e:
+            logger.error(f"DataFrame conversion error: {str(e)}")
+            return error_response("Failed to parse records into DataFrame", 500)
+        try:
+            g.current_db.insert_data(table_name, df)
+            return (
+                jsonify({"status": "success", "message": "Data inserted successfully"}),
+                200,
+            )
+        except Exception as e:
+            logger.error(f"Data insertion failed: {str(e)}", exc_info=True)
+            return error_response(str(e), 500)
 
     @app.route("/api/csv-data", methods=["GET"])
     @handle_exceptions
