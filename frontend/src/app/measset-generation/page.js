@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import DataTable from '../../components/DataTable';
 
 export default function MeasSetGen() {
   const [probeList, setProbeList] = useState([]);
@@ -178,7 +177,7 @@ export default function MeasSetGen() {
     }
   };
 
-  // openDataInNewWindow: 전달받은 data를 우선 사용하고, 없으면 csvData 사용
+  // 수정된 openDataInNewWindow: 1번째 열에 temperature가 포함된 데이터만 필터링
   const openDataInNewWindow = (data) => {
     const csvDataToUse = data || csvData;
     if (!csvDataToUse || csvDataToUse.length === 0) {
@@ -186,7 +185,27 @@ export default function MeasSetGen() {
       return;
     }
     
-    sessionStorage.setItem('csvData', JSON.stringify(csvDataToUse));
+    // 데이터의 첫 번째 열에 'temperature'가 포함된 항목만 필터링
+    const firstColumnName = Object.keys(csvDataToUse[0])[0]; // 첫 번째 열 이름 가져오기
+    const filteredData = csvDataToUse.filter(row => {
+      const firstColumnValue = String(row[firstColumnName] || '').toLowerCase();
+      return firstColumnValue.includes('temperature');
+    });
+    
+    if (filteredData.length === 0) {
+      alert('temperature가 포함된 데이터가 없습니다.');
+      return;
+    }
+    
+    // 열 인덱스를 저장하여 7번째, 8번째 열을 표시할 때 수정 가능하게 함
+    const editableColumns = {
+      columns: Object.keys(filteredData[0]),
+      editableIndices: [6, 7] // 0-based 인덱스, 7번째와 8번째 열
+    };
+    
+    sessionStorage.setItem('csvData', JSON.stringify(filteredData));
+    sessionStorage.setItem('editableColumns', JSON.stringify(editableColumns));
+    
     const newWindow = window.open('/data-view', '측정 데이터', 'width=1000,height=800');
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
       alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
@@ -211,7 +230,7 @@ export default function MeasSetGen() {
                 onChange={(e) => setSelectedDatabase(e.target.value)}
                 disabled={isLoading}
               >
-                <option value="">데이터베이스 선택</option>
+                <option value="">Select Database</option>
                 {DBList.map((db, index) => (
                   <option key={index} value={db}>{db}</option>
                 ))}
@@ -226,7 +245,7 @@ export default function MeasSetGen() {
                 onChange={(e) => setSelectedProbe(JSON.parse(e.target.value))}
                 disabled={isLoading || !selectedDatabase}
               >
-                <option value="">프로브 선택</option>
+                <option value="">Select Transducer</option>
                 {probeList.map((probe) => (
                   <option key={probe.probeId} value={JSON.stringify({ id: probe.probeId, name: probe.probeName })}>
                     {probe.probeName} ({probe.probeId})
@@ -266,6 +285,15 @@ export default function MeasSetGen() {
             </div>
             <div className="col-md-4">
               <button
+                className="btn btn-success w-100"
+                onClick={() => openDataInNewWindow()}
+                disabled={!csvData || csvData.length === 0}
+              >
+                {isLoading ? '처리 중...' : '데이터 새 창에서 보기'}
+              </button>
+            </div>
+            <div className="col-md-4">
+              <button
                 className="btn btn-primary w-100"
                 onClick={parseDatabase}
                 disabled={!selectedDatabase || !selectedProbe || isLoading}
@@ -273,15 +301,7 @@ export default function MeasSetGen() {
                 {isLoading ? '처리 중...' : sqlFile ? 'SQL 데이터베이스에 삽입' : 'SQL 데이터베이스로'}
               </button>
             </div>
-            <div className="col-md-4">
-              <button
-                className="btn btn-success w-100"
-                onClick={() => openDataInNewWindow()}
-                disabled={!csvData || csvData.length === 0}
-              >
-                데이터 새 창에서 보기
-              </button>
-            </div>
+          
           </div>
           {error && <div className="alert alert-danger mt-3">{error}</div>}
         </div>

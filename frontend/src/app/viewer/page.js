@@ -94,7 +94,7 @@ export default function Viewer() {
           <div className="card-body">
             <div className="row g-3">
               <div className="col-md-5">
-                <label htmlFor="database" className="form-label">Database</label>
+                <label htmlFor="database" className="form-label">데이터베이스 선택</label>
                 <select
                   id="database"
                   className="form-select"
@@ -110,7 +110,7 @@ export default function Viewer() {
               </div>
 
               <div className="col-md-5">
-                <label htmlFor="table" className="form-label">Table</label>
+                <label htmlFor="table" className="form-label">SQL 테이블 선택</label>
                 <select
                   id="table"
                   className="form-select"

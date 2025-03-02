@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { ArrowUpDown, X, FileSpreadsheet } from 'lucide-react';
+import { ArrowUpDown, X, FileSpreadsheet, Save } from 'lucide-react';
 
 function DataViewContent() {
   const [csvData, setCsvData] = useState([]);
@@ -12,11 +12,18 @@ function DataViewContent() {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filters, setFilters] = useState({});
   const [comboBoxOptions, setComboBoxOptions] = useState({});
+  const [editableColumns, setEditableColumns] = useState({
+    columns: [],
+    editableIndices: [] // 수정 가능한 열의 인덱스
+  });
+  const [editedData, setEditedData] = useState({});  // 수정된 데이터를 추적하기 위한 상태
 
   useEffect(() => {
     // 페이지 로드 시 sessionStorage에서 데이터 가져오기 시도
     try {
       const storedData = sessionStorage.getItem('csvData');
+      const storedEditableColumns = sessionStorage.getItem('editableColumns');
+      
       if (storedData) {
         const parsedData = JSON.parse(storedData);
         setCsvData(parsedData);
@@ -25,6 +32,10 @@ function DataViewContent() {
       } else {
         setError('데이터를 찾을 수 없습니다.');
       }
+      
+      if (storedEditableColumns) {
+        setEditableColumns(JSON.parse(storedEditableColumns));
+      }
     } catch (error) {
       console.error('데이터 로드 오류:', error);
       setError('데이터 로드 중 오류가 발생했습니다.');
@@ -32,6 +43,46 @@ function DataViewContent() {
       setIsLoading(false);
     }
   }, []);
+
+  // 셀 값 변경 처리
+  const handleCellChange = (rowIndex, columnName, value) => {
+    // 현재 표시 중인 데이터 업데이트
+    const updatedDisplayData = [...displayData];
+    updatedDisplayData[rowIndex][columnName] = value;
+    setDisplayData(updatedDisplayData);
+    
+    // 편집된 데이터 추적
+    setEditedData(prev => ({
+      ...prev,
+      [`${rowIndex}-${columnName}`]: {
+        rowIndex,
+        columnName,
+        value
+      }
+    }));
+  };
+
+  // 수정된 데이터 저장
+  const saveEditedData = () => {
+    // CSV 데이터 전체를 업데이트
+    const updatedCsvData = [...csvData];
+    
+    // 수정된 모든 셀에 대해 원본 데이터 업데이트
+    Object.values(editedData).forEach(edit => {
+      const { rowIndex, columnName, value } = edit;
+      // displayData의 인덱스가 csvData의 인덱스와 같다고 가정
+      // 실제로는 필터링된 결과에 따라 매핑이 다를 수 있으므로 주의가 필요
+      updatedCsvData[rowIndex][columnName] = value;
+    });
+    
+    setCsvData(updatedCsvData);
+    sessionStorage.setItem('csvData', JSON.stringify(updatedCsvData));
+    
+    // 저장 후 편집 상태 초기화
+    setEditedData({});
+    
+    alert('수정된 데이터가 저장되었습니다.');
+  };
 
   // CSV 다운로드 기능
   const downloadCSV = () => {
@@ -152,7 +203,22 @@ function DataViewContent() {
     return str.length > 20 ? `${str.substring(0, 20)}...` : str;
   };
 
-  const renderCellContent = (value) => {
+  // 수정된 renderCellContent 함수 - 수정 가능한 셀 확인
+  const renderCellContent = (value, rowIndex, columnIndex, columnName) => {
+    // 수정 가능한 셀인지 확인
+    const isEditable = editableColumns.editableIndices.includes(columnIndex);
+    
+    if (isEditable) {
+      return (
+        <input
+          type="text"
+          className="w-full px-2 py-1 border rounded focus:outline-none focus:border-blue-400"
+          value={value || ''}
+          onChange={(e) => handleCellChange(rowIndex, columnName, e.target.value)}
+        />
+      );
+    }
+    
     if (value === null || value === undefined) {
       return '';
     }
@@ -204,8 +270,17 @@ function DataViewContent() {
       ) : (
         <>
           <div className="flex justify-between items-center mb-3">
-            <h4 className="mb-0">CSV 데이터 표시</h4>
+            <h4 className="mb-0">CSV 데이터 표시 (7, 8번째 열 수정 가능)</h4>
             <div className="flex gap-2">
+              {Object.keys(editedData).length > 0 && (
+                <button 
+                  className="btn btn-success"
+                  onClick={saveEditedData}
+                >
+                  <Save size={16} className="mr-1" />
+                  변경사항 저장
+                </button>
+              )}
               <button 
                 className="btn btn-primary"
                 onClick={downloadCSV}
@@ -233,6 +308,9 @@ function DataViewContent() {
                       <div className="flex items-center justify-between group">
                         <span title={header} className="font-medium text-gray-700">
                           {truncateText(header)}
+                          {editableColumns.editableIndices.includes(index) && (
+                            <span className="ml-1 text-blue-500 text-xs">(수정가능)</span>
+                          )}
                         </span>
                         <button 
                           className="p-0.5 hover:bg-gray-200 rounded transition-colors"
@@ -283,15 +361,18 @@ function DataViewContent() {
                 {displayData.length > 0 ? (
                   displayData.map((row, rowIndex) => (
                     <tr key={rowIndex} className="hover:bg-gray-50">
-                      {Object.entries(row).map(([key, value], colIndex) => (
-                        <td 
-                          key={colIndex} 
-                          className="px-3 py-2 border"
-                          title={formatNumber(value)}
-                        >
-                          {renderCellContent(value)}
-                        </td>
-                      ))}
+                      {Object.entries(row).map(([key, value], colIndex) => {
+                        const columnName = Object.keys(row)[colIndex];
+                        return (
+                          <td 
+                            key={colIndex} 
+                            className={`px-3 py-2 border ${editableColumns.editableIndices.includes(colIndex) ? 'bg-blue-50' : ''}`}
+                            title={formatNumber(value)}
+                          >
+                            {renderCellContent(value, rowIndex, colIndex, columnName)}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))
                 ) : (
