@@ -15,8 +15,65 @@ export default function MeasSetGen() {
   const [csvData, setCsvData] = useState(null);
   const sqlFileInputRef = useRef(null);
   const [csvKey, setCsvKey] = useState(null);
+  const [dataModified, setDataModified] = useState(false); // 데이터 수정 여부를 추적하는 상태
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+
+// 수정된 useEffect 훅 - 데이터 수정 감지를 위한 이벤트 핸들러
+useEffect(() => {
+  const handleStorageChange = (event) => {
+    // storage 이벤트가 발생했을 때만 처리
+    if (event && event.key === 'csvData') {
+      try {
+        const updatedData = JSON.parse(event.newValue);
+        if (updatedData) {
+          setCsvData(updatedData);
+          setDataModified(true); // 데이터가 수정되었음을 표시
+        }
+      } catch (error) {
+        console.error('수정된 데이터 파싱 실패:', error);
+      }
+    }
+  };
+
+  // 스토리지 변경 이벤트 리스너 등록
+  window.addEventListener('storage', handleStorageChange);
+
+  // 팝업 창이 닫힐 때 이벤트 처리
+  const checkPopupClosed = setInterval(() => {
+    if (sessionStorage.getItem('dataWindowOpen') === 'closed') {
+      // 팝업 창이 닫혔으면 sessionStorage에서 최신 데이터를 가져옴
+      const updatedData = sessionStorage.getItem('csvData');
+      if (updatedData) {
+        try {
+          const parsedData = JSON.parse(updatedData);
+          setCsvData(parsedData);
+          setDataModified(true); // 데이터가 수정되었음을 표시
+        } catch (error) {
+          console.error('수정된 데이터 파싱 실패:', error);
+        }
+      }
+      sessionStorage.removeItem('dataWindowOpen');
+      clearInterval(checkPopupClosed);
+    }
+  }, 500);
+
+  // window 메시지 이벤트 리스너 추가
+  const handleMessageEvent = (event) => {
+    if (event.data && event.data.type === 'DATA_MODIFIED') {
+      setCsvData(event.data.data);
+      setDataModified(true);
+    }
+  };
+  window.addEventListener('message', handleMessageEvent);
+
+  // 클린업 함수
+  return () => {
+    window.removeEventListener('storage', handleStorageChange);
+    window.removeEventListener('message', handleMessageEvent);
+    clearInterval(checkPopupClosed);
+  };
+}, []);
 
   useEffect(() => {
     const fetchDatabases = async () => {
@@ -104,6 +161,7 @@ export default function MeasSetGen() {
         if (csvResult.status === 'success' && csvResult.data) {
           const parsedData = parseCSV(csvResult.data);
           setCsvData(parsedData);
+          setDataModified(false); // 새로운 데이터를 받았으므로 수정 상태 초기화
           setError(null);
           return parsedData; // 파싱된 데이터를 반환
         } else {
@@ -134,7 +192,10 @@ export default function MeasSetGen() {
   };
 
   const parseDatabase = async () => {
-    if (!csvData || csvData.length === 0) {
+    // 수정된 데이터가 있는지 확인하고 해당 데이터를 사용
+    const dataToSend = csvData;
+    
+    if (!dataToSend || dataToSend.length === 0) {
       alert('CSV 데이터가 없습니다.');
       return;
     }
@@ -146,11 +207,11 @@ export default function MeasSetGen() {
   
     setIsLoading(true);
     try {
-      // csvData는 이미 DataFrame을 JSON으로 표현한(객체 배열) 상태입니다.
-      const dataToSend = {
+      // 데이터 전송
+      const requestData = {
         database: selectedDatabase,
         table: 'meas_setting',
-        data: csvData, // DataFrame의 JSON 직렬화된 형태 (예: [{...}, {...}, ...])
+        data: dataToSend,
       };
   
       const response = await fetch(`${API_BASE_URL}/api/insert-sql`, {
@@ -159,7 +220,7 @@ export default function MeasSetGen() {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify(dataToSend),
+        body: JSON.stringify(requestData),
       });
   
       if (!response.ok) {
@@ -169,6 +230,7 @@ export default function MeasSetGen() {
   
       const data = await response.json();
       alert('SQL 데이터가 성공적으로 삽입되었습니다!');
+      setDataModified(false); // 데이터가 저장되었으므로 수정 상태 초기화
     } catch (error) {
       console.error('오류:', error);
       setError('SQL 삽입 처리에 실패했습니다');
@@ -177,8 +239,10 @@ export default function MeasSetGen() {
     }
   };
 
-  // 수정된 openDataInNewWindow: 1번째 열에 temperature가 포함된 데이터만 필터링
+  // 수정된 openDataInNewWindow: 팝업 창 열기 전에 sessionStorage 상태 설정
   const openDataInNewWindow = (data) => {
+    // 데이터가 명시적으로 전달되지 않았다면 현재 상태의 csvData 사용
+    // 이미 수정된 데이터가 csvData에 반영되어 있다면 그것을 사용
     const csvDataToUse = data || csvData;
     if (!csvDataToUse || csvDataToUse.length === 0) {
       alert('표시할 CSV 데이터가 없습니다.');
@@ -203,13 +267,34 @@ export default function MeasSetGen() {
       editableIndices: [6, 7] // 0-based 인덱스, 7번째와 8번째 열
     };
     
+    // 세션 스토리지에 데이터 저장
     sessionStorage.setItem('csvData', JSON.stringify(filteredData));
     sessionStorage.setItem('editableColumns', JSON.stringify(editableColumns));
+    sessionStorage.setItem('dataWindowOpen', 'open'); // 팝업 창 상태 추적
     
     const newWindow = window.open('/data-view', '측정 데이터', 'width=1000,height=800');
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
       alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
     }
+  
+    // 팝업 창이 닫힐 때 이벤트 처리
+    if (newWindow) {
+      newWindow.onbeforeunload = () => {
+        sessionStorage.setItem('dataWindowOpen', 'closed');
+      };
+    }
+  };
+
+  // 수정된 데이터가 있는지 확인하는 메시지 표시
+  const renderModifiedMessage = () => {
+    if (dataModified) {
+      return (
+        <div className="alert alert-info mt-3">
+          <strong>데이터가 수정되었습니다.</strong> 수정된 데이터를 데이터베이스에 저장하려면 'SQL 데이터베이스로' 버튼을 클릭하세요.
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -275,7 +360,9 @@ export default function MeasSetGen() {
                 onClick={() => {
                   handleFileUpload().then((parsedData) => {
                     // 전달받은 parsedData가 존재하면 새 창에서 데이터를 보여줌
-                    openDataInNewWindow(parsedData);
+                    if (parsedData) {
+                      openDataInNewWindow(parsedData);
+                    }
                   });
                 }}
                 disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
@@ -289,20 +376,20 @@ export default function MeasSetGen() {
                 onClick={() => openDataInNewWindow()}
                 disabled={!csvData || csvData.length === 0}
               >
-                {isLoading ? '처리 중...' : '데이터 새 창에서 보기'}
+                {isLoading ? '처리 중...' : `데이터 ${dataModified ? '(수정됨) ' : ''}새 창에서 보기`}
               </button>
             </div>
             <div className="col-md-4">
               <button
                 className="btn btn-primary w-100"
                 onClick={parseDatabase}
-                disabled={!selectedDatabase || !selectedProbe || isLoading}
+                disabled={!selectedDatabase || !selectedProbe || !csvData || isLoading}
               >
-                {isLoading ? '처리 중...' : sqlFile ? 'SQL 데이터베이스에 삽입' : 'SQL 데이터베이스로'}
+                {isLoading ? '처리 중...' : 'SQL 데이터베이스로'}
               </button>
             </div>
-          
           </div>
+          {renderModifiedMessage()}
           {error && <div className="alert alert-danger mt-3">{error}</div>}
         </div>
       </div>

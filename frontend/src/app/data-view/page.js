@@ -1,11 +1,12 @@
-// src/app/data-view/page.js
+//src/app/data-view/page.js
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { ArrowUpDown, X, FileSpreadsheet, Save } from 'lucide-react';
+import { ArrowUpDown, X, FileSpreadsheet, Save, CheckCircle, AlertCircle } from 'lucide-react';
 
 function DataViewContent() {
   const [csvData, setCsvData] = useState([]);
+  const [originalData, setOriginalData] = useState([]); // 원본 데이터 저장
   const [displayData, setDisplayData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -17,6 +18,8 @@ function DataViewContent() {
     editableIndices: [] // 수정 가능한 열의 인덱스
   });
   const [editedData, setEditedData] = useState({});  // 수정된 데이터를 추적하기 위한 상태
+  const [validationErrors, setValidationErrors] = useState({}); // 유효성 검사 오류 추적
+  const [showChanges, setShowChanges] = useState(false); // 변경 사항 하이라이트 토글
 
   useEffect(() => {
     // 페이지 로드 시 sessionStorage에서 데이터 가져오기 시도
@@ -27,6 +30,7 @@ function DataViewContent() {
       if (storedData) {
         const parsedData = JSON.parse(storedData);
         setCsvData(parsedData);
+        setOriginalData(JSON.parse(JSON.stringify(parsedData))); // 깊은 복사로 원본 보존
         setDisplayData(parsedData);
         setComboBoxOptions(generateComboBoxOptions(parsedData));
       } else {
@@ -42,7 +46,23 @@ function DataViewContent() {
     } finally {
       setIsLoading(false);
     }
+
+    // 창이 닫힐 때 데이터 동기화
+    window.addEventListener('beforeunload', syncDataBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', syncDataBeforeUnload);
+    };
   }, []);
+
+  // 창이 닫히기 전에 데이터 동기화
+  const syncDataBeforeUnload = () => {
+    sessionStorage.setItem('dataWindowOpen', 'closed');
+    if (Object.keys(editedData).length > 0) {
+      // 수정된 데이터가 있으면 저장
+      const updatedCsvData = [...csvData];
+      sessionStorage.setItem('csvData', JSON.stringify(updatedCsvData));
+    }
+  };
 
   // 셀 값 변경 처리
   const handleCellChange = (rowIndex, columnName, value) => {
@@ -57,31 +77,71 @@ function DataViewContent() {
       [`${rowIndex}-${columnName}`]: {
         rowIndex,
         columnName,
-        value
+        value,
+        originalValue: csvData[rowIndex][columnName]
       }
     }));
+
+    // 데이터 유효성 검사
+    validateCellData(rowIndex, columnName, value);
+  };
+
+  // 데이터 유효성 검사
+  const validateCellData = (rowIndex, columnName, value) => {
+    const errKey = `${rowIndex}-${columnName}`;
+    const newValidationErrors = { ...validationErrors };
+    
+    // 숫자 형식 검사 (온도 값 등은 보통 숫자여야 함)
+    if (value !== "" && isNaN(parseFloat(value))) {
+      newValidationErrors[errKey] = '유효한 숫자를 입력하세요';
+    } else {
+      delete newValidationErrors[errKey];
+    }
+    
+    setValidationErrors(newValidationErrors);
   };
 
   // 수정된 데이터 저장
   const saveEditedData = () => {
+    // 유효성 검사 오류가 있으면 저장 불가
+    if (Object.keys(validationErrors).length > 0) {
+      alert('유효성 검사 오류가 있습니다. 모든 오류를 수정한 후 다시 시도하세요.');
+      return;
+    }
+    
     // CSV 데이터 전체를 업데이트
     const updatedCsvData = [...csvData];
     
     // 수정된 모든 셀에 대해 원본 데이터 업데이트
     Object.values(editedData).forEach(edit => {
       const { rowIndex, columnName, value } = edit;
-      // displayData의 인덱스가 csvData의 인덱스와 같다고 가정
-      // 실제로는 필터링된 결과에 따라 매핑이 다를 수 있으므로 주의가 필요
       updatedCsvData[rowIndex][columnName] = value;
     });
     
     setCsvData(updatedCsvData);
     sessionStorage.setItem('csvData', JSON.stringify(updatedCsvData));
     
+    // 부모 창에 데이터가 수정되었음을 알림
+    if (window.opener && !window.opener.closed) {
+      // 세션 스토리지를 통한 데이터 공유
+      window.opener.postMessage({ type: 'DATA_MODIFIED', data: updatedCsvData }, '*');
+    }
+    
     // 저장 후 편집 상태 초기화
     setEditedData({});
     
     alert('수정된 데이터가 저장되었습니다.');
+  };
+
+  // 데이터 복원 (수정 취소)
+  const revertChanges = () => {
+    if (confirm('모든 변경 사항을 취소하고 원래 데이터로 복원하시겠습니까?')) {
+      const originalDataCopy = JSON.parse(JSON.stringify(originalData));
+      setCsvData(originalDataCopy);
+      setDisplayData(originalDataCopy);
+      setEditedData({});
+      setValidationErrors({});
+    }
   };
 
   // CSV 다운로드 기능
@@ -203,19 +263,38 @@ function DataViewContent() {
     return str.length > 20 ? `${str.substring(0, 20)}...` : str;
   };
 
-  // 수정된 renderCellContent 함수 - 수정 가능한 셀 확인
+  // 수정된 renderCellContent 함수 - 수정 가능한 셀 확인 및 오류 표시
   const renderCellContent = (value, rowIndex, columnIndex, columnName) => {
     // 수정 가능한 셀인지 확인
     const isEditable = editableColumns.editableIndices.includes(columnIndex);
+    const cellKey = `${rowIndex}-${columnName}`;
+    const hasError = validationErrors[cellKey];
+    const isChanged = editedData[cellKey] !== undefined;
     
     if (isEditable) {
       return (
-        <input
-          type="text"
-          className="w-full px-2 py-1 border rounded focus:outline-none focus:border-blue-400"
-          value={value || ''}
-          onChange={(e) => handleCellChange(rowIndex, columnName, e.target.value)}
-        />
+        <div className="relative">
+          <input
+            type="text"
+            className={`w-full px-2 py-1 border rounded focus:outline-none ${
+              hasError ? 'border-red-500 bg-red-50' : 
+              isChanged ? 'border-yellow-400 bg-yellow-50' : 
+              'focus:border-blue-400'
+            }`}
+            value={value || ''}
+            onChange={(e) => handleCellChange(rowIndex, columnName, e.target.value)}
+          />
+          {hasError && (
+            <div className="absolute right-0 top-0">
+              <AlertCircle size={14} className="text-red-500" title={validationErrors[cellKey]} />
+            </div>
+          )}
+          {isChanged && !hasError && (
+            <div className="absolute right-0 top-0">
+              <CheckCircle size={14} className="text-green-500" title="값이 수정되었습니다" />
+            </div>
+          )}
+        </div>
       );
     }
     
@@ -255,6 +334,31 @@ function DataViewContent() {
     applyFilters(newFilters);
   };
 
+  // 변경 사항에 대한 요약 정보 생성
+  const getChangeSummary = () => {
+    const changedCount = Object.keys(editedData).length;
+    const errorCount = Object.keys(validationErrors).length;
+    
+    if (changedCount === 0) return null;
+    
+    return (
+      <div className={`p-2 rounded mb-3 ${errorCount > 0 ? 'bg-red-100' : 'bg-yellow-100'}`}>
+        <p className="font-medium">
+          {changedCount}개의 셀이 수정되었습니다. 
+          {errorCount > 0 && <span className="text-red-600"> {errorCount}개의
+          오류가 있습니다.</span>}
+        </p>
+      </div>
+    );
+  };
+
+  // 부모 창에 변경 사항 알림
+  useEffect(() => {
+    if (Object.keys(editedData).length > 0) {
+      sessionStorage.setItem('dataModified', 'true');
+    }
+  }, [editedData]);
+
   return (
     <div className="container-fluid p-4">
       {isLoading ? (
@@ -272,14 +376,35 @@ function DataViewContent() {
           <div className="flex justify-between items-center mb-3">
             <h4 className="mb-0">CSV 데이터 표시 (7, 8번째 열 수정 가능)</h4>
             <div className="flex gap-2">
+              <div className="form-check">
+                <input 
+                  type="checkbox" 
+                  id="showChanges" 
+                  className="form-check-input" 
+                  checked={showChanges}
+                  onChange={() => setShowChanges(!showChanges)}
+                />
+                <label htmlFor="showChanges" className="form-check-label">변경 사항 하이라이트</label>
+              </div>
+              
               {Object.keys(editedData).length > 0 && (
-                <button 
-                  className="btn btn-success"
-                  onClick={saveEditedData}
-                >
-                  <Save size={16} className="mr-1" />
-                  변경사항 저장
-                </button>
+                <>
+                  <button 
+                    className="btn btn-success"
+                    onClick={saveEditedData}
+                    disabled={Object.keys(validationErrors).length > 0}
+                  >
+                    <Save size={16} className="mr-1" />
+                    변경사항 저장
+                  </button>
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={revertChanges}
+                  >
+                    <X size={16} className="mr-1" />
+                    변경취소
+                  </button>
+                </>
               )}
               <button 
                 className="btn btn-primary"
@@ -297,6 +422,8 @@ function DataViewContent() {
               </button>
             </div>
           </div>
+
+          {getChangeSummary()}
 
           <div className="table-container">
             <table className="w-full min-w-[800px]">
@@ -363,10 +490,18 @@ function DataViewContent() {
                     <tr key={rowIndex} className="hover:bg-gray-50">
                       {Object.entries(row).map(([key, value], colIndex) => {
                         const columnName = Object.keys(row)[colIndex];
+                        const cellKey = `${rowIndex}-${columnName}`;
+                        const isChanged = editedData[cellKey] !== undefined;
+                        const showHighlight = showChanges && isChanged;
+                        
                         return (
                           <td 
                             key={colIndex} 
-                            className={`px-3 py-2 border ${editableColumns.editableIndices.includes(colIndex) ? 'bg-blue-50' : ''}`}
+                            className={`px-3 py-2 border ${
+                              editableColumns.editableIndices.includes(colIndex) ? 'bg-blue-50' : ''
+                            } ${
+                              showHighlight ? 'bg-yellow-100' : ''
+                            }`}
                             title={formatNumber(value)}
                           >
                             {renderCellContent(value, rowIndex, colIndex, columnName)}

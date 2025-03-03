@@ -281,11 +281,12 @@ def create_app():
         try:
             import pandas as pd
             import json
+            from io import StringIO
 
             # 클라이언트에서 전달된 records는 이미 리스트 형태입니다.
             # 이를 JSON 문자열로 변환한 후, DataFrame으로 재구성합니다.
             json_str = json.dumps(records)
-            df = pd.read_json(json_str, orient="records")
+            df = pd.read_json(StringIO(json_str), orient="records")
         except Exception as e:
             logger.error(f"DataFrame conversion error: {str(e)}")
             return error_response("Failed to parse records into DataFrame", 500)
