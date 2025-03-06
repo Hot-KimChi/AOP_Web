@@ -40,27 +40,66 @@ function DataViewContent() {
       if (storedEditableColumns) {
         setEditableColumns(JSON.parse(storedEditableColumns));
       }
+      
+      // 창이 열렸음을 표시 (추가)
+      sessionStorage.setItem('dataWindowOpen', 'open');
     } catch (error) {
       console.error('데이터 로드 오류:', error);
       setError('데이터 로드 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }
-
+  
     // 창이 닫힐 때 데이터 동기화
     window.addEventListener('beforeunload', syncDataBeforeUnload);
+    
+    // 메인 창에서 오는 메시지 수신 추가
+    window.addEventListener('message', receiveMessage);
+    
     return () => {
       window.removeEventListener('beforeunload', syncDataBeforeUnload);
+      window.removeEventListener('message', receiveMessage);
     };
   }, []);
+
+  // 메시지 수신 함수 추가
+  const receiveMessage = (event) => {
+    if (event.data && event.data.type === 'REFRESH_DATA') {
+      const freshData = event.data.data;
+      if (freshData) {
+        setCsvData(freshData);
+        setOriginalData(JSON.parse(JSON.stringify(freshData)));
+        setDisplayData(freshData);
+        setComboBoxOptions(generateComboBoxOptions(freshData));
+        setEditedData({});  // 편집 상태 초기화
+      }
+    }
+  };    
 
   // 창이 닫히기 전에 데이터 동기화
   const syncDataBeforeUnload = () => {
     sessionStorage.setItem('dataWindowOpen', 'closed');
+    
+    // 수정된 데이터가 있으면 항상 저장
     if (Object.keys(editedData).length > 0) {
-      // 수정된 데이터가 있으면 저장
       const updatedCsvData = [...csvData];
+      Object.values(editedData).forEach(edit => {
+        const { rowIndex, columnName, value } = edit;
+        updatedCsvData[rowIndex][columnName] = value;
+      });
+      
+      // 저장 전 sessionStorage 업데이트
       sessionStorage.setItem('csvData', JSON.stringify(updatedCsvData));
+      sessionStorage.setItem('dataModified', 'true');
+      
+      // 부모 창에 메시지 전송
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ 
+          type: 'DATA_MODIFIED', 
+          data: updatedCsvData,
+          timestamp: Date.now()
+        }, '*');
+      }
     }
   };
 
@@ -118,13 +157,21 @@ function DataViewContent() {
       updatedCsvData[rowIndex][columnName] = value;
     });
     
+    // 원본 데이터도 업데이트 (추가)
+    setOriginalData(JSON.parse(JSON.stringify(updatedCsvData)));
     setCsvData(updatedCsvData);
-    sessionStorage.setItem('csvData', JSON.stringify(updatedCsvData));
     
-    // 부모 창에 데이터가 수정되었음을 알림
+    // 세션 스토리지 업데이트
+    sessionStorage.setItem('csvData', JSON.stringify(updatedCsvData));
+    sessionStorage.setItem('dataModified', 'true');
+  
+    // 기존의 메시지 통신 코드 수정
     if (window.opener && !window.opener.closed) {
-      // 세션 스토리지를 통한 데이터 공유
-      window.opener.postMessage({ type: 'DATA_MODIFIED', data: updatedCsvData }, '*');
+      window.opener.postMessage({ 
+        type: 'DATA_MODIFIED', 
+        data: updatedCsvData,
+        timestamp: Date.now()
+      }, '*');
     }
     
     // 저장 후 편집 상태 초기화
