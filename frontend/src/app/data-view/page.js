@@ -5,24 +5,29 @@ import { useEffect, useState, Suspense } from 'react';
 import { ArrowUpDown, X, FileSpreadsheet, Save, CheckCircle, AlertCircle } from 'lucide-react';
 
 function DataViewContent() {
-  const [csvData, setCsvData] = useState([]);
-  const [originalData, setOriginalData] = useState([]); // 원본 데이터 저장
-  const [displayData, setDisplayData] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [filters, setFilters] = useState({});
-  const [comboBoxOptions, setComboBoxOptions] = useState({});
+  // 기본 상태 관리
+  const [csvData, setCsvData] = useState([]);                 // 원본 CSV 데이터
+  const [originalData, setOriginalData] = useState([]);       // 변경 전 원본 데이터 (복원용)
+  const [displayData, setDisplayData] = useState([]);         // 화면에 표시할 데이터
+  const [isLoading, setIsLoading] = useState(true);           // 로딩 상태
+  const [error, setError] = useState(null);                   // 오류 메시지
+  
+  // 데이터 조작 관련 상태
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });  // 정렬 설정
+  const [filters, setFilters] = useState({});                 // 필터 설정
+  const [comboBoxOptions, setComboBoxOptions] = useState({}); // 필터 콤보박스 옵션
+  
+  // 편집 관련 상태
   const [editableColumns, setEditableColumns] = useState({
     columns: [],
-    editableIndices: [] // 수정 가능한 열의 인덱스
+    editableIndices: []                                       // 수정 가능한 열 인덱스
   });
-  const [editedData, setEditedData] = useState({});  // 수정된 데이터를 추적하기 위한 상태
-  const [validationErrors, setValidationErrors] = useState({}); // 유효성 검사 오류 추적
-  const [showChanges, setShowChanges] = useState(false); // 변경 사항 하이라이트 토글
+  const [editedData, setEditedData] = useState({});           // 수정된 데이터 추적
+  const [validationErrors, setValidationErrors] = useState({}); // 유효성 검사 오류
+  const [showChanges, setShowChanges] = useState(false);      // 변경 사항 하이라이트 토글
 
   useEffect(() => {
-    // 페이지 로드 시 sessionStorage에서 데이터 가져오기 시도
+    // 페이지 로드 시 sessionStorage에서 데이터 가져오기
     try {
       const storedData = sessionStorage.getItem('csvData');
       const storedEditableColumns = sessionStorage.getItem('editableColumns');
@@ -41,7 +46,7 @@ function DataViewContent() {
         setEditableColumns(JSON.parse(storedEditableColumns));
       }
       
-      // 창이 열렸음을 표시 (추가)
+      // 창이 열렸음을 표시
       sessionStorage.setItem('dataWindowOpen', 'open');
     } catch (error) {
       console.error('데이터 로드 오류:', error);
@@ -50,19 +55,18 @@ function DataViewContent() {
       setIsLoading(false);
     }
   
-    // 창이 닫힐 때 데이터 동기화
+    // 이벤트 리스너 등록
     window.addEventListener('beforeunload', syncDataBeforeUnload);
-    
-    // 메인 창에서 오는 메시지 수신 추가
     window.addEventListener('message', receiveMessage);
     
+    // 컴포넌트 언마운트 시 이벤트 리스너 제거
     return () => {
       window.removeEventListener('beforeunload', syncDataBeforeUnload);
       window.removeEventListener('message', receiveMessage);
     };
   }, []);
 
-  // 메시지 수신 함수 추가
+  // 메시지 수신 핸들러 - 부모 창에서 데이터 새로고침 요청 처리
   const receiveMessage = (event) => {
     if (event.data && event.data.type === 'REFRESH_DATA') {
       const freshData = event.data.data;
@@ -80,15 +84,17 @@ function DataViewContent() {
   const syncDataBeforeUnload = () => {
     sessionStorage.setItem('dataWindowOpen', 'closed');
     
-    // 수정된 데이터가 있으면 항상 저장
+    // 수정된 데이터가 있으면 저장
     if (Object.keys(editedData).length > 0) {
       const updatedCsvData = [...csvData];
+      
+      // 모든 편집 내용 적용
       Object.values(editedData).forEach(edit => {
         const { rowIndex, columnName, value } = edit;
         updatedCsvData[rowIndex][columnName] = value;
       });
       
-      // 저장 전 sessionStorage 업데이트
+      // sessionStorage 업데이트
       sessionStorage.setItem('csvData', JSON.stringify(updatedCsvData));
       sessionStorage.setItem('dataModified', 'true');
       
@@ -103,9 +109,9 @@ function DataViewContent() {
     }
   };
 
-  // 셀 값 변경 처리
+  // 셀 값 변경 핸들러
   const handleCellChange = (rowIndex, columnName, value) => {
-    // 현재 표시 중인 데이터 업데이트
+    // 화면 데이터 업데이트
     const updatedDisplayData = [...displayData];
     updatedDisplayData[rowIndex][columnName] = value;
     setDisplayData(updatedDisplayData);
@@ -125,12 +131,12 @@ function DataViewContent() {
     validateCellData(rowIndex, columnName, value);
   };
 
-  // 데이터 유효성 검사
+  // 셀 데이터 유효성 검사
   const validateCellData = (rowIndex, columnName, value) => {
     const errKey = `${rowIndex}-${columnName}`;
     const newValidationErrors = { ...validationErrors };
     
-    // 숫자 형식 검사 (온도 값 등은 보통 숫자여야 함)
+    // 숫자 형식 검사
     if (value !== "" && isNaN(parseFloat(value))) {
       newValidationErrors[errKey] = '유효한 숫자를 입력하세요';
     } else {
@@ -142,22 +148,22 @@ function DataViewContent() {
 
   // 수정된 데이터 저장
   const saveEditedData = () => {
-    // 유효성 검사 오류가 있으면 저장 불가
+    // 유효성 검사 오류 확인
     if (Object.keys(validationErrors).length > 0) {
       alert('유효성 검사 오류가 있습니다. 모든 오류를 수정한 후 다시 시도하세요.');
       return;
     }
     
-    // CSV 데이터 전체를 업데이트
+    // CSV 데이터 업데이트
     const updatedCsvData = [...csvData];
     
-    // 수정된 모든 셀에 대해 원본 데이터 업데이트
+    // 수정된 모든 셀 업데이트
     Object.values(editedData).forEach(edit => {
       const { rowIndex, columnName, value } = edit;
       updatedCsvData[rowIndex][columnName] = value;
     });
     
-    // 원본 데이터도 업데이트 (추가)
+    // 상태 업데이트
     setOriginalData(JSON.parse(JSON.stringify(updatedCsvData)));
     setCsvData(updatedCsvData);
     
@@ -165,7 +171,7 @@ function DataViewContent() {
     sessionStorage.setItem('csvData', JSON.stringify(updatedCsvData));
     sessionStorage.setItem('dataModified', 'true');
   
-    // 기존의 메시지 통신 코드 수정
+    // 부모 창에 메시지 전송
     if (window.opener && !window.opener.closed) {
       window.opener.postMessage({ 
         type: 'DATA_MODIFIED', 
@@ -174,7 +180,7 @@ function DataViewContent() {
       }, '*');
     }
     
-    // 저장 후 편집 상태 초기화
+    // 편집 상태 초기화
     setEditedData({});
     
     alert('수정된 데이터가 저장되었습니다.');
@@ -191,7 +197,7 @@ function DataViewContent() {
     }
   };
 
-  // CSV 다운로드 기능
+  // CSV 파일 다운로드
   const downloadCSV = () => {
     if (!displayData || displayData.length === 0) {
       alert('다운로드할 데이터가 없습니다.');
@@ -200,7 +206,7 @@ function DataViewContent() {
 
     try {
       // 헤더 가져오기
-      const headers = Object.keys(displayData[0]);
+      const headers = Object.keys(displayData[0] || {});
       
       // CSV 내용 생성
       const csvContent = [
@@ -208,14 +214,12 @@ function DataViewContent() {
         ...displayData.map(row =>
           headers.map(header => {
             const value = row[header];
-            if (typeof value === 'string' && value.includes(',')) {
-              return `"${value}"`;
-            }
-            return value;
+            return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
           }).join(',')
         )
       ].join('\n');
 
+      // 파일 다운로드
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
@@ -224,24 +228,26 @@ function DataViewContent() {
       link.setAttribute('href', url);
       link.setAttribute('download', fileName);
       link.style.display = 'none';
-
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Export failed:', error);
+      console.error('내보내기 실패:', error);
       alert('다운로드 중 오류가 발생했습니다. 다시 시도해주세요.');
     }
   };
 
+  // 데이터 정렬 핸들러
   const handleSort = (key) => {
+    // 정렬 방향 결정
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
 
+    // 데이터 정렬
     const sortedData = [...displayData].sort((a, b) => {
       if (a[key] === null) return 1;
       if (b[key] === null) return -1;
@@ -257,9 +263,11 @@ function DataViewContent() {
     setDisplayData(sortedData);
   };
 
+  // 필터 적용
   const applyFilters = (newFilters) => {
     let filteredData = [...csvData];
 
+    // 모든 활성 필터 적용
     Object.entries(newFilters).forEach(([column, filterValues]) => {
       if (filterValues && filterValues.length > 0) {
         filteredData = filteredData.filter(row => {
@@ -275,6 +283,7 @@ function DataViewContent() {
     setDisplayData(filteredData);
   };
 
+  // 필터 변경 핸들러
   const handleFilterChange = (column, value) => {
     const filterValues = value.split(',').map(v => v.trim()).filter(v => v !== '');
     const newFilters = {
@@ -290,6 +299,7 @@ function DataViewContent() {
     applyFilters(newFilters);
   };
 
+  // 필터 초기화
   const clearFilter = (column) => {
     const newFilters = { ...filters };
     delete newFilters[column];
@@ -297,6 +307,7 @@ function DataViewContent() {
     applyFilters(newFilters);
   };
 
+  // 숫자 형식화
   const formatNumber = (value) => {
     if (typeof value === 'number') {
       return value % 1 === 0 ? value : parseFloat(value.toFixed(4));
@@ -304,13 +315,14 @@ function DataViewContent() {
     return value?.toString() || '';
   };
 
+  // 텍스트 길이 제한
   const truncateText = (text) => {
     if (!text) return '';
     const str = text.toString();
     return str.length > 20 ? `${str.substring(0, 20)}...` : str;
   };
 
-  // 수정된 renderCellContent 함수 - 수정 가능한 셀 확인 및 오류 표시
+  // 셀 내용 렌더링
   const renderCellContent = (value, rowIndex, columnIndex, columnName) => {
     // 수정 가능한 셀인지 확인
     const isEditable = editableColumns.editableIndices.includes(columnIndex);
@@ -345,6 +357,7 @@ function DataViewContent() {
       );
     }
     
+    // 일반 셀 렌더링
     if (value === null || value === undefined) {
       return '';
     }
@@ -353,7 +366,7 @@ function DataViewContent() {
     return formattedValue === 0 ? '0' : truncateText(formattedValue);
   };
 
-  // 콤보박스 옵션을 생성하는 함수
+  // 콤보박스 옵션 생성
   const generateComboBoxOptions = (data) => {
     if (!data || data.length === 0) return {};
     
@@ -367,7 +380,7 @@ function DataViewContent() {
     return options;
   };
 
-  // 콤보박스 값 변경 시 필터 적용
+  // 콤보박스 값 변경 핸들러
   const handleComboBoxChange = (column, value) => {
     const newFilters = { ...filters };
     
@@ -381,7 +394,7 @@ function DataViewContent() {
     applyFilters(newFilters);
   };
 
-  // 변경 사항에 대한 요약 정보 생성
+  // 변경 요약 정보 생성
   const getChangeSummary = () => {
     const changedCount = Object.keys(editedData).length;
     const errorCount = Object.keys(validationErrors).length;
@@ -392,14 +405,13 @@ function DataViewContent() {
       <div className={`p-2 rounded mb-3 ${errorCount > 0 ? 'bg-red-100' : 'bg-yellow-100'}`}>
         <p className="font-medium">
           {changedCount}개의 셀이 수정되었습니다. 
-          {errorCount > 0 && <span className="text-red-600"> {errorCount}개의
-          오류가 있습니다.</span>}
+          {errorCount > 0 && <span className="text-red-600"> {errorCount}개의 오류가 있습니다.</span>}
         </p>
       </div>
     );
   };
 
-  // 부모 창에 변경 사항 알림
+  // 편집 상태 변경 시 부모 창에 알림
   useEffect(() => {
     if (Object.keys(editedData).length > 0) {
       sessionStorage.setItem('dataModified', 'true');
@@ -569,11 +581,11 @@ function DataViewContent() {
           </div>
         </>
       )}
-        <style jsx>{`
+      <style jsx>{`
         .table-container {
             width: 100%;
-            overflow: auto;       /* 세로/가로 스크롤 */
-            max-height: 900px;    /* 스크롤 영역 높이 */
+            overflow: auto;
+            max-height: 900px;
             white-space: nowrap;
             background-color: white;
             border-radius: 0.25rem;
@@ -593,8 +605,8 @@ function DataViewContent() {
         .table-container thead tr:first-child th {
             position: sticky;
             top: 0;
-            z-index: 20;             /* 두 번째 헤더보다 크게 */
-            background-color: #f8f8f8;  /* 겹침 방지용 배경색 */
+            z-index: 20;
+            background-color: #f8f8f8;
             height: 35px;
             line-height: 35px;
         }
@@ -602,13 +614,13 @@ function DataViewContent() {
         /* 두 번째 헤더(필터) */
         .table-container thead tr:nth-child(2) th {
             position: sticky;
-            top: 40px;               /* 첫 번째 헤더 높이만큼 offset */
-            z-index: 10;             /* 첫 번째 헤더보다 작게 */
-            background-color: #fff;  /* 겹침 방지용 배경색 */
+            top: 40px;
+            z-index: 10;
+            background-color: #fff;
             height: 35px;
             line-height: 35px;
         }
-        `}</style>
+      `}</style>
     </div>
   );
 }
