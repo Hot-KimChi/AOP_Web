@@ -1,3 +1,4 @@
+//src/app/measset-geneation/page.js
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -12,7 +13,6 @@ export default function MeasSetGen() {
   const [isLoading, setIsLoading] = useState(false);             // 로딩 상태
   const [error, setError] = useState(null);                      // 오류 메시지
   const [csvData, setCsvData] = useState(null);                  // CSV 데이터
-  const [csvKey, setCsvKey] = useState(null);                    // CSV 키
   const [dataModified, setDataModified] = useState(false);       // 데이터 수정 여부
   const [dataWindowReference, setDataWindowReference] = useState(null); // 데이터 창 참조
 
@@ -184,8 +184,6 @@ export default function MeasSetGen() {
 
       const data = await response.json();
       if (data.status === 'success' && data.csv_key) {
-        setCsvKey(data.csv_key);
-        
         // CSV 데이터 요청
         const csvResponse = await fetch(`${API_BASE_URL}/api/csv-data?csv_key=${data.csv_key}`, {
           method: 'GET',
@@ -289,7 +287,7 @@ export default function MeasSetGen() {
     }
 
     // temperature가 포함된 데이터 필터링
-    const firstColumnName = Object.keys(csvDataToUse[0])[0];
+    const firstColumnName = Object.keys(csvDataToUse[0])[1];
     const filteredData = csvDataToUse.filter(row => {
       const firstColumnValue = String(row[firstColumnName] || '').toLowerCase();
       return firstColumnValue.includes('temperature');
@@ -300,10 +298,10 @@ export default function MeasSetGen() {
       return;
     }
 
-    // 수정 가능한 열 설정 (7번째, 8번째 열)
+    // 수정 가능한 열 설정 (2번째, 7번째, 8번째 열)
     const editableColumns = {
       columns: Object.keys(filteredData[0]),
-      editableIndices: [6, 7],
+      editableIndices: [1, 7, 8],
     };
 
     // 세션 스토리지 설정
@@ -311,6 +309,9 @@ export default function MeasSetGen() {
     sessionStorage.setItem('editableColumns', JSON.stringify(editableColumns));
     sessionStorage.setItem('dataWindowOpen', 'open');
     sessionStorage.setItem('parentWindowId', window.name || 'main');
+
+    // 현재 데이터를 별도로 저장 (창 닫힘 시 비교용)
+    const originalDataSnapshot = JSON.stringify(filteredData);
 
     // 새 창 열기
     const newWindow = window.open('/data-view', '측정 데이터', 'width=1000,height=800');
@@ -339,12 +340,18 @@ export default function MeasSetGen() {
       // 창이 닫힐 때 최신 데이터 확인
       const updatedData = sessionStorage.getItem('csvData');
       if (updatedData) {
-        try {
-          const parsedData = JSON.parse(updatedData);
-          setCsvData(parsedData);
-          setDataModified(true);
-        } catch (err) {
-          console.error('창 닫힘 처리 중 데이터 파싱 오류:', err);
+        // 데이터가 변경되었는지 비교
+        if (updatedData !== originalDataSnapshot) {
+          try {
+            const parsedData = JSON.parse(updatedData);
+            setCsvData(parsedData);
+            setDataModified(true);
+          } catch (err) {
+            console.error('창 닫힘 처리 중 데이터 파싱 오류:', err);
+          }
+        } else {
+          // 변경이 없으면 dataModified를 false로 유지
+          setDataModified(false);
         }
       }
     };

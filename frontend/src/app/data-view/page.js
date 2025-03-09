@@ -2,29 +2,30 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { ArrowUpDown, X, FileSpreadsheet, Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowUpDown, X, FileSpreadsheet, Save, CheckCircle, AlertCircle, Trash2, Copy } from 'lucide-react';
 
 function DataViewContent() {
   // 기본 상태 관리
-  const [csvData, setCsvData] = useState([]);                 // 원본 CSV 데이터
-  const [originalData, setOriginalData] = useState([]);       // 변경 전 원본 데이터 (복원용)
-  const [displayData, setDisplayData] = useState([]);         // 화면에 표시할 데이터
-  const [isLoading, setIsLoading] = useState(true);           // 로딩 상태
-  const [error, setError] = useState(null);                   // 오류 메시지
+  const [csvData, setCsvData] = useState([]);                                     // 원본 CSV 데이터
+  const [originalData, setOriginalData] = useState([]);                           // 변경 전 원본 데이터 (복원용)
+  const [displayData, setDisplayData] = useState([]);                             // 화면에 표시할 데이터
+  const [isLoading, setIsLoading] = useState(true);                               // 로딩 상태
+  const [error, setError] = useState(null);                                       // 오류 메시지
   
   // 데이터 조작 관련 상태
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });  // 정렬 설정
-  const [filters, setFilters] = useState({});                 // 필터 설정
-  const [comboBoxOptions, setComboBoxOptions] = useState({}); // 필터 콤보박스 옵션
+  const [filters, setFilters] = useState({});                                     // 필터 설정
+  const [comboBoxOptions, setComboBoxOptions] = useState({});                     // 필터 콤보박스 옵션
   
   // 편집 관련 상태
   const [editableColumns, setEditableColumns] = useState({
     columns: [],
-    editableIndices: []                                       // 수정 가능한 열 인덱스
+    editableIndices: []                                                           // 수정 가능한 열 인덱스
   });
-  const [editedData, setEditedData] = useState({});           // 수정된 데이터 추적
-  const [validationErrors, setValidationErrors] = useState({}); // 유효성 검사 오류
-  const [showChanges, setShowChanges] = useState(false);      // 변경 사항 하이라이트 토글
+  const [editedData, setEditedData] = useState({});                               // 수정된 데이터 추적
+  const [validationErrors, setValidationErrors] = useState({});                   // 유효성 검사 오류
+  const [showChanges, setShowChanges] = useState(false);                          // 변경 사항 하이라이트 토글
+  const [deletedRows, setDeletedRows] = useState([]);                             // 삭제된 행 인덱스 추적
 
   useEffect(() => {
     // 페이지 로드 시 sessionStorage에서 데이터 가져오기
@@ -35,7 +36,7 @@ function DataViewContent() {
       if (storedData) {
         const parsedData = JSON.parse(storedData);
         setCsvData(parsedData);
-        setOriginalData(JSON.parse(JSON.stringify(parsedData))); // 깊은 복사로 원본 보존
+        setOriginalData(JSON.parse(JSON.stringify(parsedData)));                  // 깊은 복사로 원본 보존
         setDisplayData(parsedData);
         setComboBoxOptions(generateComboBoxOptions(parsedData));
       } else {
@@ -76,6 +77,7 @@ function DataViewContent() {
         setDisplayData(freshData);
         setComboBoxOptions(generateComboBoxOptions(freshData));
         setEditedData({});  // 편집 상태 초기화
+        setDeletedRows([]);  // 삭제된 행 초기화
       }
     }
   };    
@@ -84,15 +86,23 @@ function DataViewContent() {
   const syncDataBeforeUnload = () => {
     sessionStorage.setItem('dataWindowOpen', 'closed');
     
-    // 수정된 데이터가 있으면 저장
-    if (Object.keys(editedData).length > 0) {
-      const updatedCsvData = [...csvData];
+    // 수정된 데이터가 있거나 삭제된 행이 있으면 저장
+    if (Object.keys(editedData).length > 0 || deletedRows.length > 0) {
+      let updatedCsvData = [...csvData];
       
       // 모든 편집 내용 적용
       Object.values(editedData).forEach(edit => {
         const { rowIndex, columnName, value } = edit;
         updatedCsvData[rowIndex][columnName] = value;
       });
+      
+      // 삭제된 행 제거 (인덱스가 큰 것부터 제거해야 인덱스 변경 문제 방지)
+      if (deletedRows.length > 0) {
+        const sortedDeletedIndices = [...deletedRows].sort((a, b) => b - a);
+        sortedDeletedIndices.forEach(index => {
+          updatedCsvData.splice(index, 1);
+        });
+      }
       
       // sessionStorage 업데이트
       sessionStorage.setItem('csvData', JSON.stringify(updatedCsvData));
@@ -155,13 +165,21 @@ function DataViewContent() {
     }
     
     // CSV 데이터 업데이트
-    const updatedCsvData = [...csvData];
+    let updatedCsvData = [...csvData];
     
     // 수정된 모든 셀 업데이트
     Object.values(editedData).forEach(edit => {
       const { rowIndex, columnName, value } = edit;
       updatedCsvData[rowIndex][columnName] = value;
     });
+    
+    // 삭제된 행 제거 (인덱스가 큰 것부터 제거해야 인덱스 변경 문제 방지)
+    if (deletedRows.length > 0) {
+      const sortedDeletedIndices = [...deletedRows].sort((a, b) => b - a);
+      sortedDeletedIndices.forEach(index => {
+        updatedCsvData.splice(index, 1);
+      });
+    }
     
     // 상태 업데이트
     setOriginalData(JSON.parse(JSON.stringify(updatedCsvData)));
@@ -182,6 +200,20 @@ function DataViewContent() {
     
     // 편집 상태 초기화
     setEditedData({});
+    setDeletedRows([]);
+    
+    // 삭제된 행이 있으면 필터링된 데이터도 업데이트
+    if (deletedRows.length > 0) {
+      // 기존 필터 적용
+      const filteredData = updatedCsvData.filter(row => {
+        return Object.entries(filters).every(([column, filterValues]) => {
+          if (!filterValues || filterValues.length === 0) return true;
+          const cellValue = (row[column]?.toString() || '').toLowerCase();
+          return filterValues.some(filter => cellValue === filter.toLowerCase().trim());
+        });
+      });
+      setDisplayData(filteredData);
+    }
     
     alert('수정된 데이터가 저장되었습니다.');
   };
@@ -194,6 +226,84 @@ function DataViewContent() {
       setDisplayData(originalDataCopy);
       setEditedData({});
       setValidationErrors({});
+      setDeletedRows([]);
+    }
+  };
+
+  // 행 삭제 핸들러
+  const handleDeleteRow = (rowIndex) => {
+    if (confirm('정말로 이 행을 삭제하시겠습니까? 이 작업은 저장 전까지 취소할 수 있습니다.')) {
+      // 삭제된 행 추적
+      setDeletedRows(prev => [...prev, rowIndex]);
+      
+      // 화면에서 행 제거
+      const updatedDisplayData = displayData.filter((_, idx) => idx !== rowIndex);
+      setDisplayData(updatedDisplayData);
+      
+      // 삭제된 행과 관련된 편집 상태 제거
+      const newEditedData = { ...editedData };
+      Object.keys(newEditedData).forEach(key => {
+        if (key.startsWith(`${rowIndex}-`)) {
+          delete newEditedData[key];
+        }
+      });
+      setEditedData(newEditedData);
+      
+      // 삭제된 행과 관련된 유효성 검사 오류 제거
+      const newValidationErrors = { ...validationErrors };
+      Object.keys(newValidationErrors).forEach(key => {
+        if (key.startsWith(`${rowIndex}-`)) {
+          delete newValidationErrors[key];
+        }
+      });
+      setValidationErrors(newValidationErrors);
+    }
+  };
+
+  // **행 복사 및 추가 핸들러**
+  const handleCopyRow = (rowIndex) => {
+    // 복사할 행 가져오기 (현재 화면에 표시된 데이터 기준)
+    const rowToCopy = displayData[rowIndex];
+    // 새로운 행 생성 (얕은 복사 - 원시값만 있다면 충분합니다)
+    const newRow = { ...rowToCopy };
+    // csvData에 복사된 행 추가
+    const updatedCsvData = [...csvData, newRow];
+    setCsvData(updatedCsvData);
+
+    // 활성 필터가 있을 경우, 필터를 재적용하여 displayData 업데이트
+    if (Object.keys(filters).length > 0) {
+      let filteredData = [...updatedCsvData];
+      Object.entries(filters).forEach(([column, filterValues]) => {
+        if (filterValues && filterValues.length > 0) {
+          filteredData = filteredData.filter(row => {
+            const cellValue = (row[column]?.toString() || '').toLowerCase();
+            return filterValues.every(filter => cellValue === filter.toLowerCase().trim());
+          });
+        }
+      });
+      setDisplayData(filteredData);
+    } else {
+      // 필터가 없으면 단순히 displayData에 추가
+      setDisplayData(updatedCsvData);
+    }
+  };
+
+  // 삭제 취소 (모든 행 복원)
+  const restoreDeletedRows = () => {
+    if (deletedRows.length === 0) return;
+    
+    if (confirm('삭제된 모든 행을 복원하시겠습니까?')) {
+      // 원본 데이터 필터링
+      const filteredData = csvData.filter(row => {
+        return Object.entries(filters).every(([column, filterValues]) => {
+          if (!filterValues || filterValues.length === 0) return true;
+          const cellValue = (row[column]?.toString() || '').toLowerCase();
+          return filterValues.some(filter => cellValue === filter.toLowerCase().trim());
+        });
+      });
+      
+      setDisplayData(filteredData);
+      setDeletedRows([]);
     }
   };
 
@@ -281,6 +391,8 @@ function DataViewContent() {
     });
 
     setDisplayData(filteredData);
+    // 행 삭제 상태 초기화 (필터가 변경되면 삭제 추적이 복잡해짐)
+    setDeletedRows([]);
   };
 
   // 필터 변경 핸들러
@@ -398,25 +510,35 @@ function DataViewContent() {
   const getChangeSummary = () => {
     const changedCount = Object.keys(editedData).length;
     const errorCount = Object.keys(validationErrors).length;
+    const deletedCount = deletedRows.length;
     
-    if (changedCount === 0) return null;
+    if (changedCount === 0 && deletedCount === 0) return null;
     
     return (
       <div className={`p-2 rounded mb-3 ${errorCount > 0 ? 'bg-red-100' : 'bg-yellow-100'}`}>
         <p className="font-medium">
-          {changedCount}개의 셀이 수정되었습니다. 
+          {changedCount > 0 && `${changedCount}개의 셀이 수정되었습니다. `}
+          {deletedCount > 0 && `${deletedCount}개의 행이 삭제 대기 중입니다. `}
           {errorCount > 0 && <span className="text-red-600"> {errorCount}개의 오류가 있습니다.</span>}
         </p>
+        {deletedCount > 0 && (
+          <button 
+            className="text-blue-600 text-sm underline hover:text-blue-800 mt-1"
+            onClick={restoreDeletedRows}
+          >
+            삭제된 행 복원하기
+          </button>
+        )}
       </div>
     );
   };
 
   // 편집 상태 변경 시 부모 창에 알림
   useEffect(() => {
-    if (Object.keys(editedData).length > 0) {
+    if (Object.keys(editedData).length > 0 || deletedRows.length > 0) {
       sessionStorage.setItem('dataModified', 'true');
     }
-  }, [editedData]);
+  }, [editedData, deletedRows]);
 
   return (
     <div className="container-fluid p-4">
@@ -446,7 +568,7 @@ function DataViewContent() {
                 <label htmlFor="showChanges" className="form-check-label">변경 사항 하이라이트</label>
               </div>
               
-              {Object.keys(editedData).length > 0 && (
+              {(Object.keys(editedData).length > 0 || deletedRows.length > 0) && (
                 <>
                   <button 
                     className="btn btn-success"
@@ -489,6 +611,9 @@ function DataViewContent() {
               <thead>
                 {/* 첫 번째 헤더(파라미터 이름) */}
                 <tr className="bg-gray-100">
+                  <th className="px-3 py-2 border text-center" style={{ width: '60px' }}>
+                    <span title="행 복사/삭제" className="font-medium text-gray-700">복사/삭제</span>
+                  </th>
                   {Object.keys(displayData[0] || {}).map((header, index) => (
                     <th key={index} className="px-3 py-2 border">
                       <div className="flex items-center justify-between group">
@@ -514,6 +639,7 @@ function DataViewContent() {
                 </tr>
                 {/* 두 번째 헤더(필터 선택) */}
                 <tr>
+                  <th className="px-2 py-1 border bg-gray-50"></th>
                   {Object.keys(displayData[0] || {}).map((header, index) => (
                     <th key={index} className="px-2 py-1 border bg-gray-50">
                       <div className="relative">
@@ -547,6 +673,22 @@ function DataViewContent() {
                 {displayData.length > 0 ? (
                   displayData.map((row, rowIndex) => (
                     <tr key={rowIndex} className="hover:bg-gray-50">
+                      <td className="px-1 py-2 border text-center">
+                        <button
+                          className="p-1 text-green-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                          onClick={() => handleCopyRow(rowIndex)}
+                          title="행 복사"
+                        >
+                          <Copy size={16} />
+                        </button>
+                        <button
+                          className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          onClick={() => handleDeleteRow(rowIndex)}
+                          title="행 삭제"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
                       {Object.entries(row).map(([key, value], colIndex) => {
                         const columnName = Object.keys(row)[colIndex];
                         const cellKey = `${rowIndex}-${columnName}`;
@@ -571,7 +713,7 @@ function DataViewContent() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={Object.keys(displayData[0] || {}).length} className="text-center py-3 text-gray-500">
+                    <td colSpan={Object.keys(displayData[0] || {}).length + 1} className="text-center py-3 text-gray-500">
                       필터 조건에 맞는 데이터가 없습니다. 필터를 조정해주세요.
                     </td>
                   </tr>
