@@ -146,10 +146,22 @@ function DataViewContent() {
     const errKey = `${rowIndex}-${columnName}`;
     const newValidationErrors = { ...validationErrors };
     
-    // 숫자 형식 검사
-    if (value !== "" && isNaN(parseFloat(value))) {
-      newValidationErrors[errKey] = '유효한 숫자를 입력하세요';
+    // 열 인덱스 찾기
+    const columnIndex = Object.keys(csvData[0] || {}).findIndex(key => key === columnName);
+    
+    // 열 타입에 따른 유효성 검사
+    if (columnIndex === 1) {
+      // 2번째 열(인덱스 1)은 텍스트 데이터이므로 별도의 유효성 검사가 필요하지 않음
+      delete newValidationErrors[errKey];
+    } else if (editableColumns.editableIndices.includes(columnIndex)) {
+      // 수정 가능한 열(7, 8번째 열)에 대해서는 숫자 형식 검사 적용
+      if (value !== "" && isNaN(parseFloat(value))) {
+        newValidationErrors[errKey] = '유효한 숫자를 입력하세요';
+      } else {
+        delete newValidationErrors[errKey];
+      }
     } else {
+      // 그 외 열은 기본적으로 오류 없음
       delete newValidationErrors[errKey];
     }
     
