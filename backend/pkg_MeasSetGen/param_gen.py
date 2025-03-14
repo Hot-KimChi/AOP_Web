@@ -12,8 +12,6 @@ class ParamGen:
         self.df["probeId"] = self.probeid
         self.df["probeName"] = self.probename
 
-        self.df["maxTxVoltageVolt"] = 90
-        self.df["ceilTxVoltageVolt"] = 90
         self.df["totalVoltagePt"] = 20
         self.df["zStartDistCm"] = 0.5
         self.df["DTxFreqIndex"] = 0
@@ -26,6 +24,7 @@ class ParamGen:
         self.bsIdx()
         self.freqidx2Hz()
         self.cnt_cycle()
+        self.maxVolt_ceilVolt()
         self.calc_profvolt()
         self.zMeasNum()
 
@@ -36,7 +35,6 @@ class ParamGen:
         ##  = self.df['Mode'].apply(lambda mode: 10 if mode == 'Contrast' else 8)
 
         self.df["numMeasVoltage"] = 10
-
         return self.df
 
     def findOrgIdx(self):
@@ -58,7 +56,6 @@ class ParamGen:
             lambda row: mode_submode_map.get((row["Mode"], row["SubModeIndex"]), -1),
             axis=1,
         )
-
         return self.df
 
     def bsIdx(self):
@@ -72,7 +69,6 @@ class ParamGen:
         self.df["bsIndexTrace"] = self.df.apply(
             lambda row: bsIndex(row["OrgBeamstyleIdx"], row["isDuplicate"]), axis=1
         )
-
         return self.df
 
     def freqidx2Hz(self):
@@ -133,7 +129,6 @@ class ParamGen:
         self.df["TxFrequencyHz"] = self.df["SysTxFreqIndex"].apply(
             lambda i: frequencyTable[i]
         )
-
         return self.df
 
     def cnt_cycle(self):
@@ -155,7 +150,17 @@ class ParamGen:
             ),
             axis=1,
         )
+        return self.df
 
+    def maxVolt_ceilVolt(self):
+        ## update maxVoltage and ceilVoltage by VTxIndex
+
+        self.df.loc[
+            self.df["VTxIndex"] == 1, ["maxTxVoltageVolt", "ceilTxVoltageVolt"]
+        ] = 93
+        self.df.loc[
+            self.df["VTxIndex"] == 0, ["maxTxVoltageVolt", "ceilTxVoltageVolt"]
+        ] = 90
         return self.df
 
     def calc_profvolt(self):
@@ -170,7 +175,6 @@ class ParamGen:
             ),
             axis=1,
         )
-
         return self.df
 
     def zMeasNum(self):
