@@ -191,5 +191,4 @@ class ParamGen:
                 return (14 - 0.5) * 10
 
         self.df["zMeasNum"] = self.df["TxFocusLocCm"].apply(z_meas_num)
-
         return self.df

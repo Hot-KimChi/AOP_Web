@@ -47,7 +47,8 @@ export default function MeasSetGen() {
         
         // 전체 데이터에 업데이트 적용
         if (fullCsvData) {
-          const updatedFullData = updateFullData(fullCsvData, parsedData);
+          // 기존에 있는 행 업데이트 및 새로운 행 추가
+          const updatedFullData = mergeDataWithNewRows(fullCsvData, parsedData);
           setFullCsvData(updatedFullData);
           
           // 세션 스토리지에 전체 데이터 저장
@@ -59,7 +60,9 @@ export default function MeasSetGen() {
         } else {
           // 전체 데이터가 없는 경우 (비정상 상황)
           setCsvData(parsedData);
+          setFullCsvData(parsedData); // 전체 데이터도 설정
           sessionStorage.setItem('csvData', JSON.stringify(parsedData));
+          sessionStorage.setItem('fullCsvData', JSON.stringify(parsedData));
         }
         
         setDataModified(true);
@@ -76,14 +79,21 @@ export default function MeasSetGen() {
     // 복사본 생성
     const newFullData = [...fullData];
     let updateCount = 0;
+    let addCount = 0;
     
     // groupIndex를 키로 하는 맵 생성
     const updatedMap = new Map();
+    const existingGroupIndices = new Set();
+    
+    // 기존 fullData의 모든 groupIndex를 Set에 추가
+    newFullData.forEach(fullRow => {
+      if (fullRow.groupIndex) {
+        existingGroupIndices.add(fullRow.groupIndex);
+      }
+    });
     
     // 각 필터된 행에 대해 groupIndex를 키로 사용하여 맵 구성
     updatedFilteredData.forEach(filteredRow => {
-      // 여기서는 'groupIndex'라는 이름의 필드가 있다고 가정
-      // 실제 필드명이 다르다면 해당 필드명으로 변경해야 함
       const groupIndex = filteredRow.groupIndex; 
       
       if (groupIndex) {
@@ -117,9 +127,76 @@ export default function MeasSetGen() {
       }
     });
     
+    // 새로운 행 추가: updatedFilteredData에는 있지만 fullData에는 없는 행들을 찾아 추가
+    updatedFilteredData.forEach(filteredRow => {
+      const groupIndex = filteredRow.groupIndex;
+      
+      // groupIndex가 없거나 기존 fullData에 없는 새로운 행인 경우
+      if (groupIndex && !existingGroupIndices.has(groupIndex)) {
+        newFullData.push(filteredRow); // 전체 데이터에 추가
+        addCount++;
+        existingGroupIndices.add(groupIndex); // 추가된 행 기록
+      }
+    });
+    
     // 업데이트 수 설정
-    setUpdatedCount(updateCount);
-    console.log(`총 ${updateCount}개의 데이터가 업데이트되었습니다.`);
+    setUpdatedCount(updateCount + addCount);
+    console.log(`총 ${updateCount}개의 데이터가 업데이트되었고, ${addCount}개의 새 행이 추가되었습니다.`);
+    
+    return newFullData;
+  };
+
+  // 새로운 행 추가 및 기존 행 업데이트를 처리하는 함수
+  const mergeDataWithNewRows = (fullData, filteredData) => {
+    if (!fullData || !filteredData) return fullData;
+    
+    // 복사본 생성
+    const newFullData = [...fullData];
+    let updateCount = 0;
+    let addCount = 0;
+    
+    // 키 필드 (groupIndex)를 사용하여 맵 생성
+    const fullDataMap = new Map();
+    
+    // 전체 데이터를 맵으로 변환 (키: groupIndex, 값: 행 객체)
+    newFullData.forEach((row, index) => {
+      if (row.groupIndex) {
+        fullDataMap.set(row.groupIndex, { row, index });
+      }
+    });
+    
+    // 필터링된 데이터의 각 행을 순회
+    filteredData.forEach(filteredRow => {
+      const groupIndex = filteredRow.groupIndex;
+      
+      // 해당 행이 전체 데이터에 있는지 확인
+      if (groupIndex && fullDataMap.has(groupIndex)) {
+        // 기존 행 업데이트
+        const { row, index } = fullDataMap.get(groupIndex);
+        const keys = Object.keys(row);
+        const editableIndices = [8, 9]; // 8번째, 9번째 열 (인덱스 기준으로는 6, 7)
+        
+        editableIndices.forEach(colIndex => {
+          if (colIndex < keys.length) {
+            const columnKey = keys[colIndex - 1]; // 인덱스를 1부터 시작하도록 조정
+            
+            // 값이 변경되었는지 확인
+            if (row[columnKey] !== filteredRow[columnKey]) {
+              newFullData[index][columnKey] = filteredRow[columnKey];
+              updateCount++;
+            }
+          }
+        });
+      } else if (groupIndex) {
+        // 새로운 행 추가
+        newFullData.push({ ...filteredRow });
+        addCount++;
+      }
+    });
+    
+    // 업데이트 수 설정
+    setUpdatedCount(updateCount + addCount);
+    console.log(`총 ${updateCount}개의 데이터가 업데이트되었고, ${addCount}개의 새 행이 추가되었습니다.`);
     
     return newFullData;
   };
