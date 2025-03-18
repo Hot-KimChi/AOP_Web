@@ -54,11 +54,11 @@ class MeasSetGen:
                 database=self.database,
             )
             gen_df_inten = predictionML.intensity_zt_est()
-            gen_df_temp = predictionML.temperature_PRF_est()
             gen_df_power = predictionML.power_PRF_est()
+            gen_df_temp = predictionML.temperature_PRF_est()
 
             df_total = pd.concat(
-                [gen_df_inten, gen_df_temp, gen_df_power], axis=0, ignore_index=True
+                [gen_df_inten, gen_df_power, gen_df_temp], axis=0, ignore_index=True
             )
             df_total = df_total.fillna(-1)
             logging.info("Machine learning predictions completed.")

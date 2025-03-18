@@ -95,19 +95,6 @@ class PredictML:
 
         return self.df
 
-    def temperature_PRF_est(self):
-        ## predict PRF by ML model.
-
-        temp_df = self.df.loc[self.df.groupby("GroupIndex")["TxFocusLocCm"].idxmax()]
-        temp_df = temp_df.drop_duplicates(subset=["GroupIndex"])
-        temp_df["AI_param"] = 610
-        temp_df["measSetComments"] = f"Beamstyle_{self.probeName}_temperature"
-
-        # 결과를 GroupIndex로 정렬
-        temp_df = temp_df.sort_values("GroupIndex")
-
-        return temp_df
-
     def power_PRF_est(self):
         ## predict PRF by ML model.
 
@@ -125,14 +112,40 @@ class PredictML:
         pitchCm_df = connect.execute_query(query)
         oneCmElement = np.ceil(1 / pitchCm_df["probePitchCm"].iloc[0])
 
-        power_df = self.df.loc[self.df.groupby("GroupIndex")["TxFocusLocCm"].idxmax()]
+        # 각 GroupIndex 내에서 최대 TxFocusLocCm 값을 찾기
+        max_values = self.df.groupby("GroupIndex")["TxFocusLocCm"].transform("max")
+
+        # 최대값과 일치하는 모든 행 선택
+        power_df = self.df[self.df["TxFocusLocCm"] == max_values]
+
+        # 필요하다면 여기서 중복 제거
         power_df = power_df.drop_duplicates(subset=["GroupIndex"])
+
         power_df["measSetComments"] = f"Beamstyle_{self.probeName}_power"
         power_df["NumTxElements"] = oneCmElement
-
         power_df["AI_param"] = 1000
 
         # 결과를 GroupIndex로 정렬
         power_df = power_df.sort_values("GroupIndex")
 
         return power_df
+
+    def temperature_PRF_est(self):
+        ## predict PRF by ML model.
+
+        # 각 GroupIndex 내에서 최대 TxFocusLocCm 값을 찾기
+        max_values = self.df.groupby("GroupIndex")["TxFocusLocCm"].transform("max")
+
+        # 최대값과 일치하는 모든 행 선택
+        temp_df = self.df[self.df["TxFocusLocCm"] == max_values]
+
+        # 필요하다면 여기서 중복 제거
+        temp_df = temp_df.drop_duplicates(subset=["GroupIndex"])
+
+        temp_df["AI_param"] = 610
+        temp_df["measSetComments"] = f"Beamstyle_{self.probeName}_temperature"
+
+        # 결과를 GroupIndex로 정렬
+        temp_df = temp_df.sort_values("GroupIndex")
+
+        return temp_df
