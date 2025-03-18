@@ -99,14 +99,14 @@ class ParamUpdate:
                 group_index += 1
                 group_indices.append(group_index)
             prev_value = value
-        df["groupIndex"] = group_indices
+        df["GroupIndex"] = group_indices
 
         return df
 
     def updateDuplicate(self, df):
-        # 각 groupIndex 내에서 하나라도 isDuplicate가 0이면 해당 그룹의 모든 isDuplicate를 0으로 설정
+        # 각 GroupIndex 내에서 하나라도 isDuplicate가 0이면 해당 그룹의 모든 isDuplicate를 0으로 설정
 
-        df["isDuplicate"] = df.groupby("groupIndex")["isDuplicate"].transform(
+        df["isDuplicate"] = df.groupby("GroupIndex")["isDuplicate"].transform(
             lambda x: 0 if 0 in x.values else 1
         )
 

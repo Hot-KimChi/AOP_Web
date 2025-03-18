@@ -13,7 +13,7 @@ def arrangeParam(func):
     ## parameter 순서 변경.
     def wrapper(self):
         arrange_param = [
-            "groupIndex",
+            "GroupIndex",
             "measSetComments",
             "probeId",
             "OrgBeamstyleIdx",

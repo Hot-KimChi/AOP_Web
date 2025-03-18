@@ -98,13 +98,13 @@ class PredictML:
     def temperature_PRF_est(self):
         ## predict PRF by ML model.
 
-        temp_df = self.df.loc[self.df.groupby("groupIndex")["TxFocusLocCm"].idxmax()]
-        temp_df = temp_df.drop_duplicates(subset=["groupIndex"])
+        temp_df = self.df.loc[self.df.groupby("GroupIndex")["TxFocusLocCm"].idxmax()]
+        temp_df = temp_df.drop_duplicates(subset=["GroupIndex"])
         temp_df["AI_param"] = 610
         temp_df["measSetComments"] = f"Beamstyle_{self.probeName}_temperature"
 
-        # 결과를 groupIndex로 정렬
-        temp_df = temp_df.sort_values("groupIndex")
+        # 결과를 GroupIndex로 정렬
+        temp_df = temp_df.sort_values("GroupIndex")
 
         return temp_df
 
@@ -125,14 +125,14 @@ class PredictML:
         pitchCm_df = connect.execute_query(query)
         oneCmElement = np.ceil(1 / pitchCm_df["probePitchCm"].iloc[0])
 
-        power_df = self.df.loc[self.df.groupby("groupIndex")["TxFocusLocCm"].idxmax()]
-        power_df = power_df.drop_duplicates(subset=["groupIndex"])
+        power_df = self.df.loc[self.df.groupby("GroupIndex")["TxFocusLocCm"].idxmax()]
+        power_df = power_df.drop_duplicates(subset=["GroupIndex"])
         power_df["measSetComments"] = f"Beamstyle_{self.probeName}_power"
         power_df["NumTxElements"] = oneCmElement
 
         power_df["AI_param"] = 1000
 
-        # 결과를 groupIndex로 정렬
-        power_df = power_df.sort_values("groupIndex")
+        # 결과를 GroupIndex로 정렬
+        power_df = power_df.sort_values("GroupIndex")
 
         return power_df
