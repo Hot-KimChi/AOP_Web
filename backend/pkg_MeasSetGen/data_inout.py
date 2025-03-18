@@ -63,7 +63,7 @@ def renameColumns(func):
                 "ProbeNumTxCycles": "numTxCycles",
                 "IsTxChannelModulationEn": "IsTxAperModulationEn",
                 "IsPresetCpaEn": "IsCPAEn",
-                "TxPulseRle": "MeasTxPulseRleA",
+                "TxPulseRle": "TxPulseRleA",
                 "CpaDelayOffsetClk": "CpaDelayOffsetClkA",
                 "SystemPulserSel": "SysPulserSelA",
             }
