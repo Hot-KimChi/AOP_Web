@@ -755,6 +755,11 @@ function DataViewContent() {
             border: 1px solid #ddd;
         }
 
+        /* tbody의 모든 td를 가운데 정렬로 변경 */
+        tbody td {
+          text-align: center;
+        }
+
         /* 첫 번째 헤더(파라미터 이름) */
         .table-container thead tr:first-child th {
             position: sticky;
