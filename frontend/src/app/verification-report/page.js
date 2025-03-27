@@ -73,13 +73,13 @@ export default function VerificationReport() {
 
   // 선택된 데이터베이스에 따른 소프트웨어 목록 로딩
   useEffect(() => {
-    if (selectedDatabase) {
+    if (selectedProbe) {
       setIsLoading(true);
       
       const fetchSoftware = async () => {
         try {
           const response = await fetch(
-            `${API_BASE_URL}/api/get_software?database=${selectedDatabase}`,
+            `${API_BASE_URL}/api/get_software?database=${selectedProbe}`,
             { method: 'GET', credentials: 'include' }
           );
           
@@ -99,7 +99,7 @@ export default function VerificationReport() {
     } else {
       setSoftwareList([]);
     }
-  }, [selectedDatabase, API_BASE_URL]);
+  }, [selectedProbe, API_BASE_URL]);
 
   // 파일 변경 핸들러
   const handleFileChange = (event) => setFile(event.target.files[0]);
