@@ -48,14 +48,26 @@ export default function VerificationReport() {
       
       const fetchProbes = async () => {
         try {
-          const response = await fetch(
-            `${API_BASE_URL}/api/get_probes?database=${selectedDatabase}`,
-            { method: 'GET', credentials: 'include' }
-          );
+          // URL 객체를 사용하여 더 안전하게 URL과 파라미터 구성
+          const url = new URL(`${API_BASE_URL}/api/get_probes`);
+          url.searchParams.append('database', selectedDatabase);
+          url.searchParams.append('table', 'Tx_summary');
           
-          if (!response.ok) throw new Error('프로브 목록을 가져오는데 실패했습니다');
+          console.log('요청 URL:', url.toString()); // 디버깅용 로그
+          
+          const response = await fetch(url, { 
+            method: 'GET', 
+            credentials: 'include' 
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`에러 응답: ${response.status} - ${errorText}`);
+            throw new Error(`프로브 목록을 가져오는데 실패했습니다: ${response.status}`);
+          }
           
           const data = await response.json();
+          console.log('받은 데이터:', data); // 디버깅용 로그
           setProbeList(data.probes || []);
         } catch (err) {
           console.error('프로브 목록 가져오기 실패:', err);

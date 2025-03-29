@@ -340,8 +340,24 @@ def create_app():
     @with_db_connection()
     def get_probes():
         """프로브 목록 반환"""
-        query = "SELECT probeId, probeName FROM probe_geo"
+        selected_database = request.args.get("database")
+        selected_table = request.args.get("table")
+        logger.info(f"Database: {selected_database}, Table: {selected_table}")
+
+        # 허용된 테이블 이름 목록
+        allowed_tables = ["Tx_summary", "probe_geo"]
+
+        if selected_table not in allowed_tables:
+            return (
+                jsonify(
+                    {"status": "error", "message": "유효하지 않은 테이블 이름입니다"}
+                ),
+                400,
+            )
+
+        query = f"SELECT probeId, probeName FROM {selected_table}"
         df = g.current_db.execute_query(query)
+        df["probeId"] = df["probeId"].fillna("unknown")
         probes = [
             {"probeId": row[0], "probeName": row[1]} for row in df.values.tolist()
         ]
