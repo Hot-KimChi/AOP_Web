@@ -357,10 +357,26 @@ def create_app():
 
         query = f"SELECT probeId, probeName FROM {selected_table}"
         df = g.current_db.execute_query(query)
-        df["probeId"] = df["probeId"].fillna("unknown")
-        probes = [
-            {"probeId": row[0], "probeName": row[1]} for row in df.values.tolist()
-        ]
+
+        df["probeId"] = df["probeId"].fillna("empty")
+
+        # probeId와 probeName을 기준으로 중복 제거
+        df_unique = df.drop_duplicates(subset=["probeId", "probeName"])
+
+        # probeName을 기준으로 정렬
+        df_unique = df_unique.sort_values(by="probeName")
+
+        # React용 고유 ID 추가하되, 표시되는 데이터는 그대로 유지
+        probes = []
+        for i, row in enumerate(df_unique.values.tolist()):
+            probes.append(
+                {
+                    "probeId": row[0],  # 실제 데이터 유지
+                    "probeName": row[1],  # 실제 데이터 유지
+                    "_id": f"{row[0]}_{i}",  # 내부 고유 식별자 추가 (프론트엔드에서만 사용)
+                }
+            )
+
         return jsonify({"status": "success", "probes": probes})
 
     @app.teardown_appcontext

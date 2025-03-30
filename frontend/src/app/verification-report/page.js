@@ -313,7 +313,7 @@ export default function VerificationReport() {
                 <option value="">프로브 선택</option>
                 {probeList.map((probe) => (
                   <option
-                    key={probe.probeId}
+                    key={probe._id || `${probe.probeId}_${probe.probeName}`} // _id가 있으면 사용, 없으면 대체 키 생성
                     value={JSON.stringify({ id: probe.probeId, name: probe.probeName })}
                   >
                     {probe.probeName} ({probe.probeId})
