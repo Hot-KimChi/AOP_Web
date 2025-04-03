@@ -379,6 +379,97 @@ def create_app():
 
         return jsonify({"status": "success", "probes": probes})
 
+    @app.route("/api/get_table_data", methods=["GET"])
+    @handle_exceptions
+    @require_auth
+    @with_db_connection()
+    def get_table_data():
+        """프로브 및 소프트웨어 데이터 반환"""
+        selected_database = request.args.get("database")
+        selected_table = request.args.get("table")
+        logger.info(f"Database: {selected_database}, Table: {selected_table}")
+        # 허용된 테이블 이름 목록
+        allowed_tables = ["Tx_summary", "probe_geo"]
+        if selected_table not in allowed_tables:
+            return (
+                jsonify(
+                    {"status": "error", "message": "유효하지 않은 테이블 이름입니다"}
+                ),
+                400,
+            )
+        # 테이블에 따라 다른 쿼리 실행
+        if selected_table == "Tx_summary":
+            # Tx_summary 테이블에서 probeId, probeName, Software_version 데이터를 가져옴
+            query = f"SELECT ProbeID, ProbeName, Software_version FROM {selected_table}"
+        else:
+            # probe_geo 테이블은 프로브 정보만 포함
+            query = f"SELECT probeId, probeName FROM {selected_table}"
+
+        df = g.current_db.execute_query(query)
+        # NULL 값 처리
+        df["probeId"] = df["probeId"].fillna("empty")
+        df["probeName"] = df["probeName"].fillna("empty")
+
+        # 프로브 정보 추출 (중복 제거 및 정렬)
+        df_probes = df.drop_duplicates(subset=["probeId", "probeName"])
+        df_probes = df_probes.sort_values(by="probeName")
+        # React용 고유 ID 추가
+        probes = []
+        for i, row in enumerate(df_probes[["probeId", "probeName"]].values.tolist()):
+            probes.append(
+                {
+                    "probeId": row[0],
+                    "probeName": row[1],
+                    "_id": f"{row[0]}_{i}",  # 내부 고유 식별자
+                }
+            )
+        response_data = {
+            "status": "success",
+            "probes": probes,
+            "hasSoftwareData": selected_table
+            == "Tx_summary",  # 소프트웨어 데이터 포함 여부
+        }
+        # Tx_summary 테이블인 경우에만 소프트웨어 버전 정보 추가
+        if selected_table == "Tx_summary":
+            # NULL 값 처리
+            df["Software_version"] = df["Software_version"].fillna("empty")
+
+            # 소프트웨어 버전 정보 추출 (중복 제거 및 정렬)
+            df_software = df.drop_duplicates(subset=["Software_version"])
+            df_software = df_software.sort_values(by="Software_version")
+
+            # 프로브별 소프트웨어 버전 매핑 정보 생성
+            probe_software_map = {}
+            for _, row in df.iterrows():
+                probe_id = row["probeId"]
+                if probe_id not in probe_software_map:
+                    probe_software_map[probe_id] = []
+
+                software_version = row["Software_version"]
+                if (
+                    software_version != "empty"
+                    and {"softwareVersion": software_version}
+                    not in probe_software_map[probe_id]
+                ):
+                    probe_software_map[probe_id].append(
+                        {"softwareVersion": software_version}
+                    )
+
+            # 소프트웨어 버전 목록 생성
+            software = []
+            for i, row in enumerate(df_software[["Software_version"]].values.tolist()):
+                if row[0] != "empty":  # empty 값 제외
+                    software.append(
+                        {
+                            "softwareVersion": row[0],
+                            "_id": f"sw_version_{i}",  # 내부 고유 식별자
+                        }
+                    )
+
+            response_data["software"] = software
+            response_data["mapping"] = probe_software_map
+        return jsonify(response_data)
+
     @app.teardown_appcontext
     def teardown_db(exception):
         """애플리케이션 컨텍스트가 종료될 때 데이터베이스 연결 정리"""

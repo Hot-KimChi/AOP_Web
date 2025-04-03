@@ -40,7 +40,6 @@ export default function VerificationReport() {
     
     fetchDatabases();
   }, [API_BASE_URL]);
-
   
   // 선택된 데이터베이스에 따른 프로브 목록 로딩
   useEffect(() => {
