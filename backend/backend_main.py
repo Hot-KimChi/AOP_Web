@@ -397,15 +397,17 @@ def create_app():
                 ),
                 400,
             )
-        # 테이블에 따라 다른 쿼리 실행
+
+        # 테이블에 따라 다른 쿼리 실행 및 컬럼명 처리
         if selected_table == "Tx_summary":
-            # Tx_summary 테이블에서 probeId, probeName, Software_version 데이터를 가져옴
-            query = f"SELECT ProbeID, ProbeName, Software_version FROM {selected_table}"
+            # Tx_summary 테이블의 컬럼명을 일관되게 소문자로 변환하여 사용
+            query = f"SELECT ProbeID AS probeId, ProbeName AS probeName, Software_version AS software_version FROM {selected_table}"
         else:
-            # probe_geo 테이블은 프로브 정보만 포함
+            # probe_geo 테이블은 이미 소문자로 컬럼명이 정의되어 있음
             query = f"SELECT probeId, probeName FROM {selected_table}"
 
         df = g.current_db.execute_query(query)
+
         # NULL 값 처리
         df["probeId"] = df["probeId"].fillna("empty")
         df["probeName"] = df["probeName"].fillna("empty")
@@ -413,6 +415,7 @@ def create_app():
         # 프로브 정보 추출 (중복 제거 및 정렬)
         df_probes = df.drop_duplicates(subset=["probeId", "probeName"])
         df_probes = df_probes.sort_values(by="probeName")
+
         # React용 고유 ID 추가
         probes = []
         for i, row in enumerate(df_probes[["probeId", "probeName"]].values.tolist()):
@@ -423,20 +426,22 @@ def create_app():
                     "_id": f"{row[0]}_{i}",  # 내부 고유 식별자
                 }
             )
+
         response_data = {
             "status": "success",
             "probes": probes,
             "hasSoftwareData": selected_table
             == "Tx_summary",  # 소프트웨어 데이터 포함 여부
         }
+
         # Tx_summary 테이블인 경우에만 소프트웨어 버전 정보 추가
         if selected_table == "Tx_summary":
             # NULL 값 처리
-            df["Software_version"] = df["Software_version"].fillna("empty")
+            df["software_version"] = df["software_version"].fillna("empty")
 
             # 소프트웨어 버전 정보 추출 (중복 제거 및 정렬)
-            df_software = df.drop_duplicates(subset=["Software_version"])
-            df_software = df_software.sort_values(by="Software_version")
+            df_software = df.drop_duplicates(subset=["software_version"])
+            df_software = df_software.sort_values(by="software_version")
 
             # 프로브별 소프트웨어 버전 매핑 정보 생성
             probe_software_map = {}
@@ -445,7 +450,7 @@ def create_app():
                 if probe_id not in probe_software_map:
                     probe_software_map[probe_id] = []
 
-                software_version = row["Software_version"]
+                software_version = row["software_version"]
                 if (
                     software_version != "empty"
                     and {"softwareVersion": software_version}
@@ -457,7 +462,7 @@ def create_app():
 
             # 소프트웨어 버전 목록 생성
             software = []
-            for i, row in enumerate(df_software[["Software_version"]].values.tolist()):
+            for i, row in enumerate(df_software[["software_version"]].values.tolist()):
                 if row[0] != "empty":  # empty 값 제외
                     software.append(
                         {
@@ -468,6 +473,7 @@ def create_app():
 
             response_data["software"] = software
             response_data["mapping"] = probe_software_map
+
         return jsonify(response_data)
 
     @app.teardown_appcontext
