@@ -400,10 +400,8 @@ def create_app():
 
         # 테이블에 따라 다른 쿼리 실행 및 컬럼명 처리
         if selected_table == "Tx_summary":
-            # Tx_summary 테이블의 컬럼명을 일관되게 소문자로 변환하여 사용
             query = f"SELECT ProbeID AS probeId, ProbeName AS probeName, Software_version AS software_version FROM {selected_table}"
         else:
-            # probe_geo 테이블은 이미 소문자로 컬럼명이 정의되어 있음
             query = f"SELECT probeId, probeName FROM {selected_table}"
 
         df = g.current_db.execute_query(query)
@@ -421,8 +419,8 @@ def create_app():
         for i, row in enumerate(df_probes[["probeId", "probeName"]].values.tolist()):
             probes.append(
                 {
-                    "probeId": row[0],
-                    "probeName": row[1],
+                    "probeId": str(row[0]),  # 문자열로 변환
+                    "probeName": str(row[1]),  # 문자열로 변환
                     "_id": f"{row[0]}_{i}",  # 내부 고유 식별자
                 }
             )
@@ -439,18 +437,25 @@ def create_app():
             # NULL 값 처리
             df["software_version"] = df["software_version"].fillna("empty")
 
+            # 모든 소프트웨어 버전을 문자열로 변환
+            df["software_version"] = df["software_version"].astype(str)
+
             # 소프트웨어 버전 정보 추출 (중복 제거 및 정렬)
             df_software = df.drop_duplicates(subset=["software_version"])
-            df_software = df_software.sort_values(by="software_version")
+
+            # 문자열로 정렬 (숫자와 문자열 혼합 시 문제 방지)
+            df_software = df_software.sort_values(
+                by="software_version", key=lambda x: x.astype(str)
+            )
 
             # 프로브별 소프트웨어 버전 매핑 정보 생성
             probe_software_map = {}
             for _, row in df.iterrows():
-                probe_id = row["probeId"]
+                probe_id = str(row["probeId"])  # 문자열로 변환
                 if probe_id not in probe_software_map:
                     probe_software_map[probe_id] = []
 
-                software_version = row["software_version"]
+                software_version = str(row["software_version"])  # 문자열로 변환
                 if (
                     software_version != "empty"
                     and {"softwareVersion": software_version}
@@ -466,7 +471,7 @@ def create_app():
                 if row[0] != "empty":  # empty 값 제외
                     software.append(
                         {
-                            "softwareVersion": row[0],
+                            "softwareVersion": str(row[0]),  # 문자열로 변환
                             "_id": f"sw_version_{i}",  # 내부 고유 식별자
                         }
                     )

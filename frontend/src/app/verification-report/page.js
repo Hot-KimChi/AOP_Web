@@ -5,17 +5,20 @@ import { useState, useEffect } from 'react';
 export default function VerificationReport() {
   // 기본 상태 변수 선언
   const [probeList, setProbeList] = useState([]);                // 프로브 목록
-  const [softwareList, setSoftwareList] = useState([]);          // 소프트웨어 목록
-  const [DBList, setDBList] = useState([]);                      // 데이터베이스 목록
-  const [selectedDatabase, setSelectedDatabase] = useState('');  // 선택된 데이터베이스
-  const [selectedProbe, setSelectedProbe] = useState(null);      // 선택된 프로브
-  const [selectedSoftware, setSelectedSoftware] = useState(null); // 선택된 소프트웨어
-  const [file, setFile] = useState(null);                        // 업로드된 파일
-  const [isLoading, setIsLoading] = useState(false);             // 로딩 상태
-  const [error, setError] = useState(null);                      // 오류 메시지
-  const [summaryData, setSummaryData] = useState(null);          // 요약 테이블 데이터
-  const [reportData, setReportData] = useState(null);            // 추출된 보고서 데이터
+  const [softwareList, setSoftwareList] = useState([]);            // 소프트웨어 목록
+  const [DBList, setDBList] = useState([]);                        // 데이터베이스 목록
+  const [selectedDatabase, setSelectedDatabase] = useState('');    // 선택된 데이터베이스
+  const [selectedProbe, setSelectedProbe] = useState('');          // 선택된 프로브 (ProbeID 문자열)
+  const [selectedSoftware, setSelectedSoftware] = useState('');    // 선택된 소프트웨어 (Software_version 문자열)
+  const [file, setFile] = useState(null);                          // 업로드된 파일
+  const [isLoading, setIsLoading] = useState(false);               // 로딩 상태
+  const [error, setError] = useState(null);                        // 오류 메시지
+  const [summaryData, setSummaryData] = useState(null);            // 요약 테이블 데이터
+  const [reportData, setReportData] = useState(null);              // 추출된 보고서 데이터
   const [dataWindowReference, setDataWindowReference] = useState(null); // 데이터 창 참조
+  const [hasSoftwareData, setHasSoftwareData] = useState(true);
+  const [filteredSoftwareList, setFilteredSoftwareList] = useState([]);
+  const [probeSoftwareMapping, setProbeSoftwareMapping] = useState({});
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
@@ -27,9 +30,7 @@ export default function VerificationReport() {
           method: 'GET',
           credentials: 'include',
         });
-        
         if (!response.ok) throw new Error('데이터베이스 목록을 가져오는데 실패했습니다');
-        
         const data = await response.json();
         setDBList(data.databases || []);
       } catch (err) {
@@ -37,81 +38,70 @@ export default function VerificationReport() {
         setError('데이터베이스 목록을 가져오는데 실패했습니다');
       }
     };
-    
     fetchDatabases();
   }, [API_BASE_URL]);
   
-  // 선택된 데이터베이스에 따른 프로브 목록 로딩
+  // 선택된 데이터베이스에 따른 프로브 및 소프트웨어 데이터 로딩
   useEffect(() => {
     if (selectedDatabase) {
       setIsLoading(true);
-      
-      const fetchProbes = async () => {
+      const fetchData = async () => {
         try {
-          // URL 객체를 사용하여 더 안전하게 URL과 파라미터 구성
-          const url = new URL(`${API_BASE_URL}/api/get_probes`);
+          // URL 객체 생성 및 파라미터 추가 (필드 선택)
+          const url = new URL(`${API_BASE_URL}/api/get_table_data`);
           url.searchParams.append('database', selectedDatabase);
           url.searchParams.append('table', 'Tx_summary');
-          
-          console.log('요청 URL:', url.toString()); // 디버깅용 로그
+          url.searchParams.append('fields', 'ProbeID,Software_version');
+          console.log('요청 URL:', url.toString());
           
           const response = await fetch(url, { 
             method: 'GET', 
             credentials: 'include' 
           });
-          
           if (!response.ok) {
             const errorText = await response.text();
             console.error(`에러 응답: ${response.status} - ${errorText}`);
-            throw new Error(`프로브 목록을 가져오는데 실패했습니다: ${response.status}`);
+            throw new Error(`데이터를 가져오는데 실패했습니다: ${response.status}`);
           }
           
+          // 서버에서 반환하는 결과는 객체 형태임
           const data = await response.json();
-          console.log('받은 데이터:', data); // 디버깅용 로그
+          console.log('받은 데이터:', data);
+          
+          // 서버에서 이미 probes, software, mapping이 전달됨
           setProbeList(data.probes || []);
+          setSoftwareList(data.software || []);
+          setProbeSoftwareMapping(data.mapping || {});
+          setHasSoftwareData(data.hasSoftwareData);
         } catch (err) {
-          console.error('프로브 목록 가져오기 실패:', err);
-          setError('프로브 목록을 가져오는데 실패했습니다');
+          console.error('데이터 가져오기 실패:', err);
+          setError('데이터를 가져오는데 실패했습니다');
         } finally {
           setIsLoading(false);
         }
       };
-      
-      fetchProbes();
+      fetchData();
     } else {
       setProbeList([]);
+      setSoftwareList([]);
+      setHasSoftwareData(true);
+      setProbeSoftwareMapping({});
     }
   }, [selectedDatabase, API_BASE_URL]);
 
-  // 선택된 데이터베이스에 따른 소프트웨어 목록 로딩
+  // 프로브 선택 시 해당 프로브에 맞는 소프트웨어 목록 필터링
   useEffect(() => {
-    if (selectedProbe) {
-      setIsLoading(true);
-      
-      const fetchSoftware = async () => {
-        try {
-          const response = await fetch(
-            `${API_BASE_URL}/api/get_software?database=${selectedProbe}`,
-            { method: 'GET', credentials: 'include' }
-          );
-          
-          if (!response.ok) throw new Error('소프트웨어 목록을 가져오는데 실패했습니다');
-          
-          const data = await response.json();
-          setSoftwareList(data.software || []);
-        } catch (err) {
-          console.error('소프트웨어 목록 가져오기 실패:', err);
-          setError('소프트웨어 목록을 가져오는데 실패했습니다');
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      
-      fetchSoftware();
+    if (selectedProbe && Object.keys(probeSoftwareMapping).length > 0) {
+      const softwareForProbe = probeSoftwareMapping[selectedProbe] || [];
+      const softwareVersions = softwareForProbe.map(item => item.softwareVersion);
+      const filteredSoftware = softwareList.filter(sw => 
+        softwareVersions.includes(sw.softwareVersion)
+      );
+      setFilteredSoftwareList(filteredSoftware);
     } else {
-      setSoftwareList([]);
+      setFilteredSoftwareList([]);
     }
-  }, [selectedProbe, API_BASE_URL]);
+  }, [selectedProbe, probeSoftwareMapping, softwareList]);
 
   // 파일 변경 핸들러
   const handleFileChange = (event) => setFile(event.target.files[0]);
@@ -122,15 +112,12 @@ export default function VerificationReport() {
       alert('요약 테이블을 추출하기 전에 데이터베이스, 프로브, 소프트웨어를 선택해주세요.');
       return;
     }
-
     setIsLoading(true);
     setError(null);
     setSummaryData(null);
-
     try {
-      const { id: probeId } = selectedProbe;
-      const { id: softwareId } = selectedSoftware;
-      
+      const probeId = selectedProbe;
+      const softwareVersion = selectedSoftware;
       const response = await fetch(`${API_BASE_URL}/api/extract-summary-table`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -138,24 +125,17 @@ export default function VerificationReport() {
         body: JSON.stringify({
           database: selectedDatabase,
           probeId,
-          softwareId
+          softwareVersion
         }),
       });
-      
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`요약 테이블 추출 실패: ${errorText}`);
       }
-      
       const data = await response.json();
-      
       if (data.status === 'success' && data.summaryData) {
         setSummaryData(data.summaryData);
-        
-        // 세션 스토리지에 데이터 저장
         sessionStorage.setItem('summaryData', JSON.stringify(data.summaryData));
-        
-        // 데이터 창에서 보기
         openDataInNewWindow(data.summaryData, 'summary');
       } else {
         setError('요약 테이블 데이터를 가져오는데 실패했습니다');
@@ -174,42 +154,30 @@ export default function VerificationReport() {
       alert('데이터를 추출하기 전에 데이터베이스, 프로브, 소프트웨어, 파일을 선택해주세요.');
       return;
     }
-
     setIsLoading(true);
     setError(null);
     setReportData(null);
-
-    const { id: probeId, name: probeName } = selectedProbe;
-    const { id: softwareId, name: softwareName } = selectedSoftware;
+    const probeId = selectedProbe;
+    const softwareVersion = selectedSoftware;
     const formData = new FormData();
     formData.append('file', file);
     formData.append('database', selectedDatabase);
     formData.append('probeId', probeId);
-    formData.append('probeName', probeName);
-    formData.append('softwareId', softwareId);
-    formData.append('softwareName', softwareName);
-
+    formData.append('softwareVersion', softwareVersion);
     try {
       const response = await fetch(`${API_BASE_URL}/api/extract-report-data`, {
         method: 'POST',
         body: formData,
         credentials: 'include',
       });
-      
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`데이터 추출 실패: ${errorText}`);
       }
-      
       const data = await response.json();
-      
       if (data.status === 'success' && data.reportData) {
         setReportData(data.reportData);
-        
-        // 세션 스토리지에 데이터 저장
         sessionStorage.setItem('reportData', JSON.stringify(data.reportData));
-        
-        // 데이터 창에서 보기
         openDataInNewWindow(data.reportData, 'report');
       } else {
         setError('보고서 데이터를 추출하는데 실패했습니다');
@@ -224,37 +192,25 @@ export default function VerificationReport() {
 
   // 새 창에서 데이터 보기
   const openDataInNewWindow = (data, type) => {
-    // 이미 열린 창이 있으면 닫기
     if (dataWindowReference && !dataWindowReference.closed) {
       dataWindowReference.close();
     }
-
     if (!data || data.length === 0) {
       alert('표시할 데이터가 없습니다.');
       return;
     }
-
-    // 데이터 유형에 따라 다른 키 사용
     const dataKey = type === 'summary' ? 'summaryData' : 'reportData';
-    
-    // 세션 스토리지 설정
     sessionStorage.setItem(dataKey, JSON.stringify(data));
     sessionStorage.setItem('dataType', type);
     sessionStorage.setItem('dataWindowOpen', 'open');
     sessionStorage.setItem('parentWindowId', window.name || 'main');
-
-    // 새 창 열기
     const windowTitle = type === 'summary' ? '요약 테이블' : '보고서 데이터';
     const newWindow = window.open('/data-view', windowTitle, 'width=1000,height=800');
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
       alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
       return;
     }
-
-    // 창 참조 저장
     setDataWindowReference(newWindow);
-
-    // 창이 로드된 후 메시지 전송
     newWindow.onload = () => {
       newWindow.postMessage({
         type: 'INIT_DATA',
@@ -262,8 +218,6 @@ export default function VerificationReport() {
         dataType: type
       }, '*');
     };
-
-    // 창이 닫힐 때 이벤트 처리
     newWindow.onbeforeunload = () => {
       sessionStorage.setItem('dataWindowOpen', 'closed');
       setDataWindowReference(null);
@@ -306,15 +260,19 @@ export default function VerificationReport() {
               <select
                 id="probeSelect"
                 className="form-select"
-                value={selectedProbe ? JSON.stringify(selectedProbe) : ''}
-                onChange={(e) => setSelectedProbe(JSON.parse(e.target.value))}
+                value={selectedProbe}
+                onChange={(e) => {
+                  const probeId = e.target.value;
+                  setSelectedProbe(probeId);
+                  setSelectedSoftware('');
+                }}
                 disabled={isLoading || !selectedDatabase}
               >
                 <option value="">프로브 선택</option>
                 {probeList.map((probe) => (
                   <option
-                    key={probe._id || `${probe.probeId}_${probe.probeName}`} // _id가 있으면 사용, 없으면 대체 키 생성
-                    value={JSON.stringify({ id: probe.probeId, name: probe.probeName })}
+                    key={probe.probeId}
+                    value={probe.probeId}
                   >
                     {probe.probeName} ({probe.probeId})
                   </option>
@@ -329,20 +287,25 @@ export default function VerificationReport() {
               <select
                 id="softwareSelect"
                 className="form-select"
-                value={selectedSoftware ? JSON.stringify(selectedSoftware) : ''}
-                onChange={(e) => setSelectedSoftware(JSON.parse(e.target.value))}
-                disabled={isLoading || !selectedDatabase}
+                value={selectedSoftware}
+                onChange={(e) => setSelectedSoftware(e.target.value)}
+                disabled={isLoading || !selectedProbe || !hasSoftwareData}
               >
                 <option value="">소프트웨어 선택</option>
-                {softwareList.map((software) => (
+                {filteredSoftwareList.map((software) => (
                   <option
-                    key={software.softwareId}
-                    value={JSON.stringify({ id: software.softwareId, name: software.softwareName })}
+                    key={software.softwareVersion}
+                    value={software.softwareVersion}
                   >
-                    {software.softwareName} ({software.softwareId})
+                    {software.softwareVersion}
                   </option>
                 ))}
               </select>
+              {!hasSoftwareData && selectedDatabase && (
+                <small className="text-muted">
+                  선택한 테이블에 소프트웨어 데이터가 없습니다.
+                </small>
+              )}
             </div>
             
             <div className="col-md-3">
@@ -363,9 +326,9 @@ export default function VerificationReport() {
               <button
                 className="btn btn-primary w-100"
                 onClick={extractSummaryTable}
-                disabled={!selectedDatabase || !selectedProbe || !selectedSoftware || isLoading}
+                disabled={!selectedDatabase || !selectedProbe || (!selectedSoftware && hasSoftwareData) || isLoading}
               >
-                {isLoading ? '처리 중...' : 'Sumarry Table 추출'}
+                {isLoading ? '처리 중...' : 'Summary Table 추출'}
               </button>
             </div>
             
@@ -373,7 +336,7 @@ export default function VerificationReport() {
               <button
                 className="btn btn-success w-100"
                 onClick={extractReportData}
-                disabled={!selectedDatabase || !selectedProbe || !selectedSoftware || !file || isLoading}
+                disabled={!selectedDatabase || !selectedProbe || (!selectedSoftware && hasSoftwareData) || !file || isLoading}
               >
                 {isLoading ? '처리 중...' : 'Report Table 추출'}
               </button>
