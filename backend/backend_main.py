@@ -407,8 +407,8 @@ def create_app():
         df = g.current_db.execute_query(query)
 
         # NULL 값 처리
-        df["probeId"] = df["probeId"].fillna("empty")
-        df["probeName"] = df["probeName"].fillna("empty")
+        df["probeId"] = df["probeId"].fillna("Empty")
+        df["probeName"] = df["probeName"].fillna("Empty")
 
         # 프로브 정보 추출 (중복 제거 및 정렬)
         df_probes = df.drop_duplicates(subset=["probeId", "probeName"])
@@ -435,7 +435,7 @@ def create_app():
         # Tx_summary 테이블인 경우에만 소프트웨어 버전 정보 추가
         if selected_table == "Tx_summary":
             # NULL 값 처리
-            df["software_version"] = df["software_version"].fillna("empty")
+            df["software_version"] = df["software_version"].fillna("Empty")
 
             # 모든 소프트웨어 버전을 문자열로 변환
             df["software_version"] = df["software_version"].astype(str)

@@ -271,10 +271,10 @@ export default function VerificationReport() {
                 <option value="">프로브 선택</option>
                 {probeList.map((probe) => (
                   <option
-                    key={probe.probeId}
+                    key={probe._id}
                     value={probe.probeId}
                   >
-                    {probe.probeName} ({probe.probeId})
+                    {probe.probeName} ({Number(probe.probeId).toString()})
                   </option>
                 ))}
               </select>
@@ -294,7 +294,7 @@ export default function VerificationReport() {
                 <option value="">소프트웨어 선택</option>
                 {filteredSoftwareList.map((software) => (
                   <option
-                    key={software.softwareVersion}
+                    key={software._id}
                     value={software.softwareVersion}
                   >
                     {software.softwareVersion}
