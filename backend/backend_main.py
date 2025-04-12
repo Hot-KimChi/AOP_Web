@@ -406,9 +406,8 @@ def create_app():
 
         df = g.current_db.execute_query(query)
 
-        # NULL 값 처리
-        df["probeId"] = df["probeId"].fillna("Empty")
-        df["probeName"] = df["probeName"].fillna("Empty")
+        # NULL 값 처리 - NULL이 있는 행 삭제(probeId 또는 probeName에서 NULL일 경우 해당 행 삭제제)
+        df = df.dropna(subset=["probeId", "probeName"])
 
         # 프로브 정보 추출 (중복 제거 및 정렬)
         df_probes = df.drop_duplicates(subset=["probeId", "probeName"])
