@@ -19,6 +19,8 @@ export default function VerificationReport() {
   const [hasSoftwareData, setHasSoftwareData] = useState(true);
   const [filteredSoftwareList, setFilteredSoftwareList] = useState([]);
   const [probeSoftwareMapping, setProbeSoftwareMapping] = useState({});
+  const [intensity, setIntensity] = useState('');                  // 인텐시티 입력값
+  const [temperature, setTemperature] = useState('');              // 온도 입력값
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
@@ -125,7 +127,9 @@ export default function VerificationReport() {
         body: JSON.stringify({
           database: selectedDatabase,
           probeId,
-          softwareVersion
+          softwareVersion,
+          intensity,    // 인텐시티 값 추가
+          temperature   // 온도 값 추가
         }),
       });
       if (!response.ok) {
@@ -164,6 +168,8 @@ export default function VerificationReport() {
     formData.append('database', selectedDatabase);
     formData.append('probeId', probeId);
     formData.append('softwareVersion', softwareVersion);
+    formData.append('intensity', intensity);       // 인텐시티 값 추가
+    formData.append('temperature', temperature);   // 온도 값 추가
     try {
       const response = await fetch(`${API_BASE_URL}/api/extract-report-data`, {
         method: 'POST',
@@ -321,7 +327,36 @@ export default function VerificationReport() {
               />
             </div>
             
-            {/* 두번째 줄: 4), 5) */}
+            {/* 새로운 줄: Intensity와 Temperature 입력 필드 */}
+            <div className="col-md-6">
+              <label htmlFor="intensityInput" className="form-label">
+                Intensity
+              </label>
+              <input
+                type="text"
+                id="intensityInput"
+                className="form-control"
+                value={intensity}
+                onChange={(e) => setIntensity(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            
+            <div className="col-md-6">
+              <label htmlFor="temperatureInput" className="form-label">
+                Temperature
+              </label>
+              <input
+                type="text"
+                id="temperatureInput"
+                className="form-control"
+                value={temperature}
+                onChange={(e) => setTemperature(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            
+            {/* 버튼 줄: 4), 5) */}
             <div className="col-md-6 mt-3">
               <button
                 className="btn btn-primary w-100"
