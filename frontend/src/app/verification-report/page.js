@@ -232,13 +232,13 @@ export default function VerificationReport() {
 
   return (
     <div className="container mt-4">
-      <div className="card shadow-sm">
+      {/* 첫 번째 카드: 기본 설정 부분 */}
+      <div className="card shadow-sm mb-4">
         <div className="card-header bg-primary text-white">
-          <h5 className="mb-0">Verification Report</h5>
+          <h5 className="mb-0">기본 설정</h5>
         </div>
         <div className="card-body">
           <div className="row g-3">
-            {/* 첫번째 줄: 1), 2), 3), 6) */}
             <div className="col-md-3">
               <label htmlFor="databaseSelect" className="form-label">
                 데이터베이스 선택
@@ -313,22 +313,8 @@ export default function VerificationReport() {
                 </small>
               )}
             </div>
-            
+
             <div className="col-md-3">
-              <label htmlFor="fileInput" className="form-label">
-                파일 선택
-              </label>
-              <input
-                type="file"
-                id="fileInput"
-                className="form-control"
-                onChange={handleFileChange}
-                disabled={isLoading}
-              />
-            </div>
-            
-            {/* 새로운 줄: Intensity와 Temperature 입력 필드 */}
-            <div className="col-md-6">
               <label htmlFor="intensityInput" className="form-label">
                 Intensity
               </label>
@@ -342,7 +328,7 @@ export default function VerificationReport() {
               />
             </div>
             
-            <div className="col-md-6">
+            <div className="col-md-3">
               <label htmlFor="temperatureInput" className="form-label">
                 Temperature
               </label>
@@ -355,9 +341,31 @@ export default function VerificationReport() {
                 disabled={isLoading}
               />
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 두 번째 카드: 파일 선택 및 버튼 부분 */}
+      <div className="card shadow-sm mb-4">
+        <div className="card-header bg-info text-white">
+          <h5 className="mb-0">데이터 추출</h5>
+        </div>
+        <div className="card-body">
+          <div className="row g-3">
+            <div className="col-md-12 mb-3">
+              <label htmlFor="fileInput" className="form-label">
+                파일 선택
+              </label>
+              <input
+                type="file"
+                id="fileInput"
+                className="form-control"
+                onChange={handleFileChange}
+                disabled={isLoading}
+              />
+            </div>
             
-            {/* 버튼 줄: 4), 5) */}
-            <div className="col-md-6 mt-3">
+            <div className="col-md-6">
               <button
                 className="btn btn-primary w-100"
                 onClick={extractSummaryTable}
@@ -367,7 +375,7 @@ export default function VerificationReport() {
               </button>
             </div>
             
-            <div className="col-md-6 mt-3">
+            <div className="col-md-6">
               <button
                 className="btn btn-success w-100"
                 onClick={extractReportData}
@@ -377,74 +385,82 @@ export default function VerificationReport() {
               </button>
             </div>
           </div>
-          
-          {error && <div className="alert alert-danger mt-3">{error}</div>}
-          
-          {/* 요약 테이블 데이터 미리보기 */}
-          {summaryData && (
-            <div className="mt-4">
-              <h5>요약 테이블 미리보기</h5>
-              <div className="table-responsive">
-                <table className="table table-bordered table-hover">
-                  <thead className="table-light">
-                    {summaryData.length > 0 && (
-                      <tr>
-                        {Object.keys(summaryData[0]).map((key, index) => (
-                          <th key={index}>{key}</th>
-                        ))}
-                      </tr>
-                    )}
-                  </thead>
-                  <tbody>
-                    {summaryData.slice(0, 5).map((row, rowIndex) => (
-                      <tr key={rowIndex}>
-                        {Object.values(row).map((value, cellIndex) => (
-                          <td key={cellIndex}>{value}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {summaryData.length > 5 && (
-                  <p className="text-muted">총 {summaryData.length}개 행 중 5개만 표시됩니다.</p>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* 보고서 데이터 미리보기 */}
-          {reportData && (
-            <div className="mt-4">
-              <h5>보고서 데이터 미리보기</h5>
-              <div className="table-responsive">
-                <table className="table table-bordered table-hover">
-                  <thead className="table-light">
-                    {reportData.length > 0 && (
-                      <tr>
-                        {Object.keys(reportData[0]).map((key, index) => (
-                          <th key={index}>{key}</th>
-                        ))}
-                      </tr>
-                    )}
-                  </thead>
-                  <tbody>
-                    {reportData.slice(0, 5).map((row, rowIndex) => (
-                      <tr key={rowIndex}>
-                        {Object.values(row).map((value, cellIndex) => (
-                          <td key={cellIndex}>{value}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {reportData.length > 5 && (
-                  <p className="text-muted">총 {reportData.length}개 행 중 5개만 표시됩니다.</p>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
+
+      {error && <div className="alert alert-danger mt-3">{error}</div>}
+      
+      {/* 요약 테이블 데이터 미리보기 */}
+      {summaryData && (
+        <div className="card shadow-sm mb-4">
+          <div className="card-header bg-light">
+            <h5 className="mb-0">요약 테이블 미리보기</h5>
+          </div>
+          <div className="card-body">
+            <div className="table-responsive">
+              <table className="table table-bordered table-hover">
+                <thead className="table-light">
+                  {summaryData.length > 0 && (
+                    <tr>
+                      {Object.keys(summaryData[0]).map((key, index) => (
+                        <th key={index}>{key}</th>
+                      ))}
+                    </tr>
+                  )}
+                </thead>
+                <tbody>
+                  {summaryData.slice(0, 5).map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                      {Object.values(row).map((value, cellIndex) => (
+                        <td key={cellIndex}>{value}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {summaryData.length > 5 && (
+                <p className="text-muted">총 {summaryData.length}개 행 중 5개만 표시됩니다.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* 보고서 데이터 미리보기 */}
+      {reportData && (
+        <div className="card shadow-sm">
+          <div className="card-header bg-light">
+            <h5 className="mb-0">보고서 데이터 미리보기</h5>
+          </div>
+          <div className="card-body">
+            <div className="table-responsive">
+              <table className="table table-bordered table-hover">
+                <thead className="table-light">
+                  {reportData.length > 0 && (
+                    <tr>
+                      {Object.keys(reportData[0]).map((key, index) => (
+                        <th key={index}>{key}</th>
+                      ))}
+                    </tr>
+                  )}
+                </thead>
+                <tbody>
+                  {reportData.slice(0, 5).map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                      {Object.values(row).map((value, cellIndex) => (
+                        <td key={cellIndex}>{value}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {reportData.length > 5 && (
+                <p className="text-muted">총 {reportData.length}개 행 중 5개만 표시됩니다.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
