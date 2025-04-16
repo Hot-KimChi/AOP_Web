@@ -232,14 +232,15 @@ export default function VerificationReport() {
 
   return (
     <div className="container mt-4">
-      {/* 첫 번째 카드: 기본 설정 부분 */}
+      {/* 첫 번째 카드: Verification Report 부분 */}
       <div className="card shadow-sm mb-4">
         <div className="card-header bg-primary text-white">
-          <h5 className="mb-0">기본 설정</h5>
+          <h5 className="mb-0">Verification Report</h5>
         </div>
         <div className="card-body">
           <div className="row g-3">
-            <div className="col-md-3">
+            {/* 첫 번째 줄: 데이터베이스, 프로브, 소프트웨어 선택 */}
+            <div className="col-md-4">
               <label htmlFor="databaseSelect" className="form-label">
                 데이터베이스 선택
               </label>
@@ -259,7 +260,7 @@ export default function VerificationReport() {
               </select>
             </div>
             
-            <div className="col-md-3">
+            <div className="col-md-4">
               <label htmlFor="probeSelect" className="form-label">
                 프로브 선택
               </label>
@@ -286,7 +287,7 @@ export default function VerificationReport() {
               </select>
             </div>
             
-            <div className="col-md-3">
+            <div className="col-md-4">
               <label htmlFor="softwareSelect" className="form-label">
                 소프트웨어 선택
               </label>
@@ -313,10 +314,11 @@ export default function VerificationReport() {
                 </small>
               )}
             </div>
-
-            <div className="col-md-3">
+            
+            {/* 두 번째 줄: Intensity, Temperature 입력 필드 */}
+            <div className="col-md-6">
               <label htmlFor="intensityInput" className="form-label">
-                Intensity
+                Intensity measSSid
               </label>
               <input
                 type="text"
@@ -328,9 +330,9 @@ export default function VerificationReport() {
               />
             </div>
             
-            <div className="col-md-3">
+            <div className="col-md-6">
               <label htmlFor="temperatureInput" className="form-label">
-                Temperature
+                Temperature measSSid
               </label>
               <input
                 type="text"
@@ -341,17 +343,29 @@ export default function VerificationReport() {
                 disabled={isLoading}
               />
             </div>
+            
+            {/* 세 번째 줄: Report Table 추출 버튼 */}
+            <div className="col-md-12">
+              <button
+                className="btn btn-success w-100"
+                onClick={extractReportData}
+                disabled={!selectedDatabase || !selectedProbe || (!selectedSoftware && hasSoftwareData) || !file || isLoading}
+              >
+                {isLoading ? '처리 중...' : 'Report Table 추출'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* 두 번째 카드: 파일 선택 및 버튼 부분 */}
+  
+      {/* 두 번째 카드: Tx summary Input 부분 */}
       <div className="card shadow-sm mb-4">
         <div className="card-header bg-info text-white">
-          <h5 className="mb-0">데이터 추출</h5>
+          <h5 className="mb-0">Tx summary Input</h5>
         </div>
         <div className="card-body">
           <div className="row g-3">
+            {/* 첫 번째 줄: 파일 선택 필드 */}
             <div className="col-md-12 mb-3">
               <label htmlFor="fileInput" className="form-label">
                 파일 선택
@@ -365,7 +379,8 @@ export default function VerificationReport() {
               />
             </div>
             
-            <div className="col-md-6">
+            {/* 두 번째 줄: Summary Table 추출 버튼 */}
+            <div className="col-md-12">
               <button
                 className="btn btn-primary w-100"
                 onClick={extractSummaryTable}
@@ -374,20 +389,10 @@ export default function VerificationReport() {
                 {isLoading ? '처리 중...' : 'Summary Table 추출'}
               </button>
             </div>
-            
-            <div className="col-md-6">
-              <button
-                className="btn btn-success w-100"
-                onClick={extractReportData}
-                disabled={!selectedDatabase || !selectedProbe || (!selectedSoftware && hasSoftwareData) || !file || isLoading}
-              >
-                {isLoading ? '처리 중...' : 'Report Table 추출'}
-              </button>
-            </div>
           </div>
         </div>
       </div>
-
+  
       {error && <div className="alert alert-danger mt-3">{error}</div>}
       
       {/* 요약 테이블 데이터 미리보기 */}
