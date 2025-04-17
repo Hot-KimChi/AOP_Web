@@ -21,6 +21,9 @@ export default function VerificationReport() {
   const [probeSoftwareMapping, setProbeSoftwareMapping] = useState({});
   const [intensity, setIntensity] = useState('');                  // 인텐시티 입력값
   const [temperature, setTemperature] = useState('');              // 온도 입력값
+  const [selectedWcsSoftware, setSelectedWcsSoftware] = useState('');
+  const [wcsVersionList, setWcsVersionList] = useState([]);
+  const [filteredWcsVersions, setFilteredWcsVersions] = useState([]);
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
@@ -239,8 +242,8 @@ export default function VerificationReport() {
         </div>
         <div className="card-body">
           <div className="row g-3">
-            {/* 첫 번째 줄: 데이터베이스, 프로브, 소프트웨어 선택 */}
-            <div className="col-md-4">
+            {/* 첫 번째 줄: 데이터베이스, 프로브, WCS_S/W, 소프트웨어 선택 */}
+            <div className="col-md-3">
               <label htmlFor="databaseSelect" className="form-label">
                 데이터베이스 선택
               </label>
@@ -260,7 +263,7 @@ export default function VerificationReport() {
               </select>
             </div>
             
-            <div className="col-md-4">
+            <div className="col-md-3">
               <label htmlFor="probeSelect" className="form-label">
                 프로브 선택
               </label>
@@ -272,6 +275,14 @@ export default function VerificationReport() {
                   const probeId = e.target.value;
                   setSelectedProbe(probeId);
                   setSelectedSoftware('');
+                  setSelectedWcsSoftware('');
+                  // 프로브 선택 시 해당 프로브에 맞는 WCS_S/W 데이터 필터링
+                  if (probeId && wcsVersionList) {
+                    const filteredVersions = wcsVersionList.filter(wcs => wcs.probeId === probeId);
+                    setFilteredWcsVersions(filteredVersions);
+                  } else {
+                    setFilteredWcsVersions([]);
+                  }
                 }}
                 disabled={isLoading || !selectedDatabase}
               >
@@ -287,7 +298,35 @@ export default function VerificationReport() {
               </select>
             </div>
             
-            <div className="col-md-4">
+            <div className="col-md-3">
+              <label htmlFor="wcsSoftwareSelect" className="form-label">
+                WCS_S/W 선택
+              </label>
+              <select
+                id="wcsSoftwareSelect"
+                className="form-select"
+                value={selectedWcsSoftware}
+                onChange={(e) => setSelectedWcsSoftware(e.target.value)}
+                disabled={isLoading || !selectedProbe || filteredWcsVersions.length === 0}
+              >
+                <option value="">WCS_S/W 선택</option>
+                {filteredWcsVersions.map((wcsVersion, index) => (
+                  <option
+                    key={`wcs_${index}`}
+                    value={wcsVersion.myVersion}
+                  >
+                    {wcsVersion.myVersion}
+                  </option>
+                ))}
+              </select>
+              {selectedProbe && filteredWcsVersions.length === 0 && (
+                <small className="text-muted">
+                  선택한 프로브에 WCS_S/W 데이터가 없습니다.
+                </small>
+              )}
+            </div>
+            
+            <div className="col-md-3">
               <label htmlFor="softwareSelect" className="form-label">
                 소프트웨어 선택
               </label>
@@ -395,7 +434,7 @@ export default function VerificationReport() {
   
       {error && <div className="alert alert-danger mt-3">{error}</div>}
       
-      {/* 요약 테이블 데이터 미리보기 */}
+      {/* 이하 미리보기 부분은 동일하게 유지 */}
       {summaryData && (
         <div className="card shadow-sm mb-4">
           <div className="card-header bg-light">
@@ -431,7 +470,6 @@ export default function VerificationReport() {
         </div>
       )}
       
-      {/* 보고서 데이터 미리보기 */}
       {reportData && (
         <div className="card shadow-sm">
           <div className="card-header bg-light">

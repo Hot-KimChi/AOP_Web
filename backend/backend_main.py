@@ -389,7 +389,7 @@ def create_app():
         selected_table = request.args.get("table")
         logger.info(f"Database: {selected_database}, Table: {selected_table}")
         # 허용된 테이블 이름 목록
-        allowed_tables = ["Tx_summary", "probe_geo"]
+        allowed_tables = ["Tx_summary", "probe_geo", "WCS"]
         if selected_table not in allowed_tables:
             return (
                 jsonify(
@@ -401,15 +401,58 @@ def create_app():
         # 테이블에 따라 다른 쿼리 실행 및 컬럼명 처리
         if selected_table == "Tx_summary":
             query = f"SELECT ProbeID AS probeId, ProbeName AS probeName, Software_version AS software_version FROM {selected_table}"
+        elif selected_table == "WCS":
+            query = f"SELECT probeId, myVersion FROM {selected_table}"
         else:
             query = f"SELECT probeId, probeName FROM {selected_table}"
 
         df = g.current_db.execute_query(query)
 
-        # NULL 값 처리 - NULL이 있는 행 삭제(probeId 또는 probeName에서 NULL일 경우 해당 행 삭제제)
-        df = df.dropna(subset=["probeId", "probeName"])
+        # NULL 값 처리 - 테이블별로 필요한 컬럼에서 NULL일 경우 해당 행 삭제
+        if selected_table == "WCS":
+            df = df.dropna(subset=["probeId", "myVersion"])
+        else:
+            df = df.dropna(subset=["probeId", "probeName"])
 
-        # 프로브 정보 추출 (중복 제거 및 정렬)
+        response_data = {
+            "status": "success",
+            "hasSoftwareData": selected_table
+            == "Tx_summary",  # 소프트웨어 데이터 포함 여부
+        }
+
+        # WCS 테이블 처리
+        if selected_table == "WCS":
+            # probeId를 문자열로 변환
+            df["probeId"] = df["probeId"].astype(str)
+            # myVersion을 문자열로 변환
+            df["myVersion"] = df["myVersion"].astype(str)
+
+            # probeId별 myVersion 목록 생성
+            wcs_versions = []
+            for i, row in enumerate(df.values.tolist()):
+                wcs_versions.append(
+                    {
+                        "probeId": row[0],
+                        "myVersion": row[1],
+                        "_id": f"wcs_{i}",  # 내부 고유 식별자
+                    }
+                )
+
+            response_data["wcsVersions"] = wcs_versions
+
+            # 중복 제거된 버전 목록도 제공
+            unique_versions = df.drop_duplicates(subset=["myVersion"])
+            unique_versions_list = []
+            for i, row in enumerate(unique_versions["myVersion"].values.tolist()):
+                unique_versions_list.append(
+                    {"myVersion": row, "_id": f"wcs_version_{i}"}  # 내부 고유 식별자
+                )
+
+            response_data["uniqueWcsVersions"] = unique_versions_list
+
+            return jsonify(response_data)
+
+        # 프로브 정보 처리 (Tx_summary 또는 probe_geo 테이블의 경우)
         df_probes = df.drop_duplicates(subset=["probeId", "probeName"])
         df_probes = df_probes.sort_values(by="probeName")
 
@@ -424,12 +467,7 @@ def create_app():
                 }
             )
 
-        response_data = {
-            "status": "success",
-            "probes": probes,
-            "hasSoftwareData": selected_table
-            == "Tx_summary",  # 소프트웨어 데이터 포함 여부
-        }
+        response_data["probes"] = probes
 
         # Tx_summary 테이블인 경우에만 소프트웨어 버전 정보 추가
         if selected_table == "Tx_summary":
