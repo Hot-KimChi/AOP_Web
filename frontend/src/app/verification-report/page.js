@@ -276,9 +276,19 @@ export default function VerificationReport() {
                   setSelectedProbe(probeId);
                   setSelectedSoftware('');
                   setSelectedWcsSoftware('');
+                  
                   // 프로브 선택 시 해당 프로브에 맞는 WCS_S/W 데이터 필터링
-                  if (probeId && wcsVersionList) {
-                    const filteredVersions = wcsVersionList.filter(wcs => wcs.probeId === probeId);
+                  if (probeId && wcsVersionList && wcsVersionList.length > 0) {
+                    // 문자열 비교를 위해 명시적으로 문자열로 변환
+                    const selectedProbeIdStr = String(probeId);
+                    console.log("Selected probeId:", selectedProbeIdStr);
+                    console.log("Available WCS versions:", wcsVersionList);
+                    
+                    const filteredVersions = wcsVersionList.filter(wcs => 
+                      String(wcs.probeId) === selectedProbeIdStr
+                    );
+                    
+                    console.log("Filtered WCS versions:", filteredVersions);
                     setFilteredWcsVersions(filteredVersions);
                   } else {
                     setFilteredWcsVersions([]);
