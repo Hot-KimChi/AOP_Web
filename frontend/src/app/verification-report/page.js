@@ -108,6 +108,71 @@ export default function VerificationReport() {
     }
   }, [selectedProbe, probeSoftwareMapping, softwareList]);
 
+  const loadWcsData = async () => {
+    try {
+      setIsLoading(true);
+  
+      const url = new URL(`${API_BASE_URL}/api/get_table_data`);
+      url.searchParams.append('database', selectedDatabase);
+      url.searchParams.append('table', 'WCS');
+      console.log('Loading WCS from:', url.toString());
+  
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const txt = await response.text();
+        throw new Error(`WCS fetch 실패: ${response.status} – ${txt}`);
+      }
+  
+      const data = await response.json();
+      console.log('WCS raw data:', data);
+  
+      // ✔️ 성공 시 항상 wcsVersionList 세팅
+      const wcsData = Array.isArray(data.wcsVersions)
+        ? data.wcsVersions.map(wcs => ({
+            ...wcs,
+            probeId: String(wcs.probeId),
+            myVersion: String(wcs.myVersion),
+          }))
+        : [];
+  
+      setWcsVersionList(wcsData);
+  
+      // ✔️ 현재 선택 probe 기준으로도 필터링
+      if (selectedProbe) {
+        setFilteredWcsVersions(
+          wcsData.filter(wcs => wcs.probeId === String(selectedProbe))
+        );
+      } else {
+        setFilteredWcsVersions([]);
+      }
+  
+    } catch (err) {
+      console.error('WCS 데이터 로딩 오류:', err);
+      setError('WCS 데이터 로딩 중 오류가 발생했습니다.');
+      setWcsVersionList([]);
+      setFilteredWcsVersions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Probe 또는 WCS 리스트가 바뀔 때마다 필터링
+  useEffect(() => {
+    if (selectedProbe && wcsVersionList.length > 0) {
+      setFilteredWcsVersions(
+        wcsVersionList.filter(wcs => wcs.probeId === String(selectedProbe))
+      );
+    } else {
+      setFilteredWcsVersions([]);
+    }
+    // 새 WCS 목록이 들어오면 선택된 WCS 소프트웨어 초기화
+    setSelectedWcsSoftware('');
+  }, [selectedProbe, wcsVersionList]);
+
+
   // 파일 변경 핸들러
   const handleFileChange = (event) => setFile(event.target.files[0]);
 
