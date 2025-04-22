@@ -85,12 +85,18 @@ export default function VerificationReport() {
           setIsLoading(false);
         }
       };
+      
+      // Tx_summary 데이터 가져오기
       fetchData();
+      
+      // WCS 데이터 가져오기
+      loadWcsData();
     } else {
       setProbeList([]);
       setSoftwareList([]);
       setHasSoftwareData(true);
       setProbeSoftwareMapping({});
+      setWcsVersionList([]); // 데이터베이스 선택 해제 시 WCS 목록도 초기화
     }
   }, [selectedDatabase, API_BASE_URL]);
 
@@ -162,9 +168,14 @@ export default function VerificationReport() {
   // Probe 또는 WCS 리스트가 바뀔 때마다 필터링
   useEffect(() => {
     if (selectedProbe && wcsVersionList.length > 0) {
-      setFilteredWcsVersions(
-        wcsVersionList.filter(wcs => wcs.probeId === String(selectedProbe))
-      );
+      const probeIdStr = String(selectedProbe);
+      console.log("필터링 중: 선택된 probeId:", probeIdStr);
+      console.log("필터링 대상 WCS 목록:", wcsVersionList);
+      
+      const filtered = wcsVersionList.filter(wcs => wcs.probeId === probeIdStr);
+      console.log("필터링 결과:", filtered);
+      
+      setFilteredWcsVersions(filtered);
     } else {
       setFilteredWcsVersions([]);
     }
@@ -316,7 +327,13 @@ export default function VerificationReport() {
                 id="databaseSelect"
                 className="form-select"
                 value={selectedDatabase}
-                onChange={(e) => setSelectedDatabase(e.target.value)}
+                onChange={(e) => {
+                  const newDatabase = e.target.value;
+                  setSelectedDatabase(newDatabase);
+                  setSelectedProbe('');
+                  setSelectedSoftware('');
+                  setSelectedWcsSoftware('');
+                }}
                 disabled={isLoading}
               >
                 <option value="">데이터베이스 선택</option>
@@ -341,23 +358,6 @@ export default function VerificationReport() {
                   setSelectedProbe(probeId);
                   setSelectedSoftware('');
                   setSelectedWcsSoftware('');
-                  
-                  // 프로브 선택 시 해당 프로브에 맞는 WCS_S/W 데이터 필터링
-                  if (probeId && wcsVersionList && wcsVersionList.length > 0) {
-                    // 문자열 비교를 위해 명시적으로 문자열로 변환
-                    const selectedProbeIdStr = String(probeId);
-                    console.log("Selected probeId:", selectedProbeIdStr);
-                    console.log("Available WCS versions:", wcsVersionList);
-                    
-                    const filteredVersions = wcsVersionList.filter(wcs => 
-                      String(wcs.probeId) === selectedProbeIdStr
-                    );
-                    
-                    console.log("Filtered WCS versions:", filteredVersions);
-                    setFilteredWcsVersions(filteredVersions);
-                  } else {
-                    setFilteredWcsVersions([]);
-                  }
                 }}
                 disabled={isLoading || !selectedDatabase}
               >
@@ -399,6 +399,16 @@ export default function VerificationReport() {
                   선택한 프로브에 WCS_S/W 데이터가 없습니다.
                 </small>
               )}
+              {/* 버튼 추가: WCS 데이터 새로고침 */}
+              <div className="mt-2">
+                <button 
+                  className="btn btn-sm btn-outline-secondary" 
+                  onClick={loadWcsData}
+                  disabled={!selectedDatabase || isLoading}
+                >
+                  WCS 데이터 새로고침
+                </button>
+              </div>
             </div>
             
             <div className="col-md-3">
