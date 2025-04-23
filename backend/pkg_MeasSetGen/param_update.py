@@ -1,4 +1,5 @@
 import pandas as pd
+from flask import jsonify, session
 
 
 class ParamUpdate:
@@ -10,6 +11,12 @@ class ParamUpdate:
     def __init__(self, df):
 
         self.df = df
+
+        self.username = session.get("username")
+        self.password = session.get("password")
+
+        if not self.username or not self.password:
+            return jsonify({"error": "User not authenticated"}), 401
 
         ## parameter selection
         list_param = [
