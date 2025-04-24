@@ -1,7 +1,8 @@
 from pkg_MeasSetGen.data_inout import loadfile
-from pkg_MeasSetGen.param_update import ParamUpdate
+from pkg_MeasSetGen.remove_duplicate import RemoveDuplicate
 from pkg_MeasSetGen.param_gen import ParamGen
 from pkg_MeasSetGen.predictML import PredictML
+from pkg_MeasSetGen.create_groupidx import GroupIdx
 from pkg_MeasSetGen.data_inout import DataOut
 import pandas as pd
 import logging
@@ -33,10 +34,13 @@ class MeasSetGen:
             logging.info("Raw data successfully loaded.")
 
             # Step 2: 중복 데이터 제거 및 인덱스 생성
-            param_update = ParamUpdate(raw_data)
-            df_total = param_update.remove_duplicate()
-            df_total = param_update.createGroupIdx(df_total)
-            selected_df = param_update.updateDuplicate(df_total)
+            remove_duplicate = RemoveDuplicate(raw_data)
+            df_total = remove_duplicate.remove_duplicate()
+
+            group_idx = GroupIdx(probeId=self.probeId, database=self.database)
+            df_total = group_idx.createGroupIdx(df_total)
+            selected_df = group_idx.updateDuplicate(df_total)
+
             logging.info("Duplicate data processing completed.")
 
             # Step 3: Parameter 생성

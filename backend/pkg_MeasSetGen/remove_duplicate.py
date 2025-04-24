@@ -1,8 +1,7 @@
 import pandas as pd
-from flask import jsonify, session
 
 
-class ParamUpdate:
+class RemoveDuplicate:
     """
     1) parameter 선정 진행
     2) selection한 데이터프레임을 기반으로 merge 작업진행: 중복을 제거하기 위해.
@@ -11,12 +10,6 @@ class ParamUpdate:
     def __init__(self, df):
 
         self.df = df
-
-        self.username = session.get("username")
-        self.password = session.get("password")
-
-        if not self.username or not self.password:
-            return jsonify({"error": "User not authenticated"}), 401
 
         ## parameter selection
         list_param = [
@@ -92,29 +85,3 @@ class ParamUpdate:
         df_total = pd.concat([df_BM, df_CD, df_CEUS_mode])
 
         return df_total
-
-    def createGroupIdx(self, df):
-        # GroupIndex 열 생성
-
-        group_index = 1
-        group_indices = []
-        prev_value = None
-        for value in df["TxFocusLocCm"]:
-            if prev_value is None or value >= prev_value:
-                group_indices.append(group_index)
-            else:
-                group_index += 1
-                group_indices.append(group_index)
-            prev_value = value
-        df["GroupIndex"] = group_indices
-
-        return df
-
-    def updateDuplicate(self, df):
-        # 각 GroupIndex 내에서 하나라도 isDuplicate가 0이면 해당 그룹의 모든 isDuplicate를 0으로 설정
-
-        df["isDuplicate"] = df.groupby("GroupIndex")["isDuplicate"].transform(
-            lambda x: 0 if 0 in x.values else 1
-        )
-
-        return df
