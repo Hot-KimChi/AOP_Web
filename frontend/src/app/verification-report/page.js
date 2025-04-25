@@ -165,7 +165,7 @@ export default function VerificationReport() {
     }
   };
 
-  // Probe 또는 WCS 리스트가 바뀔 때마다 필터링
+  // ✔️ Probe 또는 WCS 리스트가 바뀔 때마다 필터링
   useEffect(() => {
     if (selectedProbe && wcsVersionList.length > 0) {
       const probeIdStr = String(selectedProbe);
