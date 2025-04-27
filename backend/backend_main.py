@@ -427,6 +427,8 @@ def create_app():
             # myVersion을 문자열로 변환
             df["myVersion"] = df["myVersion"].astype(str)
 
+            df = df.drop_duplicates(subset=["myVersion"])
+
             # probeId별 myVersion 목록 생성
             wcs_versions = []
             for i, row in enumerate(df.values.tolist()):
@@ -439,16 +441,6 @@ def create_app():
                 )
 
             response_data["wcsVersions"] = wcs_versions
-
-            # 중복 제거된 버전 목록도 제공
-            unique_versions = df.drop_duplicates(subset=["myVersion"])
-            unique_versions_list = []
-            for i, row in enumerate(unique_versions["myVersion"].values.tolist()):
-                unique_versions_list.append(
-                    {"myVersion": row, "_id": f"wcs_version_{i}"}  # 내부 고유 식별자
-                )
-
-            response_data["uniqueWcsVersions"] = unique_versions_list
 
             return jsonify(response_data)
 
