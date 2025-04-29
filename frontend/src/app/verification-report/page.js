@@ -207,8 +207,8 @@ export default function VerificationReport() {
           database: selectedDatabase,
           probeId,
           softwareVersion,
-          intensity,    // 인텐시티 값 추가
-          temperature   // 온도 값 추가
+          intensity,
+          temperature
         }),
       });
       if (!response.ok) {
