@@ -4,23 +4,23 @@ import { useState, useEffect } from 'react';
 
 export default function VerificationReport() {
   // 기본 상태 변수 선언
-  const [probeList, setProbeList] = useState([]);                // 프로브 목록
-  const [softwareList, setSoftwareList] = useState([]);            // 소프트웨어 목록
-  const [DBList, setDBList] = useState([]);                        // 데이터베이스 목록
-  const [selectedDatabase, setSelectedDatabase] = useState('');    // 선택된 데이터베이스
-  const [selectedProbe, setSelectedProbe] = useState('');          // 선택된 프로브 (ProbeID 문자열)
-  const [selectedSoftware, setSelectedSoftware] = useState('');    // 선택된 소프트웨어 (Software_version 문자열)
-  const [file, setFile] = useState(null);                          // 업로드된 파일
-  const [isLoading, setIsLoading] = useState(false);               // 로딩 상태
-  const [error, setError] = useState(null);                        // 오류 메시지
-  const [summaryData, setSummaryData] = useState(null);            // 요약 테이블 데이터
-  const [reportData, setReportData] = useState(null);              // 추출된 보고서 데이터
+  const [probeList, setProbeList] = useState([]);                       // 프로브 목록
+  const [softwareList, setSoftwareList] = useState([]);                 // 소프트웨어 목록
+  const [DBList, setDBList] = useState([]);                             // 데이터베이스 목록
+  const [selectedDatabase, setSelectedDatabase] = useState('');         // 선택된 데이터베이스
+  const [selectedProbe, setSelectedProbe] = useState('');               // 선택된 프로브 (ProbeID 문자열)
+  const [selectedSoftware, setSelectedSoftware] = useState('');         // 선택된 소프트웨어 (Software_version 문자열)
+  const [file, setFile] = useState(null);                               // 업로드된 파일
+  const [isLoading, setIsLoading] = useState(false);                    // 로딩 상태
+  const [error, setError] = useState(null);                             // 오류 메시지
+  const [summaryData, setSummaryData] = useState(null);                 // 요약 테이블 데이터
+  const [reportData, setReportData] = useState(null);                   // 추출된 보고서 데이터
   const [dataWindowReference, setDataWindowReference] = useState(null); // 데이터 창 참조
   const [hasSoftwareData, setHasSoftwareData] = useState(true);
   const [filteredSoftwareList, setFilteredSoftwareList] = useState([]);
   const [probeSoftwareMapping, setProbeSoftwareMapping] = useState({});
-  const [intensity, setIntensity] = useState('');                  // 인텐시티 입력값
-  const [temperature, setTemperature] = useState('');              // 온도 입력값
+  const [intensity, setIntensity] = useState('');                       // 인텐시티 입력값
+  const [temperature, setTemperature] = useState('');                   // 온도 입력값
   const [selectedWcsSoftware, setSelectedWcsSoftware] = useState('');
   const [wcsVersionList, setWcsVersionList] = useState([]);
   const [filteredWcsVersions, setFilteredWcsVersions] = useState([]);
@@ -52,32 +52,11 @@ export default function VerificationReport() {
       setIsLoading(true);
       const fetchData = async () => {
         try {
-          // URL 객체 생성 및 파라미터 추가 (필드 선택)
-          const url = new URL(`${API_BASE_URL}/api/get_table_data`);
-          url.searchParams.append('database', selectedDatabase);
-          url.searchParams.append('table', 'Tx_summary');
-          url.searchParams.append('fields', 'ProbeID,Software_version');
-          console.log('요청 URL:', url.toString());
-          
-          const response = await fetch(url, { 
-            method: 'GET', 
-            credentials: 'include' 
-          });
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`에러 응답: ${response.status} - ${errorText}`);
-            throw new Error(`데이터를 가져오는데 실패했습니다: ${response.status}`);
-          }
-          
-          // 서버에서 반환하는 결과는 객체 형태임
-          const data = await response.json();
-          console.log('받은 데이터:', data);
-          
-          // 서버에서 이미 probes, software, mapping이 전달됨
-          setProbeList(data.probes || []);
-          setSoftwareList(data.software || []);
-          setProbeSoftwareMapping(data.mapping || {});
-          setHasSoftwareData(data.hasSoftwareData);
+          // 소프트웨어 데이터와 WCS 데이터를 병렬로 로드
+          await Promise.all([
+            loadSoftwareData(),
+            loadWcsData()
+          ]);
         } catch (err) {
           console.error('데이터 가져오기 실패:', err);
           setError('데이터를 가져오는데 실패했습니다');
@@ -86,11 +65,8 @@ export default function VerificationReport() {
         }
       };
       
-      // Tx_summary 데이터 가져오기
+      // 데이터 가져오기
       fetchData();
-      
-      // WCS 데이터 가져오기
-      loadWcsData();
     } else {
       setProbeList([]);
       setSoftwareList([]);
@@ -114,10 +90,75 @@ export default function VerificationReport() {
     }
   }, [selectedProbe, probeSoftwareMapping, softwareList]);
 
+  // WCS와 소프트웨어 데이터를 함께 새로고침하는 함수
+  const refreshAllData = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // 두 데이터를 병렬로 로드
+      await Promise.all([
+        loadWcsData(),
+        loadSoftwareData()
+      ]);
+    } catch (err) {
+      console.error('데이터 새로고침 중 오류 발생:', err);
+      setError('데이터 새로고침 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 소프트웨어 데이터 로딩 함수
+  const loadSoftwareData = async () => {
+    try {
+      // URL 객체 생성 및 파라미터 추가 (필드 선택)
+      const url = new URL(`${API_BASE_URL}/api/get_table_data`);
+      url.searchParams.append('database', selectedDatabase);
+      url.searchParams.append('table', 'Tx_summary');
+      url.searchParams.append('fields', 'ProbeID,Software_version');
+      console.log('소프트웨어 데이터 로딩 URL:', url.toString());
+      
+      const response = await fetch(url, { 
+        method: 'GET', 
+        credentials: 'include' 
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`에러 응답: ${response.status} - ${errorText}`);
+        throw new Error(`소프트웨어 데이터를 가져오는데 실패했습니다: ${response.status}`);
+      }
+      
+      // 서버에서 반환하는 결과는 객체 형태임
+      const data = await response.json();
+      console.log('받은 소프트웨어 데이터:', data);
+      
+      // 서버에서 이미 probes, software, mapping이 전달됨
+      setProbeList(data.probes || []);
+      setSoftwareList(data.software || []);
+      setProbeSoftwareMapping(data.mapping || {});
+      setHasSoftwareData(data.hasSoftwareData);
+      
+      // 현재 선택된 프로브가 있으면 해당 프로브의 소프트웨어를 필터링
+      if (selectedProbe && data.mapping && data.mapping[selectedProbe]) {
+        const softwareForProbe = data.mapping[selectedProbe] || [];
+        const softwareVersions = softwareForProbe.map(item => item.softwareVersion);
+        const filteredSoftware = (data.software || []).filter(sw => 
+          softwareVersions.includes(sw.softwareVersion)
+        );
+        setFilteredSoftwareList(filteredSoftware);
+      }
+      
+      return data;
+    } catch (err) {
+      console.error('소프트웨어 데이터 가져오기 실패:', err);
+      throw err; // 상위 함수에서 처리하도록 에러 전파
+    }
+  };
+
+  // WCS 데이터 로딩 함수
   const loadWcsData = async () => {
     try {
-      setIsLoading(true);
-  
       const url = new URL(`${API_BASE_URL}/api/get_table_data`);
       url.searchParams.append('database', selectedDatabase);
       url.searchParams.append('table', 'WCS');
@@ -154,14 +195,13 @@ export default function VerificationReport() {
       } else {
         setFilteredWcsVersions([]);
       }
-  
+      
+      return data;
     } catch (err) {
       console.error('WCS 데이터 로딩 오류:', err);
-      setError('WCS 데이터 로딩 중 오류가 발생했습니다.');
       setWcsVersionList([]);
       setFilteredWcsVersions([]);
-    } finally {
-      setIsLoading(false);
+      throw err; // 상위 함수에서 처리하도록 에러 전파
     }
   };
 
@@ -399,14 +439,14 @@ export default function VerificationReport() {
                   선택한 프로브에 WCS_S/W 데이터가 없습니다.
                 </small>
               )}
-              {/* 버튼 추가: WCS 데이터 새로고침 */}
+              {/* 버튼 추가: 데이터 새로고침 */}
               <div className="mt-2">
                 <button 
                   className="btn btn-sm btn-outline-secondary" 
-                  onClick={loadWcsData}
+                  onClick={refreshAllData}
                   disabled={!selectedDatabase || isLoading}
                 >
-                  WCS 데이터 새로고침
+                  데이터 새로고침
                 </button>
               </div>
             </div>
@@ -473,7 +513,7 @@ export default function VerificationReport() {
               <button
                 className="btn btn-success w-100"
                 onClick={extractReportData}
-                disabled={!selectedDatabase || !selectedProbe || (!selectedSoftware && hasSoftwareData) || !file || isLoading}
+                disabled={!selectedDatabase || !selectedProbe || !selectedWcsSoftware || (!selectedSoftware && hasSoftwareData) || !intensity || !temperature || isLoading}
               >
                 {isLoading ? '처리 중...' : 'Report Table 추출'}
               </button>
