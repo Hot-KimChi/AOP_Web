@@ -9,7 +9,7 @@ export default function VerificationReport() {
   const [DBList, setDBList] = useState([]);                             // 데이터베이스 목록
   const [selectedDatabase, setSelectedDatabase] = useState('');         // 선택된 데이터베이스
   const [selectedProbe, setSelectedProbe] = useState('');               // 선택된 프로브 (ProbeID 문자열)
-  const [selectedSoftware, setSelectedSoftware] = useState('');         // 선택된 소프트웨어 (Software_version 문자열)
+  const [selectedTxSW, setSelectedSoftware] = useState('');         // 선택된 소프트웨어 (Software_version 문자열)
   const [file, setFile] = useState(null);                               // 업로드된 파일
   const [isLoading, setIsLoading] = useState(false);                    // 로딩 상태
   const [error, setError] = useState(null);                             // 오류 메시지
@@ -19,9 +19,10 @@ export default function VerificationReport() {
   const [hasSoftwareData, setHasSoftwareData] = useState(true);
   const [filteredSoftwareList, setFilteredSoftwareList] = useState([]);
   const [probeSoftwareMapping, setProbeSoftwareMapping] = useState({});
-  const [intensity, setIntensity] = useState('');                       // 인텐시티 입력값
   const [temperature, setTemperature] = useState('');                   // 온도 입력값
-  const [selectedWcsSoftware, setSelectedWcsSoftware] = useState('');
+  const [MI, setMI] = useState('');                                     // MI 입력값
+  const [Ispta, setIspta] = useState('');                               // Ispta.3 입력값
+  const [selectedWcsSW, setSelectedWcsSoftware] = useState('');
   const [wcsVersionList, setWcsVersionList] = useState([]);
   const [filteredWcsVersions, setFilteredWcsVersions] = useState([]);
 
@@ -229,7 +230,7 @@ export default function VerificationReport() {
 
   // 요약 테이블 추출 함수
   const extractSummaryTable = async () => {
-    if (!selectedDatabase || !selectedProbe || !selectedSoftware) {
+    if (!selectedDatabase || !selectedProbe || !selectedTxSW) {
       alert('요약 테이블을 추출하기 전에 데이터베이스, 프로브, 소프트웨어를 선택해주세요.');
       return;
     }
@@ -238,7 +239,7 @@ export default function VerificationReport() {
     setSummaryData(null);
     try {
       const probeId = selectedProbe;
-      const softwareVersion = selectedSoftware;
+      const softwareVersion = selectedTxSW;
       const response = await fetch(`${API_BASE_URL}/api/extract-summary-table`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -247,7 +248,7 @@ export default function VerificationReport() {
           database: selectedDatabase,
           probeId,
           softwareVersion,
-          intensity,
+          intensity: MI,
           temperature
         }),
       });
@@ -273,21 +274,33 @@ export default function VerificationReport() {
 
   // 데이터 추출 함수
   const extractReportData = async () => {
-    if (!selectedDatabase || !selectedProbe || !selectedSoftware || !file) {
-      alert('데이터를 추출하기 전에 데이터베이스, 프로브, 소프트웨어, 파일을 선택해주세요.');
+    if (!selectedDatabase || !selectedProbe || !selectedTxSW || !selectedWcsSW || !MI || !temperature) {
+      alert('데이터를 추출하기 전에 데이터베이스, 프로브, 소프트웨어, measSSId를 선택해주세요.');
       return;
     }
     setIsLoading(true);
     setError(null);
     setReportData(null);
+    
+    const requestData = {
+      database: selectedDatabase,
+      probeId: probeList.find(probe => probe.probeId === selectedProbe)?.probeId || '',
+      wcsSoftware: selectedWcsSW,
+      TxSummarySoftware: selectedTxSW,
+      measSSId_Temp: temperature,
+      measSSId_Ispta: MI,
+
+      
+    }
+    
     const probeId = selectedProbe;
-    const softwareVersion = selectedSoftware;
+    const softwareVersion = selectedTxSW;
     const formData = new FormData();
-    formData.append('file', file);
     formData.append('database', selectedDatabase);
     formData.append('probeId', probeId);
-    formData.append('softwareVersion', softwareVersion);
-    formData.append('intensity', intensity);       // 인텐시티 값 추가
+    formData.append('WCS_SW', softwareVersion);
+    formData.append('')
+    formData.append('intensity', MI);       // 인텐시티 값 추가
     formData.append('temperature', temperature);   // 온도 값 추가
     try {
       const response = await fetch(`${API_BASE_URL}/api/extract-report-data`, {
@@ -358,8 +371,8 @@ export default function VerificationReport() {
         </div>
         <div className="card-body">
           <div className="row g-3">
-            {/* 첫 번째 줄: 데이터베이스, 프로브, WCS_S/W, 소프트웨어 선택 */}
-            <div className="col-md-3">
+            {/* 첫 번째 줄: 데이터베이스, 프로브, WCS_S/W, 소프트웨어 선택, 데이터 새로고침 버튼 */}
+            <div className="col-md-2">
               <label htmlFor="databaseSelect" className="form-label">
                 데이터베이스 선택
               </label>
@@ -385,7 +398,7 @@ export default function VerificationReport() {
               </select>
             </div>
             
-            <div className="col-md-3">
+            <div className="col-md-2">
               <label htmlFor="probeSelect" className="form-label">
                 프로브 선택
               </label>
@@ -413,14 +426,14 @@ export default function VerificationReport() {
               </select>
             </div>
             
-            <div className="col-md-3">
+            <div className="col-md-2">
               <label htmlFor="wcsSoftwareSelect" className="form-label">
                 WCS_S/W 선택
               </label>
               <select
                 id="wcsSoftwareSelect"
                 className="form-select"
-                value={selectedWcsSoftware}
+                value={selectedWcsSW}
                 onChange={(e) => setSelectedWcsSoftware(e.target.value)}
                 disabled={isLoading || !selectedProbe || filteredWcsVersions.length === 0}
               >
@@ -439,26 +452,16 @@ export default function VerificationReport() {
                   선택한 프로브에 WCS_S/W 데이터가 없습니다.
                 </small>
               )}
-              {/* 버튼 추가: 데이터 새로고침 */}
-              <div className="mt-2">
-                <button 
-                  className="btn btn-sm btn-outline-secondary" 
-                  onClick={refreshAllData}
-                  disabled={!selectedDatabase || isLoading}
-                >
-                  데이터 새로고침
-                </button>
-              </div>
             </div>
             
-            <div className="col-md-3">
+            <div className="col-md-2">
               <label htmlFor="softwareSelect" className="form-label">
                 소프트웨어 선택
               </label>
               <select
                 id="softwareSelect"
                 className="form-select"
-                value={selectedSoftware}
+                value={selectedTxSW}
                 onChange={(e) => setSelectedSoftware(e.target.value)}
                 disabled={isLoading || !selectedProbe || !hasSoftwareData}
               >
@@ -479,22 +482,18 @@ export default function VerificationReport() {
               )}
             </div>
             
-            {/* 두 번째 줄: Intensity, Temperature 입력 필드 */}
-            <div className="col-md-6">
-              <label htmlFor="intensityInput" className="form-label">
-                Intensity measSSid
-              </label>
-              <input
-                type="text"
-                id="intensityInput"
-                className="form-control"
-                value={intensity}
-                onChange={(e) => setIntensity(e.target.value)}
-                disabled={isLoading}
-              />
+            <div className="col-md-4 d-flex align-items-end mb-3">
+              <button 
+                className="btn btn-outline-secondary w-100" 
+                onClick={refreshAllData}
+                disabled={!selectedDatabase || isLoading}
+              >
+                데이터 새로고침
+              </button>
             </div>
             
-            <div className="col-md-6">
+            {/* 두 번째 줄: Temperature, MI, Ispta 입력 필드 (같은 줄에 배치) */}
+            <div className="col-md-4">
               <label htmlFor="temperatureInput" className="form-label">
                 Temperature measSSid
               </label>
@@ -507,13 +506,41 @@ export default function VerificationReport() {
                 disabled={isLoading}
               />
             </div>
+  
+            <div className="col-md-4">
+              <label htmlFor="MI_Input" className="form-label">
+                MI measSSid
+              </label>
+              <input
+                type="text"
+                id="MI_Input"
+                className="form-control"
+                value={MI}
+                onChange={(e) => setMI(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            
+            <div className="col-md-4">
+              <label htmlFor="IsptaInput" className="form-label">
+                Ispta.3 measSSid
+              </label>
+              <input
+                type="text"
+                id="IsptaInput"
+                className="form-control"
+                value={Ispta}
+                onChange={(e) => setIspta(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
             
             {/* 세 번째 줄: Report Table 추출 버튼 */}
             <div className="col-md-12">
               <button
                 className="btn btn-success w-100"
                 onClick={extractReportData}
-                disabled={!selectedDatabase || !selectedProbe || !selectedWcsSoftware || (!selectedSoftware && hasSoftwareData) || !intensity || !temperature || isLoading}
+                disabled={!selectedDatabase || !selectedProbe || !selectedWcsSW || (!selectedTxSW && hasSoftwareData) || !MI || !temperature || isLoading}
               >
                 {isLoading ? '처리 중...' : 'Report Table 추출'}
               </button>
@@ -548,7 +575,7 @@ export default function VerificationReport() {
               <button
                 className="btn btn-primary w-100"
                 onClick={extractSummaryTable}
-                disabled={!selectedDatabase || !selectedProbe || (!selectedSoftware && hasSoftwareData) || isLoading}
+                disabled={!selectedDatabase || !selectedProbe || (!selectedTxSW && hasSoftwareData) || isLoading}
               >
                 {isLoading ? '처리 중...' : 'Summary Table 추출'}
               </button>
