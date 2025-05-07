@@ -334,6 +334,104 @@ def create_app():
         tables = os.environ.get("SERVER_TABLE_TABLE", "").split(",")
         return jsonify({"status": "success", "tables": tables})
 
+    @app.route("/api/run_tx_compare", methods=["POST"])
+    @handle_exceptions
+    @require_auth
+    @with_db_connection()
+    def run_tx_compare():
+        """TxCompare 저장 프로시저를 실행하여 비교 보고서 데이터 추출"""
+        try:
+            # 요청 데이터 검증
+            if not request.is_json:
+                return error_response(
+                    "요청 형식이 잘못되었습니다. JSON 형식이 필요합니다.", 400
+                )
+
+            data = request.get_json()
+
+            # 필수 파라미터 확인
+            required_params = [
+                "database",
+                "probeId",
+                "wcsSoftware",
+                "TxSumSoftware",
+                "measSSId_Temp",
+                "measSSId_MI",
+                "measSSId_Ispta",
+            ]
+
+            missing_params = [param for param in required_params if not data.get(param)]
+            if missing_params:
+                return error_response(
+                    f"필수 파라미터가 누락되었습니다: {', '.join(missing_params)}", 400
+                )
+
+            # 파라미터 추출
+            database = data.get("database")
+            probe_id = data.get("probeId")
+            wcs_software = data.get("wcsSoftware")
+            tx_sum_software = data.get("TxSumSoftware")
+            meas_ss_id_temp = data.get("measSSId_Temp")
+            meas_ss_id_mi = data.get("measSSId_MI")
+            meas_ss_id_ispta = data.get("measSSId_Ispta")
+
+            logger.info(
+                f"TxCompare 실행 요청: database={database}, probeId={probe_id}, wcsSoftware={wcs_software}, "
+                f"TxSumSoftware={tx_sum_software}, measSSId_Temp={meas_ss_id_temp}, "
+                f"measSSId_MI={meas_ss_id_mi}, measSSId_Ispta={meas_ss_id_ispta}"
+            )
+
+            # 저장 프로시저 실행
+            # MS-SQL 저장 프로시저 호출 구문
+            stored_procedure = "EXEC TxCompare @database=?, @probeId=?, @wcsSoftware=?, @TxSumSoftware=?, @measSSId_Temp=?, @measSSId_MI=?, @measSSId_Ispta=?"
+
+            # 파라미터 설정
+            params = (
+                database,
+                probe_id,
+                wcs_software,
+                tx_sum_software,
+                meas_ss_id_temp,
+                meas_ss_id_mi,
+                meas_ss_id_ispta,
+            )
+
+            # 저장 프로시저 실행 및 결과 반환
+            result_df = g.current_db.execute_procedure("TxCompare", params)
+
+            if result_df is None or result_df.empty:
+                return (
+                    jsonify(
+                        {
+                            "status": "success",
+                            "message": "비교 보고서 데이터가 없습니다.",
+                            "reportData": [],
+                        }
+                    ),
+                    200,
+                )
+
+            # DataFrame을 JSON으로 변환
+            report_data = result_df.to_dict(orient="records")
+
+            # 응답 반환
+            return (
+                jsonify(
+                    {
+                        "status": "success",
+                        "message": "비교 보고서 데이터를 성공적으로 추출했습니다.",
+                        "reportData": report_data,
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+            logger.error(f"TxCompare 실행 중 오류 발생: {str(e)}", exc_info=True)
+            return error_response(
+                f"비교 보고서 데이터 추출 중 오류가 발생했습니다: {str(e)}", 500
+            )
+
     @app.route("/api/get_probes", methods=["GET"])
     @handle_exceptions
     @require_auth

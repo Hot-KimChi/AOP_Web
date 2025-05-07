@@ -229,14 +229,16 @@ export default function VerificationReport() {
   const handleFileChange = (event) => setFile(event.target.files[0]);
 
   // 요약 테이블 추출 함수
-  const extractSummaryTable = async () => {
+  const extractVerifyTable = async () => {
     if (!selectedDatabase || !selectedProbe || !selectedTxSW) {
       alert('요약 테이블을 추출하기 전에 데이터베이스, 프로브, 소프트웨어를 선택해주세요.');
       return;
     }
+    
     setIsLoading(true);
     setError(null);
     setSummaryData(null);
+    
     try {
       const probeId = selectedProbe;
       const softwareVersion = selectedTxSW;
@@ -274,7 +276,7 @@ export default function VerificationReport() {
 
   // 데이터 추출 함수
   const extractReportData = async () => {
-    if (!selectedDatabase || !selectedProbe || !selectedTxSW || !selectedWcsSW || !MI || !temperature) {
+    if (!selectedDatabase || !selectedProbe || !selectedTxSW || !selectedWcsSW || !MI || !temperature || !Ispta) {
       alert('데이터를 추출하기 전에 데이터베이스, 프로브, 소프트웨어, measSSId를 선택해주세요.');
       return;
     }
@@ -286,39 +288,40 @@ export default function VerificationReport() {
       database: selectedDatabase,
       probeId: probeList.find(probe => probe.probeId === selectedProbe)?.probeId || '',
       wcsSoftware: selectedWcsSW,
-      TxSummarySoftware: selectedTxSW,
+      TxSumSoftware: selectedTxSW,
       measSSId_Temp: temperature,
-      measSSId_Ispta: MI,
-
-      
-    }
+      measSSId_MI: MI,
+      measSSId_Ispta: Ispta,
+    };
     
-    const probeId = selectedProbe;
-    const softwareVersion = selectedTxSW;
-    const formData = new FormData();
-    formData.append('database', selectedDatabase);
-    formData.append('probeId', probeId);
-    formData.append('WCS_SW', softwareVersion);
-    formData.append('')
-    formData.append('intensity', MI);       // 인텐시티 값 추가
-    formData.append('temperature', temperature);   // 온도 값 추가
     try {
-      const response = await fetch(`${API_BASE_URL}/api/extract-report-data`, {
+      const response = await fetch(`${API_BASE_URL}/api/run_tx_compare`, {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
         credentials: 'include',
       });
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`데이터 추출 실패: ${errorText}`);
       }
+  
       const data = await response.json();
+      
       if (data.status === 'success' && data.reportData) {
+        // 결과 데이터 처리
         setReportData(data.reportData);
+        
+        // 세션 스토리지에 저장
         sessionStorage.setItem('reportData', JSON.stringify(data.reportData));
+        
+        // 데이터 창에서 보기
         openDataInNewWindow(data.reportData, 'report');
       } else {
-        setError('보고서 데이터를 추출하는데 실패했습니다');
+        setError(data.message || '보고서 데이터를 추출하는데 실패했습니다');
       }
     } catch (err) {
       console.error('오류:', err);
@@ -574,7 +577,7 @@ export default function VerificationReport() {
             <div className="col-md-12">
               <button
                 className="btn btn-primary w-100"
-                onClick={extractSummaryTable}
+                onClick={extractVerifyTable}
                 disabled={!selectedDatabase || !selectedProbe || (!selectedTxSW && hasSoftwareData) || isLoading}
               >
                 {isLoading ? '처리 중...' : 'Summary Table 추출'}
