@@ -229,7 +229,7 @@ export default function VerificationReport() {
   const handleFileChange = (event) => setFile(event.target.files[0]);
 
   // 요약 테이블 추출 함수
-  const extractVerifyTable = async () => {
+  const parsingTxSum = async () => {
     if (!selectedDatabase || !selectedProbe || !selectedTxSW) {
       alert('요약 테이블을 추출하기 전에 데이터베이스, 프로브, 소프트웨어를 선택해주세요.');
       return;
@@ -333,35 +333,74 @@ export default function VerificationReport() {
 
   // 새 창에서 데이터 보기
   const openDataInNewWindow = (data, type) => {
+    // 기존 열린 창 닫기
     if (dataWindowReference && !dataWindowReference.closed) {
       dataWindowReference.close();
     }
+
     if (!data || data.length === 0) {
       alert('표시할 데이터가 없습니다.');
       return;
     }
+
+    // 데이터 키 및 창 제목 결정
     const dataKey = type === 'summary' ? 'summaryData' : 'reportData';
-    sessionStorage.setItem(dataKey, JSON.stringify(data));
+    const windowTitle = type === 'summary' ? '요약 테이블' : '보고서 데이터';
+
+    // 세션 스토리지에 원본 및 편집 정보 저장
+    const originalSnapshot = JSON.stringify(data);
+    sessionStorage.setItem(dataKey, originalSnapshot);
     sessionStorage.setItem('dataType', type);
+    // if (editableColumns) {
+    //   sessionStorage.setItem('editableColumns', JSON.stringify(editableColumns));
+    // }
     sessionStorage.setItem('dataWindowOpen', 'open');
     sessionStorage.setItem('parentWindowId', window.name || 'main');
-    const windowTitle = type === 'summary' ? '요약 테이블' : '보고서 데이터';
+
+    // 새 창 열기
     const newWindow = window.open('/data-view', windowTitle, 'width=1000,height=800');
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
       alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
       return;
     }
     setDataWindowReference(newWindow);
+
+    // 초기화 메시지 전송
     newWindow.onload = () => {
-      newWindow.postMessage({
-        type: 'INIT_DATA',
-        data: data,
-        dataType: type
-      }, '*');
+      newWindow.postMessage(
+        {
+          type: 'INIT_DATA',
+          data,
+          dataType: type,
+          editableColumns,
+        },
+        '*'
+      );
     };
+
+    // 창 닫힘 이벤트 처리: 변경 여부 확인 후 업데이트
     newWindow.onbeforeunload = () => {
       sessionStorage.setItem('dataWindowOpen', 'closed');
       setDataWindowReference(null);
+
+      try {
+        const updated = sessionStorage.getItem(dataKey);
+        if (updated && updated !== originalSnapshot) {
+          const parsed = JSON.parse(updated);
+          // 요약은 handleCSVUpdate, 보고서는 handleReportUpdate 호출
+          if (type === 'summary') {
+            handleCSVUpdate(parsed);
+          } else {
+            // 보고서 전용 업데이트 처리 함수
+            handleReportUpdate(parsed);
+          }
+        } else {
+          // 변경 없으면 상태 초기화
+          setDataModified(false);
+        }
+      } catch (err) {
+        console.error('창 닫힘 처리 중 오류:', err);
+      }
     };
   };
 
@@ -577,7 +616,7 @@ export default function VerificationReport() {
             <div className="col-md-12">
               <button
                 className="btn btn-primary w-100"
-                onClick={extractVerifyTable}
+                onClick={parsingTxSum}
                 disabled={!selectedDatabase || !selectedProbe || (!selectedTxSW && hasSoftwareData) || isLoading}
               >
                 {isLoading ? '처리 중...' : 'Summary Table 추출'}

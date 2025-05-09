@@ -542,7 +542,7 @@ def create_app():
                 )
 
             # 파라미터 추출
-            probeid = data.get("probeId")
+            probeid = int(float(data.get("probeId")))
             tx_sw = data.get("TxSumSoftware")  # 프론트엔드의 파라미터명
             wcs_sw = data.get("wcsSoftware")  # 프론트엔드의 파라미터명
             ssid_temp = data.get("measSSId_Temp")
@@ -569,6 +569,10 @@ def create_app():
             # 저장 프로시저 실행 및 결과 반환
             # 프로시저명과 파라미터를 전달하는 방식으로 변경
             result_df = g.current_db.execute_procedure("TxCompare", params)
+            # NaN 값 때문에 JSON 직렬화 오류 방지
+            import numpy as np
+
+            result_df = result_df.replace({np.nan: None})
 
             if result_df is None or result_df.empty:
                 return (

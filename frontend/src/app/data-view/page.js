@@ -30,7 +30,13 @@ function DataViewContent() {
   useEffect(() => {
     // 페이지 로드 시 sessionStorage에서 데이터 가져오기
     try {
-      const storedData = sessionStorage.getItem('csvData');
+      // const storedData = sessionStorage.getItem('csvData');
+
+      // 부모에서 INIT_DATA 못 받을 경우를 대비해
+      // reportData / summaryData 키를 뒤져 본다
+      const storedData = sessionStorage.getItem('reportData') ||  
+      sessionStorage.getItem('summaryData') || sessionStorage.getItem('csvData');
+
       const storedEditableColumns = sessionStorage.getItem('editableColumns');
       
       if (storedData) {

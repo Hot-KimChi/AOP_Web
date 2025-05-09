@@ -113,6 +113,85 @@ class SQL:
             logging.error(f"Query execution error: {str(e)}")
             raise
 
+    def execute_procedure(self, procedure_name, parameters=None):
+        """
+        MS-SQL 저장 프로시저를 실행하고 결과를 pandas DataFrame으로 반환합니다.
+
+        Args:
+            procedure_name (str): 실행할 저장 프로시저 이름
+            parameters (list or tuple, optional): 저장 프로시저에 전달할 파라미터들
+                각 파라미터는 (값, 타입) 형태의 튜플로 제공하거나 값만 제공할 수 있습니다.
+                예: [(1, int), ('test', str)] 또는 [1, 'test']
+
+        Returns:
+            pandas.DataFrame: 저장 프로시저 실행 결과
+        """
+        try:
+            # 기존 연결(SQLAlchemy 엔진)으로부터 pyodbc 연결 객체 가져오기
+            raw_conn = self.engine.raw_connection()
+            cursor = raw_conn.cursor()
+
+            if parameters:
+                # 매개변수 처리를 위한 준비
+                param_placeholders = ",".join(["?" for _ in range(len(parameters))])
+                query = f"EXEC {procedure_name} {param_placeholders}"
+
+                # 매개변수 값들만 추출하여 전달 (타입 변환은 pyodbc에 맡김)
+                param_values = []
+                for param in parameters:
+                    if isinstance(param, tuple) and len(param) == 2:
+                        value, param_type = param
+
+                        # 특정 타입으로 변환
+                        if param_type == int:
+                            param_values.append(
+                                int(value) if value is not None else None
+                            )
+                        elif param_type == float:
+                            param_values.append(
+                                float(value) if value is not None else None
+                            )
+                        elif param_type == bool:
+                            param_values.append(
+                                bool(value) if value is not None else None
+                            )
+                        else:  # str 등 다른 타입은 그대로 전달
+                            param_values.append(value)
+                    else:
+                        # 타입이 명시되지 않은 경우 그대로 사용
+                        param_values.append(param)
+
+                # 저장 프로시저 실행
+                cursor.execute(query, param_values)
+            else:
+                # 파라미터가 없는 경우
+                query = f"EXEC {procedure_name}"
+                cursor.execute(query)
+
+            # 결과가 있는 경우 처리
+            if cursor.description:
+                # 컬럼 이름 가져오기
+                columns = [column[0] for column in cursor.description]
+                # 모든 행 가져오기
+                rows = cursor.fetchall()
+                # DataFrame 생성
+                df = pd.DataFrame.from_records(rows, columns=columns)
+            else:
+                # 결과가 없는 경우 빈 DataFrame 반환
+                df = pd.DataFrame()
+
+            # 커서 닫기
+            cursor.close()
+
+            # 변경 사항 커밋
+            raw_conn.commit()
+
+            logging.info(f"Stored procedure '{procedure_name}' executed successfully")
+            return df
+        except Exception as e:
+            logging.error(f"Stored procedure execution error: {str(e)}")
+            raise
+
     def insert_data(self, table_name, data):
         """MS-SQL 테이블에 데이터를 삽입합니다."""
         try:
