@@ -358,7 +358,7 @@ export default function VerificationReport() {
     sessionStorage.setItem('parentWindowId', window.name || 'main');
 
     // 새 창 열기
-    const newWindow = window.open('/data-view', windowTitle, 'width=1000,height=800');
+    const newWindow = window.open('/verification-report/data-view-standalone', windowTitle, 'width=1000,height=800');
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
       alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
       return;
@@ -372,7 +372,7 @@ export default function VerificationReport() {
           type: 'INIT_DATA',
           data,
           dataType: type,
-          editableColumns,
+          // editableColumns,
         },
         '*'
       );
