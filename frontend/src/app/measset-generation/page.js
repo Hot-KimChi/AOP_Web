@@ -235,11 +235,10 @@ export default function MeasSetGen() {
   // 파일 변경 핸들러
   const handleFileChange = (event) => setFile(event.target.files[0]);
 
-  // CSV 파일 업로드 및 처리
-  const handleFileUpload = async () => {
+  // 파일 업로드 및 CSV 데이터 생성을 위한 공통함수
+  const processFileUpload = async (file, selectedDatabase, selectedProbe) => {
     if (!file || !selectedDatabase || !selectedProbe) {
-      alert('파일 업로드 전에 데이터베이스, 프로브, 파일을 선택해주세요.');
-      return;
+      throw new Error('파일 업로드 전에 데이터베이스, 프로브, 파일을 선택해주세요.');
     }
 
     setIsLoading(true);
@@ -250,23 +249,25 @@ export default function MeasSetGen() {
     formData.append('probeId', probeId);
     formData.append('probeName', probeName);
 
-    try {
-      // 파일 업로드 및 처리 요청
-      const response = await fetch(`${API_BASE_URL}/api/measset-generation`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      });
+    // 파일 업로드 및 처리 요청
+    const response = await fetch(`${API_BASE_URL}/api/measset-generation`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`파일 처리 실패: ${errorText}`);
-      }
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`파일 처리 실패: ${errorText}`);
+    }
 
-      const data = await response.json();
+    const data = await response.json();
       
-      if (data.status === 'success' && data.data) {
-        const parsedData = parseCSV(data.data);
+    if (data.status === 'success' && data.data) {
+      return data.data;
+    } else if ()
+
+      const parsedData = parseCSV(data.data);
         
         // 전체 데이터 저장
         setFullCsvData(parsedData);
@@ -583,7 +584,7 @@ export default function MeasSetGen() {
               <button
                 className="btn btn-primary w-100"
                 onClick={() => {
-                  handleFileUpload().then((parsedData) => {
+                  processFileUpload().then((parsedData) => {
                     if (parsedData) {
                       openDataInNewWindow(parsedData);
                     }
