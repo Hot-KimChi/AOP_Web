@@ -1,4 +1,3 @@
-//src/app/measset-generation/page.js
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -12,7 +11,7 @@ export default function MeasSetGen() {
   const [file, setFile] = useState(null);                        // 업로드된 파일
   const [isLoading, setIsLoading] = useState(false);             // 로딩 상태
   const [error, setError] = useState(null);                      // 오류 메시지
-  const [filterCsvData, filterSetCsvData] = useState(null);                  // CSV 데이터 (필터링된)
+  const [filterCsvData, setFilterCsvData] = useState(null);      // CSV 데이터 (필터링된)
   const [fullCsvData, setFullCsvData] = useState(null);          // 전체 CSV 데이터
   const [dataModified, setDataModified] = useState(false);       // 데이터 수정 여부
   const [dataWindowReference, setDataWindowReference] = useState(null); // 데이터 창 참조
@@ -47,18 +46,22 @@ export default function MeasSetGen() {
         
         // 전체 데이터에 업데이트 적용
         if (fullCsvData) {
-          const updatedFullData = updateFullData(fullCsvData, parsedData);
+          // 세션 스토리지에서 최신 전체 데이터 가져오기
+          const storedFullData = sessionStorage.getItem('fullCsvData');
+          const currentFullData = storedFullData ? JSON.parse(storedFullData) : fullCsvData;
+          
+          const updatedFullData = updateFullData(currentFullData, parsedData);
           setFullCsvData(updatedFullData);
           
           // 세션 스토리지에 전체 데이터 저장
           sessionStorage.setItem('fullCsvData', JSON.stringify(updatedFullData));
           
           // 필터링된 데이터도 업데이트
-          filterSetCsvData(parsedData);
+          setFilterCsvData(parsedData);
           sessionStorage.setItem('csvData', JSON.stringify(parsedData));
         } else {
           // 전체 데이터가 없는 경우 (비정상 상황)
-          filterSetCsvData(parsedData);
+          setFilterCsvData(parsedData);
           sessionStorage.setItem('csvData', JSON.stringify(parsedData));
         }
         
@@ -69,56 +72,82 @@ export default function MeasSetGen() {
     }
   };
 
-  // 전체 데이터 업데이트 함수
+  // updateFullData 함수 수정 - 수정할 열을 maxTxVoltageVolt와 ceilTxVoltageVolt로 제한
   const updateFullData = (fullData, updatedFilteredData) => {
-    if (!fullData || !updatedFilteredData) return fullData;
+    if (!fullData || !updatedFilteredData) {
+      console.error('updateFullData: 데이터가 없습니다.', { fullData, updatedFilteredData });
+      return fullData;
+    }
     
-    // 복사본 생성
-    const newFullData = [...fullData];
+    // 깊은 복사 생성
+    const newFullData = JSON.parse(JSON.stringify(fullData));
     let updateCount = 0;
     
-    // groupIndex를 키로 하는 맵 생성
-    const updatedMap = new Map();
-    
-    // 각 필터된 행에 대해 groupIndex를 키로 사용하여 맵 구성
-    updatedFilteredData.forEach(filteredRow => {
-      // 여기서는 'groupIndex'라는 이름의 필드가 있다고 가정
-      // 실제 필드명이 다르다면 해당 필드명으로 변경해야 함
-      const groupIndex = filteredRow.groupIndex; 
+    // 인덱스 키를 정규화하는 함수
+    const normalizeKey = (obj) => {
+      // 가능한 인덱스 키 변형들
+      const possibleKeys = ['groupIndex', 'GroupIndex', 'groupindex', 'GROUPINDEX'];
       
-      if (groupIndex) {
-        updatedMap.set(groupIndex, filteredRow);
+      // 객체에 존재하는 키 찾기
+      for (const key of possibleKeys) {
+        if (obj[key] !== undefined) {
+          return { key, value: obj[key] };
+        }
+      }
+      return null;
+    };
+    
+    // 디버깅을 위해 필터링된 데이터 샘플 출력
+    console.log('필터링된 데이터 샘플:', updatedFilteredData.slice(0, 2));
+    
+    // 각 필터된 행에 대해 정규화된 인덱스를 키로 사용하여 맵 구성
+    const updatedMap = new Map();
+    updatedFilteredData.forEach(filteredRow => {
+      const indexInfo = normalizeKey(filteredRow);
+      
+      if (indexInfo) {
+        updatedMap.set(indexInfo.value, filteredRow);
+      } else {
+        console.warn('groupIndex가 없는 필터링된 행:', filteredRow);
       }
     });
     
+    console.log(`업데이트 맵 크기: ${updatedMap.size}`);
+    
     // 전체 데이터 순회하며 업데이트
     newFullData.forEach((fullRow, index) => {
-      const groupIndex = fullRow.groupIndex;
+      const indexInfo = normalizeKey(fullRow);
       
-      // groupIndex가 맵에 있으면 해당 행을 찾은 것
-      const updatedRow = updatedMap.get(groupIndex);
+      if (!indexInfo) {
+        console.warn(`전체 데이터 행 ${index}에 groupIndex가 없습니다:`, fullRow);
+        return; // 이 행은 건너뜀
+      }
+      
+      // 정규화된 인덱스 값으로 맵에서 찾기
+      const updatedRow = updatedMap.get(indexInfo.value);
       
       if (updatedRow) {
-        // 7번째, 8번째 열의 데이터 업데이트
-        const keys = Object.keys(fullRow);
-        const editableIndices = [8, 9]; // 8번째, 9번째 열 (인덱스 기준으로는 6, 7)
+        let rowUpdated = false;
         
-        editableIndices.forEach(colIndex => {
-          if (colIndex < keys.length) {
-            const columnKey = keys[colIndex - 1]; // 인덱스를 1부터 시작하도록 조정
-            
-            // 값이 변경되었는지 확인
-            if (fullRow[columnKey] !== updatedRow[columnKey]) {
-              fullRow[columnKey] = updatedRow[columnKey];
-              updateCount++;
-            }
+        // 수정 가능한 열을 maxTxVoltageVolt와 ceilTxVoltageVolt로 제한
+        const editableKeys = ['maxTxVoltageVolt', 'ceilTxVoltageVolt'];
+        
+        // 특별히 수정 가능한 열에 대해서만 업데이트
+        editableKeys.forEach(key => {
+          if (updatedRow[key] !== undefined && fullRow[key] !== updatedRow[key]) {
+            console.log(`행 ${index}의 ${key} 열 업데이트: '${fullRow[key]}' -> '${updatedRow[key]}'`);
+            fullRow[key] = updatedRow[key];
+            rowUpdated = true;
           }
         });
+        
+        if (rowUpdated) {
+          updateCount++;
+        }
       }
     });
     
     // 업데이트 수 설정
-    setUpdatedCount(updateCount);
     console.log(`총 ${updateCount}개의 데이터가 업데이트되었습니다.`);
     
     return newFullData;
@@ -235,13 +264,12 @@ export default function MeasSetGen() {
   // 파일 변경 핸들러
   const handleFileChange = (event) => setFile(event.target.files[0]);
 
-  // 파일 업로드 및 CSV 데이터 생성을 위한 공통함수
+  // 파일 업로드 및 CSV 데이터 생성을 위한 공통 함수
   const processFileUpload = async (file, selectedDatabase, selectedProbe) => {
     if (!file || !selectedDatabase || !selectedProbe) {
       throw new Error('파일 업로드 전에 데이터베이스, 프로브, 파일을 선택해주세요.');
     }
 
-    setIsLoading(true);
     const { id: probeId, name: probeName } = selectedProbe;
     const formData = new FormData();
     formData.append('file', file);
@@ -255,155 +283,322 @@ export default function MeasSetGen() {
       body: formData,
       credentials: 'include',
     });
-      
+    
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`파일 처리 실패: ${errorText}`);
     }
 
     const data = await response.json();
-      
+    
     if (data.status === 'success' && data.data) {
       return data.data;
-    } else if ()
-
-      const parsedData = parseCSV(data.data);
-        
-        // 전체 데이터 저장
-        setFullCsvData(parsedData);
-        sessionStorage.setItem('fullCsvData', JSON.stringify(parsedData));
-        
-        // 필터링된 데이터 생성
-        const firstColumnName = Object.keys(parsedData[0])[1];
-        const filteredData = parsedData.filter(row => {
-          const firstColumnValue = String(row[firstColumnName] || '').toLowerCase();
-          return firstColumnValue.includes('temperature');
-        });
-        
-        // 필터링된 데이터 저장
-        filterSetCsvData(filteredData);
-        sessionStorage.setItem('csvData', JSON.stringify(filteredData));
-        
-        setDataModified(false);
-        setUpdatedCount(0);
-        setError(null);
-        return filteredData;
-      } else {
-        setError('잘못된 CSV 데이터가 수신되었습니다');
-      }
+    } else if (data.status === 'success' && data.csv_key) {
+      // CSV 데이터 요청
+      const csvResponse = await fetch(`${API_BASE_URL}/api/csv-data?csv_key=${data.csv_key}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
       
-    } catch (err) {
-      console.error('오류:', err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
+      if (!csvResponse.ok) throw new Error('CSV 데이터를 가져오는데 실패했습니다');
+      
+      const csvResult = await csvResponse.json();
+      if (csvResult.status === 'success' && csvResult.data) {
+        return csvResult.data;
+      }
     }
+    
+    throw new Error('잘못된 CSV 데이터가 수신되었습니다');
   };
 
-  // CSV 데이터를 데이터베이스에 삽입
-  const parseDatabase = async () => {
-    // 1) 파일이 없으면 CSV 데이터 생성
+  // 데이터 필터링 및 저장 공통 함수
+  const processAndSaveData = (csvData) => {
+    const parsedData = parseCSV(csvData);
+    
+    // 전체 데이터 저장
+    setFullCsvData(parsedData);
+    sessionStorage.setItem('fullCsvData', JSON.stringify(parsedData));
+    
+    // 필터링된 데이터 생성
+    const firstColumnName = Object.keys(parsedData[0])[1];
+    const filteredData = parsedData.filter(row => {
+      const firstColumnValue = String(row[firstColumnName] || '').toLowerCase();
+      return firstColumnValue.includes('temperature');
+    });
+    
+    // 필터링된 데이터 저장
+    setFilterCsvData(filteredData);
+    sessionStorage.setItem('csvData', JSON.stringify(filteredData));
+    
+    setDataModified(false);
+    setUpdatedCount(0);
+    
+    return { parsedData, filteredData };
+  };
+
+  // CSV 파일 업로드 및 처리
+  const handleFileUpload = async () => {
     if (!file || !selectedDatabase || !selectedProbe) {
       alert('파일 업로드 전에 데이터베이스, 프로브, 파일을 선택해주세요.');
       return;
     }
 
     setIsLoading(true);
-    const { id: probeId, name: probeName } = selectedProbe;
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('database', selectedDatabase);
-    formData.append('probeId', probeId);
-    formData.append('probeName', probeName);
-
+    
     try {
-      // 파일 업로드 및 처리 요청
-      const response = await fetch(`${API_BASE_URL}/api/measset-generation`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`파일 처리 실패: ${errorText}`);
-      }
-
-      const data = await response.json();
-      if (data.status === 'success' && data.csv_key) {
-        // CSV 데이터 요청
-        const csvResponse = await fetch(`${API_BASE_URL}/api/csv-data?csv_key=${data.csv_key}`, {
-          method: 'GET',
-          credentials: 'include',
-        });
-        
-        if (!csvResponse.ok) throw new Error('CSV 데이터를 가져오는데 실패했습니다');
-        
-        const csvResult = await csvResponse.json();
-        if (csvResult.status === 'success' && csvResult.data) {
-          const parsedData = parseCSV(csvResult.data);
-          
-          // 2) 데이터베이스 및 프로브 유효성 검사
-          if (!selectedDatabase || !selectedProbe) {
-            alert('데이터베이스와 프로브를 선택해주세요.');
-            return;
-          }
-
-          // 3) 수정된 전체 데이터를 API로 전송
-          const requestData = {
-            database: selectedDatabase,
-            table: 'meas_setting',
-            data: parsedData,
-          };
-          const sqlResponse = await fetch(`${API_BASE_URL}/api/insert-sql`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(requestData),
-          });
-          
-          if (!sqlResponse.ok) {
-            const text = await sqlResponse.text();
-            throw new Error(`SQL 삽입 실패: ${text}`);
-          }
-
-          // 전체 데이터 저장
-          setFullCsvData(parsedData);
-          sessionStorage.setItem('fullCsvData', JSON.stringify(parsedData));
-          
-          // 필터링된 데이터 생성
-          const firstColumnName = Object.keys(parsedData[0])[1];
-          const filteredData = parsedData.filter(row => {
-            const firstColumnValue = String(row[firstColumnName] || '').toLowerCase();
-            return firstColumnValue.includes('temperature');
-          });
-          
-          // 필터링된 데이터 저장
-          filterSetCsvData(filteredData);
-          sessionStorage.setItem('csvData', JSON.stringify(filteredData));
-          
-          setDataModified(false);
-          setUpdatedCount(0);
-          setError(null);
-
-          // SQL 데이터 삽입 완료 알림
-          alert('SQL 데이터가 성공적으로 삽입되었습니다!');
-          
-          // 선택적으로 새 창에서 데이터 보기
-          openDataInNewWindow(filteredData);
-        } else {
-          setError('잘못된 CSV 데이터가 수신되었습니다');
-        }
-      } else {
-        setError('CSV 생성에 실패했습니다');
-      }
+      const csvData = await processFileUpload(file, selectedDatabase, selectedProbe);
+      const { parsedData, filteredData } = processAndSaveData(csvData);
+      setError(null);
+      return filteredData; // 필터링된 데이터 반환
     } catch (err) {
-      console.error('SQL 삽입 오류:', err);
-      setError('SQL 삽입 처리에 실패했습니다');
+      console.error('오류:', err);
+      setError(err.message);
+      return null;
     } finally {
       setIsLoading(false);
     }
   };
+
+  // 최신 데이터를 세션 스토리지에서 가져오기
+  const getLatestData = () => {
+    // 세션 스토리지에서 최신 데이터 가져오기
+    const storedFullData = sessionStorage.getItem('fullCsvData');
+    
+    if (storedFullData) {
+      try {
+        return JSON.parse(storedFullData);
+      } catch (err) {
+        console.error('세션 스토리지 데이터 파싱 실패:', err);
+      }
+    }
+    
+    // 저장된 데이터가 없으면 현재 state의 데이터를 사용
+    return fullCsvData;
+  };
+
+  // SQL 데이터를 데이터베이스에 삽입
+  const parseDatabase = async () => {
+    if (!selectedDatabase || !selectedProbe) {
+      alert('데이터베이스와 프로브를 선택해주세요.');
+      return;
+    }
+
+    // 1. 팝업 창이 열려있다면 최신 데이터 요청 및 대기
+    if (dataWindowReference && !dataWindowReference.closed) {
+      try {
+        console.log('팝업 창에 최신 데이터 요청 중...');
+        dataWindowReference.postMessage({ type: 'REQUEST_LATEST_DATA' }, '*');
+        
+        // 데이터 동기화를 위한 충분한 대기 시간
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      } catch (err) {
+        console.error('팝업 창 데이터 요청 중 오류:', err);
+      }
+    }
+
+    // 2. 세션 스토리지에서 최신 데이터 가져오기
+    const storedFilteredData = sessionStorage.getItem('csvData');
+    const storedFullData = sessionStorage.getItem('fullCsvData');
+    
+    console.log('세션 스토리지 데이터 확인:', {
+      storedFilteredData: storedFilteredData ? '있음' : '없음',
+      storedFullData: storedFullData ? '있음' : '없음'
+    });
+    
+    // 3. 데이터 변수 초기화
+    let latestFilteredData = null;
+    let latestFullData = null;
+    
+    try {
+      // 세션 스토리지의 필터링된 데이터가 있으면 파싱
+      if (storedFilteredData) {
+        latestFilteredData = JSON.parse(storedFilteredData);
+        console.log(`세션 스토리지에서 ${latestFilteredData.length}개의 필터링 데이터 로드됨`);
+      } else if (filterCsvData) {
+        latestFilteredData = filterCsvData;
+        console.log(`상태에서 ${latestFilteredData.length}개의 필터링 데이터 로드됨`);
+      }
+      
+      // 세션 스토리지의 전체 데이터가 있으면 파싱
+      if (storedFullData) {
+        latestFullData = JSON.parse(storedFullData);
+        console.log(`세션 스토리지에서 ${latestFullData.length}개의 전체 데이터 로드됨`);
+      } else if (fullCsvData) {
+        latestFullData = fullCsvData;
+        console.log(`상태에서 ${latestFullData.length}개의 전체 데이터 로드됨`);
+      }
+    } catch (err) {
+      console.error('세션 스토리지 데이터 파싱 오류:', err);
+      alert('데이터 파싱 중 오류가 발생했습니다.');
+      return;
+    }
+
+    // 4. 데이터 체크 및 필요시 파일 업로드
+    if (!latestFilteredData || !latestFullData) {
+      if (!file) {
+        alert('파일을 업로드하거나 데이터를 먼저 생성해주세요.');
+        return;
+      }
+      
+      // 파일 업로드 처리
+      const uploadedData = await handleFileUpload();
+      if (!uploadedData) {
+        alert('데이터 생성에 실패했습니다.');
+        return;
+      }
+      
+      // 새로운 데이터 로드
+      latestFilteredData = uploadedData;
+      latestFullData = fullCsvData;
+    }
+
+    // 5. 필터링된 데이터의 변경사항을 전체 데이터에 동기화 - 특정 열만 업데이트
+  if (latestFilteredData && latestFilteredData.length > 0 && latestFullData && latestFullData.length > 0) {
+    console.log('필터링된 데이터를 전체 데이터에 반영하는 중...');
+    
+    // 인덱스 키를 정규화하는 함수
+    const normalizeKey = (obj) => {
+      // 가능한 인덱스 키 변형들
+      const possibleKeys = ['groupIndex', 'GroupIndex', 'groupindex', 'GROUPINDEX'];
+      
+      // 객체에 존재하는 키 찾기
+      for (const key of possibleKeys) {
+        if (obj[key] !== undefined) {
+          return { key, value: obj[key] };
+        }
+      }
+      return null;
+    };
+    
+    // 각 필터된 행에 대해 정규화된 인덱스를 키로 사용하여 맵 구성
+    const updatedMap = new Map();
+    
+    // 디버깅을 위해 필터링된 데이터 샘플 출력
+    console.log('필터링된 데이터 샘플:', latestFilteredData.slice(0, 2));
+    
+    latestFilteredData.forEach(filteredRow => {
+      const indexInfo = normalizeKey(filteredRow);
+      
+      if (indexInfo) {
+        updatedMap.set(indexInfo.value, filteredRow);
+      } else {
+        console.warn('groupIndex가 없는 필터링된 행:', filteredRow);
+      }
+    });
+    
+    console.log(`업데이트 맵 크기: ${updatedMap.size}`);
+    
+    // 전체 데이터 순회하며 업데이트
+    let updateCount = 0;
+    const updatedFullData = latestFullData.map(fullRow => {
+      const indexInfo = normalizeKey(fullRow);
+      
+      if (!indexInfo) {
+        console.warn(`전체 데이터 행에 groupIndex가 없습니다:`, fullRow);
+        return fullRow;
+      }
+      
+      // 정규화된 인덱스 값으로 맵에서 찾기
+      const updatedRow = updatedMap.get(indexInfo.value);
+      
+      if (updatedRow) {
+        let rowUpdated = false;
+        
+        // 수정 가능한 열을 maxTxVoltageVolt와 ceilTxVoltageVolt로 제한
+        const editableKeys = ['maxTxVoltageVolt', 'ceilTxVoltageVolt'];
+        
+        // 수정된 행 복사본 생성
+        const newRow = { ...fullRow };
+        
+        // 특별히 수정 가능한 열에 대해서만 업데이트
+        editableKeys.forEach(key => {
+          if (updatedRow[key] !== undefined && fullRow[key] !== updatedRow[key]) {
+            console.log(`행의 ${key} 열 업데이트: '${fullRow[key]}' -> '${updatedRow[key]}'`);
+            newRow[key] = updatedRow[key];
+            rowUpdated = true;
+          }
+        });
+        
+        if (rowUpdated) {
+          updateCount++;
+          return newRow;
+        }
+      }
+      
+      return fullRow;
+    });
+    
+    console.log(`총 ${updateCount}개의 데이터 행이 동기화되었습니다.`);
+    setUpdatedCount(updateCount);
+    
+    // 업데이트된 전체 데이터를 사용
+    latestFullData = updatedFullData;
+    
+    // 업데이트된 데이터를 상태와 세션 스토리지에 저장
+    setFullCsvData(updatedFullData);
+    sessionStorage.setItem('fullCsvData', JSON.stringify(updatedFullData));
+  }
+
+      // 6. 최종적으로 SQL에 저장
+      setIsLoading(true);
+      
+      try {
+        // 최종 데이터를 SQL에 저장하기 전 확인
+        if (!latestFullData || latestFullData.length === 0) {
+          throw new Error('저장할 데이터가 없습니다.');
+        }
+        
+        console.log(`SQL에 저장할 데이터: ${latestFullData.length}개 행`);
+        
+        // 마지막 검증: 필터링된 데이터의 변경사항이 전체 데이터에 반영되었는지 최종 확인
+        const finalSyncCheck = verifyDataSyncStatus();
+        if (finalSyncCheck.includes('불일치')) {
+          console.warn(`주의: ${finalSyncCheck}`);
+          
+          // 사용자에게 불일치 여부 확인 (선택적)
+          if (!confirm('데이터 동기화에 일부 불일치가 발견되었습니다. 계속 진행하시겠습니까?')) {
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        // 요청 데이터 구성
+        const requestData = {
+          database: selectedDatabase,
+          table: 'meas_setting',
+          data: latestFullData,
+        };
+        
+        // API 요청을 통해 데이터베이스에 저장
+        const sqlResponse = await fetch(`${API_BASE_URL}/api/insert-sql`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(requestData),
+        });
+        
+        if (!sqlResponse.ok) {
+          const text = await sqlResponse.text();
+          throw new Error(`SQL 삽입 실패: ${text}`);
+        }
+
+        const result = await sqlResponse.json();
+        console.log('SQL 삽입 결과:', result);
+
+        setError(null);
+        setDataModified(false); // 저장 후 수정 상태 초기화
+        
+        // SQL 데이터 삽입 완료 알림
+        alert('SQL 데이터가 성공적으로 삽입되었습니다!');
+        
+      } catch (err) {
+        console.error('SQL 삽입 오류:', err);
+        setError(err.message);
+        alert(`SQL 삽입 오류: ${err.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
   // 새 창에서 CSV 데이터 보기
   const openDataInNewWindow = (data) => {
@@ -412,7 +607,11 @@ export default function MeasSetGen() {
       dataWindowReference.close();
     }
 
-    const filteredDataToUse = data || filterCsvData;
+    // 최신 세션 스토리지 데이터 사용
+    const latestSessionData = sessionStorage.getItem('csvData');
+    const filteredDataToUse = data || 
+                           (latestSessionData ? JSON.parse(latestSessionData) : filterCsvData);
+                           
     if (!filteredDataToUse || filteredDataToUse.length === 0) {
       alert('표시할 CSV 데이터가 없습니다.');
       return;
@@ -499,7 +698,7 @@ export default function MeasSetGen() {
         const parsedData = JSON.parse(storedData);
         const parsedFullData = JSON.parse(storedFullData);
         
-        filterSetCsvData(parsedData);
+        setFilterCsvData(parsedData);
         setFullCsvData(parsedFullData);
         
         alert(`데이터가 새로고침되었습니다. ${updatedCount}개의 데이터가 수정되었습니다.`);
@@ -510,6 +709,44 @@ export default function MeasSetGen() {
     } else {
       alert('새로고침할 데이터가 없습니다.');
     }
+  };
+
+  // 필터링된 데이터와 전체 데이터의 동기화 상태 확인
+  const verifyDataSyncStatus = () => {
+    if (!fullCsvData || !filterCsvData) {
+      return "데이터가 없습니다";
+    }
+    
+    // groupIndex 기준으로 필터링된 데이터의 맵 생성
+    const filteredMap = new Map();
+    filterCsvData.forEach(row => {
+      filteredMap.set(row.groupIndex, row);
+    });
+    
+    // 불일치 카운트
+    let mismatchCount = 0;
+    
+    // 전체 데이터를 순회하며 필터링된 데이터와 비교
+    fullCsvData.forEach(fullRow => {
+      const groupIndex = fullRow.groupIndex;
+      const filteredRow = filteredMap.get(groupIndex);
+      
+      if (filteredRow) {
+        // 수정 가능한 열만 비교 (2번째, 7번째, 8번째 열)
+        const columns = Object.keys(fullRow);
+        const editableIndices = [1, 7, 8];
+        editableIndices.forEach(index => {
+          const key = columns[index];
+          if (key && fullRow[key] !== filteredRow[key]) {
+            mismatchCount++;
+          }
+        });
+      }
+    });
+    
+    return mismatchCount === 0 ? 
+      "데이터 동기화 상태: 정상" : 
+      `데이터 동기화 문제: ${mismatchCount}개의 불일치 발견`;
   };
 
   return (
@@ -584,7 +821,7 @@ export default function MeasSetGen() {
               <button
                 className="btn btn-primary w-100"
                 onClick={() => {
-                  processFileUpload().then((parsedData) => {
+                  handleFileUpload().then((parsedData) => {
                     if (parsedData) {
                       openDataInNewWindow(parsedData);
                     }
@@ -612,7 +849,7 @@ export default function MeasSetGen() {
               <button
                 className="btn btn-primary w-100"
                 onClick={parseDatabase}
-                disabled={!selectedDatabase || !selectedProbe || !fullCsvData || isLoading}
+                disabled={!selectedDatabase || !selectedProbe || (!fullCsvData && !file) || isLoading}
               >
                 {isLoading ? '처리 중...' : 'SQL 데이터베이스로'}
               </button>
