@@ -550,18 +550,6 @@ export default function MeasSetGen() {
         
         console.log(`SQL에 저장할 데이터: ${latestFullData.length}개 행`);
         
-        // 마지막 검증: 필터링된 데이터의 변경사항이 전체 데이터에 반영되었는지 최종 확인
-        const finalSyncCheck = verifyDataSyncStatus();
-        if (finalSyncCheck.includes('불일치')) {
-          console.warn(`주의: ${finalSyncCheck}`);
-          
-          // 사용자에게 불일치 여부 확인 (선택적)
-          if (!confirm('데이터 동기화에 일부 불일치가 발견되었습니다. 계속 진행하시겠습니까?')) {
-            setIsLoading(false);
-            return;
-          }
-        }
-        
         // 요청 데이터 구성
         const requestData = {
           database: selectedDatabase,
@@ -709,44 +697,6 @@ export default function MeasSetGen() {
     } else {
       alert('새로고침할 데이터가 없습니다.');
     }
-  };
-
-  // 필터링된 데이터와 전체 데이터의 동기화 상태 확인
-  const verifyDataSyncStatus = () => {
-    if (!fullCsvData || !filterCsvData) {
-      return "데이터가 없습니다";
-    }
-    
-    // groupIndex 기준으로 필터링된 데이터의 맵 생성
-    const filteredMap = new Map();
-    filterCsvData.forEach(row => {
-      filteredMap.set(row.groupIndex, row);
-    });
-    
-    // 불일치 카운트
-    let mismatchCount = 0;
-    
-    // 전체 데이터를 순회하며 필터링된 데이터와 비교
-    fullCsvData.forEach(fullRow => {
-      const groupIndex = fullRow.groupIndex;
-      const filteredRow = filteredMap.get(groupIndex);
-      
-      if (filteredRow) {
-        // 수정 가능한 열만 비교 (2번째, 7번째, 8번째 열)
-        const columns = Object.keys(fullRow);
-        const editableIndices = [1, 7, 8];
-        editableIndices.forEach(index => {
-          const key = columns[index];
-          if (key && fullRow[key] !== filteredRow[key]) {
-            mismatchCount++;
-          }
-        });
-      }
-    });
-    
-    return mismatchCount === 0 ? 
-      "데이터 동기화 상태: 정상" : 
-      `데이터 동기화 문제: ${mismatchCount}개의 불일치 발견`;
   };
 
   return (
