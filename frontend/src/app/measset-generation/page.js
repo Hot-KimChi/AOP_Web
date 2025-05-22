@@ -790,7 +790,7 @@ export default function MeasSetGen() {
                 onClick={() => openDataInNewWindow()}
                 disabled={!filterCsvData || filterCsvData.length === 0}
               >
-                {isLoading ? '처리 중...' : `데이터 ${dataModified ? `(${updatedCount}개 수정됨)` : ''} 새 창에서 보기`}
+                {isLoading ? '처리 중...' : `데이터 새 창에서 보기`}
               </button>
             </div>
             
