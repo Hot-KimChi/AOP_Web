@@ -398,13 +398,13 @@ def create_app():
                 400,
             )
 
-        # 테이블에 따라 다른 쿼리 실행 및 컬럼명 처리
+        # 테이블에 따라 다른 쿼리 실행 및 컬럼명 처리 (유니크 데이터)
         if selected_table == "Tx_summary":
-            query = f"SELECT ProbeID AS probeId, ProbeName AS probeName, Software_version AS software_version FROM {selected_table}"
+            query = f"SELECT DISTINCT ProbeID AS probeId, ProbeName AS probeName, Software_version AS software_version FROM {selected_table}"
         elif selected_table == "WCS":
-            query = f"SELECT probeId, myVersion FROM {selected_table}"
+            query = f"SELECT DISTINCT probeId, myVersion FROM {selected_table}"
         else:
-            query = f"SELECT probeId, probeName FROM {selected_table}"
+            query = f"SELECT DISTINCT probeId, probeName FROM {selected_table}"
 
         df = g.current_db.execute_query(query)
 
