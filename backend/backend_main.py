@@ -400,7 +400,7 @@ def create_app():
 
         # 테이블에 따라 다른 쿼리 실행 및 컬럼명 처리 (유니크 데이터)
         if selected_table == "Tx_summary":
-            query = f"SELECT DISTINCT ProbeID AS probeId, ProbeName AS probeName, Software_version AS software_version FROM {selected_table}"
+            query = f"SELECT DISTINCT ProbeID AS probeId, ProbeName AS probeName,           Software_version AS software_version FROM {selected_table}"
         elif selected_table == "WCS":
             query = f"SELECT DISTINCT probeId, myVersion FROM {selected_table}"
         else:
@@ -427,7 +427,8 @@ def create_app():
             # myVersion을 문자열로 변환
             df["myVersion"] = df["myVersion"].astype(str)
 
-            df = df.drop_duplicates(subset=["myVersion"])
+            # ProbeID와 myVersion 조합으로만 중복 제거
+            df = df.drop_duplicates(subset=["probeId", "myVersion"])
 
             # probeId별 myVersion 목록 생성
             wcs_versions = []
