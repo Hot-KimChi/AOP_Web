@@ -273,62 +273,89 @@ export default function VerificationReport() {
       setIsLoading(false);
     }
   };
-
   // 데이터 추출 함수
   const extractReportData = async () => {
-    if (!selectedDatabase || !selectedProbe || !selectedTxSW || !selectedWcsSW || !MI || !temperature || !Ispta) {
-      alert('데이터를 추출하기 전에 데이터베이스, 프로브, 소프트웨어, measSSId를 선택해주세요.');
+    if (!selectedDatabase || !selectedProbe || !selectedTxSW || !selectedWcsSW) {
+      alert('데이터베이스, 프로브, 소프트웨어, WCS_S/W를 선택하세요.');
       return;
     }
+
+    // SSid별로 요청할 값이 있는지 확인
+    const tasks = [];
+    if (temperature) {
+      tasks.push({
+        label: `Temp:${temperature}`,
+        requestData: {
+          database: selectedDatabase,
+          probeId: String(selectedProbe),
+          wcsSoftware: selectedWcsSW,
+          TxSumSoftware: selectedTxSW,
+          measSSId_Temp: temperature,
+          measSSId_MI: MI || null,  // 빈 값 대신 null 전달
+          measSSId_Ispta: Ispta || null,  // 빈 값 대신 null 전달
+        }
+      });
+    }
+    if (MI) {
+      tasks.push({
+        label: `MI:${MI}`,
+        requestData: {
+          database: selectedDatabase,
+          probeId: String(selectedProbe),
+          wcsSoftware: selectedWcsSW,
+          TxSumSoftware: selectedTxSW,
+          measSSId_Temp: temperature || null,  // 빈 값 대신 null 전달
+          measSSId_MI: MI,
+          measSSId_Ispta: Ispta || null,  // 빈 값 대신 null 전달
+        }
+      });
+    }
+    if (Ispta) {
+      tasks.push({
+        label: `Ispta:${Ispta}`,
+        requestData: {
+          database: selectedDatabase,
+          probeId: String(selectedProbe),
+          wcsSoftware: selectedWcsSW,
+          TxSumSoftware: selectedTxSW,
+          measSSId_Temp: temperature || null,  // 빈 값 대신 null 전달
+          measSSId_MI: MI || null,  // 빈 값 대신 null 전달
+          measSSId_Ispta: Ispta,
+        }
+      });
+    }
+
+    if (tasks.length === 0) {
+      alert('SSid 값을 입력하세요.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
-    setReportData(null);
-    
-    const requestData = {
-      database: selectedDatabase,
-      probeId: probeList.find(probe => probe.probeId === selectedProbe)?.probeId || '',
-      wcsSoftware: selectedWcsSW,
-      TxSumSoftware: selectedTxSW,
-      measSSId_Temp: temperature,
-      measSSId_MI: MI,
-      measSSId_Ispta: Ispta,
-    };
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/run_tx_compare`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-        credentials: 'include',
-      });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`데이터 추출 실패: ${errorText}`);
+    for (const task of tasks) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/run_tx_compare`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(task.requestData),
+          credentials: 'include',
+        });
+        const data = await response.json();
+        if (data.status === 'success' && data.reportData) {
+          // 세션스토리지에 별도 key로 저장
+          const storageKey = `reportData_${task.label}`;
+          sessionStorage.setItem(storageKey, JSON.stringify(data.reportData));
+          // 새 창 오픈 (라벨, 키 전달)
+          window.open(`/verification-report/data-view-standalone?pageLabel=${encodeURIComponent(task.label)}&storageKey=${encodeURIComponent(storageKey)}`, '_blank');
+        } else {
+          alert(`${task.label} 데이터 없음`);
+        }
+      } catch (err) {
+        alert(`${task.label} 요청 실패: ${err.message}`);
       }
-  
-      const data = await response.json();
-      
-      if (data.status === 'success' && data.reportData) {
-        // 결과 데이터 처리
-        setReportData(data.reportData);
-        
-        // 세션 스토리지에 저장
-        sessionStorage.setItem('reportData', JSON.stringify(data.reportData));
-        
-        // 데이터 창에서 보기
-        openDataInNewWindow(data.reportData, 'report');
-      } else {
-        setError(data.message || '보고서 데이터를 추출하는데 실패했습니다');
-      }
-    } catch (err) {
-      console.error('오류:', err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
 
   // 새 창에서 데이터 보기

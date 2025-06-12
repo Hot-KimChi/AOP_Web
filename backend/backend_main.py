@@ -400,9 +400,9 @@ def create_app():
 
         # 테이블에 따라 다른 쿼리 실행 및 컬럼명 처리 (유니크 데이터)
         if selected_table == "Tx_summary":
-            query = f"SELECT DISTINCT ProbeID AS probeId, ProbeName AS probeName,           Software_version AS software_version FROM {selected_table}"
+            query = f"SELECT DISTINCT ProbeID AS probeId, ProbeName AS probeName, Software_version AS software_version FROM {selected_table} ORDER BY software_version DESC"
         elif selected_table == "WCS":
-            query = f"SELECT DISTINCT probeId, myVersion FROM {selected_table}"
+            query = f"SELECT DISTINCT probeId, myVersion FROM {selected_table} ORDER BY myVersion DESC"
         else:
             query = f"SELECT DISTINCT probeId, probeName FROM {selected_table}"
 
@@ -540,23 +540,28 @@ def create_app():
             if missing_params:
                 return error_response(
                     f"필수 파라미터가 누락되었습니다: {', '.join(missing_params)}", 400
-                )
-
-            # 파라미터 추출
+                )  # 파라미터 추출
             probeid = int(float(data.get("probeId")))
             tx_sw = data.get("TxSumSoftware")  # 프론트엔드의 파라미터명
             wcs_sw = data.get("wcsSoftware")  # 프론트엔드의 파라미터명
+
+            # 빈 문자열이나 None을 None으로 처리
             ssid_temp = data.get("measSSId_Temp")
+            ssid_temp = None if ssid_temp == "" or ssid_temp is None else ssid_temp
+
             ssid_mi = data.get("measSSId_MI")
+            ssid_mi = None if ssid_mi == "" or ssid_mi is None else ssid_mi
+
             ssid_ispta3 = data.get("measSSId_Ispta")
+            ssid_ispta3 = (
+                None if ssid_ispta3 == "" or ssid_ispta3 is None else ssid_ispta3
+            )
 
             logger.info(
                 f"TxCompare 실행 요청: probeId={probeid}, "
                 f"Tx_SW={tx_sw}, WCS_SW={wcs_sw}, "
                 f"SSid_Temp={ssid_temp}, SSid_MI={ssid_mi}, SSid_Ispta3={ssid_ispta3}"
-            )
-
-            # 저장 프로시저 실행
+            )  # 저장 프로시저 실행
             # 파라미터 설정 - 저장 프로시저의 파라미터명과 일치시킴
             params = (
                 probeid,
@@ -566,6 +571,19 @@ def create_app():
                 ssid_mi,
                 ssid_ispta3,
             )
+
+            # 모든 파라미터가 None이면 에러 메시지 반환
+            if ssid_temp is None and ssid_mi is None and ssid_ispta3 is None:
+                return (
+                    jsonify(
+                        {
+                            "status": "success",
+                            "message": "measSSId 값이 모두 없습니다. 적어도 하나는 입력해주세요.",
+                            "reportData": [],
+                        }
+                    ),
+                    200,
+                )
 
             # 저장 프로시저 실행 및 결과 반환
             # 프로시저명과 파라미터를 전달하는 방식으로 변경

@@ -17,12 +17,18 @@ function DataViewContent() {
   // 페이지 로드 시 데이터 가져오기
   useEffect(() => {
     try {
-      const storedData = sessionStorage.getItem('reportData');
-      
+      // 쿼리스트링에서 storageKey, pageLabel 읽기
+      const params = new URLSearchParams(window.location.search);
+      const storageKey = params.get('storageKey') || 'reportData';
+      const pageLabel = params.get('pageLabel') || '';
+
+      const storedData = sessionStorage.getItem(storageKey);
+
       if (storedData) {
         const parsedData = JSON.parse(storedData);
         setCsvData(parsedData);
         setDisplayData(parsedData);
+        document.title = pageLabel ? `데이터(${pageLabel})` : 'CSV 데이터 표시';
       } else {
         setError('데이터를 찾을 수 없습니다.');
       }
