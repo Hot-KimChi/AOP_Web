@@ -526,33 +526,35 @@ def create_app():
 
             data = request.get_json()
 
-            # 필수 파라미터 확인
+            # 필수 파라미터 확인 (SSid 파라미터는 셋 중 하나만 있으면 됨)
             required_params = [
                 "probeId",
                 "TxSumSoftware",  # Tx_SW
                 "wcsSoftware",  # WCS_SW
-                "measSSId_Temp",  # SSid_Temp
-                "measSSId_MI",  # SSid_MI
-                "measSSId_Ispta",  # SSid_Ispta3
             ]
-
             missing_params = [param for param in required_params if not data.get(param)]
             if missing_params:
                 return error_response(
                     f"필수 파라미터가 누락되었습니다: {', '.join(missing_params)}", 400
-                )  # 파라미터 추출
+                )
+
+            # SSid 파라미터 셋 중 하나라도 값이 있으면 통과
+            ssid_temp = data.get("measSSId_Temp")
+            ssid_mi = data.get("measSSId_MI")
+            ssid_ispta3 = data.get("measSSId_Ispta")
+            if not (ssid_temp or ssid_mi or ssid_ispta3):
+                return error_response(
+                    "measSSId_Temp, measSSId_MI, measSSId_Ispta 중 적어도 하나는 입력해야 합니다.",
+                    400,
+                )
+
             probeid = int(float(data.get("probeId")))
             tx_sw = data.get("TxSumSoftware")  # 프론트엔드의 파라미터명
             wcs_sw = data.get("wcsSoftware")  # 프론트엔드의 파라미터명
 
             # 빈 문자열이나 None을 None으로 처리
-            ssid_temp = data.get("measSSId_Temp")
             ssid_temp = None if ssid_temp == "" or ssid_temp is None else ssid_temp
-
-            ssid_mi = data.get("measSSId_MI")
             ssid_mi = None if ssid_mi == "" or ssid_mi is None else ssid_mi
-
-            ssid_ispta3 = data.get("measSSId_Ispta")
             ssid_ispta3 = (
                 None if ssid_ispta3 == "" or ssid_ispta3 is None else ssid_ispta3
             )
@@ -572,18 +574,18 @@ def create_app():
                 ssid_ispta3,
             )
 
-            # 모든 파라미터가 None이면 에러 메시지 반환
-            if ssid_temp is None and ssid_mi is None and ssid_ispta3 is None:
-                return (
-                    jsonify(
-                        {
-                            "status": "success",
-                            "message": "measSSId 값이 모두 없습니다. 적어도 하나는 입력해주세요.",
-                            "reportData": [],
-                        }
-                    ),
-                    200,
-                )
+            # 모든 파라미터가 None이면 에러 메시지 반환 (위에서 이미 체크했으므로 이 부분은 생략 가능)
+            # if ssid_temp is None and ssid_mi is None and ssid_ispta3 is None:
+            #     return (
+            #         jsonify(
+            #             {
+            #                 "status": "success",
+            #                 "message": "measSSId 값이 모두 없습니다. 적어도 하나는 입력해주세요.",
+            #                 "reportData": [],
+            #             }
+            #         ),
+            #         200,
+            #     )
 
             # 저장 프로시저 실행 및 결과 반환
             # 프로시저명과 파라미터를 전달하는 방식으로 변경

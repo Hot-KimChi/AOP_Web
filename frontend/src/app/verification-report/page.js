@@ -291,8 +291,8 @@ export default function VerificationReport() {
           wcsSoftware: selectedWcsSW,
           TxSumSoftware: selectedTxSW,
           measSSId_Temp: temperature,
-          measSSId_MI: MI || null,  // 빈 값 대신 null 전달
-          measSSId_Ispta: Ispta || null,  // 빈 값 대신 null 전달
+          measSSId_MI: null,
+          measSSId_Ispta: null,
         }
       });
     }
@@ -304,9 +304,9 @@ export default function VerificationReport() {
           probeId: String(selectedProbe),
           wcsSoftware: selectedWcsSW,
           TxSumSoftware: selectedTxSW,
-          measSSId_Temp: temperature || null,  // 빈 값 대신 null 전달
+          measSSId_Temp: null,
           measSSId_MI: MI,
-          measSSId_Ispta: Ispta || null,  // 빈 값 대신 null 전달
+          measSSId_Ispta: null,
         }
       });
     }
@@ -318,8 +318,8 @@ export default function VerificationReport() {
           probeId: String(selectedProbe),
           wcsSoftware: selectedWcsSW,
           TxSumSoftware: selectedTxSW,
-          measSSId_Temp: temperature || null,  // 빈 값 대신 null 전달
-          measSSId_MI: MI || null,  // 빈 값 대신 null 전달
+          measSSId_Temp: null,
+          measSSId_MI: null,
           measSSId_Ispta: Ispta,
         }
       });
