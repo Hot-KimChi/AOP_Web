@@ -346,8 +346,9 @@ export default function VerificationReport() {
           // 세션스토리지에 별도 key로 저장
           const storageKey = `reportData_${task.label}`;
           sessionStorage.setItem(storageKey, JSON.stringify(data.reportData));
-          // 새 창 오픈 (라벨, 키 전달)
-          window.open(`/verification-report/data-view-standalone?pageLabel=${encodeURIComponent(task.label)}&storageKey=${encodeURIComponent(storageKey)}`, '_blank');
+          // viewer와 동일하게 새 창 옵션 지정
+          const windowFeatures = 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no';
+          window.open(`/verification-report/data-view-standalone?pageLabel=${encodeURIComponent(task.label)}&storageKey=${encodeURIComponent(storageKey)}`, '_blank', windowFeatures);
         } else {
           alert(`${task.label} 데이터 없음`);
         }
