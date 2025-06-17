@@ -6,6 +6,7 @@ import DataViewer from '../../../components/DataViewer';
 
 function DataViewContent() {
   const [data, setData] = useState([]);
+  const [columns, setColumns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [title, setTitle] = useState('검증 결과');
@@ -18,8 +19,12 @@ function DataViewContent() {
       setTitle(pageLabel);
       if (storageKey) {
         const storedData = sessionStorage.getItem(storageKey);
+        const storedColumns = sessionStorage.getItem(`${storageKey}_columns`);
         if (storedData) {
           setData(JSON.parse(storedData));
+          if (storedColumns) {
+            setColumns(JSON.parse(storedColumns));
+          }
         } else {
           setError('세션 데이터가 없습니다.');
         }
@@ -48,6 +53,7 @@ function DataViewContent() {
   return (
     <DataViewer
       data={data}
+      columns={columns}
       title={title}
       showExport={true}
       minWidth={800}

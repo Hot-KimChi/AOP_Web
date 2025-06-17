@@ -4,6 +4,7 @@ import { ArrowUpDown, X, FileSpreadsheet } from 'lucide-react';
 
 export default function DataViewer({
   data = [],
+  columns = [], // 추가: 컬럼 순서 정보
   title = '',
   onExport = null,
   showExport = true,
@@ -127,6 +128,9 @@ export default function DataViewer({
     return options;
   }
 
+  // 컬럼 정보 결정
+  const columnList = columns && columns.length > 0 ? columns : Object.keys(displayData[0] || {});
+
   return (
     <div className="table-container" style={style}>
       <div className="flex justify-between items-center mb-3">
@@ -140,7 +144,7 @@ export default function DataViewer({
       <table className={`w-full min-w-[${minWidth}px] border-collapse`}>
         <thead>
           <tr className="bg-gray-100 sticky-header">
-            {Object.keys(displayData[0] || {}).map((header, index) => (
+            {columnList.map((header, index) => (
               <th key={index} className="px-3 py-2 border">
                 <div className="flex items-center justify-between group">
                   <span title={header} className="font-medium text-gray-700">
@@ -163,7 +167,7 @@ export default function DataViewer({
         </thead>
         <thead className="sticky-filter">
           <tr>
-            {Object.keys(displayData[0] || {}).map((header, index) => (
+            {columnList.map((header, index) => (
               <th key={index} className="px-2 py-1 border bg-gray-50">
                 <div className="relative">
                   <select
@@ -196,20 +200,20 @@ export default function DataViewer({
           {displayData.length > 0 ? (
             displayData.map((row, rowIndex) => (
               <tr key={rowIndex} className="hover:bg-gray-50">
-                {Object.values(row).map((value, colIndex) => (
+                {columnList.map((col, colIndex) => (
                   <td
                     key={colIndex}
                     className="px-3 py-2 border"
-                    title={formatNumber(value)}
+                    title={formatNumber(row[col])}
                   >
-                    {renderCellContent(value)}
+                    {renderCellContent(row[col])}
                   </td>
                 ))}
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={Object.keys(displayData[0] || {}).length} className="text-center py-3 text-gray-500">
+              <td colSpan={columnList.length} className="text-center py-3 text-gray-500">
                 No data to display. Please adjust your filters.
               </td>
             </tr>

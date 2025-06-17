@@ -574,19 +574,6 @@ def create_app():
                 ssid_ispta3,
             )
 
-            # 모든 파라미터가 None이면 에러 메시지 반환 (위에서 이미 체크했으므로 이 부분은 생략 가능)
-            # if ssid_temp is None and ssid_mi is None and ssid_ispta3 is None:
-            #     return (
-            #         jsonify(
-            #             {
-            #                 "status": "success",
-            #                 "message": "measSSId 값이 모두 없습니다. 적어도 하나는 입력해주세요.",
-            #                 "reportData": [],
-            #             }
-            #         ),
-            #         200,
-            #     )
-
             # 저장 프로시저 실행 및 결과 반환
             # 프로시저명과 파라미터를 전달하는 방식으로 변경
             result_df = g.current_db.execute_procedure("TxCompare", params)
@@ -609,6 +596,7 @@ def create_app():
 
             # DataFrame을 JSON으로 변환
             report_data = result_df.to_dict(orient="records")
+            columns = list(result_df.columns)
 
             # 응답 반환
             return (
@@ -617,6 +605,7 @@ def create_app():
                         "status": "success",
                         "message": "비교 보고서 데이터를 성공적으로 추출했습니다.",
                         "reportData": report_data,
+                        "columns": columns,  # 컬럼 순서 정보 추가
                     }
                 ),
                 200,

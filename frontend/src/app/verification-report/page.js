@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Layout from '../../components/Layout';
 
 export default function VerificationReport() {
   // 기본 상태 변수 선언
@@ -342,10 +343,14 @@ export default function VerificationReport() {
           credentials: 'include',
         });
         const data = await response.json();
+        
         if (data.status === 'success' && data.reportData) {
           // 세션스토리지에 별도 key로 저장
           const storageKey = `reportData_${task.label}`;
           sessionStorage.setItem(storageKey, JSON.stringify(data.reportData));
+          if (data.columns) {
+            sessionStorage.setItem(`${storageKey}_columns`, JSON.stringify(data.columns));
+          }
           // viewer와 동일하게 새 창 옵션 지정
           const windowFeatures = 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no';
           window.open(`/verification-report/data-view-standalone?pageLabel=${encodeURIComponent(task.label)}&storageKey=${encodeURIComponent(storageKey)}`, '_blank', windowFeatures);
@@ -433,299 +438,301 @@ export default function VerificationReport() {
   };
 
   return (
-    <div className="container mt-4">
-      {/* 첫 번째 카드: Verification Report 부분 */}
-      <div className="card shadow-sm mb-4">
-        <div className="card-header bg-primary text-white">
-          <h5 className="mb-0">Verification Report</h5>
-        </div>
-        <div className="card-body">
-          <div className="row g-3">
-            {/* 첫 번째 줄: 데이터베이스, 프로브, WCS_S/W, 소프트웨어 선택, 데이터 새로고침 버튼 */}
-            <div className="col-md-2">
-              <label htmlFor="databaseSelect" className="form-label">
-                데이터베이스 선택
-              </label>
-              <select
-                id="databaseSelect"
-                className="form-select"
-                value={selectedDatabase}
-                onChange={(e) => {
-                  const newDatabase = e.target.value;
-                  setSelectedDatabase(newDatabase);
-                  setSelectedProbe('');
-                  setSelectedSoftware('');
-                  setSelectedWcsSoftware('');
-                }}
-                disabled={isLoading}
-              >
-                <option value="">데이터베이스 선택</option>
-                {DBList.map((db, index) => (
-                  <option key={index} value={db}>
-                    {db}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="col-md-2">
-              <label htmlFor="probeSelect" className="form-label">
-                프로브 선택
-              </label>
-              <select
-                id="probeSelect"
-                className="form-select"
-                value={selectedProbe}
-                onChange={(e) => {
-                  const probeId = e.target.value;
-                  setSelectedProbe(probeId);
-                  setSelectedSoftware('');
-                  setSelectedWcsSoftware('');
-                }}
-                disabled={isLoading || !selectedDatabase}
-              >
-                <option value="">프로브 선택</option>
-                {probeList.map((probe) => (
-                  <option
-                    key={probe._id}
-                    value={probe.probeId}
-                  >
-                    {probe.probeName} ({Number(probe.probeId).toString()})
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="col-md-2">
-              <label htmlFor="wcsSoftwareSelect" className="form-label">
-                WCS_S/W 선택
-              </label>
-              <select
-                id="wcsSoftwareSelect"
-                className="form-select"
-                value={selectedWcsSW}
-                onChange={(e) => setSelectedWcsSoftware(e.target.value)}
-                disabled={isLoading || !selectedProbe || filteredWcsVersions.length === 0}
-              >
-                <option value="">WCS_S/W 선택</option>
-                {filteredWcsVersions.map((wcsVersion, index) => (
-                  <option
-                    key={`wcs_${index}`}
-                    value={wcsVersion.myVersion}
-                  >
-                    {wcsVersion.myVersion}
-                  </option>
-                ))}
-              </select>
-              {selectedProbe && filteredWcsVersions.length === 0 && (
-                <small className="text-muted">
-                  선택한 프로브에 WCS_S/W 데이터가 없습니다.
-                </small>
-              )}
-            </div>
-            
-            <div className="col-md-2">
-              <label htmlFor="softwareSelect" className="form-label">
-                소프트웨어 선택
-              </label>
-              <select
-                id="softwareSelect"
-                className="form-select"
-                value={selectedTxSW}
-                onChange={(e) => setSelectedSoftware(e.target.value)}
-                disabled={isLoading || !selectedProbe || !hasSoftwareData}
-              >
-                <option value="">소프트웨어 선택</option>
-                {filteredSoftwareList.map((software) => (
-                  <option
-                    key={software._id}
-                    value={software.softwareVersion}
-                  >
-                    {software.softwareVersion}
-                  </option>
-                ))}
-              </select>
-              {!hasSoftwareData && selectedDatabase && (
-                <small className="text-muted">
-                  선택한 테이블에 소프트웨어 데이터가 없습니다.
-                </small>
-              )}
-            </div>
-            
-            <div className="col-md-4 d-flex align-items-end mb-3">
-              <button 
-                className="btn btn-outline-secondary w-100" 
-                onClick={refreshAllData}
-                disabled={!selectedDatabase || isLoading}
-              >
-                데이터 새로고침
-              </button>
-            </div>
-            
-            {/* 두 번째 줄: Temperature, MI, Ispta 입력 필드 (같은 줄에 배치) */}
-            <div className="col-md-4">
-              <label htmlFor="temperatureInput" className="form-label">
-                Temperature measSSid
-              </label>
-              <input
-                type="text"
-                id="temperatureInput"
-                className="form-control"
-                value={temperature}
-                onChange={(e) => setTemperature(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-  
-            <div className="col-md-4">
-              <label htmlFor="MI_Input" className="form-label">
-                MI measSSid
-              </label>
-              <input
-                type="text"
-                id="MI_Input"
-                className="form-control"
-                value={MI}
-                onChange={(e) => setMI(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-            
-            <div className="col-md-4">
-              <label htmlFor="IsptaInput" className="form-label">
-                Ispta.3 measSSid
-              </label>
-              <input
-                type="text"
-                id="IsptaInput"
-                className="form-control"
-                value={Ispta}
-                onChange={(e) => setIspta(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-            
-            {/* 세 번째 줄: Report Table 추출 버튼 */}
-            <div className="col-md-12">
-              <button
-                className="btn btn-success w-100"
-                onClick={extractReportData}
-                disabled={!selectedDatabase || !selectedProbe || !selectedWcsSW || (!selectedTxSW && hasSoftwareData) || !MI || !temperature || isLoading}
-              >
-                {isLoading ? '처리 중...' : 'Report Table 추출'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-  
-      {/* 두 번째 카드: Tx summary Input 부분 */}
-      <div className="card shadow-sm mb-4">
-        <div className="card-header bg-info text-white">
-          <h5 className="mb-0">Tx summary Input</h5>
-        </div>
-        <div className="card-body">
-          <div className="row g-3">
-            {/* 첫 번째 줄: 파일 선택 필드 */}
-            <div className="col-md-12 mb-3">
-              <label htmlFor="fileInput" className="form-label">
-                파일 선택
-              </label>
-              <input
-                type="file"
-                id="fileInput"
-                className="form-control"
-                onChange={handleFileChange}
-                disabled={isLoading}
-              />
-            </div>
-            
-            {/* 두 번째 줄: Summary Table 추출 버튼 */}
-            <div className="col-md-12">
-              <button
-                className="btn btn-primary w-100"
-                onClick={parsingTxSum}
-                disabled={!selectedDatabase || !selectedProbe || (!selectedTxSW && hasSoftwareData) || isLoading}
-              >
-                {isLoading ? '처리 중...' : 'Summary Table 추출'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-  
-      {error && <div className="alert alert-danger mt-3">{error}</div>}
-      
-      {/* 이하 미리보기 부분은 동일하게 유지 */}
-      {summaryData && (
+    <Layout>
+      <div className="container mt-4">
+        {/* 첫 번째 카드: Verification Report 부분 */}
         <div className="card shadow-sm mb-4">
-          <div className="card-header bg-light">
-            <h5 className="mb-0">요약 테이블 미리보기</h5>
+          <div className="card-header bg-primary text-white">
+            <h5 className="mb-0">Verification Report</h5>
           </div>
           <div className="card-body">
-            <div className="table-responsive">
-              <table className="table table-bordered table-hover">
-                <thead className="table-light">
-                  {summaryData.length > 0 && (
-                    <tr>
-                      {Object.keys(summaryData[0]).map((key, index) => (
-                        <th key={index}>{key}</th>
-                      ))}
-                    </tr>
-                  )}
-                </thead>
-                <tbody>
-                  {summaryData.slice(0, 5).map((row, rowIndex) => (
-                    <tr key={rowIndex}>
-                      {Object.values(row).map((value, cellIndex) => (
-                        <td key={cellIndex}>{value}</td>
-                      ))}
-                    </tr>
+            <div className="row g-3">
+              {/* 첫 번째 줄: 데이터베이스, 프로브, WCS_S/W, 소프트웨어 선택, 데이터 새로고침 버튼 */}
+              <div className="col-md-2">
+                <label htmlFor="databaseSelect" className="form-label">
+                  데이터베이스 선택
+                </label>
+                <select
+                  id="databaseSelect"
+                  className="form-select"
+                  value={selectedDatabase}
+                  onChange={(e) => {
+                    const newDatabase = e.target.value;
+                    setSelectedDatabase(newDatabase);
+                    setSelectedProbe('');
+                    setSelectedSoftware('');
+                    setSelectedWcsSoftware('');
+                  }}
+                  disabled={isLoading}
+                >
+                  <option value="">데이터베이스 선택</option>
+                  {DBList.map((db, index) => (
+                    <option key={index} value={db}>
+                      {db}
+                    </option>
                   ))}
-                </tbody>
-              </table>
-              {summaryData.length > 5 && (
-                <p className="text-muted">총 {summaryData.length}개 행 중 5개만 표시됩니다.</p>
-              )}
+                </select>
+              </div>
+              
+              <div className="col-md-2">
+                <label htmlFor="probeSelect" className="form-label">
+                  프로브 선택
+                </label>
+                <select
+                  id="probeSelect"
+                  className="form-select"
+                  value={selectedProbe}
+                  onChange={(e) => {
+                    const probeId = e.target.value;
+                    setSelectedProbe(probeId);
+                    setSelectedSoftware('');
+                    setSelectedWcsSoftware('');
+                  }}
+                  disabled={isLoading || !selectedDatabase}
+                >
+                  <option value="">프로브 선택</option>
+                  {probeList.map((probe) => (
+                    <option
+                      key={probe._id}
+                      value={probe.probeId}
+                    >
+                      {probe.probeName} ({Number(probe.probeId).toString()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="col-md-2">
+                <label htmlFor="wcsSoftwareSelect" className="form-label">
+                  WCS_S/W 선택
+                </label>
+                <select
+                  id="wcsSoftwareSelect"
+                  className="form-select"
+                  value={selectedWcsSW}
+                  onChange={(e) => setSelectedWcsSoftware(e.target.value)}
+                  disabled={isLoading || !selectedProbe || filteredWcsVersions.length === 0}
+                >
+                  <option value="">WCS_S/W 선택</option>
+                  {filteredWcsVersions.map((wcsVersion, index) => (
+                    <option
+                      key={`wcs_${index}`}
+                      value={wcsVersion.myVersion}
+                    >
+                      {wcsVersion.myVersion}
+                    </option>
+                  ))}
+                </select>
+                {selectedProbe && filteredWcsVersions.length === 0 && (
+                  <small className="text-muted">
+                    선택한 프로브에 WCS_S/W 데이터가 없습니다.
+                  </small>
+                )}
+              </div>
+              
+              <div className="col-md-2">
+                <label htmlFor="softwareSelect" className="form-label">
+                  소프트웨어 선택
+                </label>
+                <select
+                  id="softwareSelect"
+                  className="form-select"
+                  value={selectedTxSW}
+                  onChange={(e) => setSelectedSoftware(e.target.value)}
+                  disabled={isLoading || !selectedProbe || !hasSoftwareData}
+                >
+                  <option value="">소프트웨어 선택</option>
+                  {filteredSoftwareList.map((software) => (
+                    <option
+                      key={software._id}
+                      value={software.softwareVersion}
+                    >
+                      {software.softwareVersion}
+                    </option>
+                  ))}
+                </select>
+                {!hasSoftwareData && selectedDatabase && (
+                  <small className="text-muted">
+                    선택한 테이블에 소프트웨어 데이터가 없습니다.
+                  </small>
+                )}
+              </div>
+              
+              <div className="col-md-4 d-flex align-items-end mb-3">
+                <button 
+                  className="btn btn-outline-secondary w-100" 
+                  onClick={refreshAllData}
+                  disabled={!selectedDatabase || isLoading}
+                >
+                  데이터 새로고침
+                </button>
+              </div>
+              
+              {/* 두 번째 줄: Temperature, MI, Ispta 입력 필드 (같은 줄에 배치) */}
+              <div className="col-md-4">
+                <label htmlFor="temperatureInput" className="form-label">
+                  Temperature measSSid
+                </label>
+                <input
+                  type="text"
+                  id="temperatureInput"
+                  className="form-control"
+                  value={temperature}
+                  onChange={(e) => setTemperature(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+    
+              <div className="col-md-4">
+                <label htmlFor="MI_Input" className="form-label">
+                  MI measSSid
+                </label>
+                <input
+                  type="text"
+                  id="MI_Input"
+                  className="form-control"
+                  value={MI}
+                  onChange={(e) => setMI(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+              
+              <div className="col-md-4">
+                <label htmlFor="IsptaInput" className="form-label">
+                  Ispta.3 measSSid
+                </label>
+                <input
+                  type="text"
+                  id="IsptaInput"
+                  className="form-control"
+                  value={Ispta}
+                  onChange={(e) => setIspta(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+              
+              {/* 세 번째 줄: Report Table 추출 버튼 */}
+              <div className="col-md-12">
+                <button
+                  className="btn btn-success w-100"
+                  onClick={extractReportData}
+                  disabled={!selectedDatabase || !selectedProbe || !selectedWcsSW || (!selectedTxSW && hasSoftwareData) || !MI || !temperature || isLoading}
+                >
+                  {isLoading ? '처리 중...' : 'Report Table 추출'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      )}
-      
-      {reportData && (
-        <div className="card shadow-sm">
-          <div className="card-header bg-light">
-            <h5 className="mb-0">보고서 데이터 미리보기</h5>
+    
+        {/* 두 번째 카드: Tx summary Input 부분 */}
+        <div className="card shadow-sm mb-4">
+          <div className="card-header bg-info text-white">
+            <h5 className="mb-0">Tx summary Input</h5>
           </div>
           <div className="card-body">
-            <div className="table-responsive">
-              <table className="table table-bordered table-hover">
-                <thead className="table-light">
-                  {reportData.length > 0 && (
-                    <tr>
-                      {Object.keys(reportData[0]).map((key, index) => (
-                        <th key={index}>{key}</th>
-                      ))}
-                    </tr>
-                  )}
-                </thead>
-                <tbody>
-                  {reportData.slice(0, 5).map((row, rowIndex) => (
-                    <tr key={rowIndex}>
-                      {Object.values(row).map((value, cellIndex) => (
-                        <td key={cellIndex}>{value}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {reportData.length > 5 && (
-                <p className="text-muted">총 {reportData.length}개 행 중 5개만 표시됩니다.</p>
-              )}
+            <div className="row g-3">
+              {/* 첫 번째 줄: 파일 선택 필드 */}
+              <div className="col-md-12 mb-3">
+                <label htmlFor="fileInput" className="form-label">
+                  파일 선택
+                </label>
+                <input
+                  type="file"
+                  id="fileInput"
+                  className="form-control"
+                  onChange={handleFileChange}
+                  disabled={isLoading}
+                />
+              </div>
+              
+              {/* 두 번째 줄: Summary Table 추출 버튼 */}
+              <div className="col-md-12">
+                <button
+                  className="btn btn-primary w-100"
+                  onClick={parsingTxSum}
+                  disabled={!selectedDatabase || !selectedProbe || (!selectedTxSW && hasSoftwareData) || isLoading}
+                >
+                  {isLoading ? '처리 중...' : 'Summary Table 추출'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      )}
-    </div>
+    
+        {error && <div className="alert alert-danger mt-3">{error}</div>}
+        
+        {/* 이하 미리보기 부분은 동일하게 유지 */}
+        {summaryData && (
+          <div className="card shadow-sm mb-4">
+            <div className="card-header bg-light">
+              <h5 className="mb-0">요약 테이블 미리보기</h5>
+            </div>
+            <div className="card-body">
+              <div className="table-responsive">
+                <table className="table table-bordered table-hover">
+                  <thead className="table-light">
+                    {summaryData.length > 0 && (
+                      <tr>
+                        {Object.keys(summaryData[0]).map((key, index) => (
+                          <th key={index}>{key}</th>
+                        ))}
+                      </tr>
+                    )}
+                  </thead>
+                  <tbody>
+                    {summaryData.slice(0, 5).map((row, rowIndex) => (
+                      <tr key={rowIndex}>
+                        {Object.values(row).map((value, cellIndex) => (
+                          <td key={cellIndex}>{value}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {summaryData.length > 5 && (
+                  <p className="text-muted">총 {summaryData.length}개 행 중 5개만 표시됩니다.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {reportData && (
+          <div className="card shadow-sm">
+            <div className="card-header bg-light">
+              <h5 className="mb-0">보고서 데이터 미리보기</h5>
+            </div>
+            <div className="card-body">
+              <div className="table-responsive">
+                <table className="table table-bordered table-hover">
+                  <thead className="table-light">
+                    {reportData.length > 0 && (
+                      <tr>
+                        {Object.keys(reportData[0]).map((key, index) => (
+                          <th key={index}>{key}</th>
+                        ))}
+                      </tr>
+                    )}
+                  </thead>
+                  <tbody>
+                    {reportData.slice(0, 5).map((row, rowIndex) => (
+                      <tr key={rowIndex}>
+                        {Object.values(row).map((value, cellIndex) => (
+                          <td key={cellIndex}>{value}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {reportData.length > 5 && (
+                  <p className="text-muted">총 {reportData.length}개 행 중 5개만 표시됩니다.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </Layout>    
   );
 }

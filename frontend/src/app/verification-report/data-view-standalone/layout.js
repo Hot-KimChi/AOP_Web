@@ -1,6 +1,6 @@
 // src/app/viewer/data-view-standalone/layout.js
 export const metadata = {
-    title: 'Verification Report'
+    title: 'Verification Report',
   }
   
   export default function StandaloneLayout({ children }) {
