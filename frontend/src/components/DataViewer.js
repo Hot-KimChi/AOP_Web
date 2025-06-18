@@ -70,16 +70,15 @@ export default function DataViewer({
   const exportToExcel = () => {
     try {
       if (!displayData.length) throw new Error('내보낼 데이터가 없습니다.');
-      const headers = Object.keys(displayData[0]);
+      // Object.keys 대신 columnList 사용 (화면 표시 순서와 동일하게)
+      const headers = columnList;
       const csvContent = [
         headers.join(','),
         ...displayData.map(row =>
           headers.map(header => {
             const value = row[header];
-            if (typeof value === 'string' && value.includes(',')) {
-              return `"${value}"`;
-            }
-            return value;
+            // 소수점 2자리 적용 컬럼이면 반올림 적용
+            return formatNumber(value, header);
           }).join(',')
         )
       ].join('\n');
@@ -101,8 +100,13 @@ export default function DataViewer({
   };
 
   // 유틸
-  function formatNumber(value) {
+  function formatNumber(value, key) {
+    // 소수점 2자리까지 표시할 컬럼명 패턴 (MaxReportValue 추가)
+    const float2Pattern = /^(XP_Value_\d+|reportValue_\d+|Difference_\d+|Ambient_Temp_\d+|MaxReportValue)$/;
     if (typeof value === 'number') {
+      if (key && float2Pattern.test(key)) {
+        return value.toFixed(2);
+      }
       return value % 1 === 0 ? value : parseFloat(value.toFixed(4));
     }
     return value?.toString() || '';
@@ -112,11 +116,11 @@ export default function DataViewer({
     const str = text.toString();
     return str.length > 20 ? `${str.substring(0, 20)}...` : str;
   }
-  function renderCellContent(value) {
+  function renderCellContent(value, key) {
     if (value === null || value === undefined) {
       return '';
     }
-    const formattedValue = formatNumber(value);
+    const formattedValue = formatNumber(value, key);
     return formattedValue === 0 ? '0' : truncateText(formattedValue);
   }
   function generateComboBoxOptions(data) {
@@ -204,9 +208,9 @@ export default function DataViewer({
                   <td
                     key={colIndex}
                     className="px-3 py-2 border"
-                    title={formatNumber(row[col])}
+                    title={formatNumber(row[col], col)}
                   >
-                    {renderCellContent(row[col])}
+                    {renderCellContent(row[col], col)}
                   </td>
                 ))}
               </tr>
