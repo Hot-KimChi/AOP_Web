@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from contextlib import contextmanager
 from typing import Optional
 import logging
+from docx import Document
+import pandas as pd
 
 from pkg_SQL.database import SQL
 from pkg_MeasSetGen.meas_generation import MeasSetGen
@@ -389,7 +391,7 @@ def create_app():
         selected_table = request.args.get("table")
         logger.info(f"Database: {selected_database}, Table: {selected_table}")
         # 허용된 테이블 이름 목록
-        allowed_tables = ["Tx_summary", "probe_geo", "WCS"]
+        allowed_tables = ["Tx_summary", "probe_geo", "WCS", "meas_station_setup"]
         if selected_table not in allowed_tables:
             return (
                 jsonify(
@@ -397,6 +399,15 @@ def create_app():
                 ),
                 400,
             )
+
+        # meas_station_setup은 모든 데이터 반환 (필터/가공 없이)
+        if selected_table == "meas_station_setup":
+            df = g.current_db.execute_query(
+                f"SELECT measSSId, measComments, probeId, measPersonName, measPurpose, imagingSysSn, probeSn, hydrophId FROM {selected_table} where measPurpose not like '%Beamstyle%' order by measSSId desc"
+            )
+            data = df.to_dict(orient="records") if df is not None else []
+            columns = list(df.columns) if df is not None else []
+            return jsonify({"status": "success", "data": data, "columns": columns})
 
         # 테이블에 따라 다른 쿼리 실행 및 컬럼명 처리 (유니크 데이터)
         if selected_table == "Tx_summary":
@@ -616,6 +627,46 @@ def create_app():
             return error_response(
                 f"비교 보고서 데이터 추출 중 오류가 발생했습니다: {str(e)}", 500
             )
+
+    @app.route("/api/export_table_to_word", methods=["GET"])
+    @handle_exceptions
+    @require_auth
+    @with_db_connection()
+    def export_table_to_word():
+        """선택한 데이터베이스/테이블을 Word(.docx)로 내보내기"""
+        selected_database = request.args.get("database")
+        selected_table = request.args.get("table")
+        if not selected_database or not selected_table:
+            return error_response("database, table 파라미터가 필요합니다", 400)
+
+        # 쿼리 실행 (모든 데이터)
+        query = f"SELECT * FROM {selected_table}"
+        df = g.current_db.execute_query(query)
+        if df is None or df.empty:
+            return error_response("해당 테이블에 데이터가 없습니다", 404)
+
+        # Word 문서 생성
+        doc = Document()
+        doc.add_heading(f"Table: {selected_table}", 0)
+        table = doc.add_table(rows=1, cols=len(df.columns))
+        hdr_cells = table.rows[0].cells
+        for i, col in enumerate(df.columns):
+            hdr_cells[i].text = str(col)
+        for row in df.itertuples(index=False):
+            row_cells = table.add_row().cells
+            for i, value in enumerate(row):
+                row_cells[i].text = str(value) if value is not None else ""
+
+        # 파일을 메모리 버퍼에 저장
+        buf = io.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        filename = f"{selected_table}.docx"
+        return Response(
+            buf.getvalue(),
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
 
     @app.teardown_appcontext
     def teardown_db(exception):

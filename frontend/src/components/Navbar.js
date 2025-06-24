@@ -21,6 +21,7 @@ const Navbar = () => {
     { href: '/measset-generation', icon: faCogs, text: 'MeasSet Generation' },
     { href: '/viewer', icon: faEye, text: 'Viewer' },
     { href: '/verification-report', icon: faClipboardCheck, text: 'Verification Report' },
+    { href: '/SSR_DocOut', icon: faClipboardCheck, text: 'SSR_DocOut' }, // SSR_DocOut 메뉴 추가
     { href: '/machine-learning', icon: faBrain, text: 'Machine Learning' },
   ];
 
