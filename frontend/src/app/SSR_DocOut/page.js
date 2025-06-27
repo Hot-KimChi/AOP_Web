@@ -13,6 +13,7 @@ export default function SSR_DocOut() {
   const [selectedProbe, setSelectedProbe] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedRowIdxs, setSelectedRowIdxs] = useState([]); // 여러 행 선택 상태 추가
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
@@ -86,9 +87,17 @@ export default function SSR_DocOut() {
     }
   }, [selectedDatabase]);
 
+  // Word 내보내기: 선택된 measSSId만 전달
   const handleExportWord = async () => {
-    if (selectedDatabase) {
-      const url = `${API_BASE_URL}/api/export_table_to_word?database=${encodeURIComponent(selectedDatabase)}&table=meas_station_setup`;
+    if (selectedDatabase && selectedRowIdxs.length > 0) {
+      // 선택된 measSSId 값 추출
+      const selectedIds = selectedRowIdxs.map(idx => tableData[idx]?.measSSId).filter(Boolean);
+      if (selectedIds.length === 0) {
+        setError('선택된 행에 measSSId 값이 없습니다.');
+        return;
+      }
+      // SSR_table에서 선택된 measSSId만 워드로 요청
+      const url = `${API_BASE_URL}/api/export_table_to_word?database=${encodeURIComponent(selectedDatabase)}&table=SSR_table&measSSIds=${encodeURIComponent(selectedIds.join(','))}`;
       try {
         const response = await fetch(url, {
           method: 'GET',
@@ -99,7 +108,7 @@ export default function SSR_DocOut() {
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
-        a.download = `meas_station_setup.docx`;
+        a.download = `SSR_table_selected.docx`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -107,12 +116,25 @@ export default function SSR_DocOut() {
       } catch (err) {
         setError('Word 파일 다운로드 실패');
       }
+    } else {
+      setError('행을 선택하세요.');
+    }
+  };
+
+  // 행 클릭 핸들러 (ctrlKey 지원)
+  const handleRowClick = (idx, event) => {
+    if (event.ctrlKey) {
+      setSelectedRowIdxs(prev =>
+        prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
+      );
+    } else {
+      setSelectedRowIdxs([idx]);
     }
   };
 
   return (
     <Layout>
-      <div className="container-fluid mt-4" style={{ maxWidth: '1600px' }}>
+      <div className="container mt-4">
         <div className="card shadow-sm">
           <div className="card-header bg-primary text-white">
             <h5 className="mb-0">SSR_DocOut - meas_station_setup 테이블 미리보기</h5>
@@ -134,11 +156,11 @@ export default function SSR_DocOut() {
                   ))}
                 </select>
               </div>
-              <div className="col-md-5 d-flex align-items-end">
+              <div className="col-md-7 d-flex align-items-end">
                 <button
                   className="btn btn-outline-success w-100"
                   onClick={handleExportWord}
-                  disabled={!selectedDatabase}
+                  disabled={!selectedDatabase || tableData.length === 0}
                 >
                   Word로 내보내기
                 </button>
@@ -147,17 +169,32 @@ export default function SSR_DocOut() {
             <hr />
             {isLoading && <div>로딩 중...</div>}
             {!isLoading && columns.length > 0 && (
-              <div className="table-responsive mt-3">
-                <table className="table table-bordered table-sm">
-                  <thead className="table-light">
+              <div className="table-responsive mt-3" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <table className="table table-bordered table-sm" style={{ fontSize: '0.85rem' }}>
+                  <thead className="table-light" style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f8f9fa' }}>
                     <tr>
                       {columns.map(col => <th key={col}>{col}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {tableData.map((row, idx) => (
-                      <tr key={idx}>
-                        {columns.map(col => <td key={col}>{row[col]}</td>)}
+                      <tr
+                        key={idx}
+                        onClick={e => handleRowClick(idx, e)}
+                        className={selectedRowIdxs.includes(idx) ? 'table-primary' : ''}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {columns.map(col => (
+                          <td
+                            key={col}
+                            style={{ maxWidth: 120, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                            title={typeof row[col] === 'string' ? row[col] : undefined}
+                          >
+                            {typeof row[col] === 'string' && row[col].length > 20
+                              ? row[col].slice(0, 20) + '...'
+                              : row[col]}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>

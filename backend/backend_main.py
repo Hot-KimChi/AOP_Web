@@ -636,11 +636,22 @@ def create_app():
         """선택한 데이터베이스/테이블을 Word(.docx)로 내보내기"""
         selected_database = request.args.get("database")
         selected_table = request.args.get("table")
+        measSSIds = request.args.get(
+            "measSSIds"
+        )  # 추가: 선택된 measSSId 목록 (콤마 구분)
         if not selected_database or not selected_table:
             return error_response("database, table 파라미터가 필요합니다", 400)
 
-        # 쿼리 실행 (모든 데이터)
-        query = f"SELECT * FROM {selected_table}"
+        # 쿼리 실행 (measSSIds가 있으면 where절 추가)
+        if measSSIds:
+            # SQL Injection 방지: 숫자만 허용
+            id_list = [s for s in measSSIds.split(",") if s.isdigit()]
+            if not id_list:
+                return error_response("measSSIds 파라미터가 올바르지 않습니다", 400)
+            id_str = ",".join(id_list)
+            query = f"SELECT * FROM {selected_table} WHERE measSSId IN ({id_str})"
+        else:
+            query = f"SELECT * FROM {selected_table}"
         df = g.current_db.execute_query(query)
         if df is None or df.empty:
             return error_response("해당 테이블에 데이터가 없습니다", 404)
