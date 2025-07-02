@@ -114,7 +114,7 @@ export default function DataViewer({
   function truncateText(text) {
     if (!text) return '';
     const str = text.toString();
-    return str.length > 20 ? `${str.substring(0, 20)}...` : str;
+    return str.length > 30 ? `${str.substring(0, 30)}...` : str;
   }
   function renderCellContent(value, key) {
     if (value === null || value === undefined) {
