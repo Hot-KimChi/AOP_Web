@@ -540,52 +540,53 @@ export default function MeasSetGen() {
   }
 
       // 6. 최종적으로 SQL에 저장
-      setIsLoading(true);
-      
-      try {
-        // 최종 데이터를 SQL에 저장하기 전 확인
-        if (!latestFullData || latestFullData.length === 0) {
-          throw new Error('저장할 데이터가 없습니다.');
-        }
-        
-        console.log(`SQL에 저장할 데이터: ${latestFullData.length}개 행`);
-        
-        // 요청 데이터 구성
-        const requestData = {
-          database: selectedDatabase,
-          table: 'meas_setting',
-          data: latestFullData,
-        };
-        
-        // API 요청을 통해 데이터베이스에 저장
-        const sqlResponse = await fetch(`${API_BASE_URL}/api/insert-sql`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(requestData),
-        });
-        
-        if (!sqlResponse.ok) {
-          const text = await sqlResponse.text();
-          throw new Error(`SQL 삽입 실패: ${text}`);
-        }
-
-        const result = await sqlResponse.json();
-        console.log('SQL 삽입 결과:', result);
-
-        setError(null);
-        setDataModified(false); // 저장 후 수정 상태 초기화
-        
-        // SQL 데이터 삽입 완료 알림
-        alert('SQL 데이터가 성공적으로 삽입되었습니다!');
-        
-      } catch (err) {
-        console.error('SQL 삽입 오류:', err);
-        setError(err.message);
-        alert(`SQL 삽입 오류: ${err.message}`);
-      } finally {
-        setIsLoading(false);
+    setIsLoading(true);
+    try {
+      if (!latestFullData || latestFullData.length === 0) {
+        throw new Error('저장할 데이터가 없습니다.');
       }
+      // 신규행: filteredData에서 전체데이터에 존재하지 않는 행(전체 row 기준, groupIndex 중복 상관없음)
+      // 신규행은 전체데이터 마지막에 추가됨
+      const isRowEqual = (row1, row2) => {
+        const keys1 = Object.keys(row1);
+        const keys2 = Object.keys(row2);
+        if (keys1.length !== keys2.length) return false;
+        return keys1.every(key => row1[key] === row2[key]);
+      };
+      const newRows = filterCsvData
+        ? filterCsvData.filter(fRow => !latestFullData.some(fullRow => isRowEqual(fRow, fullRow)))
+        : [];
+      // 전체데이터 + 신규행만 DB에 저장 (filteredData 전체는 저장하지 않음)
+      // 신규행은 groupIndex 중복과 상관없이 모두 추가됨
+      const mergedData = [...latestFullData, ...newRows];
+      console.log('SQL에 저장할 데이터(최종, 전체데이터+신규행, 신규행 내 groupIndex 중복 허용):', mergedData);
+      const requestData = {
+        database: selectedDatabase,
+        table: 'meas_setting',
+        data: mergedData,
+      };
+      const sqlResponse = await fetch(`${API_BASE_URL}/api/insert-sql`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(requestData),
+      });
+      if (!sqlResponse.ok) {
+        const text = await sqlResponse.text();
+        throw new Error(`SQL 삽입 실패: ${text}`);
+      }
+      const result = await sqlResponse.json();
+      console.log('SQL 삽입 결과:', result);
+      setError(null);
+      setDataModified(false);
+      alert('SQL 데이터가 성공적으로 삽입되었습니다!');
+    } catch (err) {
+      console.error('SQL 삽입 오류:', err);
+      setError(err.message);
+      alert(`SQL 삽입 오류: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
     };
 
   // 새 창에서 CSV 데이터 보기
