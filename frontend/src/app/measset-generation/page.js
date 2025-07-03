@@ -622,7 +622,7 @@ export default function MeasSetGen() {
     const originalDataSnapshot = JSON.stringify(filteredDataToUse);
 
     // 새 창 열기
-    const newWindow = window.open('/data-view', '측정 데이터', 'width=1000,height=800');
+    const newWindow = window.open('/data-view', '측정 데이터', 'width=2000,height=800');
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
       alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
       return;

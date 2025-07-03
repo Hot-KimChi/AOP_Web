@@ -352,7 +352,7 @@ export default function VerificationReport() {
             sessionStorage.setItem(`${storageKey}_columns`, JSON.stringify(data.columns));
           }
           // viewer와 동일하게 새 창 옵션 지정
-          const windowFeatures = 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no';
+          const windowFeatures = 'width=2000,height=800,menubar=no,toolbar=no,location=no,status=no';
           window.open(`/verification-report/data-view-standalone?pageLabel=${encodeURIComponent(task.label)}&storageKey=${encodeURIComponent(storageKey)}`, '_blank', windowFeatures);
         } else {
           alert(`${task.label} 데이터 없음`);
