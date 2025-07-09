@@ -679,6 +679,22 @@ def create_app():
             headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
 
+    @app.route("/api/get_ml_models", methods=["GET"])
+    @handle_exceptions
+    @require_auth
+    def get_ml_models():
+        """머신러닝 모델 리스트 반환"""
+        from pkg_MachineLearning.machine_learning import MachineLearning
+
+        ml = MachineLearning()
+        models = ml.get_ml_models()
+        if models:
+            logger.info(f"Available ML models: {models}")
+        else:
+            logger.warning("No ML models found in the configuration file.")
+            models = []
+        return jsonify({"status": "success", "models": models})
+
     @app.teardown_appcontext
     def teardown_db(exception):
         """애플리케이션 컨텍스트가 종료될 때 데이터베이스 연결 정리"""
