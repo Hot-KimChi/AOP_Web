@@ -5,7 +5,7 @@ import os
 class Config:
     UPLOAD_FOLDER = "./1_uploads"
     SECRET_KEY = os.environ.get("AUTH_SECRET_KEY", "AOP_Admin_Token")
-    EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME", 3600))
+    EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME", 7200))
     ALLOWED_ORIGINS = ["*"]
 
     @staticmethod
