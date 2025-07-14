@@ -16,6 +16,13 @@ def create_app():
         resources={r"/api/*": {"origins": Config.ALLOWED_ORIGINS}},
     )
     app.secret_key = b"AOP_Web_Secret_Key"  # 실제 운영시 환경변수로 관리 권장
+    
+    # 디버그 모드에서 더 자세한 로깅 활성화
+    if app.debug:
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+        app.logger.setLevel(logging.DEBUG)
+    
     app.register_blueprint(auth_bp)
     app.register_blueprint(file_bp)
     app.register_blueprint(db_api_bp)
