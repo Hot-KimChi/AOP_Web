@@ -5,73 +5,70 @@ from pkg_SQL.database import SQL
 
 def fetchData():
     # 데이터베이스에서 데이터를 가져오는 함수
-    # 환경변수 이름을 기존 설정과 맞춤
     server_address = os.environ.get("SERVER_ADDRESS_ADDRESS") or os.environ.get(
         "SERVER_ADDRESS"
     )
     ID = os.environ.get("USER_NAME")
     password = os.environ.get("PASSWORD")
-    databases = os.environ.get("DB_ML") or os.environ.get("DATABASE_NAME", "")
+    databases_ML = os.environ.get("DATABASE_ML_NAME")
 
-    if not all([server_address, ID, password, databases]):
+    if not all([server_address, ID, password, databases_ML]):
         raise ValueError(
             "필수 환경변수가 설정되지 않았습니다. (SERVER_ADDRESS, USER_NAME, PASSWORD, DB_ML)"
         )
 
-    list_database = databases.split(",")
-
+    list_database = databases_ML.split(",")
     print(f"연결할 데이터베이스 목록: {list_database}")
 
     SQL_list = []
-    # K2, Juniper, NX3, NX2 and FROSK
     for db in list_database:
         print(f"[{db}] 데이터베이스 연결 중...")
-
-        # 기존 SQL 클래스 사용
-        sql_connection = SQL(ID, password, db)
-
-        query = f"""
-            SELECT * FROM
-            (
-            SELECT a.[measSetId]
-            ,a.[probeId]
-            ,a.[beamstyleIndex]
-            ,a.[txFrequencyHz]
-            ,a.[focusRangeCm]
-            ,a.[numTxElements]
-            ,a.[txpgWaveformStyle]
-            ,a.[numTxCycles]
-            ,a.[elevAperIndex]
-            ,a.[IsTxAperModulationEn]
-            ,d.[probeName]
-            ,d.[probePitchCm]
-            ,d.[probeRadiusCm]
-            ,d.[probeElevAperCm0]
-            ,d.[probeElevAperCm1]
-            ,d.[probeElevFocusRangCm]
-            ,d.[probeElevFocusRangCm1]
-            ,b.[measResId]
-            ,b.[zt]
-            ,ROW_NUMBER() over (partition by a.measSetId order by b.measResId desc) as RankNo
-            FROM meas_setting AS a
-            LEFT JOIN meas_res_summary AS b
-                ON a.[measSetId] = b.[measSetId]
-            LEFT JOIN meas_station_setup AS c
-                ON b.[measSSId] = c.[measSSId]
-            LEFT JOIN probe_geo AS d
-                ON a.[probeId] = d.[probeId]
-            where b.[isDataUsable] ='yes' and c.[measPurpose] like '%Beamstyle%' and b.[errorDataLog] = ''
-            ) T
-            where RankNo = 1
-            order by 1
-            """
-
-        # SQL 클래스의 execute_query 메서드 사용
-        Raw_data = sql_connection.execute_query(query)
-        print(Raw_data["probeName"].value_counts(dropna=False))
-        SQL_list.append(Raw_data)
-        # SQL 클래스는 자동으로 연결 해제됨
-
+        sql_connection = None
+        try:
+            sql_connection = SQL(ID, password, db)
+            query = f"""
+                SELECT * FROM
+                (
+                SELECT a.[measSetId]
+                ,a.[probeId]
+                ,a.[beamstyleIndex]
+                ,a.[txFrequencyHz]
+                ,a.[focusRangeCm]
+                ,a.[numTxElements]
+                ,a.[txpgWaveformStyle]
+                ,a.[numTxCycles]
+                ,a.[elevAperIndex]
+                ,a.[IsTxAperModulationEn]
+                ,d.[probeName]
+                ,d.[probePitchCm]
+                ,d.[probeRadiusCm]
+                ,d.[probeElevAperCm0]
+                ,d.[probeElevAperCm1]
+                ,d.[probeElevFocusRangCm]
+                ,d.[probeElevFocusRangCm1]
+                ,b.[measResId]
+                ,b.[zt]
+                ,ROW_NUMBER() over (partition by a.measSetId order by b.measResId desc) as RankNo
+                FROM meas_setting AS a
+                LEFT JOIN meas_res_summary AS b
+                    ON a.[measSetId] = b.[measSetId]
+                LEFT JOIN meas_station_setup AS c
+                    ON b.[measSSId] = c.[measSSId]
+                LEFT JOIN probe_geo AS d
+                    ON a.[probeId] = d.[probeId]
+                where b.[isDataUsable] ='yes' and c.[measPurpose] like '%Beamstyle%' and b.[errorDataLog] = ''
+                ) T
+                where RankNo = 1
+                order by 1
+                """
+            Raw_data = sql_connection.execute_query(query)
+            print(Raw_data["probeName"].value_counts(dropna=False))
+            SQL_list.append(Raw_data)
+        except Exception as e:
+            print(f"[ERROR] {db} DB 처리 중 오류 발생: {e}")
+        finally:
+            if sql_connection and hasattr(sql_connection, "engine"):
+                sql_connection.engine.dispose()  # SQLAlchemy 엔진 리소스 해제
     return SQL_list
 
 
