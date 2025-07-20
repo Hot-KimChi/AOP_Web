@@ -1,13 +1,12 @@
 import os
 import pandas as pd
 from pkg_SQL.database import SQL
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def fetchData():
-    # 데이터베이스에서 데이터를 가져오는 함수
-    server_address = os.environ.get("SERVER_ADDRESS_ADDRESS") or os.environ.get(
-        "SERVER_ADDRESS"
-    )
+    # 데이터베이스에서 데이터를 가져오는 함수 (병렬 처리)
+    server_address = os.environ.get("SERVER_ADDRESS_ADDRESS")
     ID = os.environ.get("USER_NAME")
     password = os.environ.get("PASSWORD")
     databases_ML = os.environ.get("DATABASE_ML_NAME")
@@ -20,8 +19,7 @@ def fetchData():
     list_database = databases_ML.split(",")
     print(f"연결할 데이터베이스 목록: {list_database}")
 
-    SQL_list = []
-    for db in list_database:
+    def fetch_one_db(db):
         print(f"[{db}] 데이터베이스 연결 중...")
         sql_connection = None
         try:
@@ -63,19 +61,28 @@ def fetchData():
                 """
             Raw_data = sql_connection.execute_query(query)
             print(Raw_data["probeName"].value_counts(dropna=False))
-            SQL_list.append(Raw_data)
+            return Raw_data
         except Exception as e:
             print(f"[ERROR] {db} DB 처리 중 오류 발생: {e}")
+            return None
         finally:
             if sql_connection and hasattr(sql_connection, "engine"):
-                sql_connection.engine.dispose()  # SQLAlchemy 엔진 리소스 해제
-    return SQL_list
+                sql_connection.engine.dispose()
+
+    SQL_get_data = []
+    with ThreadPoolExecutor(max_workers=min(8, len(list_database))) as executor:
+        future_to_db = {executor.submit(fetch_one_db, db): db for db in list_database}
+        for future in as_completed(future_to_db):
+            result = future.result()
+            if result is not None:
+                SQL_get_data.append(result)
+    return SQL_get_data
 
 
 def merge_selectionFeature():
-    SQL_list = fetchData()
-    # 결합할 데이터프레임 list: SQL_list
-    AOP_data = pd.concat(SQL_list, ignore_index=True)
+    SQL_get_data = fetchData()
+    # 결합할 데이터프레임 list: SQL_get_data
+    AOP_data = pd.concat(SQL_get_data, ignore_index=True)
 
     # 결측치 제거 및 대체
     AOP_data["probeRadiusCm"] = AOP_data["probeRadiusCm"].fillna(0)
@@ -86,12 +93,16 @@ def merge_selectionFeature():
 
     print(AOP_data.count())
 
-    # CSV 파일을 적절한 경로에 저장
+    # CSV 파일을 pkg_MachineLearning/SQL_get_Data 하위에 저장
     import os
+    from datetime import datetime
 
-    output_dir = os.path.join(os.path.dirname(__file__), "..", "1_uploads")
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "AOP_Raw_data.csv")
+    output_dir = os.path.join(os.path.dirname(__file__), "SQL_get_Data")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+    now = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_filename = f"{now}_Intensity_SQL_Get_Data.csv"
+    output_path = os.path.join(output_dir, output_filename)
     AOP_data.to_csv(output_path, index=False)
     print(f"데이터가 저장되었습니다: {output_path}")
 
