@@ -5,10 +5,10 @@ from utils.decorators import handle_exceptions, require_auth
 from utils.error_handler import error_response
 from pkg_MeasSetGen.meas_generation import MeasSetGen
 
-file_bp = Blueprint("file", __name__, url_prefix="/api")
+measset_gen_bp = Blueprint("measset_gen", __name__, url_prefix="/api")
 
 
-@file_bp.route("/measset-generation", methods=["POST"])
+@measset_gen_bp.route("/measset-generation", methods=["POST"])
 @handle_exceptions
 @require_auth
 def upload_file():
