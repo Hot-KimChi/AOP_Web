@@ -72,7 +72,7 @@ export default function MeasSetGen() {
     }
   };
 
-  // updateFullData 함수 수정 - 수정할 열을 maxTxVoltageVolt와 ceilTxVoltageVolt로 제한
+  // updateFullData 함수 수정 - 새로운 행은 전체 데이터에 반영하지 않음
   const updateFullData = (fullData, updatedFilteredData) => {
     if (!fullData || !updatedFilteredData) {
       console.error('updateFullData: 데이터가 없습니다.', { fullData, updatedFilteredData });
@@ -97,24 +97,52 @@ export default function MeasSetGen() {
       return null;
     };
     
+    // 전체 행 동등성 비교 함수
+    const isRowEqual = (row1, row2) => {
+      const keys1 = Object.keys(row1);
+      const keys2 = Object.keys(row2);
+      if (keys1.length !== keys2.length) return false;
+      return keys1.every(key => row1[key] === row2[key]);
+    };
+    
+    // 전체 데이터에 존재하는 행인지 확인하는 함수
+    const existsInFullData = (filteredRow) => {
+      return newFullData.some(fullRow => {
+        // groupIndex가 같고, 전체 행이 동일한지 확인
+        const filteredIndexInfo = normalizeKey(filteredRow);
+        const fullIndexInfo = normalizeKey(fullRow);
+        
+        if (!filteredIndexInfo || !fullIndexInfo) return false;
+        
+        // groupIndex가 같은 행들 중에서 전체 내용이 일치하는 행이 있는지 확인
+        return filteredIndexInfo.value === fullIndexInfo.value && 
+               Object.keys(filteredRow).every(key => 
+                 key === 'maxTxVoltageVolt' || key === 'ceilTxVoltageVolt' || 
+                 filteredRow[key] === fullRow[key]
+               );
+      });
+    };
+    
     // 디버깅을 위해 필터링된 데이터 샘플 출력
     console.log('필터링된 데이터 샘플:', updatedFilteredData.slice(0, 2));
     
-    // 각 필터된 행에 대해 정규화된 인덱스를 키로 사용하여 맵 구성
+    // 기존 행만 업데이트 맵에 포함 (새로운 행은 제외)
     const updatedMap = new Map();
     updatedFilteredData.forEach(filteredRow => {
       const indexInfo = normalizeKey(filteredRow);
       
-      if (indexInfo) {
+      if (indexInfo && existsInFullData(filteredRow)) {
         updatedMap.set(indexInfo.value, filteredRow);
-      } else {
+      } else if (!indexInfo) {
         console.warn('groupIndex가 없는 필터링된 행:', filteredRow);
+      } else {
+        console.log('새로운 행이므로 전체 데이터 업데이트에서 제외:', filteredRow);
       }
     });
     
-    console.log(`업데이트 맵 크기: ${updatedMap.size}`);
+    console.log(`업데이트 맵 크기 (기존 행만): ${updatedMap.size}`);
     
-    // 전체 데이터 순회하며 업데이트
+    // 전체 데이터 순회하며 기존 행만 업데이트
     newFullData.forEach((fullRow, index) => {
       const indexInfo = normalizeKey(fullRow);
       
@@ -148,7 +176,7 @@ export default function MeasSetGen() {
     });
     
     // 업데이트 수 설정
-    console.log(`총 ${updateCount}개의 데이터가 업데이트되었습니다.`);
+    console.log(`총 ${updateCount}개의 기존 데이터가 업데이트되었습니다.`);
     
     return newFullData;
   };
@@ -452,7 +480,7 @@ export default function MeasSetGen() {
       latestFullData = fullCsvData;
     }
 
-    // 5. 필터링된 데이터의 변경사항을 전체 데이터에 동기화 - 특정 열만 업데이트
+    // 5. 필터링된 데이터의 변경사항을 전체 데이터에 동기화 - 기존 행만 업데이트, 새로운 행은 제외
   if (latestFilteredData && latestFilteredData.length > 0 && latestFullData && latestFullData.length > 0) {
     console.log('필터링된 데이터를 전체 데이터에 반영하는 중...');
     
@@ -470,7 +498,25 @@ export default function MeasSetGen() {
       return null;
     };
     
-    // 각 필터된 행에 대해 정규화된 인덱스를 키로 사용하여 맵 구성
+    // 전체 데이터에 존재하는 행인지 확인하는 함수
+    const existsInFullData = (filteredRow) => {
+      return latestFullData.some(fullRow => {
+        // groupIndex가 같고, 전체 행이 동일한지 확인 (편집 가능한 열 제외)
+        const filteredIndexInfo = normalizeKey(filteredRow);
+        const fullIndexInfo = normalizeKey(fullRow);
+        
+        if (!filteredIndexInfo || !fullIndexInfo) return false;
+        
+        // groupIndex가 같은 행들 중에서 편집 불가능한 열들이 모두 일치하는 행이 있는지 확인
+        return filteredIndexInfo.value === fullIndexInfo.value && 
+               Object.keys(filteredRow).every(key => 
+                 key === 'maxTxVoltageVolt' || key === 'ceilTxVoltageVolt' || 
+                 filteredRow[key] === fullRow[key]
+               );
+      });
+    };
+    
+    // 기존 행만 업데이트 맵에 포함 (새로운 행은 제외)
     const updatedMap = new Map();
     
     // 디버깅을 위해 필터링된 데이터 샘플 출력
@@ -479,16 +525,18 @@ export default function MeasSetGen() {
     latestFilteredData.forEach(filteredRow => {
       const indexInfo = normalizeKey(filteredRow);
       
-      if (indexInfo) {
+      if (indexInfo && existsInFullData(filteredRow)) {
         updatedMap.set(indexInfo.value, filteredRow);
-      } else {
+      } else if (!indexInfo) {
         console.warn('groupIndex가 없는 필터링된 행:', filteredRow);
+      } else {
+        console.log('새로운 행이므로 전체 데이터 업데이트에서 제외:', filteredRow);
       }
     });
     
-    console.log(`업데이트 맵 크기: ${updatedMap.size}`);
+    console.log(`업데이트 맵 크기 (기존 행만): ${updatedMap.size}`);
     
-    // 전체 데이터 순회하며 업데이트
+    // 전체 데이터 순회하며 기존 행만 업데이트
     let updateCount = 0;
     const updatedFullData = latestFullData.map(fullRow => {
       const indexInfo = normalizeKey(fullRow);
@@ -528,7 +576,7 @@ export default function MeasSetGen() {
       return fullRow;
     });
     
-    console.log(`총 ${updateCount}개의 데이터 행이 동기화되었습니다.`);
+    console.log(`총 ${updateCount}개의 기존 데이터 행이 동기화되었습니다.`);
     setUpdatedCount(updateCount);
     
     // 업데이트된 전체 데이터를 사용
@@ -545,18 +593,34 @@ export default function MeasSetGen() {
       if (!latestFullData || latestFullData.length === 0) {
         throw new Error('저장할 데이터가 없습니다.');
       }
-      // 신규행: filteredData에서 전체데이터에 존재하지 않는 행(전체 row 기준, groupIndex 중복 상관없음)
-      // 신규행은 전체데이터 마지막에 추가됨
+      
+      // 신규행: filteredData에서 전체데이터에 존재하지 않는 행
+      // 행 동등성 비교 함수 (편집 가능한 열 제외)
       const isRowEqual = (row1, row2) => {
         const keys1 = Object.keys(row1);
         const keys2 = Object.keys(row2);
         if (keys1.length !== keys2.length) return false;
-        return keys1.every(key => row1[key] === row2[key]);
+        
+        // maxTxVoltageVolt와 ceilTxVoltageVolt를 제외한 모든 열이 같은지 확인
+        return keys1.every(key => {
+          if (key === 'maxTxVoltageVolt' || key === 'ceilTxVoltageVolt') {
+            return true; // 이 열들은 비교에서 제외
+          }
+          return row1[key] === row2[key];
+        });
       };
-      const newRows = filterCsvData
-        ? filterCsvData.filter(fRow => !latestFullData.some(fullRow => isRowEqual(fRow, fullRow)))
+      
+      // 필터링된 데이터에서 새로운 행 찾기
+      const newRows = latestFilteredData 
+        ? latestFilteredData.filter(fRow => !latestFullData.some(fullRow => isRowEqual(fRow, fullRow)))
         : [];
-      // 전체데이터 + 신규행만 DB에 저장 (filteredData 전체는 저장하지 않음)
+      
+      console.log(`발견된 새로운 행 수: ${newRows.length}`);
+      if (newRows.length > 0) {
+        console.log('새로운 행들:', newRows);
+      }
+      
+      // 전체데이터 + 신규행만 DB에 저장
       // 신규행은 groupIndex 중복과 상관없이 모두 추가됨
       const mergedData = [...latestFullData, ...newRows];
       console.log('SQL에 저장할 데이터(최종, 전체데이터+신규행, 신규행 내 groupIndex 중복 허용):', mergedData);
@@ -609,7 +673,7 @@ export default function MeasSetGen() {
     // 수정 가능한 열 설정 (2번째, 7번째, 8번째 열)
     const editableColumns = {
       columns: Object.keys(filteredDataToUse[0]),
-      editableIndices: [1, 7, 8],
+      editableIndices: [1, 7, 8, 14],
     };
 
     // 세션 스토리지 설정
