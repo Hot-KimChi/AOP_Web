@@ -780,7 +780,7 @@ export default function MeasSetGen() {
                 }}
                 disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
               >
-                {isLoading ? '처리 중...' : 'CSV 파일 생성'}
+                {isLoading ? '처리 중...' : 'Generation & CSV 파일 생성'}
               </button>
             </div>
             
