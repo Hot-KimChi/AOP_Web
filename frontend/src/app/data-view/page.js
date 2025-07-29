@@ -20,7 +20,7 @@ function DataViewContent() {
   // 편집 관련 상태
   const [editableColumns, setEditableColumns] = useState({
     columns: [],
-    editableIndices: []                                                           // 수정 가능한 열 인덱스
+    editableKeys: []                                                              // 수정 가능한 열 컬럼명
   });
   const [editedData, setEditedData] = useState({});                               // 수정된 데이터 추적
   const [validationErrors, setValidationErrors] = useState({});                   // 유효성 검사 오류
@@ -152,22 +152,26 @@ function DataViewContent() {
     const errKey = `${rowIndex}-${columnName}`;
     const newValidationErrors = { ...validationErrors };
     
-    // 열 인덱스 찾기
-    const columnIndex = Object.keys(csvData[0] || {}).findIndex(key => key === columnName);
+    // 수정 가능한 열인지 확인
+    const isEditable = editableColumns.editableKeys && editableColumns.editableKeys.includes(columnName);
     
-    // 열 타입에 따른 유효성 검사
-    if (columnIndex === 1) {
-      // 2번째 열(인덱스 1)은 텍스트 데이터이므로 별도의 유효성 검사가 필요하지 않음
-      delete newValidationErrors[errKey];
-    } else if (editableColumns.editableIndices.includes(columnIndex)) {
-      // 수정 가능한 열(7, 8번째 열)에 대해서는 숫자 형식 검사 적용
-      if (value !== "" && isNaN(parseFloat(value))) {
-        newValidationErrors[errKey] = '유효한 숫자를 입력하세요';
+    if (isEditable) {
+      // 수정 가능한 열에 대해서는 필요에 따라 유효성 검사 적용
+      if (columnName === 'measSetComments') {
+        // 텍스트 데이터이므로 별도의 유효성 검사가 필요하지 않음
+        delete newValidationErrors[errKey];
+      } else if (['maxTxVoltageVolt', 'ceilTxVoltageVolt', 'numTxCycles'].includes(columnName)) {
+        // 숫자 형식 검사 적용
+        if (value !== "" && isNaN(parseFloat(value))) {
+          newValidationErrors[errKey] = '유효한 숫자를 입력하세요';
+        } else {
+          delete newValidationErrors[errKey];
+        }
       } else {
         delete newValidationErrors[errKey];
       }
     } else {
-      // 그 외 열은 기본적으로 오류 없음
+      // 수정 불가능한 열은 기본적으로 오류 없음
       delete newValidationErrors[errKey];
     }
     
@@ -455,7 +459,7 @@ function DataViewContent() {
   // 셀 내용 렌더링
   const renderCellContent = (value, rowIndex, columnIndex, columnName) => {
     // 수정 가능한 셀인지 확인
-    const isEditable = editableColumns.editableIndices.includes(columnIndex);
+    const isEditable = editableColumns.editableKeys && editableColumns.editableKeys.includes(columnName);
     const cellKey = `${rowIndex}-${columnName}`;
     const hasError = validationErrors[cellKey];
     const isChanged = editedData[cellKey] !== undefined;
@@ -573,7 +577,7 @@ function DataViewContent() {
       ) : (
         <>
           <div className="flex justify-between items-center mb-3">
-            <h4 className="mb-0">CSV 데이터 표시 (7, 8번째 열 수정 가능)</h4>
+            <h4 className="mb-0">CSV 데이터 표시 (measSetComments, maxTxVoltageVolt, ceilTxVoltageVolt, numTxCycles 수정 가능)</h4>
             <div className="flex gap-2">
               <div className="form-check">
                 <input 
@@ -637,7 +641,7 @@ function DataViewContent() {
                       <div className="flex items-center justify-between group">
                         <span title={header} className="font-medium text-gray-700">
                           {truncateText(header)}
-                          {editableColumns.editableIndices.includes(index) && (
+                          {editableColumns.editableKeys && editableColumns.editableKeys.includes(header) && (
                             <span className="ml-1 text-blue-500 text-xs">(수정가능)</span>
                           )}
                         </span>
@@ -717,7 +721,7 @@ function DataViewContent() {
                           <td 
                             key={colIndex} 
                             className={`px-3 py-2 border ${
-                              editableColumns.editableIndices.includes(colIndex) ? 'bg-blue-50' : ''
+                              editableColumns.editableKeys && editableColumns.editableKeys.includes(columnName) ? 'bg-blue-50' : ''
                             } ${
                               showHighlight ? 'bg-yellow-100' : ''
                             }`}

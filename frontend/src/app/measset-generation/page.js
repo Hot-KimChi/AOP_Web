@@ -670,10 +670,10 @@ export default function MeasSetGen() {
       return;
     }
 
-    // 수정 가능한 열 설정 (2번째, 7번째, 8번째 열)
+    // 수정 가능한 열 설정 (컬럼명으로 지정)
     const editableColumns = {
       columns: Object.keys(filteredDataToUse[0]),
-      editableIndices: [1, 7, 8, 14],
+      editableKeys: ['measSetComments', 'maxTxVoltageVolt', 'ceilTxVoltageVolt', 'numTxCycles'],
     };
 
     // 세션 스토리지 설정
