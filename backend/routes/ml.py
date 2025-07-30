@@ -37,20 +37,13 @@ def train_model():
         if not selected_model:
             return error_response("모델이 선택되지 않았습니다.", 400)
 
-        # 세션에서 사용자 정보 가져오기
-        username = session.get("username")
-        password = session.get("password")
-
-        if not username or not password:
-            return error_response("인증 정보가 없습니다. 다시 로그인해주세요.", 401)
-
         logger.info(f"Training request received for model: {selected_model}")
 
         # MachineLearning 클래스 인스턴스 생성 및 훈련 실행
         ml = MachineLearning()
-        result = ml.train_model(selected_model, username, password)
+        result = ml.train_model(selected_model)
 
-        logger.info(f"Training completed successfully for model: {selected_model}")
+        # 훈련 완료 로그는 machine_learning.py에서 처리하므로 중복 제거
         return jsonify(result)
 
     except Exception as e:

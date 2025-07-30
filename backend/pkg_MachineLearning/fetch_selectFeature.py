@@ -2,19 +2,23 @@ import os
 import pandas as pd
 from pkg_SQL.database import SQL
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from flask import session, g
 
 
 def fetchData():
     # 데이터베이스에서 데이터를 가져오는 함수 (병렬 처리)
+    # session에서 인증 정보 가져오기
+    username = session.get("username")
+    password = session.get("password")
+
+    if not username or not password:
+        raise ValueError("세션에 사용자 인증 정보가 없습니다.")
+
     server_address = os.environ.get("SERVER_ADDRESS_ADDRESS")
-    ID = os.environ.get("USER_NAME")
-    password = os.environ.get("PASSWORD")
     databases_ML = os.environ.get("DATABASE_ML_NAME")
 
-    if not all([server_address, ID, password, databases_ML]):
-        raise ValueError(
-            "필수 환경변수가 설정되지 않았습니다. (SERVER_ADDRESS, USER_NAME, PASSWORD, DB_ML)"
-        )
+    if not all([server_address, databases_ML]):
+        raise ValueError("필수 환경변수가 설정되지 않았습니다. (SERVER_ADDRESS, DB_ML)")
 
     list_database = databases_ML.split(",")
     print(f"연결할 데이터베이스 목록: {list_database}")
@@ -23,7 +27,7 @@ def fetchData():
         print(f"[{db}] 데이터베이스 연결 중...")
         sql_connection = None
         try:
-            sql_connection = SQL(ID, password, db)
+            sql_connection = SQL(username, password, db)
             query = f"""
                 SELECT * FROM
                 (
