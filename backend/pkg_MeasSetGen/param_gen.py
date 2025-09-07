@@ -53,6 +53,7 @@ class ParamGen:
             ("M", 0): 15,
             ("M", 1): 20,
             ("Contrast", 4): 4,
+            # ("VTQ")
         }
 
         self.df["OrgBeamstyleIdx"] = self.df.apply(
