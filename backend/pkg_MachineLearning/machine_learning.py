@@ -1,6 +1,7 @@
 import os
 import configparser
 import logging
+from .mlflow_integration import AOP_MLflowTracker
 
 
 class MachineLearning:
@@ -38,6 +39,18 @@ class MachineLearning:
         Returns:
             dict: 훈련 결과 정보
         """
+        # MLflow 추적기 초기화
+        mlflow_tracker = None
+        try:
+            mlflow_tracker = AOP_MLflowTracker()
+            run_uuid = mlflow_tracker.start_training_run(model_name)
+            self.logger.info(
+                f"MLflow tracking started for {model_name} (Run: {run_uuid[:8] if run_uuid else 'disabled'}...)"
+            )
+        except Exception as e:
+            self.logger.warning(f"MLflow tracker initialization failed: {e}")
+            mlflow_tracker = None
+
         try:
             self.logger.info(f"Starting training for model: {model_name}")
 
@@ -48,6 +61,10 @@ class MachineLearning:
             self.logger.info(
                 f"Data loaded - Features: {feature_data.shape}, Target: {target_data.shape}"
             )
+
+            # MLflow: 데이터 정보 로깅
+            if mlflow_tracker:
+                mlflow_tracker.log_data_info(feature_data, target_data)
 
             # 2. 데이터 분할 (test_size=0.2)
             from .data_splitting import dataSplit
@@ -68,12 +85,20 @@ class MachineLearning:
             )
             self.logger.info(f"Data preprocessing completed for model: {model_name}")
 
+            # MLflow: 전처리 정보 로깅
+            if mlflow_tracker:
+                mlflow_tracker.log_preprocessing_info(model_name)
+
             # 4. 모델 선택
             from .model_selection import MLModel
 
             model_selector = MLModel(model_name)
             model = model_selector.select_model()
             self.logger.info(f"Model selected: {model.__class__.__name__}")
+
+            # MLflow: 모델 하이퍼파라미터 로깅
+            if mlflow_tracker:
+                mlflow_tracker.log_model_params(model)
 
             # 5. 모델 훈련 및 평가
             from .training_evaluation import ModelEvaluator
@@ -83,8 +108,16 @@ class MachineLearning:
             )
             training_result = evaluator.evaluate_model()
 
+            # MLflow: 훈련 결과 로깅
+            if mlflow_tracker:
+                mlflow_tracker.log_training_result(training_result)
+
             # 6. 모델 저장
             evaluator.modelSave()
+
+            # MLflow: 성공적으로 실행 종료
+            if mlflow_tracker:
+                mlflow_tracker.end_run(status="FINISHED")
 
             # 최종 완료 로그 (한 번만)
             self.logger.info(f"Model training pipeline completed for: {model_name}")
@@ -100,6 +133,10 @@ class MachineLearning:
             }
 
         except Exception as e:
+            # MLflow: 에러 발생 시 실행 종료
+            if mlflow_tracker:
+                mlflow_tracker.end_run(status="FAILED", error_message=str(e))
+
             self.logger.error(
                 f"Training failed for {model_name}: {str(e)}", exc_info=True
             )
