@@ -104,13 +104,52 @@ class SQL:
         """비밀번호 일치 여부를 확인합니다."""
         return bcrypt.checkpw(password.encode(), hashed_password.encode())
 
-    def execute_query(self, query):
+    def execute_query(self, query, params=None):
         """SQL 쿼리를 실행하고 결과를 pandas DataFrame으로 반환합니다."""
         try:
+            # logging.info(f"Executing query: {query[:100]}...")
+            if params:
+                logging.info(f"With params: {params}")
+
             with self.connect() as connection:
-                return pd.read_sql(query, connection)
+                # 쿼리 타입 확인 (SELECT vs INSERT/UPDATE/DELETE)
+                query_upper = query.strip().upper()
+                if query_upper.startswith("SELECT"):
+                    # SELECT 쿼리는 pandas DataFrame으로 반환
+                    if params:
+                        # pyodbc 스타일의 ? 플레이스홀더 사용
+                        return pd.read_sql(query, connection, params=params)
+                    else:
+                        return pd.read_sql(query, connection)
+                else:
+                    # INSERT/UPDATE/DELETE 쿼리는 raw connection 사용
+                    if params:
+                        # 파라미터를 Python 기본 타입으로 변환
+                        converted_params = []
+                        for param in params:
+                            if hasattr(param, "item"):  # numpy 타입인 경우
+                                converted_params.append(param.item())
+                            else:
+                                converted_params.append(param)
+
+                        # raw connection 사용해서 직접 실행
+                        raw_conn = connection.connection
+                        cursor = raw_conn.cursor()
+                        cursor.execute(query, tuple(converted_params))
+                        raw_conn.commit()
+                        cursor.close()
+                    else:
+                        raw_conn = connection.connection
+                        cursor = raw_conn.cursor()
+                        cursor.execute(query)
+                        raw_conn.commit()
+                        cursor.close()
+                    logging.info(f"Non-SELECT query executed successfully")
+                    return pd.DataFrame()
         except Exception as e:
             logging.error(f"Query execution error: {str(e)}")
+            logging.error(f"Query was: {query}")
+            logging.error(f"Params were: {params}")
             raise
 
     def execute_procedure(self, procedure_name, parameters=None):
