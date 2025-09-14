@@ -52,7 +52,9 @@ class AOP_MLflowTracker:
                 self.logger.warning(f"Experiment '{experiment_name}' not found")
                 return None
 
-            experiment_id = exp_result.iloc[0]["experiment_id"]
+            experiment_id = int(
+                exp_result.iloc[0]["experiment_id"]
+            )  # numpy.int64 -> int 변환
 
             # 새 실행 UUID 생성
             self.current_run_uuid = str(uuid.uuid4()).replace("-", "")
@@ -127,13 +129,15 @@ class AOP_MLflowTracker:
                     VALUES (?, ?, ?, ?)
                 """
                 self.db.execute_query(
-                    query, (self.current_run_uuid, param_key, param_value, param_type)
+                    query,
+                    (self.current_run_uuid, param_key, param_value, param_type),
                 )
 
             # 실행 정보 업데이트
             update_query = "UPDATE ml_runs SET data_shape_info = ? WHERE run_uuid = ?"
             self.db.execute_query(
-                update_query, (data_shape_info, self.current_run_uuid)
+                update_query,
+                (data_shape_info, self.current_run_uuid),
             )
 
             self.logger.info(f"Data info logged: {data_shape_info}")
@@ -171,7 +175,8 @@ class AOP_MLflowTracker:
                     VALUES (?, ?, ?, ?)
                 """
                 self.db.execute_query(
-                    query, (self.current_run_uuid, param_key, param_value, param_type)
+                    query,
+                    (self.current_run_uuid, param_key, param_value, param_type),
                 )
 
             self.logger.info(f"Preprocessing info logged for model type: {model_type}")
@@ -266,7 +271,8 @@ class AOP_MLflowTracker:
             """
 
             self.db.execute_query(
-                query, (datetime.datetime.now(), status, self.current_run_uuid)
+                query,
+                (datetime.datetime.now(), status, self.current_run_uuid),
             )
 
             if error_message:
