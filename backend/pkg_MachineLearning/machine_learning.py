@@ -115,6 +115,40 @@ class MachineLearning:
             # 6. 모델 저장
             evaluator.modelSave()
 
+            # 🆕 Step 3: 모델 등록 및 버전 관리 추가
+            if mlflow_tracker:
+                try:
+                    # 저장된 모델 파일 경로 생성
+                    import platform
+                    import sklearn
+
+                    python_version = platform.python_version().replace(".", "")[:3]
+                    sklearn_version = sklearn.__version__.replace(".", "")
+
+                    # evaluator.modelSave()에서 저장하는 경로와 동일하게 생성
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    model_dir = os.path.join(current_dir, "..", "ML_Models")
+                    filename = f"{model_name}_v1_python{python_version}_sklearn{sklearn_version}.pkl"
+                    file_path = os.path.join(model_dir, filename)
+
+                    # 상대 경로로 변환 (DB 저장용)
+                    relative_path = f"backend/ML_Models/{filename}"
+
+                    # 모델 등록
+                    model_version_id = mlflow_tracker.register_model(
+                        model_name=f"{model_name}_AOP",
+                        model_file_path=relative_path,
+                        training_result=training_result,
+                        stage="Production",
+                    )
+
+                    self.logger.info(
+                        f"Model registered: {model_name}_AOP v{model_version_id}"
+                    )
+
+                except Exception as e:
+                    self.logger.warning(f"Model registration failed: {e}")
+
             # MLflow: 성공적으로 실행 종료
             if mlflow_tracker:
                 mlflow_tracker.end_run(status="FINISHED")

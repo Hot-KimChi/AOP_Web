@@ -56,6 +56,21 @@ class AOP_MLflowTracker:
                 exp_result.iloc[0]["experiment_id"]
             )  # numpy.int64 -> int 변환
 
+            # 🆕 최소한의 개선: 실험 활동 시간 업데이트
+            try:
+                update_exp_query = """
+                    UPDATE ml_experiments 
+                    SET last_update_time = GETDATE()
+                    WHERE experiment_name = ?
+                """
+                self.db.execute_query(update_exp_query, (experiment_name,))
+                self.logger.info(f"Updated experiment activity: {experiment_name}")
+            except Exception as update_error:
+                # 업데이트 실패해도 전체 프로세스는 계속 진행
+                self.logger.warning(
+                    f"Failed to update experiment activity: {update_error}"
+                )
+
             # 새 실행 UUID 생성
             self.current_run_uuid = str(uuid.uuid4()).replace("-", "")
 
@@ -299,9 +314,269 @@ class AOP_MLflowTracker:
         except Exception as e:
             self.logger.error(f"Failed to end run: {e}")
 
+    def register_model(
+        self, model_name, model_file_path, training_result, stage="None"
+    ):
+        """
+        훈련 완료 후 모델 등록 및 버전 관리
+
+        Args:
+            model_name (str): 모델명 (예: "XGBoost_AOP")
+            model_file_path (str): 모델 파일 경로
+            training_result (dict): 훈련 결과 딕셔너리
+            stage (str): 모델 스테이지 ("None", "Staging", "Production")
+
+        Returns:
+            int: 생성된 model_version_id, 실패 시 None
+        """
+        if not self.tracking_enabled or not self.current_run_uuid:
+            self.logger.warning(
+                "Model registration skipped: tracking disabled or no active run"
+            )
+            return None
+
+        try:
+            # 1. 등록된 모델 ID 조회 (이미 등록된 모델인지 확인)
+            model_query = (
+                "SELECT model_id FROM ml_registered_models WHERE model_name = ?"
+            )
+            model_result = self.db.execute_query(model_query, (model_name,))
+
+            if model_result.empty:
+                self.logger.warning(
+                    f"Model '{model_name}' not found in registry. Please register the model first."
+                )
+                return None
+
+            model_id = int(model_result.iloc[0]["model_id"])
+
+            # 2. 다음 버전 번호 계산
+            version_query = "SELECT MAX(version_number) as max_version FROM ml_model_versions WHERE model_id = ?"
+            version_result = self.db.execute_query(version_query, (model_id,))
+
+            next_version = 1
+            if (
+                not version_result.empty
+                and version_result.iloc[0]["max_version"] is not None
+            ):
+                next_version = int(version_result.iloc[0]["max_version"]) + 1
+
+            # 3. 모델 파일 크기 계산
+            import os
+
+            file_size = 0
+            if os.path.exists(model_file_path):
+                file_size = os.path.getsize(model_file_path)
+
+            # 4. 새 모델 버전 등록
+            version_query = """
+                INSERT INTO ml_model_versions (
+                    model_id, version_number, user_id, stage, 
+                    run_uuid, file_path, description
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+
+            description = f"Auto-registered from training run. Test score: {training_result.get('test_score', 'N/A')}"
+
+            self.db.execute_query(
+                version_query,
+                (
+                    model_id,
+                    next_version,
+                    self.username,
+                    stage,
+                    self.current_run_uuid,
+                    model_file_path,
+                    description,
+                ),
+            )
+
+            # 5. 생성된 version_id 조회
+            version_id_query = """
+                SELECT version_id FROM ml_model_versions 
+                WHERE model_id = ? AND version_number = ?
+            """
+            version_id_result = self.db.execute_query(
+                version_id_query, (model_id, next_version)
+            )
+            version_id = int(version_id_result.iloc[0]["version_id"])
+
+            # 6. 모델 성능 정보 저장
+            self._log_model_performance(version_id, training_result)
+
+            # 7. 최고 성능 모델인 경우 자동으로 Production 단계로 승격
+            self._auto_promote_best_model(
+                model_id, version_id, training_result.get("test_score", 0)
+            )
+
+            self.logger.info(
+                f"Model registered: {model_name} v{next_version} (version_id: {version_id})"
+            )
+            return version_id
+
+        except Exception as e:
+            self.logger.error(f"Failed to register model: {e}")
+            return None
+
+    def _log_model_performance(self, version_id, training_result):
+        """모델 성능 정보를 ml_model_performance 테이블에 저장"""
+        try:
+            performance_metrics = [
+                ("train_cv_score", training_result.get("train_cv_score"), "train"),
+                (
+                    "validation_cv_score",
+                    training_result.get("validation_cv_score"),
+                    "validation",
+                ),
+                ("test_score", training_result.get("test_score"), "test"),
+                ("cv_folds", training_result.get("cv_folds"), "cv"),
+            ]
+
+            for metric_name, metric_value, dataset_type in performance_metrics:
+                if metric_value is not None:
+                    perf_query = """
+                        INSERT INTO ml_model_performance (
+                            model_version_id, metric_name, metric_value, dataset_type
+                        )
+                        VALUES (?, ?, ?, ?)
+                    """
+                    self.db.execute_query(
+                        perf_query,
+                        (version_id, metric_name, float(metric_value), dataset_type),
+                    )
+
+            self.logger.info(f"Performance metrics logged for version_id: {version_id}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to log model performance: {e}")
+
+    def _auto_promote_best_model(self, model_id, new_version_id, new_test_score):
+        """
+        새 모델이 최고 성능이면 자동으로 Production으로 승격
+        기존 Production 모델은 Staging으로 강등
+        """
+        try:
+            if new_test_score is None:
+                return
+
+            # 현재 Production 모델의 성능 조회
+            current_prod_query = """
+                SELECT mv.version_id, mp.metric_value
+                FROM ml_model_versions mv
+                JOIN ml_model_performance mp ON mv.version_id = mp.model_version_id
+                WHERE mv.model_id = ? AND mv.stage = 'Production' 
+                    AND mp.metric_name = 'test_score'
+            """
+            current_prod_result = self.db.execute_query(current_prod_query, (model_id,))
+
+            should_promote = False
+
+            if current_prod_result.empty:
+                # Production 모델이 없으면 승격
+                should_promote = True
+                self.logger.info("No Production model found. Promoting new model.")
+            else:
+                # 기존 Production 모델보다 성능이 좋으면 승격
+                current_score = float(current_prod_result.iloc[0]["metric_value"])
+                if new_test_score > current_score:
+                    should_promote = True
+                    current_prod_version_id = int(
+                        current_prod_result.iloc[0]["version_id"]
+                    )
+
+                    # 기존 Production 모델을 Staging으로 강등
+                    demote_query = "UPDATE ml_model_versions SET stage = 'Staging' WHERE version_id = ?"
+                    self.db.execute_query(demote_query, (current_prod_version_id,))
+
+                    self.logger.info(
+                        f"Demoted version_id {current_prod_version_id} to Staging"
+                    )
+
+            if should_promote:
+                # 새 모델을 Production으로 승격
+                promote_query = "UPDATE ml_model_versions SET stage = 'Production' WHERE version_id = ?"
+                self.db.execute_query(promote_query, (new_version_id,))
+
+                self.logger.info(
+                    f"Promoted version_id {new_version_id} to Production (score: {new_test_score})"
+                )
+
+        except Exception as e:
+            self.logger.error(f"Failed to auto-promote model: {e}")
+
+    def log_prediction(
+        self,
+        model_version_id,
+        input_features,
+        prediction_result,
+        request_source="unknown",
+        prediction_type="intensity",
+        processing_time_ms=0,
+    ):
+        """
+        예측 결과를 aop_prediction_logs 테이블에 로깅
+
+        Args:
+            model_version_id (int): 사용된 모델 버전 ID
+            input_features (dict or str): 입력 특성 (JSON으로 저장)
+            prediction_result (list or str): 예측 결과 (JSON으로 저장)
+            request_source (str): 요청 출처 ("intensity_estimation", "power_estimation" 등)
+            prediction_type (str): 예측 타입 ("intensity", "power", "temperature")
+            processing_time_ms (int): 처리 시간 (밀리초)
+
+        Returns:
+            int: 생성된 log_id, 실패 시 None
+        """
+        if not self.tracking_enabled:
+            return None
+
+        try:
+            # JSON 형태로 변환
+            if isinstance(input_features, dict):
+                input_features_json = json.dumps(input_features)
+            else:
+                input_features_json = str(input_features)
+
+            if isinstance(prediction_result, (list, dict)):
+                prediction_result_json = json.dumps(prediction_result)
+            else:
+                prediction_result_json = str(prediction_result)
+
+            # 예측 로그 저장
+            log_query = """
+                INSERT INTO aop_prediction_logs (
+                    model_version_id, input_features, prediction_result,
+                    user_id, request_source, processing_time_ms, prediction_type
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+
+            self.db.execute_query(
+                log_query,
+                (
+                    model_version_id,
+                    input_features_json,
+                    prediction_result_json,
+                    self.username,
+                    request_source,
+                    processing_time_ms,
+                    prediction_type,
+                ),
+            )
+
+            self.logger.info(
+                f"Prediction logged: {prediction_type} prediction using model version {model_version_id}"
+            )
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to log prediction: {e}")
+            return None
+
     @classmethod
     def get_best_model_info(cls, model_type=None):
-        """최적 모델 정보 조회"""
+        """최적 모델 정보 조회 (개선된 버전)"""
         try:
             # 임시 인스턴스 생성 (세션 정보 필요)
             username = session.get("username")
@@ -320,8 +595,10 @@ class AOP_MLflowTracker:
                     rm.model_type,
                     mv.version_number,
                     mv.file_path,
-                    mp.metric_value,
-                    mv.creation_time
+                    mp.metric_value as test_score,
+                    mv.creation_time,
+                    mv.stage,
+                    mv.version_id
                 FROM ml_registered_models rm
                 JOIN ml_model_versions mv ON rm.model_id = mv.model_id
                 JOIN ml_model_performance mp ON mv.version_id = mp.model_version_id
@@ -340,4 +617,148 @@ class AOP_MLflowTracker:
 
         except Exception as e:
             logging.error(f"Failed to get best model info: {e}")
+            return None
+
+    @classmethod
+    def get_model_by_name(cls, model_name, stage="Production"):
+        """모델명으로 특정 스테이지의 모델 정보 조회"""
+        try:
+            username = session.get("username")
+            password = session.get("password")
+
+            if not username or not password:
+                return None
+
+            db = SQL(
+                username=username, password=password, database="AOP_MLflow_Tracking"
+            )
+
+            query = """
+                SELECT TOP 1
+                    rm.model_name,
+                    rm.model_type,
+                    mv.version_number,
+                    mv.file_path,
+                    mv.stage,
+                    mv.version_id,
+                    mp.metric_value as test_score
+                FROM ml_registered_models rm
+                JOIN ml_model_versions mv ON rm.model_id = mv.model_id
+                LEFT JOIN ml_model_performance mp ON mv.version_id = mp.model_version_id 
+                    AND mp.metric_name = 'test_score'
+                WHERE rm.model_name = ?
+                    AND mv.stage = ?
+                ORDER BY mv.version_number DESC
+            """
+
+            result = db.execute_query(query, (model_name, stage))
+
+            if not result.empty:
+                return result.iloc[0].to_dict()
+
+            return None
+
+        except Exception as e:
+            logging.error(f"Failed to get model by name: {e}")
+            return None
+
+    @classmethod
+    def log_prediction(
+        cls, model_name, input_features, prediction_result, prediction_type="regression"
+    ):
+        """예측 결과 로깅 (aop_prediction_logs 테이블에 저장)"""
+        try:
+            username = session.get("username")
+            password = session.get("password")
+
+            if not username or not password:
+                return None
+
+            db = SQL(
+                username=username, password=password, database="AOP_MLflow_Tracking"
+            )
+
+            # 입력 특성들을 JSON 형태로 저장
+            input_features_json = (
+                json.dumps(input_features)
+                if isinstance(input_features, dict)
+                else str(input_features)
+            )
+
+            # 예측 결과도 JSON 형태로 저장
+            prediction_json = (
+                json.dumps(prediction_result)
+                if not isinstance(prediction_result, str)
+                else prediction_result
+            )
+
+            query = """
+                INSERT INTO aop_prediction_logs 
+                (model_name, input_features, prediction_result, prediction_type, prediction_timestamp, user_id)
+                VALUES (?, ?, ?, ?, GETDATE(), ?)
+            """
+
+            db.execute_query(
+                query,
+                (
+                    model_name,
+                    input_features_json,
+                    prediction_json,
+                    prediction_type,
+                    username,
+                ),
+            )
+            logging.info(f"Prediction logged for model: {model_name}")
+            return True
+
+        except Exception as e:
+            logging.error(f"Failed to log prediction: {e}")
+            return False
+
+    @classmethod
+    def get_recent_predictions(cls, model_name=None, limit=10):
+        """최근 예측 결과 조회"""
+        try:
+            username = session.get("username")
+            password = session.get("password")
+
+            if not username or not password:
+                return None
+
+            db = SQL(
+                username=username, password=password, database="AOP_MLflow_Tracking"
+            )
+
+            if model_name:
+                query = """
+                    SELECT TOP (?)
+                        model_name,
+                        input_features,
+                        prediction_result,
+                        prediction_type,
+                        prediction_timestamp,
+                        user_id
+                    FROM aop_prediction_logs
+                    WHERE model_name = ?
+                    ORDER BY prediction_timestamp DESC
+                """
+                result = db.execute_query(query, (limit, model_name))
+            else:
+                query = """
+                    SELECT TOP (?)
+                        model_name,
+                        input_features,
+                        prediction_result,
+                        prediction_type,
+                        prediction_timestamp,
+                        user_id
+                    FROM aop_prediction_logs
+                    ORDER BY prediction_timestamp DESC
+                """
+                result = db.execute_query(query, (limit,))
+
+            return result
+
+        except Exception as e:
+            logging.error(f"Failed to get recent predictions: {e}")
             return None
