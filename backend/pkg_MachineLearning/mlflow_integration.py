@@ -36,40 +36,19 @@ class AOP_MLflowTracker:
         self.logger = logging.getLogger("AOP_MLflowTracker")
         self.current_run_uuid = None
 
-    def start_training_run(self, model_name, experiment_name="AOP_Model_Training"):
-        """machine_learning.py의 훈련 시작 시 호출"""
+    def start_training_run(self, model_name, experiment_name="Est_zt_Training"):
+        """machine_learning.py의 훈련 시작 시 호출 (자동 실험 생성 포함)"""
         if not self.tracking_enabled:
             return None
 
         try:
-            # 실험 ID 조회
-            exp_query = (
-                "SELECT experiment_id FROM ml_experiments WHERE experiment_name = ?"
-            )
-            exp_result = self.db.execute_query(exp_query, (experiment_name,))
-
-            if exp_result.empty:
-                self.logger.warning(f"Experiment '{experiment_name}' not found")
-                return None
-
-            experiment_id = int(
-                exp_result.iloc[0]["experiment_id"]
-            )  # numpy.int64 -> int 변환
-
-            # 🆕 최소한의 개선: 실험 활동 시간 업데이트
-            try:
-                update_exp_query = """
-                    UPDATE ml_experiments 
-                    SET last_update_time = GETDATE()
-                    WHERE experiment_name = ?
-                """
-                self.db.execute_query(update_exp_query, (experiment_name,))
-                self.logger.info(f"Updated experiment activity: {experiment_name}")
-            except Exception as update_error:
-                # 업데이트 실패해도 전체 프로세스는 계속 진행
-                self.logger.warning(
-                    f"Failed to update experiment activity: {update_error}"
+            # 🆕 개선: 실험 자동 생성 또는 조회
+            experiment_id = self._ensure_experiment_exists(experiment_name)
+            if experiment_id is None:
+                self.logger.error(
+                    f"Failed to create or find experiment: {experiment_name}"
                 )
+                return None
 
             # 새 실행 UUID 생성
             self.current_run_uuid = str(uuid.uuid4()).replace("-", "")
@@ -110,6 +89,80 @@ class AOP_MLflowTracker:
         except Exception as e:
             self.logger.error(f"Failed to start training run: {e}")
             return None
+
+    def _ensure_experiment_exists(self, experiment_name):
+        """
+        실험이 존재하는지 확인하고, 없으면 자동 생성
+
+        Returns:
+            int: experiment_id, 실패 시 None
+        """
+        try:
+            # 1. 기존 실험 조회
+            exp_query = (
+                "SELECT experiment_id FROM ml_experiments WHERE experiment_name = ?"
+            )
+            exp_result = self.db.execute_query(exp_query, (experiment_name,))
+
+            if not exp_result.empty:
+                # 기존 실험 존재
+                experiment_id = int(exp_result.iloc[0]["experiment_id"])
+                self.logger.info(
+                    f"Found existing experiment: {experiment_name} (ID: {experiment_id})"
+                )
+
+                # 🆕 실험 활동 시간 업데이트
+                self._update_experiment_activity(experiment_name)
+                return experiment_id
+
+            # 2. 새 실험 생성
+            self.logger.info(f"Creating new experiment: {experiment_name}")
+
+            create_query = """
+                INSERT INTO ml_experiments 
+                (experiment_name, artifact_location, lifecycle_stage, creation_time, last_update_time)
+                VALUES (?, ?, ?, GETDATE(), GETDATE())
+            """
+
+            artifact_location = f"/models/artifacts/{experiment_name}"
+
+            self.db.execute_query(
+                create_query, (experiment_name, artifact_location, "active")
+            )
+
+            # 3. 생성된 실험 ID 조회
+            exp_result = self.db.execute_query(exp_query, (experiment_name,))
+
+            if not exp_result.empty:
+                experiment_id = int(exp_result.iloc[0]["experiment_id"])
+                self.logger.info(
+                    f"Created new experiment: {experiment_name} (ID: {experiment_id})"
+                )
+                return experiment_id
+            else:
+                self.logger.error(
+                    f"Failed to retrieve created experiment: {experiment_name}"
+                )
+                return None
+
+        except Exception as e:
+            self.logger.error(f"Failed to ensure experiment exists: {e}")
+            return None
+
+    def _update_experiment_activity(self, experiment_name):
+        """실험의 마지막 활동 시간 업데이트"""
+        try:
+            update_query = """
+                UPDATE ml_experiments 
+                SET last_update_time = GETDATE()
+                WHERE experiment_name = ?
+            """
+            self.db.execute_query(update_query, (experiment_name,))
+            self.logger.debug(f"Updated experiment activity: {experiment_name}")
+
+        except Exception as e:
+            # 업데이트 실패해도 전체 프로세스는 계속 진행
+            self.logger.warning(f"Failed to update experiment activity: {e}")
 
     def log_data_info(self, feature_data, target_data):
         """데이터 정보 로깅"""

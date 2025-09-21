@@ -37,7 +37,7 @@ class MLModel:
                 subsample=0.8,
                 random_state=42,
             )
-        elif self.model_type == "Histogram-based Gradient Boosting":
+        elif self.model_type == "Histogram-based_Gradient_Boosting":
             self.model = HistGradientBoostingRegressor(
                 max_iter=100,
                 learning_rate=0.1,
@@ -74,9 +74,9 @@ class MLModel:
             )
         elif self.model_type == "LinearRegression":
             self.model = LinearRegression()
-        elif self.model_type == "PolynomialFeatures with linear regression":
+        elif self.model_type == "PolynomialFeatures_with_linear_regression":
             self.model = LinearRegression()
-        elif self.model_type == "Ridge regularization(L2 regularization)":
+        elif self.model_type == "Ridge_regularization(L2_regularization)":
             self.model = Ridge(alpha=1.0, random_state=42)
         elif self.model_type == "DecisionTreeRegressor":
             self.model = DecisionTreeRegressor(
