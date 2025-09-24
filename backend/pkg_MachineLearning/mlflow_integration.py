@@ -367,17 +367,371 @@ class AOP_MLflowTracker:
         except Exception as e:
             self.logger.error(f"Failed to end run: {e}")
 
-    def register_model(
-        self, model_name, model_file_path, training_result, stage="None"
-    ):
+    def _normalize_model_name(self, model_name, prediction_type="intensity"):
         """
-        훈련 완료 후 모델 등록 및 버전 관리
+        모델명을 예측 타입별 데이터베이스 등록명으로 변환
 
         Args:
-            model_name (str): 모델명 (예: "XGBoost_AOP")
-            model_file_path (str): 모델 파일 경로
+            model_name (str): model_selection.py에서 사용하는 모델명
+            prediction_type (str): 'intensity', 'power', 'temperature'
+
+        Returns:
+            str: 데이터베이스에 등록할 표준화된 모델명
+        """
+        base_mapping = {
+            "RandomForestRegressor": "RandomForest_AOP",
+            "Gradient_Boosting": "GradientBoosting_AOP",
+            "Histogram-based_Gradient_Boosting": "HistGradientBoosting_AOP",
+            "XGBoost": "XGBoost_AOP",
+            "VotingRegressor": "VotingRegressor_AOP",
+            "LinearRegression": "LinearRegression_AOP",
+            "PolynomialFeatures_with_linear_regression": "PolynomialLinear_AOP",
+            "Ridge_regularization(L2_regularization)": "Ridge_AOP",
+            "DecisionTreeRegressor": "DecisionTree_AOP",
+            "DL_DNN": "DL_DNN_AOP",
+        }
+
+        base_name = base_mapping.get(model_name, f"{model_name}_AOP")
+
+        # 예측 타입별 모델명 생성
+        prediction_suffix = prediction_type.capitalize()
+        return f"{base_name}_{prediction_suffix}"
+
+    def _serialize_model(self, model_object):
+        """
+        모델 객체를 바이너리로 직렬화하고 압축
+
+        Args:
+            model_object: 훈련된 모델 객체
+
+        Returns:
+            tuple: (compressed_binary_data, compression_type, checksum, original_size)
+        """
+        import pickle
+        import gzip
+        import hashlib
+
+        try:
+            # 1. 모델 직렬화
+            model_binary = pickle.dumps(model_object)
+            original_size = len(model_binary)
+
+            # 2. gzip 압축
+            compressed_binary = gzip.compress(model_binary)
+
+            # 3. MD5 체크섬 계산
+            checksum = hashlib.md5(compressed_binary).hexdigest()
+
+            return compressed_binary, "gzip", checksum, original_size
+
+        except Exception as e:
+            self.logger.error(f"Model serialization failed: {e}")
+            return None, None, None, None
+
+    def _deserialize_model(self, binary_data, compression_type="gzip"):
+        """
+        압축된 바이너리 데이터에서 모델 객체 복원
+
+        Args:
+            binary_data (bytes): 압축된 모델 바이너리 데이터
+            compression_type (str): 압축 타입 ("gzip")
+
+        Returns:
+            object: 복원된 모델 객체, 실패 시 None
+        """
+        import pickle
+        import gzip
+
+        try:
+            # 1. 압축 해제
+            if compression_type == "gzip":
+                model_binary = gzip.decompress(binary_data)
+            else:
+                model_binary = binary_data
+
+            # 2. 모델 객체 복원
+            model_object = pickle.loads(model_binary)
+
+            return model_object
+
+        except Exception as e:
+            self.logger.error(f"Model deserialization failed: {e}")
+            return None
+
+    def _extract_model_metadata(self, model_object, model_name):
+        """
+        모델 객체에서 메타데이터 추출
+
+        Args:
+            model_object: 훈련된 모델 객체
+            model_name (str): 모델명
+
+        Returns:
+            dict: 모델 메타데이터 (DB 컬럼에 직접 매핑)
+        """
+        import json
+
+        # 기본 메타데이터
+        metadata = {
+            "python_version": "unknown",
+            "sklearn_version": "unknown",
+            "model_class_name": type(model_object).__name__,
+            "model_parameters": "{}",
+            "feature_names": "[]",
+            "feature_count": 0,
+        }
+
+        try:
+            # Python 버전 확인
+            import sys
+
+            metadata["python_version"] = (
+                f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+            )
+
+            # sklearn 버전 확인
+            import sklearn
+
+            metadata["sklearn_version"] = sklearn.__version__
+
+            # 모델 하이퍼파라미터 추출
+            if hasattr(model_object, "get_params"):
+                params = model_object.get_params()
+                # JSON 직렬화 가능한 형태로 변환
+                serializable_params = {}
+                for key, value in params.items():
+                    try:
+                        json.dumps(value)  # 직렬화 가능한지 테스트
+                        serializable_params[key] = value
+                    except (TypeError, ValueError):
+                        serializable_params[key] = str(value)
+
+                metadata["model_parameters"] = json.dumps(
+                    serializable_params, ensure_ascii=False
+                )
+
+            # 특성 개수 및 이름
+            if hasattr(model_object, "n_features_in_"):
+                metadata["feature_count"] = int(model_object.n_features_in_)
+
+            if hasattr(model_object, "feature_names_in_"):
+                feature_names = (
+                    model_object.feature_names_in_.tolist()
+                    if hasattr(model_object.feature_names_in_, "tolist")
+                    else list(model_object.feature_names_in_)
+                )
+                metadata["feature_names"] = json.dumps(
+                    feature_names, ensure_ascii=False
+                )
+
+        except Exception as e:
+            self.logger.warning(f"Could not extract full model metadata: {e}")
+
+        return metadata
+
+    def _ensure_model_exists(self, normalized_model_name):
+        """
+        등록된 모델이 존재하는지 확인하고, 없으면 생성
+
+        Args:
+            normalized_model_name (str): 정규화된 모델명
+
+        Returns:
+            int: registered_model_id, 실패 시 None
+        """
+        try:
+            # 1. 기존 모델 조회
+            model_query = (
+                "SELECT model_id FROM ml_registered_models WHERE model_name = ?"
+            )
+            model_result = self.db.execute_query(model_query, (normalized_model_name,))
+
+            if not model_result.empty:
+                return int(model_result.iloc[0]["model_id"])
+
+            # 2. 새 모델 생성
+            from datetime import datetime
+
+            insert_query = """
+                INSERT INTO ml_registered_models (model_name, creation_time, last_updated_time)
+                OUTPUT INSERTED.model_id
+                VALUES (?, ?, ?)
+            """
+            current_time = datetime.now()
+
+            result = self.db.execute_query(
+                insert_query,
+                (normalized_model_name, current_time, current_time),
+                return_type="insert",
+            )
+
+            if (
+                isinstance(result, dict)
+                and "insert_id" in result
+                and result["insert_id"] is not None
+            ):
+                registered_model_id = result["insert_id"]
+                self.logger.info(
+                    f"Created new registered model: {normalized_model_name} (ID: {registered_model_id})"
+                )
+                return registered_model_id
+            else:
+                self.logger.error(
+                    f"Failed to create registered model: {normalized_model_name} - result: {result}"
+                )
+                return None
+
+        except Exception as e:
+            self.logger.error(f"Error ensuring model exists: {e}")
+            return None
+
+    def _get_next_version_number(self, registered_model_id):
+        """
+        다음 모델 버전 번호 계산
+
+        Args:
+            registered_model_id (int): 등록된 모델 ID
+
+        Returns:
+            int: 다음 버전 번호
+        """
+        try:
+            version_query = """
+                SELECT COALESCE(MAX(version_number), 0) + 1 as next_version 
+                FROM ml_model_versions 
+                WHERE model_id = ?
+            """
+            result = self.db.execute_query(version_query, (registered_model_id,))
+
+            if not result.empty:
+                return int(result.iloc[0]["next_version"])
+            else:
+                return 1
+
+        except Exception as e:
+            self.logger.error(f"Error getting next version number: {e}")
+            return 1
+
+    def _create_model_version(
+        self,
+        registered_model_id,
+        version_number,
+        binary_data,
+        compression_type,
+        checksum,
+        metadata,
+        prediction_type,
+        stage,
+        description,
+    ):
+        """
+        새 모델 버전을 데이터베이스에 생성
+
+        Args:
+            registered_model_id (int): 등록된 모델 ID
+            version_number (int): 버전 번호
+            binary_data (bytes): 압축된 모델 바이너리
+            compression_type (str): 압축 타입
+            checksum (str): MD5 체크섬
+            metadata (dict): 모델 메타데이터
+            prediction_type (str): 예측 타입
+            stage (str): 모델 스테이지
+            description (str): 설명
+
+        Returns:
+            int: 생성된 model_version_id, 실패 시 None
+        """
+        try:
+            from datetime import datetime
+            import json
+
+            # 메타데이터를 JSON 문자열로 변환
+            metadata_json = json.dumps(metadata, ensure_ascii=False)
+
+            # SQL Server에서 VARBINARY 데이터 삽입 시 파라미터 처리
+            insert_query = """
+                INSERT INTO ml_model_versions (
+                    model_id, version_number, run_uuid, model_binary, model_size_bytes,
+                    compression_type, model_format, checksum, prediction_type, target_variable, 
+                    stage, description, user_id, python_version, sklearn_version, model_class_name, 
+                    model_parameters, feature_names, feature_count,
+                    creation_time, last_updated_time
+                )
+                OUTPUT INSERTED.version_id
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+
+            current_time = datetime.now()
+
+            # 바이너리 데이터 크기 로그
+            self.logger.info(f"Inserting model binary data: {len(binary_data)} bytes")
+
+            result = self.db.execute_query(
+                insert_query,
+                (
+                    registered_model_id,
+                    version_number,
+                    self.current_run_uuid,
+                    binary_data,  # bytes 객체를 직접 전달
+                    len(binary_data),  # model_size_bytes - 바이너리 데이터 크기
+                    compression_type,
+                    "pickle",  # model_format - 직렬화 형식
+                    checksum,
+                    prediction_type,
+                    f"aop_{prediction_type}_value",  # target_variable - 구체적 타겟 변수명
+                    stage,
+                    description,
+                    "system",  # user_id - 시스템 사용자로 설정
+                    metadata["python_version"],
+                    metadata["sklearn_version"],
+                    metadata["model_class_name"],
+                    metadata["model_parameters"],
+                    metadata["feature_names"],
+                    metadata["feature_count"],
+                    current_time,
+                    current_time,
+                ),
+                return_type="insert",
+            )
+
+            if (
+                isinstance(result, dict)
+                and "insert_id" in result
+                and result["insert_id"] is not None
+            ):
+                version_id = result["insert_id"]
+                self.logger.info(
+                    f"Model version created: ID {version_id}, version {version_number}, "
+                    f"prediction_type {prediction_type}"
+                )
+                return version_id
+            else:
+                self.logger.error(f"Failed to create model version - result: {result}")
+                return None
+
+        except Exception as e:
+            self.logger.error(f"Error creating model version: {e}")
+            return None
+
+    def register_model(
+        self,
+        model_name,
+        model_object,
+        training_result,
+        prediction_type="intensity",
+        stage="None",
+        description=None,
+    ):
+        """
+        훈련 완료 후 모델을 데이터베이스에 바이너리로 등록 (옵션 1)
+
+        Args:
+            model_name (str): 기본 모델명 (예: "XGBoost")
+            model_object: 훈련된 모델 객체
             training_result (dict): 훈련 결과 딕셔너리
+            prediction_type (str): 예측 타입 ('intensity', 'power', 'temperature')
             stage (str): 모델 스테이지 ("None", "Staging", "Production")
+            description (str): 모델 설명
 
         Returns:
             int: 생성된 model_version_id, 실패 시 None
@@ -389,84 +743,53 @@ class AOP_MLflowTracker:
             return None
 
         try:
-            # 1. 등록된 모델 ID 조회 (이미 등록된 모델인지 확인)
-            model_query = (
-                "SELECT model_id FROM ml_registered_models WHERE model_name = ?"
+            # 1. 모델명 정규화 (예측 타입 포함)
+            normalized_model_name = self._normalize_model_name(
+                model_name, prediction_type
             )
-            model_result = self.db.execute_query(model_query, (model_name,))
 
-            if model_result.empty:
-                self.logger.warning(
-                    f"Model '{model_name}' not found in registry. Please register the model first."
-                )
+            # 2. 등록된 모델 ID 조회 또는 생성
+            registered_model_id = self._ensure_model_exists(normalized_model_name)
+            if registered_model_id is None:
                 return None
 
-            model_id = int(model_result.iloc[0]["model_id"])
+            # 3. 다음 버전 번호 계산
+            version_number = self._get_next_version_number(registered_model_id)
 
-            # 2. 다음 버전 번호 계산
-            version_query = "SELECT MAX(version_number) as max_version FROM ml_model_versions WHERE model_id = ?"
-            version_result = self.db.execute_query(version_query, (model_id,))
+            # 4. 모델 바이너리 직렬화
+            binary_data, compression_type, checksum, original_size = (
+                self._serialize_model(model_object)
+            )
+            if binary_data is None:
+                return None
 
-            next_version = 1
-            if (
-                not version_result.empty
-                and version_result.iloc[0]["max_version"] is not None
-            ):
-                next_version = int(version_result.iloc[0]["max_version"]) + 1
+            # 5. 모델 메타데이터 추출
+            metadata = self._extract_model_metadata(model_object, model_name)
 
-            # 3. 모델 파일 크기 계산
-            import os
+            # 6. 새 모델 버전 DB 저장
+            version_id = self._create_model_version(
+                registered_model_id,
+                version_number,
+                binary_data,
+                compression_type,
+                checksum,
+                metadata,
+                prediction_type,
+                stage,
+                description,
+            )
 
-            file_size = 0
-            if os.path.exists(model_file_path):
-                file_size = os.path.getsize(model_file_path)
+            if version_id:
+                # 7. 훈련 성능 메트릭 저장
+                self._log_model_performance(version_id, training_result)
 
-            # 4. 새 모델 버전 등록
-            version_query = """
-                INSERT INTO ml_model_versions (
-                    model_id, version_number, user_id, stage, 
-                    run_uuid, file_path, description
+                # 8. 모델 등록 완료 로그
+                self.logger.info(
+                    f"Model registered in database: {normalized_model_name} v{version_number} (ID: {version_id})"
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """
-
-            description = f"Auto-registered from training run. Test score: {training_result.get('test_score', 'N/A')}"
-
-            self.db.execute_query(
-                version_query,
-                (
-                    model_id,
-                    next_version,
-                    self.username,
-                    stage,
-                    self.current_run_uuid,
-                    model_file_path,
-                    description,
-                ),
-            )
-
-            # 5. 생성된 version_id 조회
-            version_id_query = """
-                SELECT version_id FROM ml_model_versions 
-                WHERE model_id = ? AND version_number = ?
-            """
-            version_id_result = self.db.execute_query(
-                version_id_query, (model_id, next_version)
-            )
-            version_id = int(version_id_result.iloc[0]["version_id"])
-
-            # 6. 모델 성능 정보 저장
-            self._log_model_performance(version_id, training_result)
-
-            # 7. 최고 성능 모델인 경우 자동으로 Production 단계로 승격
-            self._auto_promote_best_model(
-                model_id, version_id, training_result.get("test_score", 0)
-            )
-
-            self.logger.info(
-                f"Model registered: {model_name} v{next_version} (version_id: {version_id})"
-            )
-            return version_id
+                return version_id
+            else:
+                return None
 
         except Exception as e:
             self.logger.error(f"Failed to register model: {e}")
@@ -814,4 +1137,151 @@ class AOP_MLflowTracker:
 
         except Exception as e:
             logging.error(f"Failed to get recent predictions: {e}")
+            return None
+
+    def load_model_from_db(
+        self, model_name, prediction_type="intensity", version=None, stage="Production"
+    ):
+        """
+        데이터베이스에서 모델을 로드
+
+        Args:
+            model_name (str): 기본 모델명 (예: "XGBoost")
+            prediction_type (str): 예측 타입 ('intensity', 'power', 'temperature')
+            version (int, optional): 특정 버전, None이면 최신 버전
+            stage (str): 모델 스테이지 ("Production", "Staging", "None")
+
+        Returns:
+            object: 로드된 모델 객체, 실패 시 None
+        """
+        try:
+            # 1. 정규화된 모델명 생성
+            normalized_model_name = self._normalize_model_name(
+                model_name, prediction_type
+            )
+
+            # 2. 모델 버전 조회
+            if version is not None:
+                # 특정 버전 조회
+                query = """
+                    SELECT mv.model_binary, mv.compression_type, mv.checksum
+                    FROM ml_model_versions mv
+                    JOIN ml_registered_models rm ON mv.model_id = rm.model_id
+                    WHERE rm.model_name = ? AND mv.version_number = ? AND mv.prediction_type = ?
+                """
+                params = (normalized_model_name, version, prediction_type)
+            else:
+                # 스테이지별 최신 버전 조회
+                query = """
+                    SELECT TOP 1 mv.model_binary, mv.compression_type, mv.checksum
+                    FROM ml_model_versions mv
+                    JOIN ml_registered_models rm ON mv.model_id = rm.model_id
+                    WHERE rm.model_name = ? AND mv.stage = ? AND mv.prediction_type = ?
+                    ORDER BY mv.version_number DESC
+                """
+                params = (normalized_model_name, stage, prediction_type)
+
+            result = self.db.execute_query(query, params)
+
+            if result.empty:
+                self.logger.warning(
+                    f"No model found: {normalized_model_name}, prediction_type: {prediction_type}, "
+                    f"version: {version}, stage: {stage}"
+                )
+                return None
+
+            # 3. 모델 바이너리 데이터 추출
+            model_data = result.iloc[0]
+            binary_data = model_data["model_binary"]
+            compression_type = model_data["compression_type"]
+            checksum = model_data["checksum"]
+
+            # 4. 체크섬 검증
+            if not self._verify_checksum(binary_data, checksum):
+                self.logger.error(
+                    f"Checksum verification failed for model: {normalized_model_name}"
+                )
+                return None
+
+            # 5. 모델 객체 복원
+            model_object = self._deserialize_model(binary_data, compression_type)
+
+            if model_object is not None:
+                self.logger.info(
+                    f"Model loaded from database: {normalized_model_name}, "
+                    f"prediction_type: {prediction_type}"
+                )
+
+            return model_object
+
+        except Exception as e:
+            self.logger.error(f"Failed to load model from database: {e}")
+            return None
+
+    def _verify_checksum(self, binary_data, expected_checksum):
+        """
+        바이너리 데이터의 체크섬 검증
+
+        Args:
+            binary_data (bytes): 바이너리 데이터
+            expected_checksum (str): 예상 체크섬
+
+        Returns:
+            bool: 검증 성공 여부
+        """
+        import hashlib
+
+        try:
+            actual_checksum = hashlib.md5(binary_data).hexdigest()
+            return actual_checksum == expected_checksum
+        except Exception as e:
+            self.logger.error(f"Checksum verification error: {e}")
+            return False
+
+    def list_available_models(self, prediction_type=None):
+        """
+        사용 가능한 모델 목록 조회
+
+        Args:
+            prediction_type (str, optional): 특정 예측 타입으로 필터링
+
+        Returns:
+            pandas.DataFrame: 모델 목록 정보
+        """
+        try:
+            if prediction_type:
+                query = """
+                    SELECT 
+                        rm.model_name,
+                        mv.version_number,
+                        mv.prediction_type,
+                        mv.stage,
+                        mv.description,
+                        mv.creation_time
+                    FROM ml_registered_models rm
+                    JOIN ml_model_versions mv ON rm.model_id = mv.model_id
+                    WHERE mv.prediction_type = ?
+                    ORDER BY rm.model_name, mv.version_number DESC
+                """
+                params = (prediction_type,)
+            else:
+                query = """
+                    SELECT 
+                        rm.model_name,
+                        mv.version_number,
+                        mv.prediction_type,
+                        mv.stage,
+                        mv.description,
+                        mv.creation_time
+                    FROM ml_registered_models rm
+                    JOIN ml_model_versions mv ON rm.model_id = mv.model_id
+                    ORDER BY rm.model_name, mv.prediction_type, mv.version_number DESC
+                """
+                params = ()
+
+            result = self.db.execute_query(query, params)
+            return result
+
+        except Exception as e:
+            self.logger.error(f"Failed to list available models: {e}")
             return None

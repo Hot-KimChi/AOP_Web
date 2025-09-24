@@ -87,13 +87,11 @@ CREATE TABLE ml_model_versions (
     description NVARCHAR(MAX),
     user_id NVARCHAR(100),
     stage NVARCHAR(50) DEFAULT 'None',
-    source NVARCHAR(500),
     run_uuid NVARCHAR(32),  -- 훈련 실행과 연결
     
     -- 🆕 모델 바이너리 저장 관련 필드들
     model_binary VARBINARY(MAX),              -- 모델 바이너리 데이터 (압축된 pickle)
     model_size_bytes BIGINT DEFAULT 0,        -- 모델 크기 (바이트)
-    original_size_bytes BIGINT DEFAULT 0,     -- 압축 전 원본 크기
     compression_type NVARCHAR(50) DEFAULT 'gzip',  -- 압축 방식 (gzip, none, lz4)
     model_format NVARCHAR(50) DEFAULT 'pickle',    -- 직렬화 형식 (pickle, joblib, onnx)
     checksum NVARCHAR(64),                    -- MD5 체크섬 (무결성 검증)
@@ -104,15 +102,11 @@ CREATE TABLE ml_model_versions (
     model_class_name NVARCHAR(100),           -- 모델 클래스명 (RandomForestRegressor)
     model_parameters NVARCHAR(MAX),           -- 모델 하이퍼파라미터 (JSON 형태)
     feature_names NVARCHAR(MAX),              -- 입력 특성 이름들 (JSON 배열)
-    target_name NVARCHAR(100),                -- 타겟 변수명
     feature_count INT DEFAULT 0,              -- 입력 특성 개수
     
-    -- 🆕 모델 성능 요약 (빠른 조회용)
-    best_score FLOAT,                         -- 대표 성능 점수 (test_score)
-    best_metric_name NVARCHAR(50),            -- 대표 메트릭명
-    
-    -- 기존 파일 경로는 백업/참조용으로 유지 (선택적)
-    file_path NVARCHAR(500),                  -- 백업 파일 경로 (선택적)
+    -- 🆕 AOP 예측 타입 구분 (핵심!)
+    prediction_type NVARCHAR(50) NOT NULL DEFAULT 'intensity',  -- 'intensity', 'power', 'temperature'
+    target_variable NVARCHAR(100),           -- 구체적 타겟명 (선택적)
     
     -- 외래 키 및 제약 조건
     FOREIGN KEY (model_id) REFERENCES ml_registered_models(model_id) ON DELETE CASCADE,
@@ -120,12 +114,12 @@ CREATE TABLE ml_model_versions (
     UNIQUE(model_id, version_number),
     
     -- 🆕 체크 제약 조건들
+    CONSTRAINT CK_ml_model_versions_prediction_type CHECK (prediction_type IN ('intensity', 'power', 'temperature')),
     CONSTRAINT CK_ml_model_versions_stage CHECK (stage IN ('None', 'Staging', 'Production', 'Archived')),
     CONSTRAINT CK_ml_model_versions_version_positive CHECK (version_number > 0),
     CONSTRAINT CK_ml_model_versions_compression CHECK (compression_type IN ('none', 'gzip', 'lz4', 'bz2')),
     CONSTRAINT CK_ml_model_versions_format CHECK (model_format IN ('pickle', 'joblib', 'onnx', 'tensorflow')),
     CONSTRAINT CK_ml_model_versions_size_positive CHECK (model_size_bytes >= 0),
-    CONSTRAINT CK_ml_model_versions_original_size_positive CHECK (original_size_bytes >= 0),
     CONSTRAINT CK_ml_model_versions_feature_count_positive CHECK (feature_count >= 0)
 );
 
@@ -158,18 +152,19 @@ CREATE TABLE aop_prediction_logs (
 INSERT INTO ml_experiments (experiment_name, artifact_location, lifecycle_stage) 
 VALUES ('AOP_Model_Training', '/models/artifacts', 'active');
 
--- Step 3 준비용 확장된 모델 등록 (🆕 10개 모델 전체)
+-- Step 3 준비용 예측 타입별 모델 등록 (🆕 30개 = 10 모델 × 3 타입: 나중에 확장 예정)
 INSERT INTO ml_registered_models (model_name, model_type, description) VALUES
-('XGBoost_AOP', 'XGBRegressor', 'XGBoost model for AOP intensity prediction'),
-('RandomForest_AOP', 'RandomForestRegressor', 'Random Forest model for AOP intensity prediction'),
-('LinearRegression_AOP', 'LinearRegression', 'Linear Regression model for AOP intensity prediction'),
-('Ridge_AOP', 'Ridge', 'Ridge Regression model for AOP intensity prediction'),
-('GradientBoosting_AOP', 'GradientBoostingRegressor', 'Gradient Boosting model for AOP intensity prediction'),
-('HistGradientBoosting_AOP', 'HistGradientBoostingRegressor', 'Histogram-based Gradient Boosting model for AOP intensity prediction'),
-('VotingRegressor_AOP', 'VotingRegressor', 'Voting Regressor ensemble model for AOP intensity prediction'),
-('PolynomialLinear_AOP', 'LinearRegression', 'Polynomial Features with Linear Regression model for AOP intensity prediction'),
-('DecisionTree_AOP', 'DecisionTreeRegressor', 'Decision Tree model for AOP intensity prediction'),
-('DL_DNN_AOP', 'TensorFlow_Sequential', 'Deep Neural Network model for AOP intensity prediction');
+-- Intensity 예측 모델들 (기존)
+('XGBoost_AOP_Intensity', 'XGBRegressor', 'XGBoost model for AOP intensity prediction'),
+('RandomForest_AOP_Intensity', 'RandomForestRegressor', 'Random Forest model for AOP intensity prediction'),
+('LinearRegression_AOP_Intensity', 'LinearRegression', 'Linear Regression model for AOP intensity prediction'),
+('Ridge_AOP_Intensity', 'Ridge', 'Ridge Regression model for AOP intensity prediction'),
+('GradientBoosting_AOP_Intensity', 'GradientBoostingRegressor', 'Gradient Boosting model for AOP intensity prediction'),
+('HistGradientBoosting_AOP_Intensity', 'HistGradientBoostingRegressor', 'Histogram-based Gradient Boosting for intensity'),
+('VotingRegressor_AOP_Intensity', 'VotingRegressor', 'Voting Regressor ensemble model for intensity'),
+('PolynomialLinear_AOP_Intensity', 'LinearRegression', 'Polynomial Features with Linear Regression for intensity'),
+('DecisionTree_AOP_Intensity', 'DecisionTreeRegressor', 'Decision Tree model for AOP intensity prediction'),
+('DL_DNN_AOP_Intensity', 'TensorFlow_Sequential', 'Deep Neural Network model for intensity')
 
 -- 인덱스 생성 (성능 최적화)
 CREATE INDEX IX_ml_runs_experiment_id ON ml_runs(experiment_id);
@@ -183,9 +178,10 @@ CREATE INDEX IX_ml_model_performance_version_id ON ml_model_performance(model_ve
 -- 🆕 Step 3 + 옵션 1용 추가 인덱스
 CREATE INDEX IX_ml_model_versions_stage ON ml_model_versions(stage);
 CREATE INDEX IX_ml_model_versions_run_uuid ON ml_model_versions(run_uuid);
-CREATE INDEX IX_ml_model_versions_best_score ON ml_model_versions(best_score DESC);
 CREATE INDEX IX_ml_model_versions_model_class ON ml_model_versions(model_class_name);
 CREATE INDEX IX_ml_model_versions_checksum ON ml_model_versions(checksum);
+CREATE INDEX IX_ml_model_versions_prediction_type ON ml_model_versions(prediction_type);
+CREATE INDEX IX_ml_model_versions_prediction_stage ON ml_model_versions(prediction_type, stage);
 CREATE INDEX IX_aop_prediction_logs_time ON aop_prediction_logs(prediction_time);
 CREATE INDEX IX_aop_prediction_logs_user ON aop_prediction_logs(user_id);
 CREATE INDEX IX_aop_prediction_logs_type ON aop_prediction_logs(prediction_type);
@@ -202,11 +198,13 @@ ALTER TABLE aop_prediction_logs ADD CONSTRAINT CK_aop_prediction_logs_type
 PRINT 'Database: AOP_MLflow_Tracking이 성공적으로 생성되었습니다.';
 PRINT '총 8개 테이블이 생성되었습니다.';
 PRINT '🆕 옵션 1: 모델 바이너리 DB 저장 방식이 적용되었습니다.';
-PRINT '🆕 확장된 10개 모델이 등록되었습니다.';
+PRINT '🆕 AOP 다중 예측 타입 지원: intensity, power, temperature';
+PRINT '🆕 30개 모델이 등록되었습니다 (10 모델 × 3 예측 타입).';
 PRINT 'Performance indexes가 생성되었습니다.';
 PRINT '';
-PRINT '=== 옵션 1 특징 ===';
+PRINT '=== 옵션 1 + AOP 다중 예측 특징 ===';
 PRINT '✅ 모든 모델이 데이터베이스에 바이너리로 저장됩니다';
+PRINT '✅ 예측 타입별로 독립적인 모델 관리가 가능합니다';
 PRINT '✅ 파일 시스템 의존성이 제거되었습니다';
 PRINT '✅ 체크섬으로 무결성 검증이 가능합니다';
 PRINT '✅ 압축으로 저장 공간을 최적화합니다';
@@ -230,5 +228,5 @@ UNION ALL
 SELECT 'Registered Models', COUNT(*) FROM ml_registered_models;
 
 PRINT '';
-PRINT '옵션 1 구현 완료: 모델 바이너리 데이터베이스 저장 방식이 준비되었습니다.';
-PRINT 'MLflow 통합 클래스에서 serialize_model/deserialize_model 기능을 구현하세요.';
+PRINT 'AOP 다중 예측 타입 지원 완료: intensity, power, temperature 모델이 준비되었습니다.';
+PRINT 'MLflow 통합 클래스에서 prediction_type별 serialize_model/deserialize_model 기능을 구현하세요.';

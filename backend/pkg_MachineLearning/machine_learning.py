@@ -115,39 +115,33 @@ class MachineLearning:
             # 6. 모델 저장
             evaluator.modelSave()
 
-            # 🆕 Step 3: 모델 등록 및 버전 관리 추가
+            # 🆕 Step 3: 모델 바이너리 데이터베이스 등록 (Option 1)
             if mlflow_tracker:
                 try:
-                    # 저장된 모델 파일 경로 생성
-                    import platform
-                    import sklearn
-
-                    python_version = platform.python_version().replace(".", "")[:3]
-                    sklearn_version = sklearn.__version__.replace(".", "")
-
-                    # evaluator.modelSave()에서 저장하는 경로와 동일하게 생성
-                    current_dir = os.path.dirname(os.path.abspath(__file__))
-                    model_dir = os.path.join(current_dir, "..", "ML_Models")
-                    filename = f"{model_name}_v1_python{python_version}_sklearn{sklearn_version}.pkl"
-                    file_path = os.path.join(model_dir, filename)
-
-                    # 상대 경로로 변환 (DB 저장용)
-                    relative_path = f"backend/ML_Models/{filename}"
-
-                    # 모델 등록
+                    # 현재는 intensity 예측용으로만 등록 (하나의 모델 = 하나의 예측 타입)
                     model_version_id = mlflow_tracker.register_model(
-                        model_name=f"{model_name}_AOP",
-                        model_file_path=relative_path,
+                        model_name=model_name,  # 기본 모델명 (예: "XGBoost")
+                        model_object=evaluator.model,  # 훈련 완료된 모델 객체
                         training_result=training_result,
+                        prediction_type="intensity",  # 기본값으로 intensity 사용
                         stage="Production",
+                        description=f"AOP intensity prediction model trained with {model_name}",
                     )
 
-                    self.logger.info(
-                        f"Model registered: {model_name}_AOP v{model_version_id}"
-                    )
+                    if model_version_id:
+                        self.logger.info(
+                            f"Model registered: {model_name}_Intensity "
+                            f"(version_id: {model_version_id})"
+                        )
 
                 except Exception as e:
                     self.logger.warning(f"Model registration failed: {e}")
+                    # 에러 상세 정보 출력
+                    import traceback
+
+                    self.logger.error(
+                        f"Registration error details: {traceback.format_exc()}"
+                    )
 
             # MLflow: 성공적으로 실행 종료
             if mlflow_tracker:
@@ -158,7 +152,7 @@ class MachineLearning:
 
             return {
                 "status": "success",
-                "message": f"모델 '{model_name}' 훈련이 완료되었습니다.",
+                "message": f"모델 '{model_name}' 훈련 및 데이터베이스 등록이 완료되었습니다.",
                 "data_info": {
                     "features_shape": feature_data.shape,
                     "target_shape": target_data.shape,
