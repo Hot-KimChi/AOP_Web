@@ -1,4 +1,3 @@
-import joblib
 import pandas as pd
 from pkg_SQL.database import SQL
 import numpy as np
@@ -80,16 +79,46 @@ class PredictML:
 
     def intensity_zt_est(self):
         ## predict zt by Machine Learning model.
+        import time
+
+        start_time = time.time()
+
         estParams = self._paramForIntensity()
 
-        loaded_model = joblib.load(
-            r".\backend\ML_Models\RandomForestRegressor_v1_python310_sklearn1.4.2.pkl"
-        )
+        # Load model from database using MLflow integration
+        mlflow_tracker = AOP_MLflowTracker()
 
+        # Load the best performing model for intensity prediction automatically
+        model_info = mlflow_tracker.load_best_model(prediction_type="intensity")
+
+        if model_info is None:
+            print("No intensity model found in database, using fallback approach...")
+            # 대안: 클래스 메서드로 로깅하고 기본값 사용
+            self.df["AI_param"] = pd.Series([5.0] * len(self.df), name="AI_param")
+            try:
+                AOP_MLflowTracker.log_simple_prediction(
+                    input_features={"fallback": "no_model_found"},
+                    prediction_result={"AI_param": 5.0},
+                    prediction_type="intensity",
+                )
+            except Exception as e:
+                print(f"Fallback logging failed: {e}")
+            return self.df
+
+        loaded_model = model_info["model"]
+        model_name = model_info["model_name"]
+        version_id = model_info["version_id"]
+
+        # 예측 수행
+        prediction_start = time.time()
         zt_est = loaded_model.predict(estParams.values)
+        prediction_time_ms = int((time.time() - prediction_start) * 1000)
 
         # MLflow prediction logging
         try:
+            print(f"MLflow tracker enabled: {mlflow_tracker.tracking_enabled}")
+            print(f"Version ID: {version_id}")
+
             input_features = (
                 estParams.to_dict("records")[0] if len(estParams) > 0 else {}
             )
@@ -97,14 +126,21 @@ class PredictML:
                 zt_est.tolist() if hasattr(zt_est, "tolist") else list(zt_est)
             )
 
-            AOP_MLflowTracker.log_prediction(
-                model_name="RandomForestRegressor_Intensity",
+            result = mlflow_tracker.log_prediction(
+                model_version_id=version_id,
                 input_features=input_features,
                 prediction_result=prediction_result,
-                prediction_type="intensity_zt_prediction",
+                prediction_type="intensity",
+                request_source="intensity_estimation",
+                processing_time_ms=prediction_time_ms,
             )
+            print(f"Intensity logging result: {result}")
         except Exception as e:
             # Prediction logging 실패해도 메인 기능은 계속 진행
+            import traceback
+
+            print(f"Intensity MLflow prediction logging failed: {e}")
+            print(f"Full traceback: {traceback.format_exc()}")
             pass
 
         # AI_param을 Series로 변환하고 이름을 지정
@@ -150,6 +186,8 @@ class PredictML:
 
         # MLflow prediction logging
         try:
+            mlflow_tracker = AOP_MLflowTracker()
+
             input_features = {
                 "probePitch": (
                     float(pitchCm_df["probePitchCm"].iloc[0])
@@ -168,14 +206,14 @@ class PredictML:
                 "measSetComments": f"Beamstyle_{self.probeName}_power",
             }
 
-            AOP_MLflowTracker.log_prediction(
-                model_name="PowerPRF_Calculator",
+            AOP_MLflowTracker.log_simple_prediction(
                 input_features=input_features,
                 prediction_result=prediction_result,
-                prediction_type="power_prf_estimation",
+                prediction_type="power",
             )
         except Exception as e:
             # Prediction logging 실패해도 메인 기능은 계속 진행
+            print(f"MLflow prediction logging failed: {e}")
             pass
 
         return power_df
@@ -200,6 +238,8 @@ class PredictML:
 
         # MLflow prediction logging
         try:
+            mlflow_tracker = AOP_MLflowTracker()
+
             input_features = {
                 "maxTxFocusLoc": (
                     float(max_values.max()) if len(max_values) > 0 else None
@@ -212,14 +252,14 @@ class PredictML:
                 "measSetComments": f"Beamstyle_{self.probeName}_temperature",
             }
 
-            AOP_MLflowTracker.log_prediction(
-                model_name="TemperaturePRF_Calculator",
+            AOP_MLflowTracker.log_simple_prediction(
                 input_features=input_features,
                 prediction_result=prediction_result,
-                prediction_type="temperature_prf_estimation",
+                prediction_type="temperature",
             )
         except Exception as e:
             # Prediction logging 실패해도 메인 기능은 계속 진행
+            print(f"MLflow prediction logging failed: {e}")
             pass
 
         return temp_df

@@ -1039,8 +1039,8 @@ class AOP_MLflowTracker:
             return None
 
     @classmethod
-    def log_prediction(
-        cls, model_name, input_features, prediction_result, prediction_type="regression"
+    def log_simple_prediction(
+        cls, input_features, prediction_result, prediction_type="regression"
     ):
         """예측 결과 로깅 (aop_prediction_logs 테이블에 저장)"""
         try:
@@ -1070,21 +1070,27 @@ class AOP_MLflowTracker:
 
             query = """
                 INSERT INTO aop_prediction_logs 
-                (model_name, input_features, prediction_result, prediction_type, prediction_timestamp, user_id)
-                VALUES (?, ?, ?, ?, GETDATE(), ?)
+                (input_features, prediction_result, prediction_type, user_id, 
+                 request_source, processing_time_ms)
+                VALUES (?, ?, ?, ?, ?, ?)
             """
+
+            # 기본값 설정
+            request_source = f"{prediction_type}_calculation"
+            processing_time_ms = 0  # 계산 기반이므로 0으로 설정
 
             db.execute_query(
                 query,
                 (
-                    model_name,
                     input_features_json,
                     prediction_json,
                     prediction_type,
                     username,
+                    request_source,
+                    processing_time_ms,
                 ),
             )
-            logging.info(f"Prediction logged for model: {model_name}")
+            logging.info(f"Prediction logged for prediction_type: {prediction_type}")
             return True
 
         except Exception as e:
@@ -1216,6 +1222,87 @@ class AOP_MLflowTracker:
 
         except Exception as e:
             self.logger.error(f"Failed to load model from database: {e}")
+            return None
+
+    def load_best_model(self, prediction_type="intensity", stage="Production"):
+        """
+        예측 타입에 따라 성능이 가장 좋은 모델을 자동으로 로드
+
+        Args:
+            prediction_type (str): 예측 타입 ('intensity', 'power', 'temperature')
+            stage (str): 모델 스테이지 ("Production", "Staging", "None")
+
+        Returns:
+            object: 로드된 최고 성능 모델 객체, 실패 시 None
+        """
+        try:
+            # 1. 해당 예측 타입의 베스트 모델 조회
+            query = """
+                SELECT TOP 1 
+                    rm.model_name,
+                    mv.version_number,
+                    mv.version_id,
+                    mv.model_binary, 
+                    mv.compression_type, 
+                    mv.checksum,
+                    mp.metric_value as test_score
+                FROM ml_registered_models rm
+                JOIN ml_model_versions mv ON rm.model_id = mv.model_id
+                JOIN ml_model_performance mp ON mv.version_id = mp.model_version_id
+                WHERE mv.prediction_type = ? 
+                    AND mv.stage = ?
+                    AND mp.metric_name = 'test_score'
+                ORDER BY mp.metric_value DESC
+            """
+
+            result = self.db.execute_query(query, (prediction_type, stage))
+
+            if result.empty:
+                self.logger.warning(
+                    f"No model found for prediction_type: {prediction_type}, stage: {stage}"
+                )
+                return None
+
+            # 2. 최고 성능 모델 정보 추출
+            best_model = result.iloc[0]
+            model_name = best_model["model_name"]
+            version_number = best_model["version_number"]
+            version_id = best_model["version_id"]
+            binary_data = best_model["model_binary"]
+            compression_type = best_model["compression_type"]
+            checksum = best_model["checksum"]
+            test_score = best_model["test_score"]
+
+            # 3. 체크섬 검증
+            if not self._verify_checksum(binary_data, checksum):
+                self.logger.error(
+                    f"Checksum verification failed for best model: {model_name} v{version_number}"
+                )
+                return None
+
+            # 4. 모델 객체 복원
+            model_object = self._deserialize_model(binary_data, compression_type)
+
+            if model_object is not None:
+                self.logger.info(
+                    f"Best model loaded: {model_name} v{version_number}, "
+                    f"prediction_type: {prediction_type}, test_score: {test_score:.4f}"
+                )
+
+                # 모델 정보와 함께 반환 (튜플 형태)
+                return {
+                    "model": model_object,
+                    "model_name": model_name,
+                    "version_number": version_number,
+                    "version_id": version_id,
+                    "test_score": test_score,
+                    "prediction_type": prediction_type,
+                }
+
+            return None
+
+        except Exception as e:
+            self.logger.error(f"Failed to load best model: {e}")
             return None
 
     def _verify_checksum(self, binary_data, expected_checksum):

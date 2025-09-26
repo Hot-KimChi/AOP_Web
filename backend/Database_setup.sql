@@ -90,11 +90,11 @@ CREATE TABLE ml_model_versions (
     run_uuid NVARCHAR(32),  -- 훈련 실행과 연결
     
     -- 🆕 모델 바이너리 저장 관련 필드들
-    model_binary VARBINARY(MAX),              -- 모델 바이너리 데이터 (압축된 pickle)
-    model_size_bytes BIGINT DEFAULT 0,        -- 모델 크기 (바이트)
-    compression_type NVARCHAR(50) DEFAULT 'gzip',  -- 압축 방식 (gzip, none, lz4)
-    model_format NVARCHAR(50) DEFAULT 'pickle',    -- 직렬화 형식 (pickle, joblib, onnx)
-    checksum NVARCHAR(64),                    -- MD5 체크섬 (무결성 검증)
+    model_binary VARBINARY(MAX),                    -- 모델 바이너리 데이터 (압축된 pickle)
+    model_size_bytes BIGINT DEFAULT 0,              -- 모델 크기 (바이트)
+    compression_type NVARCHAR(50) DEFAULT 'gzip',   -- 압축 방식 (gzip, none, lz4)
+    model_format NVARCHAR(50) DEFAULT 'pickle',     -- 직렬화 형식 (pickle, joblib, onnx)
+    checksum NVARCHAR(64),                          -- MD5 체크섬 (무결성 검증)
     
     -- 🆕 모델 메타데이터
     python_version NVARCHAR(20),              -- Python 버전 (3.10.5)
@@ -106,7 +106,7 @@ CREATE TABLE ml_model_versions (
     
     -- 🆕 AOP 예측 타입 구분 (핵심!)
     prediction_type NVARCHAR(50) NOT NULL DEFAULT 'intensity',  -- 'intensity', 'power', 'temperature'
-    target_variable NVARCHAR(100),           -- 구체적 타겟명 (선택적)
+    target_variable NVARCHAR(100),                              -- 구체적 타겟명 (선택적)
     
     -- 외래 키 및 제약 조건
     FOREIGN KEY (model_id) REFERENCES ml_registered_models(model_id) ON DELETE CASCADE,
