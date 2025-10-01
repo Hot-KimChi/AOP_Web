@@ -15,6 +15,12 @@ GO
 USE AOP_MLflow_Tracking;
 GO
 
+-- ===================================================
+-- AOP MLflow 데이터베이스 스키마 v2.0 (최적화됨)
+-- 변경사항: ml_runs.artifact_uri 필드 제거 (미사용)
+-- 일자: 2025-09-26
+-- ===================================================
+
 -- 1. ml_experiments 테이블
 CREATE TABLE ml_experiments (
     experiment_id INT IDENTITY(1,1) PRIMARY KEY,
@@ -38,7 +44,6 @@ CREATE TABLE ml_runs (
     end_time DATETIME2,
     status NVARCHAR(50) DEFAULT 'RUNNING',
     data_shape_info NVARCHAR(500),
-    artifact_uri NVARCHAR(500),
     lifecycle_stage NVARCHAR(50) DEFAULT 'active',
     FOREIGN KEY (experiment_id) REFERENCES ml_experiments(experiment_id)
 );

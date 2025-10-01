@@ -126,7 +126,8 @@ def merge_selectionFeature():
         "probeElevFocusRangCm1",
     ]
     # feature 2개 추가.
-    data = AOP_data[feature_list].to_numpy()
-    target = AOP_data["zt"].to_numpy()
+    # DataFrame으로 반환하여 feature_names_in_ 속성이 설정되도록 함
+    data = AOP_data[feature_list]
+    target = AOP_data["zt"]
 
     return data, target

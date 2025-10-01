@@ -523,6 +523,34 @@ class AOP_MLflowTracker:
                 metadata["feature_names"] = json.dumps(
                     feature_names, ensure_ascii=False
                 )
+            else:
+                # feature_names_in_이 없는 경우 AOP 기본 feature 명들 사용
+                default_feature_names = [
+                    "TxFrequencyHz",
+                    "TxFocusLocCm",
+                    "NumTxElements",
+                    "TxpgWaveformStyle",
+                    "ProbeNumTxCycles",
+                    "ElevAperIndex",
+                    "IsTxChannelModulationEn",
+                    "IsTxAperModulationEn",
+                    "probePitchCm",
+                    "probeRadiusCm",
+                    "probeElevAperCm0",
+                    "probeElevAperCm1",
+                    "probeElevFocusRangCm",
+                    "probeElevFocusRangCm1",
+                ]
+                # n_features_in_과 일치하는 만큼만 사용
+                if hasattr(model_object, "n_features_in_"):
+                    feature_count = int(model_object.n_features_in_)
+                    feature_names = default_feature_names[:feature_count]
+                    metadata["feature_names"] = json.dumps(
+                        feature_names, ensure_ascii=False
+                    )
+                    self.logger.info(
+                        f"Used default feature names for {feature_count} features"
+                    )
 
         except Exception as e:
             self.logger.warning(f"Could not extract full model metadata: {e}")
