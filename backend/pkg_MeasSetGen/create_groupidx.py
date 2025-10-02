@@ -37,7 +37,7 @@ class GroupIdx:
             return maxGroupIdx if maxGroupIdx is not None else 0
 
         except Exception as e:
-            print(f"데이터베이스 조회 중 오류 발생: {str(e)}")
+            pass
             # 오류 발생 시 0을 반환하여 1부터 시작하도록 함
             return 0
 

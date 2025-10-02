@@ -6,6 +6,7 @@ import sys
 import sklearn
 from flask import session
 from pkg_SQL.database import SQL
+from utils.database_manager import get_mlflow_db
 
 
 class AOP_MLflowTracker:
@@ -982,16 +983,8 @@ class AOP_MLflowTracker:
     def get_best_model_info(cls, model_type=None):
         """최적 모델 정보 조회 (개선된 버전)"""
         try:
-            # 임시 인스턴스 생성 (세션 정보 필요)
-            username = session.get("username")
-            password = session.get("password")
-
-            if not username or not password:
-                return None
-
-            db = SQL(
-                username=username, password=password, database="AOP_MLflow_Tracking"
-            )
+            # DatabaseManager를 사용하여 DB 연결
+            db = get_mlflow_db()
 
             query = """
                 SELECT TOP 1
@@ -1072,15 +1065,8 @@ class AOP_MLflowTracker:
     ):
         """예측 결과 로깅 (aop_prediction_logs 테이블에 저장)"""
         try:
-            username = session.get("username")
-            password = session.get("password")
-
-            if not username or not password:
-                return None
-
-            db = SQL(
-                username=username, password=password, database="AOP_MLflow_Tracking"
-            )
+            # DatabaseManager를 사용하여 MLflow DB 연결
+            db = get_mlflow_db()
 
             # 입력 특성들을 JSON 형태로 저장
             input_features_json = (
@@ -1106,6 +1092,8 @@ class AOP_MLflowTracker:
             # 기본값 설정
             request_source = f"{prediction_type}_calculation"
             processing_time_ms = 0  # 계산 기반이므로 0으로 설정
+
+            username = session.get("username", "system")  # 기본값 설정
 
             db.execute_query(
                 query,

@@ -3,6 +3,7 @@ from pkg_SQL.database import SQL
 import numpy as np
 from flask import jsonify, session
 from pkg_MachineLearning.mlflow_integration import AOP_MLflowTracker
+from utils.database_manager import get_db_connection
 
 # Pandas 다운캐스팅 옵션 설정
 pd.set_option("future.no_silent_downcasting", True)
@@ -43,9 +44,7 @@ class PredictML:
         ].copy()
 
         ## load parameters from SQL database
-        connect = SQL(
-            username=self.username, password=self.password, database=self.database
-        )
+        connect = get_db_connection(self.database)
         query = f"""
             SELECT [probePitchCm], [probeRadiusCm], [probeElevAperCm0], [probeElevAperCm1], [probeElevFocusRangCm], [probeElevFocusRangCm1]
             FROM probe_geo 
@@ -92,7 +91,6 @@ class PredictML:
         model_info = mlflow_tracker.load_best_model(prediction_type="intensity")
 
         if model_info is None:
-            print("No intensity model found in database, using fallback approach...")
             # 대안: 클래스 메서드로 로깅하고 기본값 사용
             self.df["AI_param"] = pd.Series([5.0] * len(self.df), name="AI_param")
             try:
@@ -102,7 +100,7 @@ class PredictML:
                     prediction_type="intensity",
                 )
             except Exception as e:
-                print(f"Fallback logging failed: {e}")
+                pass
             return self.df
 
         loaded_model = model_info["model"]
@@ -116,9 +114,6 @@ class PredictML:
 
         # MLflow prediction logging
         try:
-            print(f"MLflow tracker enabled: {mlflow_tracker.tracking_enabled}")
-            print(f"Version ID: {version_id}")
-
             input_features = (
                 estParams.to_dict("records")[0] if len(estParams) > 0 else {}
             )
@@ -134,13 +129,8 @@ class PredictML:
                 request_source="intensity_estimation",
                 processing_time_ms=prediction_time_ms,
             )
-            print(f"Intensity logging result: {result}")
         except Exception as e:
             # Prediction logging 실패해도 메인 기능은 계속 진행
-            import traceback
-
-            print(f"Intensity MLflow prediction logging failed: {e}")
-            print(f"Full traceback: {traceback.format_exc()}")
             pass
 
         # AI_param을 Series로 변환하고 이름을 지정
@@ -155,9 +145,7 @@ class PredictML:
         ## predict PRF by ML model.
 
         ## load parameters from SQL database for transducer pitch
-        connect = SQL(
-            username=self.username, password=self.password, database=self.database
-        )
+        connect = get_db_connection(self.database)
         query = f"""
             SELECT [probePitchCm]
             FROM probe_geo 
@@ -213,7 +201,6 @@ class PredictML:
             )
         except Exception as e:
             # Prediction logging 실패해도 메인 기능은 계속 진행
-            print(f"MLflow prediction logging failed: {e}")
             pass
 
         return power_df
@@ -259,7 +246,6 @@ class PredictML:
             )
         except Exception as e:
             # Prediction logging 실패해도 메인 기능은 계속 진행
-            print(f"MLflow prediction logging failed: {e}")
             pass
 
         return temp_df

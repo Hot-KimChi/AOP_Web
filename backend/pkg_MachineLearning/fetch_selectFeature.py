@@ -3,31 +3,45 @@ import pandas as pd
 from pkg_SQL.database import SQL
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import session, g
+from utils.database_manager import get_db_connection
 
 
 def fetchData():
     # 데이터베이스에서 데이터를 가져오는 함수 (병렬 처리)
-    # session에서 인증 정보 가져오기
+    # session에서 인증 정보 가져오기 (메인 스레드에서 미리 추출)
     username = session.get("username")
     password = session.get("password")
 
     if not username or not password:
         raise ValueError("세션에 사용자 인증 정보가 없습니다.")
 
-    server_address = os.environ.get("SERVER_ADDRESS_ADDRESS")
-    databases_ML = os.environ.get("DATABASE_ML_NAME")
+    # config 모듈을 통해 설정 로드
+    try:
+        from config import Config
+
+        Config.load_config()
+
+        server_address = os.environ.get("SERVER_ADDRESS_ADDRESS")
+        databases_ML = os.environ.get("DATABASE_ML_NAME")
+
+    except Exception as e:
+        pass
 
     if not all([server_address, databases_ML]):
-        raise ValueError("필수 환경변수가 설정되지 않았습니다. (SERVER_ADDRESS, DB_ML)")
+        raise ValueError(
+            "필수 설정이 없습니다. AOP_config.cfg를 확인하세요. (SERVER_ADDRESS, DATABASE_ML_NAME)"
+        )
 
     list_database = databases_ML.split(",")
-    print(f"연결할 데이터베이스 목록: {list_database}")
 
-    def fetch_one_db(db):
-        print(f"[{db}] 데이터베이스 연결 중...")
+    def fetch_one_db(db, auth_username, auth_password):
         sql_connection = None
         try:
-            sql_connection = SQL(username, password, db)
+            # DatabaseManager를 직접 사용하지 않고 SQL 객체 직접 생성
+            from pkg_SQL.database import SQL
+
+            sql_connection = SQL(auth_username, auth_password, db)
+
             query = f"""
                 SELECT * FROM
                 (
@@ -64,10 +78,13 @@ def fetchData():
                 order by 1
                 """
             Raw_data = sql_connection.execute_query(query)
-            print(Raw_data["probeName"].value_counts(dropna=False))
-            return Raw_data
+
+            if Raw_data is None or Raw_data.empty:
+                return None
+            else:
+                return Raw_data
+
         except Exception as e:
-            print(f"[ERROR] {db} DB 처리 중 오류 발생: {e}")
             return None
         finally:
             if sql_connection and hasattr(sql_connection, "engine"):
@@ -75,16 +92,27 @@ def fetchData():
 
     SQL_get_data = []
     with ThreadPoolExecutor(max_workers=min(8, len(list_database))) as executor:
-        future_to_db = {executor.submit(fetch_one_db, db): db for db in list_database}
+        # 인증 정보를 각 스레드에 전달
+        future_to_db = {
+            executor.submit(fetch_one_db, db, username, password): db
+            for db in list_database
+        }
         for future in as_completed(future_to_db):
             result = future.result()
-            if result is not None:
+            if result is not None and not result.empty:
                 SQL_get_data.append(result)
     return SQL_get_data
 
 
 def merge_selectionFeature():
     SQL_get_data = fetchData()
+
+    # 수집된 데이터가 없는 경우 예외 발생
+    if not SQL_get_data:
+        raise ValueError(
+            "데이터베이스에서 사용 가능한 데이터를 찾을 수 없습니다. 데이터베이스 연결 또는 쿼리 조건을 확인하세요."
+        )
+
     # 결합할 데이터프레임 list: SQL_get_data
     AOP_data = pd.concat(SQL_get_data, ignore_index=True)
 
@@ -94,8 +122,6 @@ def merge_selectionFeature():
     AOP_data["probeElevFocusRangCm1"] = AOP_data["probeElevFocusRangCm1"].fillna(0)
     AOP_data = AOP_data.drop(AOP_data[AOP_data["beamstyleIndex"] == 12].index)
     AOP_data = AOP_data.dropna()
-
-    print(AOP_data.count())
 
     # CSV 파일을 pkg_MachineLearning/SQL_get_Data 하위에 저장
     import os
@@ -108,7 +134,6 @@ def merge_selectionFeature():
     output_filename = f"{now}_Intensity_SQL_Get_Data.csv"
     output_path = os.path.join(output_dir, output_filename)
     AOP_data.to_csv(output_path, index=False)
-    print(f"데이터가 저장되었습니다: {output_path}")
 
     feature_list = [
         "txFrequencyHz",

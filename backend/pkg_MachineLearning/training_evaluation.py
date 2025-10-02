@@ -48,8 +48,6 @@ class ModelEvaluator:
     def print_scores(self, scores):
         train_score_mean = self.calculate_mean_score(scores["train_score"])
         test_score_mean = self.calculate_mean_score(scores["test_score"])
-        print(f"\n{self.model.__class__.__name__} - Train R^2:", train_score_mean)
-        print(f"{self.model.__class__.__name__} - Validation R^2:", test_score_mean)
         return train_score_mean, test_score_mean
 
     @staticmethod
@@ -64,8 +62,6 @@ class ModelEvaluator:
         test_predictions = self.model.predict(self.test_input)
         test_score = self.model.score(self.test_input, self.test_target)
         test_score_rounded = np.round_(test_score, 3)
-
-        print(f"{self.model.__class__.__name__} - Test R^2:", test_score_rounded)
 
         # 예측값 저장 (반올림)
         self.prediction = np.round_(test_predictions, 2)
@@ -91,16 +87,9 @@ class ModelEvaluator:
         filepath = os.path.join(model_dir, filename)
 
         # 모델 저장
-        print(
-            f"Saving model: {model_name} with Python {python_version} and scikit-learn {sklearn_version}"
-        )
-        print(f"Model save path: {filepath}")
-
         try:
             joblib.dump(self.model, filepath)
-            print(f"Model saved successfully: {filename}")
         except Exception as e:
-            print(f"Error saving model: {str(e)}")
             raise
 
     # def train_dnn_model(self):

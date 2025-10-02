@@ -103,9 +103,8 @@ class DataOut:
         if not os.path.exists(self.directory):
             try:
                 os.makedirs(self.directory)
-                print(f"디렉토리 '{self.directory}'가 생성되었습니다.")
             except OSError as e:
-                print(f"디렉토리 '{self.directory}' 생성 중 오류가 발생했습니다:", e)
+                pass
 
     @arrangeParam
     @renameColumns

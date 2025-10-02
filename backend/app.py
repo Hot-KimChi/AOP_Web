@@ -31,11 +31,17 @@ def create_app():
 
     @app.teardown_appcontext
     def teardown_db(exception):
+        # 기존 DB 연결 정리
         from flask import g
 
         db = g.pop("db", None)
         if db is not None and hasattr(db, "close"):
             db.close()
+
+        # DatabaseManager 연결 정리
+        from utils.database_manager import DatabaseManager
+
+        DatabaseManager.close_connections()
 
     return app
 
