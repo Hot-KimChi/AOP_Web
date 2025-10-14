@@ -1,0 +1,21 @@
+﻿[2025-10-14 15:18:43] [INFO] === Starting AOP Web Application ===
+[2025-10-14 15:18:43] [INFO] Execution Mode: Development
+[2025-10-14 15:18:43] [INFO] Project Path: D:\GitHub\AOP_Web
+[2025-10-14 15:18:43] [INFO] Project structure verified
+[2025-10-14 15:18:43] [INFO] Preparing backend server...
+[2025-10-14 15:18:43] [INFO] Virtual environment found: D:\GitHub\AOP_Web\backend\.venv\Scripts\python.exe
+[2025-10-14 15:18:43] [INFO] Starting backend server... (Port 5000)
+[2025-10-14 15:18:44] [INFO] Backend Process ID: 29780
+[2025-10-14 15:18:49] [INFO] Backend startup wait completed
+[2025-10-14 15:18:49] [INFO] Checking Node.js environment...
+[2025-10-14 15:18:49] [INFO] Node.js version: v20.15.0
+[2025-10-14 15:18:49] [INFO] npm version: 10.7.0
+[2025-10-14 15:18:49] [INFO] Starting frontend server... (Port 3000)
+[2025-10-14 15:18:49] [INFO] Development mode: Starting development server...
+[2025-10-14 15:18:49] [INFO] Frontend Process ID: 30308
+[2025-10-14 15:18:51] [INFO] === Startup Complete ===
+[2025-10-14 15:18:51] [INFO] Backend: http://localhost:5000
+[2025-10-14 15:18:51] [INFO] Frontend: http://localhost:3000
+[2025-10-14 15:18:51] [INFO] Log file: D:\GitHub\AOP_Web\logs\startup_20251014_151843.log
+[2025-10-14 15:18:51] [INFO] Servers are running in separate windows.
+[2025-10-14 15:18:51] [INFO] To stop servers, press Ctrl+C in each server window.
