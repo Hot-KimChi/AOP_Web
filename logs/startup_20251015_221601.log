@@ -1,0 +1,24 @@
+﻿[2025-10-15 22:16:01] [INFO] === Starting AOP Web Application ===
+[2025-10-15 22:16:01] [INFO] Execution Mode: Development
+[2025-10-15 22:16:01] [INFO] Project Path: C:\AOP_Tools\AOP_Web
+[2025-10-15 22:16:01] [INFO] Project structure verified
+[2025-10-15 22:16:01] [INFO] Preparing backend server...
+[2025-10-15 22:16:01] [INFO] Found virtual environment: C:\AOP_Tools\AOP_Web\backend\.venv\Scripts\python.exe
+[2025-10-15 22:16:01] [INFO] Using Python: Python 3.12.9
+[2025-10-15 22:16:01] [DEBUG] Module 'flask' is available
+[2025-10-15 22:16:02] [DEBUG] Module 'sqlalchemy' is available
+[2025-10-15 22:16:02] [INFO] Starting backend server... (Port 5000)
+[2025-10-15 22:16:02] [INFO] Backend Process ID: 8336
+[2025-10-15 22:16:07] [INFO] Backend startup wait completed
+[2025-10-15 22:16:07] [INFO] Checking Node.js environment...
+[2025-10-15 22:16:08] [INFO] Node.js version: v20.19.4
+[2025-10-15 22:16:08] [INFO] npm version: 10.8.2
+[2025-10-15 22:16:08] [INFO] Starting frontend server... (Port 3000)
+[2025-10-15 22:16:08] [INFO] Development mode: Starting development server...
+[2025-10-15 22:16:08] [INFO] Frontend Process ID: 11068
+[2025-10-15 22:16:10] [INFO] === Startup Complete ===
+[2025-10-15 22:16:10] [INFO] Backend: http://localhost:5000
+[2025-10-15 22:16:10] [INFO] Frontend: http://localhost:3000
+[2025-10-15 22:16:10] [INFO] Log file: C:\AOP_Tools\AOP_Web\logs\startup_20251015_221601.log
+[2025-10-15 22:16:10] [INFO] Servers are running in separate windows.
+[2025-10-15 22:16:10] [INFO] To stop servers, press Ctrl+C in each server window.

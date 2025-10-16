@@ -15,7 +15,7 @@ if not exist "Start_AOP_Web.ps1" (
 )
 
 REM Execute PowerShell script in Production mode
-powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0Start_AOP_Web.ps1" -Production
+powershell.exe -ExecutionPolicy Bypass -NoExit -WindowStyle Normal -File "%~dp0Start_AOP_Web.ps1" -Production
 
 echo AOP Web Application (Production Mode) startup initiated.
 timeout /t 3 /nobreak >nul

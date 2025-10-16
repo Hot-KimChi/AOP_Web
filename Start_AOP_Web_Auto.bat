@@ -18,10 +18,10 @@ if not exist "Start_AOP_Web.ps1" (
 
 REM Execute PowerShell script with bypass policy
 REM Default: Development mode
-powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0Start_AOP_Web.ps1"
+powershell.exe -ExecutionPolicy Bypass -File "%~dp0Start_AOP_Web.ps1"
 
 REM Alternative: Production mode (uncomment the line below and comment the line above)
-REM powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0Start_AOP_Web.ps1" -Production
+REM powershell.exe -ExecutionPolicy Bypass -File "%~dp0Start_AOP_Web.ps1" -Production
 
 echo AOP Web Application startup initiated.
 
