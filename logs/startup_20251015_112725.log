@@ -1,9 +1,0 @@
-﻿[2025-10-15 11:27:25] [INFO] === Starting AOP Web Application ===
-[2025-10-15 11:27:25] [INFO] Execution Mode: Development
-[2025-10-15 11:27:25] [INFO] Project Path: D:\GitHub\AOP_Web
-[2025-10-15 11:27:25] [INFO] Project structure verified
-[2025-10-15 11:27:25] [INFO] Preparing backend server...
-[2025-10-15 11:27:25] [ERROR] Error occurred: 'System.Object[]'을(를) 'ChildPath' 매개 변수에 필요한 유형 'System.String'(으)로 변환할 수 없습니다. 지정한 메서드가 지원되지 않습니다.
-[2025-10-15 11:27:25] [ERROR] Stack trace: 위치: Find-WindowsVirtualEnvironment, D:\GitHub\AOP_Web\Start_AOP_Web.ps1: 205번째 줄
-위치: <ScriptBlock>, D:\GitHub\AOP_Web\Start_AOP_Web.ps1: 409번째 줄
-[2025-10-15 11:27:34] [INFO] Script finished
