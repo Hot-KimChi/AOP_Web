@@ -76,6 +76,49 @@ class PredictML:
         # print("CSV file saved as measSetGen_df.csv")
         return estParams
 
+    def _paramForTemperature(self):
+        ## take parameters for ML from measSet_gen file.
+        estParams = self.df[
+            [
+                "numTxCycles",
+                "numTxElements",
+                "txFrequencyHz",
+                "elevAperIndex",
+                "isTxAperModulationEn",
+                "txpgWaveformStyle",
+                "scanRange",
+                "profTxVoltageVolt",
+                "VTxindex",
+            ]
+        ].copy()
+
+        ## load parameters from SQL database
+        connect = get_db_connection(self.database)
+        query = f"""
+            SELECT [probePitchCm], [probeRadiusCm], [probeElevAperCm0]            
+            FROM probe_geo 
+            WHERE probeid = {self.probeId}
+            ORDER BY 1
+            """
+
+        probeGeo_df = connect.execute_query(query)
+        probeGeo_df = probeGeo_df.fillna(0).infer_objects()
+
+        if len(probeGeo_df) == 1:
+            probeGeo_df = pd.concat([probeGeo_df] * len(estParams), ignore_index=True)
+
+        # Assigning est_geo columns to est_params, broadcasting if necessary
+        estParams = estParams.assign(
+            probePitchCm=probeGeo_df["probePitchCm"].values,
+            probeRadiusCm=probeGeo_df["probeRadiusCm"].values,
+            probeElevAperCm0=probeGeo_df["probeElevAperCm0"].values,
+            probeElevAperCm1=probeGeo_df["probeElevAperCm1"].values,
+            probeElevFocusRangCm=probeGeo_df["probeElevFocusRangCm"].values,
+            probeElevFocusRangCm1=probeGeo_df["probeElevFocusRangCm1"].values,
+        )
+
+        return estParams
+
     def intensity_zt_est(self):
         ## predict zt by Machine Learning model.
         import time
