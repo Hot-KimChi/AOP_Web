@@ -26,6 +26,7 @@ function DataViewContent() {
   const [validationErrors, setValidationErrors] = useState({});                   // 유효성 검사 오류
   const [showChanges, setShowChanges] = useState(false);                          // 변경 사항 하이라이트 토글
   const [deletedRows, setDeletedRows] = useState([]);                             // 삭제된 행 인덱스 추적
+  const [dataViewSource, setDataViewSource] = useState('');                       // 데이터 뷰 출처 (measset-generation, 등)
 
   useEffect(() => {
     // 페이지 로드 시 sessionStorage에서 데이터 가져오기
@@ -51,6 +52,12 @@ function DataViewContent() {
       
       if (storedEditableColumns) {
         setEditableColumns(JSON.parse(storedEditableColumns));
+      }
+      
+      // 출처 정보 로드
+      const source = sessionStorage.getItem('dataViewSource');
+      if (source) {
+        setDataViewSource(source);
       }
       
       // 창이 열렸음을 표시
@@ -555,6 +562,39 @@ function DataViewContent() {
     );
   };
 
+  // ML for temperature 핸들러
+  const handleMLForTemperature = async () => {
+    if (!displayData || displayData.length === 0) {
+      alert('처리할 데이터가 없습니다.');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      // TODO: ML 처리 API 호출 구현
+      console.log('ML for temperature 처리 시작');
+      console.log('처리할 데이터:', displayData);
+      
+      // 임시: API 호출 예시
+      // const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+      // const response = await fetch(`${API_BASE_URL}/api/ml-temperature`, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ data: displayData })
+      // });
+      // 
+      // if (!response.ok) throw new Error('ML 처리 실패');
+      // const result = await response.json();
+      
+      alert('ML for temperature 처리가 완료되었습니다.');
+    } catch (error) {
+      console.error('ML 처리 오류:', error);
+      alert('ML 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // 편집 상태 변경 시 부모 창에 알림
   useEffect(() => {
     if (Object.keys(editedData).length > 0 || deletedRows.length > 0) {
@@ -589,6 +629,16 @@ function DataViewContent() {
                 />
                 <label htmlFor="showChanges" className="form-check-label">변경 사항 하이라이트</label>
               </div>
+              
+              {dataViewSource === 'measset-generation' && (
+                <button 
+                  className="btn btn-warning"
+                  onClick={handleMLForTemperature}
+                  disabled={isLoading || !displayData || displayData.length === 0}
+                >
+                  {isLoading ? '처리 중...' : 'ML for temperature'}
+                </button>
+              )}
               
               {(Object.keys(editedData).length > 0 || deletedRows.length > 0) && (
                 <>

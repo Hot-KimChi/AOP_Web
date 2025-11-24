@@ -87,6 +87,7 @@ class PredictML:
                 "isTxAperModulationEn",
                 "txpgWaveformStyle",
                 "profTxVoltageVolt",
+                "ScanRangeCm",
                 "VTxindex",
             ]
         ].copy()

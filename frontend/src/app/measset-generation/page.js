@@ -681,6 +681,7 @@ export default function MeasSetGen() {
     sessionStorage.setItem('editableColumns', JSON.stringify(editableColumns));
     sessionStorage.setItem('dataWindowOpen', 'open');
     sessionStorage.setItem('parentWindowId', window.name || 'main');
+    sessionStorage.setItem('dataViewSource', 'measset-generation'); // 출처 정보 추가
 
     // 현재 데이터를 별도로 저장 (창 닫힘 시 비교용)
     const originalDataSnapshot = JSON.stringify(filteredDataToUse);
