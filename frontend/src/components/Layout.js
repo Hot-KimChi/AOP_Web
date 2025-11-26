@@ -10,18 +10,16 @@ const Layout = ({ children }) => {
   return (
     <>
       <Head>
-        <title>AOP Database</title>
+        <title>AOP Platform</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="description" content="Database management application" />
+        <meta name="description" content="Advanced Operations Platform" />
       </Head>
       
-      <Navbar />
-      
-      <div className="container-fluid">
-        <main className="row">
-          <div className="col-12 main-content">
-            {children}
-          </div>
+      <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
+        <Navbar />
+        
+        <main className="w-100">
+          {children}
         </main>
       </div>
     </>

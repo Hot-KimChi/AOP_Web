@@ -114,7 +114,7 @@ export default function DataViewer({
   function truncateText(text) {
     if (!text) return '';
     const str = text.toString();
-    return str.length > 30 ? `${str.substring(0, 30)}...` : str;
+    return str.length > 16 ? `${str.substring(0, 16)}...` : str;
   }
   function renderCellContent(value, key) {
     if (value === null || value === undefined) {
@@ -149,19 +149,29 @@ export default function DataViewer({
         <thead>
           <tr className="bg-gray-100 sticky-header">
             {columnList.map((header, index) => (
-              <th key={index} className="px-3 py-2 border">
-                <div className="flex items-center justify-between group">
-                  <span title={header} className="font-medium text-gray-700">
+              <th key={index} className="border" style={{ padding: '2px 4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                  <span 
+                    title={header} 
+                    className="font-medium text-gray-700"
+                    style={{ 
+                      textAlign: 'center', 
+                      display: 'block', 
+                      fontSize: '12px',
+                      color: '#374151'
+                    }}
+                  >
                     {truncateText(header)}
                   </span>
                   <button
-                    className="p-0.5 hover:bg-gray-200 rounded transition-colors"
+                    style={{ padding: '1px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    className="hover:bg-gray-200 rounded transition-colors"
                     onClick={() => handleSort(header)}
                     title={`Sort ${sortConfig.key === header && sortConfig.direction === 'asc' ? 'Descending' : 'Ascending'}`}
                   >
                     <ArrowUpDown
-                      size={12}
-                      className={`transition-colors ${sortConfig.key === header ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-600'}`}
+                      size={9}
+                      className={`transition-colors ${sortConfig.key === header ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'}`}
                     />
                   </button>
                 </div>
@@ -172,10 +182,11 @@ export default function DataViewer({
         <thead className="sticky-filter">
           <tr>
             {columnList.map((header, index) => (
-              <th key={index} className="px-2 py-1 border bg-gray-50">
+              <th key={index} className="border bg-gray-50" style={{ padding: '4px' }}>
                 <div className="relative">
                   <select
-                    className="w-full px-2 py-1 pr-6 text-sm border rounded focus:outline-none focus:border-blue-400"
+                    className="w-full text-sm border rounded focus:outline-none focus:border-blue-400"
+                    style={{ padding: '2px 20px 2px 4px', fontSize: '11px' }}
                     value={filters[header]?.[0] || ''}
                     onChange={(e) => handleComboBoxChange(header, e.target.value)}
                   >
@@ -192,7 +203,7 @@ export default function DataViewer({
                       onClick={() => clearFilter(header)}
                       title="Clear filter"
                     >
-                      <X size={12} className="text-gray-400" />
+                      <X size={10} className="text-gray-400" />
                     </button>
                   )}
                 </div>
@@ -207,7 +218,11 @@ export default function DataViewer({
                 {columnList.map((col, colIndex) => (
                   <td
                     key={colIndex}
-                    className="px-3 py-2 border"
+                    className="border"
+                    style={{ 
+                      padding: '4px',
+                      fontSize: '12px'
+                    }}
                     title={formatNumber(row[col], col)}
                   >
                     {renderCellContent(row[col], col)}
@@ -228,28 +243,40 @@ export default function DataViewer({
         .table-container {
           width: 100%;
           overflow-x: auto;
-          max-height: 900px;
+          max-height: calc(100vh - 100px);
           white-space: nowrap;
           background-color: white;
           border-radius: 0.25rem;
           box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
         }
+        table {
+          border-collapse: collapse;
+          border-spacing: 0;
+          border: 1px solid #dee2e6;
+        }
         .table-container th, .table-container td {
           font-size: 12px;
           text-align: left;
-          border: 1px solid #ddd;
+          border: 0.5px solid #dee2e6 !important;
+          line-height: 1.2;
+          box-sizing: border-box;
+        }
+        .table-container tbody td {
+          text-align: center;
         }
         .sticky-header {
           position: sticky;
           top: 0;
           z-index: 10;
-          background-color: white;
+          background-color: #f8f8f8;
+          padding: 4px !important;
         }
         .sticky-filter {
           position: sticky;
-          top: 40px;
+          top: 38px;
           z-index: 9;
           background-color: white;
+          padding: 4px !important;
         }
         .table-container::-webkit-scrollbar {
           height: 8px;

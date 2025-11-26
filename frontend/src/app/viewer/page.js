@@ -79,7 +79,7 @@ export default function Viewer() {
   const handleViewData = () => {
     if (selectedDatabase && selectedTable) {
       const url = `/viewer/data-view-standalone?database=${selectedDatabase}&table=${selectedTable}`;
-      const windowFeatures = 'width=2000,height=800,menubar=no,toolbar=no,location=no,status=no';
+      const windowFeatures = 'width=2000,height=1200,menubar=no,toolbar=no,location=no,status=no';
       window.open(url, '_blank', windowFeatures);
     }
   };

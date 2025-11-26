@@ -75,29 +75,44 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-light bg-light">
-      <div className="container-fluid">
-        <Link href="/" className="navbar-brand">AOP Main</Link>
+    <nav className="navbar navbar-expand-lg bg-white shadow-sm border-bottom">
+      <div className="container-fluid px-4">
+        {/* Logo */}
+        <Link href="/" className="navbar-brand d-flex align-items-center">
+          <div className="bg-gradient rounded-3 p-2 me-2" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+            <span className="text-white fw-bold fs-5">A</span>
+          </div>
+          <span className="fw-bold" style={{ 
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>
+            AOP Web
+          </span>
+        </Link>
+
         <button 
           className="navbar-toggler" 
           type="button" 
           data-bs-toggle="collapse" 
           data-bs-target="#navbarNav"
-          aria-controls="navbarNav"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
         >
           <span className="navbar-toggler-icon"></span>
         </button>
-        <div className="collapse navbar-collapse justify-content-between" id="navbarNav">
-          <ul className="navbar-nav">
+
+        <div className="collapse navbar-collapse" id="navbarNav">
+          {/* Desktop Menu */}
+          <ul className="navbar-nav me-auto">
             {menuItems.map((item, index) => (
-              <li className="nav-item mx-3" key={index}>
-                <Link 
-                  href={item.href} 
-                  className={`nav-link ${
-                    isAuthenticated ? 'text-dark' : 'disabled text-muted'
+              <li className="nav-item" key={index}>
+                <Link
+                  href={item.href}
+                  className={`nav-link px-3 py-2 rounded ${
+                    isAuthenticated
+                      ? 'text-dark'
+                      : 'text-muted disabled'
                   }`}
+                  style={isAuthenticated ? { transition: 'all 0.2s' } : {}}
                   onClick={(e) => !isAuthenticated && e.preventDefault()}
                 >
                   <FontAwesomeIcon icon={item.icon} className="me-2" />
@@ -107,29 +122,34 @@ const Navbar = () => {
             ))}
           </ul>
 
-          {isAuthenticated ? (
-            <div className="d-flex align-items-center">
-              <div className="d-flex flex-column align-items-end me-3">
-                <small className="text-muted">Log in:</small>
-                <strong>{username}</strong>
-              </div>
-              <button
-                className="btn btn-danger d-flex align-items-center"
-                onClick={handleLogout}
+          {/* Auth Section */}
+          <div className="d-flex align-items-center">
+            {isAuthenticated ? (
+              <>
+                <div className="d-none d-md-flex flex-column align-items-end me-3">
+                  <small className="text-muted">Logged in as</small>
+                  <strong className="text-dark">{username}</strong>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="btn btn-danger shadow-sm"
+                  style={{ transition: 'all 0.2s' }}
+                >
+                  <FontAwesomeIcon icon={faUserCircle} className="me-2" />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/auth/login"
+                className="btn btn-primary shadow-sm"
+                style={{ transition: 'all 0.2s' }}
               >
                 <FontAwesomeIcon icon={faUserCircle} className="me-2" />
-                Logout
-              </button>
-            </div>
-          ) : (
-            <Link 
-              href="/auth/login" 
-              className="btn btn-primary d-flex align-items-center"
-            >
-              <FontAwesomeIcon icon={faUserCircle} className="me-2" />
-              Login
-            </Link>
-          )}
+                Login
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </nav>
