@@ -1,0 +1,260 @@
+﻿[
+    {
+        "timestamp":  "2025-12-14T18:25:21.339Z",
+        "level":  "INFO",
+        "message":  "=== Starting AOP Web (Production Mode) ===",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:21.371Z",
+        "level":  "INFO",
+        "message":  "Cleaning old logs...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:21.746Z",
+        "level":  "INFO",
+        "message":  "Setting up backend...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:21.761Z",
+        "level":  "INFO",
+        "message":  "Using virtual environment",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:21.886Z",
+        "level":  "INFO",
+        "message":  "Python version: Python 3.12.9",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:21.886Z",
+        "level":  "INFO",
+        "message":  "Checking port 5000...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:23.324Z",
+        "level":  "WARN",
+        "message":  "Found process using port 5000 : python (PID: 7736)",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:23.339Z",
+        "level":  "INFO",
+        "message":  "Stopped process PID: 7736 on port 5000",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:23.860Z",
+        "level":  "INFO",
+        "message":  "Port 5000 is now available",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:23.860Z",
+        "level":  "INFO",
+        "message":  "Starting backend server (Port 5000)...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:23.955Z",
+        "level":  "INFO",
+        "message":  "Backend PID: 7564",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+                         "port":  5000,
+                         "pid":  7564,
+                         "service":  "backend",
+                         "python":  "C:\\AOP_Tools\\AOP_Web\\backend\\.venv\\Scripts\\python.exe"
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:23.987Z",
+        "level":  "INFO",
+        "message":  "Verifying backend startup...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:29.102Z",
+        "level":  "INFO",
+        "message":  "Backend is listening on port 5000",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:29.102Z",
+        "level":  "INFO",
+        "message":  "Backend started successfully",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:29.102Z",
+        "level":  "INFO",
+        "message":  "Setting up frontend...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:29.930Z",
+        "level":  "INFO",
+        "message":  "Node v20.19.4 | npm 10.8.2",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:29.946Z",
+        "level":  "INFO",
+        "message":  "Checking port 3000...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:30.024Z",
+        "level":  "WARN",
+        "message":  "Found process using port 3000 : node (PID: 1168)",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:30.040Z",
+        "level":  "INFO",
+        "message":  "Stopped process PID: 1168 on port 3000",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:30.540Z",
+        "level":  "INFO",
+        "message":  "Port 3000 is now available",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:30.540Z",
+        "level":  "INFO",
+        "message":  "Starting frontend server (Port 3000)...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:30.555Z",
+        "level":  "INFO",
+        "message":  "Building frontend...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:52.899Z",
+        "level":  "INFO",
+        "message":  "Starting frontend in production mode...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:52.946Z",
+        "level":  "INFO",
+        "message":  "Frontend PID: 1376",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+                         "port":  3000,
+                         "pid":  1376,
+                         "service":  "frontend",
+                         "mode":  "Production"
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:57.964Z",
+        "level":  "INFO",
+        "message":  "=== Startup Complete ===",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:57.964Z",
+        "level":  "INFO",
+        "message":  "Backend:  http://localhost:5000",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:57.979Z",
+        "level":  "INFO",
+        "message":  "Frontend: http://localhost:3000",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-14T18:25:57.979Z",
+        "level":  "INFO",
+        "message":  "Log file: C:\\AOP_Tools\\AOP_Web\\logs\\startup_20251214_182521.log",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    }
+]

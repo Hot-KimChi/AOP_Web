@@ -1,0 +1,56 @@
+﻿[
+    {
+        "timestamp":  "2025-12-13T11:40:07.024Z",
+        "level":  "INFO",
+        "message":  "=== Starting shutdown process ===",
+        "script":  "Stop_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-13T11:40:07.117Z",
+        "level":  "INFO",
+        "message":  "Checking Frontend on port 3000...",
+        "script":  "Stop_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-13T11:40:09.613Z",
+        "level":  "INFO",
+        "message":  "No process found on port 3000",
+        "script":  "Stop_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-13T11:40:09.629Z",
+        "level":  "INFO",
+        "message":  "Checking Backend on port 5000...",
+        "script":  "Stop_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-13T11:40:09.692Z",
+        "level":  "INFO",
+        "message":  "No process found on port 5000",
+        "script":  "Stop_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2025-12-13T11:40:09.692Z",
+        "level":  "INFO",
+        "message":  "No running services found",
+        "script":  "Stop_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    }
+]

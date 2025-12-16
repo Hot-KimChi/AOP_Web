@@ -148,7 +148,14 @@ function Stop-ProcessOnPort {
         }
         
         Write-Host "`n$ServiceName (Port $Port) is already in use." -ForegroundColor Yellow
-        $choice = Read-Host "Stop existing process and continue? (Y/N)"
+        
+        # In production mode, automatically stop the process
+        if ($Production) {
+            Write-Host "Stopping process automatically in Production mode..." -ForegroundColor Yellow
+            $choice = 'Y'
+        } else {
+            $choice = Read-Host "Stop existing process and continue? (Y/N)"
+        }
         
         if ($choice -eq 'Y' -or $choice -eq 'y') {
             foreach ($processId in $processIds) {
@@ -303,8 +310,16 @@ try {
     
     # Start backend
     Write-Log "Starting backend server (Port 5000)..." "INFO"
-    $backendCmd = "Set-Location '$backendPath'; & '$pythonExe' app.py"
-    $backendProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -PassThru
+    
+    if ($Production) {
+        # Production mode: Start Python directly in hidden window
+        $backendProcess = Start-Process -FilePath $pythonExe -ArgumentList "app.py" -WorkingDirectory $backendPath -WindowStyle Hidden -PassThru
+    } else {
+        # Development mode: Interactive window with PowerShell
+        $backendCmd = "Set-Location '$backendPath'; & '$pythonExe' app.py"
+        $backendProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -PassThru
+    }
+    
     Write-Log "Backend PID: $($backendProcess.Id)" "INFO" @{ 
         service = "backend"
         pid = $backendProcess.Id
@@ -314,7 +329,7 @@ try {
     
     # Verify backend started successfully
     Write-Log "Verifying backend startup..." "INFO"
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds 5
     
     # Check if process is still running
     $backendRunning = Get-Process -Id $backendProcess.Id -ErrorAction SilentlyContinue
@@ -324,7 +339,7 @@ try {
     
     # Check if port 5000 is listening
     $portListening = $false
-    for ($i = 0; $i -lt 10; $i++) {
+    for ($i = 0; $i -lt 20; $i++) {
         $connection = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue
         if ($connection) {
             $portListening = $true
@@ -372,14 +387,26 @@ try {
     Write-Log "Starting frontend server (Port 3000)..." "INFO"
     
     if ($Production) {
-        $frontendCmd = "Set-Location '$frontendPath'; npm run build; if (`$LASTEXITCODE -eq 0) { npm start } else { Write-Host 'Build failed!' -ForegroundColor Red; pause }"
-        $waitTime = 10
+        # Production mode: Build and start in background
+        Write-Log "Building frontend..." "INFO"
+        Set-Location $frontendPath
+        & npm run build
+        if ($LASTEXITCODE -ne 0) {
+            Set-Location $projectPath
+            throw "Frontend build failed"
+        }
+        
+        Write-Log "Starting frontend in production mode..." "INFO"
+        # Start npm directly in hidden window
+        $frontendProcess = Start-Process -FilePath "npm" -ArgumentList "start" -WorkingDirectory $frontendPath -WindowStyle Hidden -PassThru
+        Set-Location $projectPath
+        $waitTime = 5
     } else {
+        # Development mode: Interactive window
         $frontendCmd = "Set-Location '$frontendPath'; npm run dev"
+        $frontendProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd -PassThru
         $waitTime = 2
     }
-    
-    $frontendProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd -PassThru
     Write-Log "Frontend PID: $($frontendProcess.Id)" "INFO" @{
         service = "frontend"
         pid = $frontendProcess.Id
@@ -398,7 +425,30 @@ try {
     # Save JSON log
     Save-JsonLog
     
-    if ($Debug) {
+    # Keep service running in Production mode
+    if ($Production) {
+        Write-Log "Production mode: Service will run indefinitely" "INFO"
+        Write-Host "`nService running. Press Ctrl+C to stop." -ForegroundColor Yellow
+        
+        # Wait indefinitely (keeps service alive)
+        try {
+            while ($true) {
+                Start-Sleep -Seconds 60
+                # Optional: Health check every minute
+                $backendAlive = Test-NetConnection -ComputerName localhost -Port 5000 -InformationLevel Quiet -WarningAction SilentlyContinue
+                $frontendAlive = Test-NetConnection -ComputerName localhost -Port 3000 -InformationLevel Quiet -WarningAction SilentlyContinue
+                
+                if (-not $backendAlive) {
+                    Write-Log "Backend health check failed on port 5000" "WARN"
+                }
+                if (-not $frontendAlive) {
+                    Write-Log "Frontend health check failed on port 3000" "WARN"
+                }
+            }
+        } catch {
+            Write-Log "Service loop interrupted: $($_.Exception.Message)" "INFO"
+        }
+    } elseif ($Debug) {
         Read-Host "`nPress Enter to exit"
     }
     
@@ -445,7 +495,10 @@ try {
         Write-Host $_.ScriptStackTrace -ForegroundColor Gray
     }
     
-    Read-Host "`nPress Enter to exit"
+    # Don't wait for user input in Production mode
+    if (-not $Production) {
+        Read-Host "`nPress Enter to exit"
+    }
     Exit 1
 }
 #endregion

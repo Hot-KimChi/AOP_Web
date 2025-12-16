@@ -1,0 +1,6 @@
+﻿[2025-12-13 11:40:07] [INFO] === Starting shutdown process ===
+[2025-12-13 11:40:07] [INFO] Checking Frontend on port 3000...
+[2025-12-13 11:40:09] [INFO] No process found on port 3000
+[2025-12-13 11:40:09] [INFO] Checking Backend on port 5000...
+[2025-12-13 11:40:09] [INFO] No process found on port 5000
+[2025-12-13 11:40:09] [INFO] No running services found
