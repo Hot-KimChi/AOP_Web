@@ -112,9 +112,6 @@ class PredictML:
             probePitchCm=probeGeo_df["probePitchCm"].values,
             probeRadiusCm=probeGeo_df["probeRadiusCm"].values,
             probeElevAperCm0=probeGeo_df["probeElevAperCm0"].values,
-            probeElevAperCm1=probeGeo_df["probeElevAperCm1"].values,
-            probeElevFocusRangCm=probeGeo_df["probeElevFocusRangCm"].values,
-            probeElevFocusRangCm1=probeGeo_df["probeElevFocusRangCm1"].values,
         )
 
         return estParams
