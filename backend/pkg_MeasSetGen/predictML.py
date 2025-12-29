@@ -4,6 +4,7 @@ import numpy as np
 from flask import jsonify, session
 from pkg_MachineLearning.mlflow_integration import AOP_MLflowTracker
 from utils.database_manager import get_db_connection
+from pkg_MeasSetGen.Temp_Prr_predict import find_prr_for_temprise
 
 # Pandas 다운캐스팅 옵션 설정
 pd.set_option("future.no_silent_downcasting", True)
@@ -78,23 +79,33 @@ class PredictML:
 
     def _paramForTemperature(self):
         ## take parameters for ML from measSet_gen file.
-        estParams = self.df[
+
+        # 각 GroupIndex 내에서 최대 TxFocusLocCm 값을 찾기
+        max_values = self.df.groupby("GroupIndex")["TxFocusLocCm"].transform("max")
+
+        # 최대값과 일치하는 모든 행 선택
+        temp_df = self.df[self.df["TxFocusLocCm"] == max_values]
+
+        # 필요하다면 여기서 중복 제거
+        temp_df = temp_df.drop_duplicates(subset=["GroupIndex"])
+
+        estParams = temp_df[
             [
-                "numTxCycles",
-                "numTxElements",
-                "txFrequencyHz",
-                "elevAperIndex",
-                "isTxAperModulationEn",
-                "txpgWaveformStyle",
+                "ProbeNumTxCycles",
+                "NumTxElements",
+                "TxFrequencyHz",
+                "ElevAperIndex",
+                "IsTxChannelModulationEn",
+                "TxpgWaveformStyle",
                 "profTxVoltageVolt",
-                "VTxindex",
+                "VTxIndex",
             ]
         ].copy()
 
         ## load parameters from SQL database
         connect = get_db_connection(self.database)
         query = f"""
-            SELECT [probePitchCm], [probeRadiusCm], [probeElevAperCm0]            
+            SELECT [probePitchCm], [probeRadiusCm], [probeElevAperCm0], [probeNumElements]            
             FROM probe_geo 
             WHERE probeid = {self.probeId}
             ORDER BY 1
@@ -106,6 +117,10 @@ class PredictML:
         if len(probeGeo_df) == 1:
             probeGeo_df = pd.concat([probeGeo_df] * len(estParams), ignore_index=True)
 
+        probePitch = probeGeo_df["probePitchCm"].iloc[0]
+        probeNumElements = probeGeo_df["probeNumElements"].iloc[0]
+        fullScanRange = probePitch * probeNumElements
+
         # Assigning est_geo columns to est_params, broadcasting if necessary
         estParams = estParams.assign(
             probePitchCm=probeGeo_df["probePitchCm"].values,
@@ -113,7 +128,22 @@ class PredictML:
             probeElevAperCm0=probeGeo_df["probeElevAperCm0"].values,
         )
 
-        return estParams
+        # Create two copies: one with fullScanRange, one with 0
+        estParams_full = estParams.copy()
+        estParams_full["scanRange"] = fullScanRange
+        estParams_full["NumTxElements"] = (
+            estParams_full["NumTxElements"] / 10
+        )  # 온도모델링을 위해서, Element 수를 1/10로 줄임
+
+        estParams_zero = estParams.copy()
+        estParams_zero["scanRange"] = 0
+
+        # Combine both dataframes
+        estParams_combined = pd.concat(
+            [estParams_full, estParams_zero], ignore_index=True
+        )
+
+        return estParams_combined
 
     def intensity_zt_est(self):
         ## predict zt by Machine Learning model.
@@ -244,47 +274,66 @@ class PredictML:
 
         return power_df
 
-    def temperature_PRF_est(self):
+    def temperature_PRF_est(self, target_tr: float = 15.0):
         ## predict PRF by ML model.
 
-        # 각 GroupIndex 내에서 최대 TxFocusLocCm 값을 찾기
-        max_values = self.df.groupby("GroupIndex")["TxFocusLocCm"].transform("max")
+        temp_df = self._paramForTemperature()
+        temp_df["pulseRepetRate"] = 0  # 초기값 설정
 
-        # 최대값과 일치하는 모든 행 선택
-        temp_df = self.df[self.df["TxFocusLocCm"] == max_values]
+        for c in [
+            "IsTxChannelModulationEn",
+            "TxpgWaveformStyle",
+            "ElevAperIndex",
+            "VTxIndex",
+        ]:
+            if c in temp_df.columns:
+                temp_df[c] = temp_df[c].fillna(0).astype(int)
 
-        # 필요하다면 여기서 중복 제거
-        temp_df = temp_df.drop_duplicates(subset=["GroupIndex"])
+        ai_params = []
+        used_voltages = []
 
-        temp_df["AI_param"] = 610
+        for idx, row in temp_df.iterrows():
+            user_input = row.to_dict()
+            V = user_input.get("profTxVoltageVolt", 0)
+            user_input["pulseVoltage"] = V
+            used_voltages.append(V)
+            res = find_prr_for_temprise(user_input, target_tr=target_tr)
+            ai_params.append(res["best_prr"])
+
+        temp_df["AI_param"] = ai_params
         temp_df["measSetComments"] = f"Beamstyle_{self.probeName}_temperature"
+        temp_df = temp_df.sort_index()
 
-        # 결과를 GroupIndex로 정렬
-        temp_df = temp_df.sort_values("GroupIndex")
+        temp_df.to_csv(
+            "temperature_PRF_est_output.csv", index=False, encoding="utf-8-sig"
+        )
 
-        # MLflow prediction logging
-        try:
-            mlflow_tracker = AOP_MLflowTracker()
+        # # 결과를 GroupIndex로 정렬
+        # temp_df = temp_df.sort_values("GroupIndex")
 
-            input_features = {
-                "maxTxFocusLoc": (
-                    float(max_values.max()) if len(max_values) > 0 else None
-                ),
-                "numGroups": len(temp_df),
-                "probeName": self.probeName,
-            }
-            prediction_result = {
-                "AI_param": 610,
-                "measSetComments": f"Beamstyle_{self.probeName}_temperature",
-            }
+        # # MLflow prediction logging
+        # try:
+        #     mlflow_tracker = AOP_MLflowTracker()
 
-            AOP_MLflowTracker.log_simple_prediction(
-                input_features=input_features,
-                prediction_result=prediction_result,
-                prediction_type="temperature",
-            )
-        except Exception as e:
-            # Prediction logging 실패해도 메인 기능은 계속 진행
-            pass
+        #     input_features = {
+        #         "maxTxFocusLoc": (
+        #             float(max_values.max()) if len(max_values) > 0 else None
+        #         ),
+        #         "numGroups": len(temp_df),
+        #         "probeName": self.probeName,
+        #     }
+        #     prediction_result = {
+        #         "AI_param": 610,
+        #         "measSetComments": f"Beamstyle_{self.probeName}_temperature",
+        #     }
+
+        #     AOP_MLflowTracker.log_simple_prediction(
+        #         input_features=input_features,
+        #         prediction_result=prediction_result,
+        #         prediction_type="temperature",
+        #     )
+        # except Exception as e:
+        #     # Prediction logging 실패해도 메인 기능은 계속 진행
+        #     pass
 
         return temp_df
