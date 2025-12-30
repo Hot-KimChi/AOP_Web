@@ -113,7 +113,6 @@ def _predict_temprise_one(
     # 물리 가드: 전압/PRF/사이클 중 하나라도 0 이하 → 발열 없음 처리
     if V <= 0 or prf <= 0 or cycles <= 0:
         return {"pred_temprise": 0.0, "prf": DEFAULT_POLICY_PRF}
-
     # 입력 → DataFrame 변환 후 물리 feature 생성 및 원-핫 인코딩 적용
     row = pd.DataFrame([user_input])
     for c in ["isTxAperModulationEn", "txpgWaveformStyle", "elevAperIndex", "VTxindex"]:
@@ -160,6 +159,11 @@ def find_prr_for_temprise(
     정책: pred < MIN_VALID_TEMPRISE → pred_temprise=0.0, best_prr=DEFAULT_POLICY_PRF
     """
     logging.info(f"[find_prr] input bracket=({prr_min}, {prr_max})")
+
+    # user_input을 DataFrame으로 변환 후 CSV 저장
+    user_input_df = pd.DataFrame([user_input])
+    user_input_df.to_csv("user_input_debug.csv", index=False, encoding="utf-8-sig")
+    print(f"user_input saved to user_input_debug.csv")
 
     # 런타임에서 허용 범위 보정
     prr_min = max(float(prr_min), MIN_ALLOWED_PRR)

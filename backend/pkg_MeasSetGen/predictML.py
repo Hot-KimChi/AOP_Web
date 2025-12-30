@@ -84,12 +84,12 @@ class PredictML:
         max_values = self.df.groupby("GroupIndex")["TxFocusLocCm"].transform("max")
 
         # 최대값과 일치하는 모든 행 선택
-        temp_df = self.df[self.df["TxFocusLocCm"] == max_values]
+        self.temp_df = self.df[self.df["TxFocusLocCm"] == max_values]
 
         # 필요하다면 여기서 중복 제거
-        temp_df = temp_df.drop_duplicates(subset=["GroupIndex"])
+        self.temp_df = self.temp_df.drop_duplicates(subset=["GroupIndex"])
 
-        estParams = temp_df[
+        estParams = self.temp_df[
             [
                 "ProbeNumTxCycles",
                 "NumTxElements",
@@ -101,6 +101,19 @@ class PredictML:
                 "VTxIndex",
             ]
         ].copy()
+
+        estParams = estParams.rename(
+            columns={
+                "ProbeNumTxCycles": "numTxCycles",
+                "NumTxElements": "numTxElements",
+                "TxFrequencyHz": "txFrequencyHz",
+                "ElevAperIndex": "elevAperIndex",
+                "IsTxChannelModulationEn": "isTxAperModulationEn",
+                "TxpgWaveformStyle": "txpgWaveformStyle",
+                "profTxVoltageVolt": "profTxVoltageVolt",
+                "VTxIndex": "VTxindex",
+            }
+        )
 
         ## load parameters from SQL database
         connect = get_db_connection(self.database)
@@ -131,9 +144,8 @@ class PredictML:
         # Create two copies: one with fullScanRange, one with 0
         estParams_full = estParams.copy()
         estParams_full["scanRange"] = fullScanRange
-        estParams_full["NumTxElements"] = (
-            estParams_full["NumTxElements"] / 10
-        )  # 온도모델링을 위해서, Element 수를 1/10로 줄임
+        estParams_full["numTxElements"] = estParams_full["numTxElements"] // 10
+        # 온도모델링을 위해서, Element 수를 1/10로 줄임
 
         estParams_zero = estParams.copy()
         estParams_zero["scanRange"] = 0
@@ -277,22 +289,22 @@ class PredictML:
     def temperature_PRF_est(self, target_tr: float = 15.0):
         ## predict PRF by ML model.
 
-        temp_df = self._paramForTemperature()
-        temp_df["pulseRepetRate"] = 0  # 초기값 설정
+        estParams = self._paramForTemperature()
+        estParams["pulseRepetRate"] = 0  # 초기값 설정
 
         for c in [
-            "IsTxChannelModulationEn",
-            "TxpgWaveformStyle",
-            "ElevAperIndex",
-            "VTxIndex",
+            "isTxChannelModulationEn",
+            "txpgWaveformStyle",
+            "elevAperIndex",
+            "VTxindex",
         ]:
-            if c in temp_df.columns:
-                temp_df[c] = temp_df[c].fillna(0).astype(int)
+            if c in estParams.columns:
+                estParams[c] = estParams[c].fillna(0).astype(int)
 
         ai_params = []
         used_voltages = []
 
-        for idx, row in temp_df.iterrows():
+        for idx, row in estParams.iterrows():
             user_input = row.to_dict()
             V = user_input.get("profTxVoltageVolt", 0)
             user_input["pulseVoltage"] = V
@@ -300,16 +312,14 @@ class PredictML:
             res = find_prr_for_temprise(user_input, target_tr=target_tr)
             ai_params.append(res["best_prr"])
 
-        temp_df["AI_param"] = ai_params
-        temp_df["measSetComments"] = f"Beamstyle_{self.probeName}_temperature"
-        temp_df = temp_df.sort_index()
+        # estParams에 결과 할당 (self.temp_df가 아닌)
+        estParams["AI_param"] = ai_params
 
-        temp_df.to_csv(
-            "temperature_PRF_est_output.csv", index=False, encoding="utf-8-sig"
-        )
-
-        # # 결과를 GroupIndex로 정렬
-        # temp_df = temp_df.sort_values("GroupIndex")
+        result_df = self.temp_df.copy()
+        result_df["AI_param"] = ai_params[1]  # 첫 번째 값만 사용 (또는 평균/최대값)
+        result_df["AI_param"] = result_df["AI_param"].round(2)
+        result_df["measSetComments"] = f"Beamstyle_{self.probeName}_temperature"
+        result_df = result_df.sort_values("GroupIndex")
 
         # # MLflow prediction logging
         # try:
@@ -336,4 +346,4 @@ class PredictML:
         #     # Prediction logging 실패해도 메인 기능은 계속 진행
         #     pass
 
-        return temp_df
+        return result_df
