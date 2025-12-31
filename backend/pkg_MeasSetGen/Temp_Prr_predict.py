@@ -160,11 +160,6 @@ def find_prr_for_temprise(
     """
     logging.info(f"[find_prr] input bracket=({prr_min}, {prr_max})")
 
-    # user_input을 DataFrame으로 변환 후 CSV 저장
-    user_input_df = pd.DataFrame([user_input])
-    user_input_df.to_csv("user_input_debug.csv", index=False, encoding="utf-8-sig")
-    print(f"user_input saved to user_input_debug.csv")
-
     # 런타임에서 허용 범위 보정
     prr_min = max(float(prr_min), MIN_ALLOWED_PRR)
     prr_max = min(float(prr_max), MAX_ALLOWED_PRR)

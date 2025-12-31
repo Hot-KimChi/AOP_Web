@@ -147,6 +147,7 @@ class PredictML:
         estParams_full["numTxElements"] = estParams_full["numTxElements"] // 10
         # 온도모델링을 위해서, Element 수를 1/10로 줄임
 
+        ## TempsetNumber: 4을 위해 설정.
         estParams_zero = estParams.copy()
         estParams_zero["scanRange"] = 0
 
@@ -315,8 +316,12 @@ class PredictML:
         # estParams에 결과 할당 (self.temp_df가 아닌)
         estParams["AI_param"] = ai_params
 
+        # scanRange 기준으로 DataFrame 분리
+        estParams_full = estParams[estParams["scanRange"] > 0].copy()
+        estParams_zero = estParams[estParams["scanRange"] == 0].copy()
+
         result_df = self.temp_df.copy()
-        result_df["AI_param"] = ai_params[1]  # 첫 번째 값만 사용 (또는 평균/최대값)
+        result_df["AI_param"] = estParams_zero["AI_param"].values
         result_df["AI_param"] = result_df["AI_param"].round(2)
         result_df["measSetComments"] = f"Beamstyle_{self.probeName}_temperature"
         result_df = result_df.sort_values("GroupIndex")

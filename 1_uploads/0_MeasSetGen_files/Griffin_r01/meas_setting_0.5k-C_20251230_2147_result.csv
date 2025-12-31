@@ -1,0 +1,4 @@
+GroupIndex,measSetComments,probeId,beamstyleIndex,bsIndexTrace,TxFrequencyHz,focusRangeCm,maxTxVoltageVolt,ceilTxVoltageVolt,profTxVoltageVolt,totalVoltagePt,numMeasVoltage,NumTxElements,TxpgWaveformStyle,numTxCycles,ElevAperIndex,zStartDistCm,zMeasNum,IsTxAperModulationEn,dumpSwVersion,DTxFreqIndex,IsCPAEn,TxPulseRleA,CpaDelayOffsetClkA,VTxIndex,SysPulserSelA,AI_param
+16,Beamstyle_0.5k-C_Intensity,11821684,0,0,3636400,0.5,93.0,93.0,57.71,20,10,120.0,2,4,0,0.5,45.0,1,2025-12-30,0,0,-1.0,0,1,-1.0,4.400000095367432
+16,Beamstyle_0.5k-C_power,11821684,0,0,3636400,0.5,93.0,93.0,57.71,20,10,21.0,2,4,0,0.5,45.0,1,2025-12-30,0,0,-1.0,0,1,-1.0,1000.0
+16,Beamstyle_0.5k-C_temperature,11821684,0,0,3636400,0.5,93.0,93.0,57.71,20,10,120.0,2,4,0,0.5,45.0,1,2025-12-30,0,0,-1.0,0,1,-1.0,552.59

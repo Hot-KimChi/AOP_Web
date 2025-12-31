@@ -1,3 +1,0 @@
-﻿numTxCycles,numTxElements,txFrequencyHz,elevAperIndex,isTxAperModulationEn,txpgWaveformStyle,profTxVoltageVolt,VTxindex,probePitchCm,probeRadiusCm,probeElevAperCm0,scanRange,pulseRepetRate
-4,12,3636400,0,1,2,57.71,1,0.04839999973773956,6.107999801635742,1.2999999523162842,6.195199966430664,0
-4,120,3636400,0,1,2,57.71,1,0.04839999973773956,6.107999801635742,1.2999999523162842,0.0,0
