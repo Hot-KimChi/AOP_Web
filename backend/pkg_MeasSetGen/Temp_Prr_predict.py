@@ -151,10 +151,11 @@ def find_prr_for_temprise(
     prr_min: float = 100.0,
     prr_max: float = 30000.0,
     tol: float = 0.05,
-    max_iter: int = 40,
+    max_iter: int = 8,  # 선형 보간 덕분에 20 → 8로 단축
 ) -> Dict[str, Any]:
     """
     목표 TemperatureRise(target_tr)를 만족하는 PRF 탐색.
+    하이브리드 방식: 선형 보간으로 초기 추정 → 정밀 이분 탐색
     PRF↑ ⇒ TempRise↑ 단조 가정. 비교는 항상 float로 수행.
     정책: pred < MIN_VALID_TEMPRISE → pred_temprise=0.0, best_prr=DEFAULT_POLICY_PRF
     """
@@ -183,8 +184,8 @@ def find_prr_for_temprise(
             "note": "0 V or 0 cycles",
         }
 
-    # 초기 로그 스케일 샘플링(전역 탐색용): 구간을 기하간격으로 나눠 거친 스캔 --> 13개 후보
-    grid = np.geomspace(prr_min, prr_max, num=13)
+    # 초기 로그 스케일 샘플링(전역 탐색용): 구간을 기하간격으로 나눠 거친 스캔 --> 7개 후보
+    grid = np.geomspace(prr_min, prr_max, num=7)
 
     # 초기 샘플 평가: 각 PRF 후보에 대해 _predict_temprise_one 호출해서 TempRise 예측
     preds = []
@@ -228,23 +229,63 @@ def find_prr_for_temprise(
             "note": "no crossing",
         }
 
-    lo, hi = prr_min, prr_max
-    y_lo = _extract_temprise(
+    # ===== 선형 보간으로 초기 추정값 계산 =====
+    # target_tr을 감싸는 두 점 찾기
+    lo_idx, hi_idx = 0, len(preds) - 1
+    for i in range(len(preds) - 1):
+        if preds[i][1] <= target_tr <= preds[i + 1][1]:
+            lo_idx, hi_idx = i, i + 1
+            break
+        elif preds[i][1] >= target_tr >= preds[i + 1][1]:  # 역순인 경우
+            lo_idx, hi_idx = i + 1, i
+            break
+
+    # 선형 보간으로 초기 PRF 추정
+    x0, y0 = preds[lo_idx]
+    x1, y1 = preds[hi_idx]
+
+    if abs(y1 - y0) > 1e-6:  # 0으로 나누기 방지
+        # 선형 보간: x = x0 + (target - y0) / (y1 - y0) * (x1 - x0)
+        x_init = x0 + (target_tr - y0) / (y1 - y0) * (x1 - x0)
+        x_init = max(prr_min, min(prr_max, x_init))  # 범위 내로 클리핑
+    else:
+        x_init = 0.5 * (x0 + x1)
+
+    # 초기 추정값 평가
+    y_init = _extract_temprise(
         _predict_temprise_one(
-            {**user_input, "pulseRepetRate": lo}, booster, feature_columns
+            {**user_input, "pulseRepetRate": x_init}, booster, feature_columns
         )
     )
-    y_hi = _extract_temprise(
-        _predict_temprise_one(
-            {**user_input, "pulseRepetRate": hi}, booster, feature_columns
-        )
-    )
-    if y_lo > y_hi:  # 단조 ↑ 가정 보정을 위한 스왑
+
+    # 이미 충분히 가까우면 바로 반환
+    if abs(y_init - target_tr) <= tol * max(1.0, target_tr):
+        if y_init <= 0.0:
+            return {
+                "best_prr": DEFAULT_POLICY_PRF,
+                "pred_temprise": 0.0,
+                "iters": 1,
+                "note": "policy: interpolation converged to 0 → fallback PRF",
+            }
+        return {
+            "best_prr": _scale_prr(x_init),
+            "pred_temprise": y_init,
+            "iters": 1,
+            "note": "converged by interpolation",
+        }
+
+    # ===== 선형 보간 결과 주변에서 정밀 이분 탐색 =====
+    # 탐색 범위를 보간 결과 주변으로 좁힘
+    lo, hi = x0, x1
+    y_lo, y_hi = y0, y1
+
+    # 단조성 보정
+    if y_lo > y_hi:
         lo, hi = hi, lo
         y_lo, y_hi = y_hi, y_lo
 
-    iters = 0
-    best = (None, float("inf"))  # (prr, pred)
+    iters = 1  # 이미 초기 평가 1회 수행
+    best = (x_init, y_init)  # 보간 결과로 초기화
 
     while iters < max_iter:
         mid = 0.5 * (lo + hi)
@@ -280,8 +321,7 @@ def find_prr_for_temprise(
             hi, y_hi = mid, y_mid
         iters += 1
 
-    #     # 최대 반복 도달 or 수렴 종료 시점
-    # → 항상 target에 가장 가까운 후보 반환
+    # 최대 반복 도달 → target에 가장 가까운 후보 반환
     if best[0] is None:
         return {
             "best_prr": None,
@@ -369,6 +409,225 @@ def _add_physics_features(df: pd.DataFrame) -> pd.DataFrame:
     out["log_power_like_scan"] = np.log(out["power_like_scan"] + eps)
 
     return out
+
+
+# ===== 배치 처리를 위한 함수 =====
+def find_prr_for_temprise_batch(
+    user_inputs: list[Dict[str, Any]],
+    target_tr: float,
+    prr_min: float = 100.0,
+    prr_max: float = 30000.0,
+    tol: float = 0.05,
+    max_iter: int = 8,  # 선형 보간 덕분에 20 → 8로 단축
+) -> list[Dict[str, Any]]:
+    """
+    여러 user_input을 배치로 처리하여 성능 개선.
+    하이브리드 방식: 선형 보간으로 초기 추정 → 정밀 이분 탐색
+    모델을 한 번만 로드하고 재사용.
+    """
+    booster, feature_columns = load_artifacts()  # 한 번만 로드
+    results = []
+
+    for user_input in user_inputs:
+        # 물리적 가드
+        V = float(user_input.get("pulseVoltage", 0) or 0)
+        cycles = float(user_input.get("numTxCycles", 0) or 0)
+        if V <= 0 or cycles <= 0:
+            results.append(
+                {
+                    "best_prr": DEFAULT_POLICY_PRF,
+                    "pred_temprise": 0.0,
+                    "iters": 0,
+                    "note": "0 V or 0 cycles",
+                }
+            )
+            continue
+
+        # PRF 범위 보정
+        prr_min_adj = max(float(prr_min), MIN_ALLOWED_PRR)
+        prr_max_adj = min(float(prr_max), MAX_ALLOWED_PRR)
+        if prr_min_adj >= prr_max_adj:
+            results.append(
+                {
+                    "best_prr": None,
+                    "pred_temprise": float("nan"),
+                    "iters": 0,
+                    "note": "invalid bracket after clipping",
+                }
+            )
+            continue
+
+        # 초기 로그 스케일 샘플링 (7개로 축소)
+        grid = np.geomspace(prr_min_adj, prr_max_adj, num=7)
+        preds = []
+        for g in grid:
+            u = dict(user_input)
+            u["pulseRepetRate"] = float(g)
+            y_dict = _predict_temprise_one(u, booster, feature_columns)
+            y_val = _extract_temprise(y_dict)
+            preds.append((float(g), float(y_val)))
+
+        ys = [p[1] for p in preds]
+
+        # 정책 1: 전 구간 차단
+        if max(ys) <= 0.0:
+            results.append(
+                {
+                    "best_prr": DEFAULT_POLICY_PRF,
+                    "pred_temprise": max(ys),
+                    "iters": 0,
+                    "note": "policy: all < MIN_VALID_TEMPRISE → fallback PRF",
+                }
+            )
+            continue
+
+        # 타깃이 범위 밖
+        if not (min(ys) <= target_tr <= max(ys)):
+            best = min(preds, key=lambda t: abs(t[1] - target_tr))
+            if best[1] <= 0.0:
+                results.append(
+                    {
+                        "best_prr": DEFAULT_POLICY_PRF,
+                        "pred_temprise": 0.0,
+                        "iters": 0,
+                        "note": "policy: no crossing & pred=0 → fallback PRF",
+                    }
+                )
+            else:
+                results.append(
+                    {
+                        "best_prr": min(float(best[0]), MAX_ALLOWED_PRR),
+                        "pred_temprise": best[1],
+                        "iters": 0,
+                        "note": "no crossing",
+                    }
+                )
+            continue
+
+        # ===== 선형 보간으로 초기 추정값 계산 =====
+        # target_tr을 감싸는 두 점 찾기
+        lo_idx, hi_idx = 0, len(preds) - 1
+        for i in range(len(preds) - 1):
+            if preds[i][1] <= target_tr <= preds[i + 1][1]:
+                lo_idx, hi_idx = i, i + 1
+                break
+            elif preds[i][1] >= target_tr >= preds[i + 1][1]:  # 역순인 경우
+                lo_idx, hi_idx = i + 1, i
+                break
+
+        # 선형 보간으로 초기 PRF 추정
+        x0, y0 = preds[lo_idx]
+        x1, y1 = preds[hi_idx]
+
+        if abs(y1 - y0) > 1e-6:  # 0으로 나누기 방지
+            # 선형 보간: x = x0 + (target - y0) / (y1 - y0) * (x1 - x0)
+            x_init = x0 + (target_tr - y0) / (y1 - y0) * (x1 - x0)
+            x_init = max(prr_min_adj, min(prr_max_adj, x_init))  # 범위 내로 클리핑
+        else:
+            x_init = 0.5 * (x0 + x1)
+
+        # 초기 추정값 평가
+        y_init = _extract_temprise(
+            _predict_temprise_one(
+                {**user_input, "pulseRepetRate": x_init}, booster, feature_columns
+            )
+        )
+
+        # 이미 충분히 가까우면 바로 반환
+        if abs(y_init - target_tr) <= tol * max(1.0, target_tr):
+            if y_init <= 0.0:
+                results.append(
+                    {
+                        "best_prr": DEFAULT_POLICY_PRF,
+                        "pred_temprise": 0.0,
+                        "iters": 1,
+                        "note": "policy: interpolation converged to 0 → fallback PRF",
+                    }
+                )
+            else:
+                results.append(
+                    {
+                        "best_prr": min(float(x_init), MAX_ALLOWED_PRR),
+                        "pred_temprise": y_init,
+                        "iters": 1,
+                        "note": "converged by interpolation",
+                    }
+                )
+            continue
+
+        # ===== 선형 보간 결과 주변에서 정밀 이분 탐색 =====
+        # 탐색 범위를 보간 결과 주변으로 좁힘
+        lo, hi = x0, x1
+        y_lo, y_hi = y0, y1
+
+        # 단조성 보정
+        if y_lo > y_hi:
+            lo, hi = hi, lo
+            y_lo, y_hi = y_hi, y_lo
+
+        iters = 1  # 이미 초기 평가 1회 수행
+        best = (x_init, y_init)  # 보간 결과로 초기화
+
+        while iters < max_iter:
+            mid = 0.5 * (lo + hi)
+            y_mid = _extract_temprise(
+                _predict_temprise_one(
+                    {**user_input, "pulseRepetRate": mid}, booster, feature_columns
+                )
+            )
+
+            if abs(y_mid - target_tr) < abs(best[1] - target_tr):
+                best = (mid, y_mid)
+
+            if abs(y_mid - target_tr) <= tol * max(1.0, target_tr):
+                if y_mid <= 0.0:
+                    results.append(
+                        {
+                            "best_prr": DEFAULT_POLICY_PRF,
+                            "pred_temprise": 0.0,
+                            "iters": iters + 1,
+                            "note": "policy: converged to 0 → fallback PRF",
+                        }
+                    )
+                else:
+                    results.append(
+                        {
+                            "best_prr": min(float(mid), MAX_ALLOWED_PRR),
+                            "pred_temprise": y_mid,
+                            "iters": iters + 1,
+                            "note": "converged",
+                        }
+                    )
+                break
+
+            if y_mid < target_tr:
+                lo, y_lo = mid, y_mid
+            else:
+                hi, y_hi = mid, y_mid
+            iters += 1
+        else:
+            # 최대 반복 도달
+            if best[0] is None:
+                results.append(
+                    {
+                        "best_prr": None,
+                        "pred_temprise": float("nan"),
+                        "iters": iters,
+                        "note": "no valid candidate",
+                    }
+                )
+            else:
+                final_prr, final_pred = best
+                results.append(
+                    {
+                        "best_prr": min(float(final_prr), MAX_ALLOWED_PRR),
+                        "pred_temprise": final_pred,
+                        "iters": iters,
+                        "note": "max_iter reached",
+                    }
+                )
+
+    return results
 
 
 # ===== Voltage 계산 index 2 (Voltage, ScanRange 동일) =====

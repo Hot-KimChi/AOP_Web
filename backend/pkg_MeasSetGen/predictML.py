@@ -289,6 +289,7 @@ class PredictML:
 
     def temperature_PRF_est(self, target_tr: float = 15.0):
         ## predict PRF by ML model.
+        from pkg_MeasSetGen.Temp_Prr_predict import find_prr_for_temprise_batch
 
         estParams = self._paramForTemperature()
         estParams["pulseRepetRate"] = 0  # 초기값 설정
@@ -302,7 +303,8 @@ class PredictML:
             if c in estParams.columns:
                 estParams[c] = estParams[c].fillna(0).astype(int)
 
-        ai_params = []
+        # 배치 처리를 위해 모든 user_input을 리스트로 준비
+        user_inputs = []
         used_voltages = []
 
         for idx, row in estParams.iterrows():
@@ -310,8 +312,11 @@ class PredictML:
             V = user_input.get("profTxVoltageVolt", 0)
             user_input["pulseVoltage"] = V
             used_voltages.append(V)
-            res = find_prr_for_temprise(user_input, target_tr=target_tr)
-            ai_params.append(res["best_prr"])
+            user_inputs.append(user_input)
+
+        # 배치로 한 번에 처리
+        results = find_prr_for_temprise_batch(user_inputs, target_tr=target_tr)
+        ai_params = [res["best_prr"] for res in results]
 
         # estParams에 결과 할당 (self.temp_df가 아닌)
         estParams["AI_param"] = ai_params
