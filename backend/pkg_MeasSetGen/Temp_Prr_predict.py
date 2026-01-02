@@ -50,8 +50,6 @@ def load_artifacts():
 
 
 # ===== 유틸리티 ======
-
-
 #  예측 출력 형식이 dict/float 섞여 있어도 일관된 float으로 변환
 def _extract_temprise(y) -> float:
     try:
@@ -94,8 +92,6 @@ def predict_temprise_with_xgb(
 
 
 # ===== TempRise 예측 =====
-
-
 def _predict_temprise_one(
     user_input: Dict[str, Any], booster, feature_columns
 ) -> float:
@@ -141,10 +137,9 @@ def _predict_temprise_one(
 
 # ===== 목표 TemperatureRise(target_tr)에 맞는 PRF를 역 탐색 ====
 
+
 # 로그스케일 샘플링
 ## PRF 후보군(log scale) 생성 + 탐색 알고리즘
-
-
 def find_prr_for_temprise(
     user_input: Dict[str, Any],
     target_tr: float,
