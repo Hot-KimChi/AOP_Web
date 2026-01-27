@@ -1,7 +1,7 @@
 // frontend\src\app\(home)\page.js
 export default function HomePage() {
     return (
-      <div className="min-vh-100 d-flex align-items-center justify-content-center">
+      <div className="min-vh-100 d-flex align-items-center justify-content-center position-relative">
         <div className="text-center px-4">
           <div className="mb-4">
             <div className="d-inline-flex align-items-center justify-content-center rounded-4 shadow-lg mb-4" 
@@ -36,6 +36,17 @@ export default function HomePage() {
               🎨 Bootstrap 5
             </span>
           </div>
+        </div>
+        
+        {/* Version Info - Bottom Right */}
+        <div className="position-fixed bottom-0 end-0 m-3" 
+             style={{ 
+               fontSize: '0.85rem',
+               color: '#0d0d0e',
+               opacity: 0.7,
+               userSelect: 'none'
+             }}>
+          v 0.9.10
         </div>
       </div>
     );
