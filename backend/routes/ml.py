@@ -57,41 +57,41 @@ def train_model():
 def get_model_versions_performance():
     """
     모든 모델의 모든 버전과 성능 메트릭을 조회하는 API
-    
+
     Query Parameters:
         - prediction_type (optional): 'intensity', 'power', 'temperature'
         - model_name (optional): 특정 모델만 조회
-    
+
     Returns:
         JSON: 모델별 버전 및 성능 데이터
     """
     try:
         from utils.database_manager import DatabaseManager
-        
+
         # 쿼리 파라미터 가져오기
-        prediction_type = request.args.get('prediction_type', None)
-        model_name = request.args.get('model_name', None)
-        
+        prediction_type = request.args.get("prediction_type", None)
+        model_name = request.args.get("model_name", None)
+
         # 데이터베이스 연결
         db_manager = DatabaseManager()
         db = db_manager.get_mlflow_connection()
-        
+
         # 동적 WHERE 절 구성
         where_conditions = []
         params = []
-        
+
         if prediction_type:
             where_conditions.append("mv.prediction_type = ?")
             params.append(prediction_type)
-        
+
         if model_name:
             where_conditions.append("rm.model_name = ?")
             params.append(model_name)
-        
+
         where_clause = ""
         if where_conditions:
             where_clause = "WHERE " + " AND ".join(where_conditions)
-        
+
         # 모델 버전 및 성능 데이터 조회
         query = f"""
             SELECT 
@@ -115,70 +115,79 @@ def get_model_versions_performance():
             {where_clause}
             ORDER BY rm.model_name, mv.version_number DESC, mp.metric_name
         """
-        
+
         if params:
             result_df = db.execute_query(query, tuple(params))
         else:
             result_df = db.execute_query(query)
-        
+
         if result_df.empty:
             logger.info("No model version data found")
-            return jsonify({
-                "status": "success",
-                "data": [],
-                "message": "훈련된 모델 버전이 없습니다."
-            })
-        
+            return jsonify(
+                {
+                    "status": "success",
+                    "data": [],
+                    "message": "훈련된 모델 버전이 없습니다.",
+                }
+            )
+
         # 데이터 구조화: 모델별 -> 버전별 -> 메트릭
         models_dict = {}
-        
+
         for _, row in result_df.iterrows():
-            model_name = row['model_name']
-            version_id = row['version_id']
-            
+            model_name = row["model_name"]
+            version_id = row["version_id"]
+
             # 모델이 딕셔너리에 없으면 추가
             if model_name not in models_dict:
                 models_dict[model_name] = {
-                    'model_id': int(row['model_id']),
-                    'model_name': model_name,
-                    'model_type': row['model_type'],
-                    'description': row['description'],
-                    'prediction_type': row['prediction_type'],
-                    'versions': {}
+                    "model_id": int(row["model_id"]),
+                    "model_name": model_name,
+                    "model_type": row["model_type"],
+                    "description": row["description"],
+                    "prediction_type": row["prediction_type"],
+                    "versions": {},
                 }
-            
+
             # 버전이 딕셔너리에 없으면 추가
-            if version_id not in models_dict[model_name]['versions']:
-                models_dict[model_name]['versions'][version_id] = {
-                    'version_id': int(version_id),
-                    'version_number': int(row['version_number']),
-                    'stage': row['stage'],
-                    'creation_time': row['creation_time'].isoformat() if row['creation_time'] else None,
-                    'user_id': row['user_id'],
-                    'model_class_name': row['model_class_name'],
-                    'metrics': {}
+            if version_id not in models_dict[model_name]["versions"]:
+                models_dict[model_name]["versions"][version_id] = {
+                    "version_id": int(version_id),
+                    "version_number": int(row["version_number"]),
+                    "stage": row["stage"],
+                    "creation_time": (
+                        row["creation_time"].isoformat()
+                        if row["creation_time"]
+                        else None
+                    ),
+                    "user_id": row["user_id"],
+                    "model_class_name": row["model_class_name"],
+                    "metrics": {},
                 }
-            
+
             # 메트릭 추가
-            if row['metric_name'] and row['metric_value'] is not None:
-                metric_name = row['metric_name']
-                models_dict[model_name]['versions'][version_id]['metrics'][metric_name] = float(row['metric_value'])
-        
+            if row["metric_name"] and row["metric_value"] is not None:
+                metric_name = row["metric_name"]
+                models_dict[model_name]["versions"][version_id]["metrics"][
+                    metric_name
+                ] = float(row["metric_value"])
+
         # 딕셔너리를 리스트로 변환
         result_data = []
         for model_name, model_data in models_dict.items():
             # 버전 딕셔너리를 리스트로 변환
-            versions_list = list(model_data['versions'].values())
-            model_data['versions'] = versions_list
+            versions_list = list(model_data["versions"].values())
+            model_data["versions"] = versions_list
             result_data.append(model_data)
-        
-        logger.info(f"Model versions performance data retrieved: {len(result_data)} models")
-        
-        return jsonify({
-            "status": "success",
-            "data": result_data
-        })
-        
+
+        logger.info(
+            f"Model versions performance data retrieved: {len(result_data)} models"
+        )
+
+        return jsonify({"status": "success", "data": result_data})
+
     except Exception as e:
-        logger.error(f"Failed to retrieve model versions performance: {str(e)}", exc_info=True)
+        logger.error(
+            f"Failed to retrieve model versions performance: {str(e)}", exc_info=True
+        )
         return error_response(str(e), 500)
