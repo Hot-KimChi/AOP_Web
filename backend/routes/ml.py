@@ -76,6 +76,21 @@ def get_model_versions_performance():
         db_manager = DatabaseManager()
         db = db_manager.get_mlflow_connection()
 
+        # 먼저 데이터가 있는지 간단히 확인
+        check_query = """
+            SELECT COUNT(*) as count FROM ml_model_versions
+        """
+        count_result = db.execute_query(check_query)
+        logger.info(f"Total model versions in DB: {count_result.iloc[0]['count']}")
+
+        check_perf_query = """
+            SELECT COUNT(*) as count FROM ml_model_performance
+        """
+        perf_count_result = db.execute_query(check_perf_query)
+        logger.info(
+            f"Total performance records in DB: {perf_count_result.iloc[0]['count']}"
+        )
+
         # 동적 WHERE 절 구성
         where_conditions = []
         params = []
@@ -120,6 +135,11 @@ def get_model_versions_performance():
             result_df = db.execute_query(query, tuple(params))
         else:
             result_df = db.execute_query(query)
+
+        # 디버깅: 쿼리 결과 로깅
+        logger.info(f"Query returned {len(result_df)} rows")
+        if not result_df.empty:
+            logger.info(f"Sample data: {result_df.head(3).to_dict('records')}")
 
         if result_df.empty:
             logger.info("No model version data found")
