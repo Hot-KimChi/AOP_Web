@@ -4,16 +4,11 @@
 
 import React from 'react';
 import { Save, X, FileSpreadsheet } from 'lucide-react';
-import { MESSAGES } from '../constants/messages';
-import { DATA_SOURCES } from '../constants/storageKeys';
 
 export const ActionButtons = React.memo(({
   showChanges,
   onToggleChanges,
-  dataViewSource,
-  isLoading,
   hasData,
-  onMLForTemperature,
   hasChanges,
   hasErrors,
   onSave,
@@ -33,16 +28,6 @@ export const ActionButtons = React.memo(({
         />
         <label htmlFor="showChanges" className="form-check-label">변경 사항 하이라이트</label>
       </div>
-
-      {dataViewSource === DATA_SOURCES.MEASSET_GENERATION && (
-        <button
-          className="btn btn-warning"
-          onClick={onMLForTemperature}
-          disabled={isLoading || !hasData}
-        >
-          {isLoading ? '처리 중...' : 'ML for temperature'}
-        </button>
-      )}
 
       {hasChanges && (
         <>

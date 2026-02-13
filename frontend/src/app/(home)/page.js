@@ -46,7 +46,7 @@ export default function HomePage() {
                opacity: 0.7,
                userSelect: 'none'
              }}>
-          v 0.9.12
+          v 0.9.13
         </div>
       </div>
     );

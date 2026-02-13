@@ -1,8 +1,7 @@
 //src/app/data-view/page.js
 'use client';
 
-import { useEffect, useState, Suspense, useCallback } from 'react';
-import { MESSAGES } from './constants/messages';
+import { useEffect, Suspense, useCallback } from 'react';
 import { downloadCSV as downloadCSVFile } from './utils/csvExport';
 
 // Custom Hooks
@@ -37,11 +36,9 @@ function DataViewContent() {
     error,
     comboBoxOptions,
     editableColumns,
-    dataViewSource,
     setCsvData,
     setDisplayData,
     setOriginalData,
-    setComboBoxOptions,
     loadDataFromStorage,
     refreshData,
     saveData,
@@ -53,7 +50,7 @@ function DataViewContent() {
     filters,
     handleComboBoxChange,
     clearFilter,
-  } = useDataFilter(csvData, setDisplayData, () => { });
+  } = useDataFilter(csvData, setDisplayData);
 
   // 3. 정렬
   const {
@@ -64,7 +61,9 @@ function DataViewContent() {
   // 4. 편집
   const {
     editedData,
+    setEditedData,
     validationErrors,
+    setValidationErrors,
     showChanges,
     setShowChanges,
     handleCellChange,
@@ -87,7 +86,6 @@ function DataViewContent() {
     deletedRows,
     setDeletedRows,
     handleDeleteRow,
-    handleCopyRow,
     restoreDeletedRows,
   } = useRowOperations(
     csvData,
@@ -96,9 +94,9 @@ function DataViewContent() {
     setDisplayData,
     filters,
     editedData,
-    () => { },
+    setEditedData,
     validationErrors,
-    () => { }
+    setValidationErrors
   );
 
   // 6. 윈도우 동기화
@@ -116,34 +114,6 @@ function DataViewContent() {
     } catch (error) {
       console.error('내보내기 실패:', error);
       alert(MESSAGES.ERROR_DOWNLOAD);
-    }
-  }, [displayData]);
-
-  // ML for temperature 핸들러
-  const handleMLForTemperature = useCallback(async () => {
-    if (!displayData || displayData.length === 0) {
-      alert(MESSAGES.INFO_NO_DATA_TO_PROCESS);
-      return;
-    }
-
-    try {
-      console.log('ML for temperature 처리 시작');
-      console.log('처리할 데이터:', displayData);
-
-      // TODO: ML 처리 API 호출 구현
-      // const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
-      // const response = await fetch(`${API_BASE_URL}/api/ml-temperature`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ data: displayData })
-      // });
-      // if (!response.ok) throw new Error('ML 처리 실패');
-      // const result = await response.json();
-
-      alert(MESSAGES.ML_COMPLETE);
-    } catch (error) {
-      console.error('ML 처리 오류:', error);
-      alert(MESSAGES.ERROR_ML_PROCESSING);
     }
   }, [displayData]);
 
@@ -182,10 +152,7 @@ function DataViewContent() {
             <ActionButtons
               showChanges={showChanges}
               onToggleChanges={() => setShowChanges(!showChanges)}
-              dataViewSource={dataViewSource}
-              isLoading={isLoading}
               hasData={hasData}
-              onMLForTemperature={handleMLForTemperature}
               hasChanges={hasChanges}
               hasErrors={hasErrors}
               onSave={handleSave}
@@ -220,7 +187,6 @@ function DataViewContent() {
               onFilterChange={handleComboBoxChange}
               onClearFilter={clearFilter}
               onCellChange={handleCellChange}
-              onCopyRow={handleCopyRow}
               onDeleteRow={handleDeleteRow}
             />
           </div>

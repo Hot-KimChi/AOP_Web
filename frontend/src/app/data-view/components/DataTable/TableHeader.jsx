@@ -10,7 +10,7 @@ export const TableHeader = React.memo(({ headers, editableKeys, sortConfig, onSo
   return (
     <tr className="bg-gray-100">
       <th className="px-3 py-2 border text-center" style={{ width: '60px' }}>
-        <span title="행 복사/삭제" className="font-medium text-gray-700">복사/삭제</span>
+        <span title="행 삭제" className="font-medium text-gray-700">삭제</span>
       </th>
       {headers.map((header, index) => (
         <th key={index} className="border" style={{ padding: '4px' }}>

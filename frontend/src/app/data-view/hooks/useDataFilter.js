@@ -4,11 +4,14 @@
  * @description
  * 테이블 데이터의 필터링 로직을 관리합니다.
  * 콤보박스 필터 적용, 초기화 등의 기능을 제공합니다.
+ * 
+ * @param {Array} csvData - 원본 CSV 데이터
+ * @param {Function} setDisplayData - 화면 데이터 setter
  */
 
 import { useState, useCallback } from 'react';
 
-export const useDataFilter = (csvData, setDisplayData, setDeletedRows) => {
+export const useDataFilter = (csvData, setDisplayData) => {
   const [filters, setFilters] = useState({});
 
   /**
@@ -31,8 +34,7 @@ export const useDataFilter = (csvData, setDisplayData, setDeletedRows) => {
     });
 
     setDisplayData(filteredData);
-    setDeletedRows([]); // 필터 변경 시 삭제 추적 초기화
-  }, [csvData, setDisplayData, setDeletedRows]);
+  }, [csvData, setDisplayData]);
 
   /**
    * 콤보박스 값 변경 핸들러

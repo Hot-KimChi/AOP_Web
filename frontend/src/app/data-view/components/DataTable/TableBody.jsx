@@ -15,7 +15,6 @@ export const TableBody = React.memo(({
   validationErrors,
   showChanges,
   onCellChange,
-  onCopyRow,
   onDeleteRow
 }) => {
   const renderCellContent = (value, rowIndex, columnName) => {
@@ -65,11 +64,9 @@ export const TableBody = React.memo(({
         <tr key={rowIndex} className="hover:bg-gray-50">
           <RowActions
             rowIndex={rowIndex}
-            onCopy={onCopyRow}
             onDelete={onDeleteRow}
           />
-          {Object.entries(row).map(([key, value], colIndex) => {
-            const columnName = Object.keys(row)[colIndex];
+          {Object.entries(row).map(([columnName, value], colIndex) => {
             const cellKey = `${rowIndex}-${columnName}`;
             const isChanged = editedData[cellKey] !== undefined;
             const showHighlight = showChanges && isChanged;

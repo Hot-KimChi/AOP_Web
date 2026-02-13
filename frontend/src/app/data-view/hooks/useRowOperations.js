@@ -2,7 +2,7 @@
  * 행 조작 Custom Hook
  * 
  * @description
- * 행 복사, 삭제, 복원 등의 기능을 관리합니다.
+ * 행 삭제, 복원 등의 기능을 관리합니다.
  */
 
 import { useState, useCallback } from 'react';
@@ -54,32 +54,6 @@ export const useRowOperations = (
   }, [displayData, setDisplayData, editedData, setEditedData, validationErrors, setValidationErrors]);
 
   /**
-   * 행 복사 핸들러
-   */
-  const handleCopyRow = useCallback((rowIndex) => {
-    const rowToCopy = displayData[rowIndex];
-    const newRow = { ...rowToCopy };
-    const updatedCsvData = [...csvData, newRow];
-    setCsvData(updatedCsvData);
-
-    // 활성 필터가 있을 경우 재적용
-    if (Object.keys(filters).length > 0) {
-      let filteredData = [...updatedCsvData];
-      Object.entries(filters).forEach(([column, filterValues]) => {
-        if (filterValues && filterValues.length > 0) {
-          filteredData = filteredData.filter(row => {
-            const cellValue = (row[column]?.toString() || '').toLowerCase();
-            return filterValues.every(filter => cellValue === filter.toLowerCase().trim());
-          });
-        }
-      });
-      setDisplayData(filteredData);
-    } else {
-      setDisplayData(updatedCsvData);
-    }
-  }, [displayData, csvData, setCsvData, filters, setDisplayData]);
-
-  /**
    * 삭제된 행 복원
    */
   const restoreDeletedRows = useCallback(() => {
@@ -103,7 +77,6 @@ export const useRowOperations = (
     deletedRows,
     setDeletedRows,
     handleDeleteRow,
-    handleCopyRow,
     restoreDeletedRows,
   };
 };

@@ -137,7 +137,9 @@ export const useDataEdit = (
 
   return {
     editedData,
+    setEditedData,
     validationErrors,
+    setValidationErrors,
     showChanges,
     setShowChanges,
     handleCellChange,

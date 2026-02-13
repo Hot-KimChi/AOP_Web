@@ -20,7 +20,6 @@ export const DataTable = React.memo(({
   onFilterChange,
   onClearFilter,
   onCellChange,
-  onCopyRow,
   onDeleteRow
 }) => {
   const headers = useMemo(() => {
@@ -52,7 +51,6 @@ export const DataTable = React.memo(({
           validationErrors={validationErrors}
           showChanges={showChanges}
           onCellChange={onCellChange}
-          onCopyRow={onCopyRow}
           onDeleteRow={onDeleteRow}
         />
       </table>
