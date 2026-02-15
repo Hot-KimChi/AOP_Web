@@ -144,6 +144,7 @@ class PredictML:
         # Create two copies: one with fullScanRange, one with 0
         estParams_full = estParams.copy()
         estParams_full["scanRange"] = fullScanRange
+        estParams_full["numTxCycles"] = 4  # 온도모델링을 위해서, 사이클 수를 4로 고정
         estParams_full["numTxElements"] = estParams_full["numTxElements"] // 10
         # 온도모델링을 위해서, Element 수를 1/10로 줄임
 
@@ -330,6 +331,46 @@ class PredictML:
         result_df["AI_param"] = result_df["AI_param"].round(2)
         result_df["measSetComments"] = f"Beamstyle_{self.probeName}_temperature"
         result_df = result_df.sort_values("GroupIndex")
+
+        # ============================================================
+        # estParams_zero에서 대표 행 선택 → 동일 쌍의 estParams_full 행을
+        # result_df에 추가
+        #
+        # 인덱스 구조 (pd.concat + ignore_index=True에서 유래):
+        #   estParams_full : 인덱스 0 ~ N-1
+        #   estParams_zero : 인덱스 N ~ 2N-1
+        #   → zero_idx - N = full_idx  (같은 GroupIndex 쌍)
+        # ============================================================
+        n = len(estParams_full)  # full과 zero의 행 수는 동일
+
+        # Step 1: estParams_zero에서 (elevAperIndex, isTxAperModulationEn) 조합별
+        #          AI_param이 가장 높은 행의 인덱스를 선택 (최대 4행)
+        selected_zero_idx = estParams_zero.groupby(
+            ["elevAperIndex", "isTxAperModulationEn"]
+        )["AI_param"].idxmax()
+
+        # Step 2: zero_idx - N = full_idx (같은 GroupIndex 쌍으로 매핑)
+        paired_full_idx = selected_zero_idx.values - n
+        selected_full = estParams_full.loc[paired_full_idx]
+
+        # Step 3: self.temp_df에서 동일 위치의 원본 행 가져오기
+        temp_df_reset = self.temp_df.reset_index(drop=True)
+        full_result_rows = temp_df_reset.iloc[paired_full_idx].copy()
+
+        # Step 4: estParams_full의 수정된 값들을 결과 행에 반영
+        #   - AI_param: SA 모드 PRR 예측값
+        #   - NumTxElements: estParams_full에서 // 10 된 값
+        #   - ProbeNumTxCycles: estParams_full에서 4로 고정된 값
+        full_result_rows["AI_param"] = selected_full["AI_param"].values
+        full_result_rows["AI_param"] = full_result_rows["AI_param"].round(2)
+        full_result_rows["NumTxElements"] = selected_full["numTxElements"].values
+        full_result_rows["ProbeNumTxCycles"] = selected_full["numTxCycles"].values
+        full_result_rows["measSetComments"] = (
+            f"Beamstyle_{self.probeName}_temperature_SA"
+        )
+
+        # Step 5: 기존 result_df(zero)에 SA 모드 대표 행 추가
+        result_df = pd.concat([result_df, full_result_rows], ignore_index=True)
 
         # # MLflow prediction logging
         # try:
