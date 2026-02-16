@@ -91,6 +91,7 @@ class PredictML:
 
         estParams = self.temp_df[
             [
+                "GroupIndex",
                 "ProbeNumTxCycles",
                 "NumTxElements",
                 "TxFrequencyHz",
@@ -310,6 +311,10 @@ class PredictML:
 
         for idx, row in estParams.iterrows():
             user_input = row.to_dict()
+
+            # ML 모델 입력에서 제외할 컬럼 제거
+            user_input.pop("GroupIndex", None)
+
             V = user_input.get("profTxVoltageVolt", 0)
             user_input["pulseVoltage"] = V
             used_voltages.append(V)
@@ -333,15 +338,9 @@ class PredictML:
         result_df = result_df.sort_values("GroupIndex")
 
         # ============================================================
-        # estParams_zero에서 대표 행 선택 → 동일 쌍의 estParams_full 행을
+        # estParams_zero에서 대표 행 선택 → 동일 GroupIndex의 estParams_full 행을
         # result_df에 추가
-        #
-        # 인덱스 구조 (pd.concat + ignore_index=True에서 유래):
-        #   estParams_full : 인덱스 0 ~ N-1
-        #   estParams_zero : 인덱스 N ~ 2N-1
-        #   → zero_idx - N = full_idx  (같은 GroupIndex 쌍)
         # ============================================================
-        n = len(estParams_full)  # full과 zero의 행 수는 동일
 
         # Step 1: estParams_zero에서 (elevAperIndex, isTxAperModulationEn) 조합별
         #          AI_param이 가장 높은 행의 인덱스를 선택 (최대 4행)
@@ -349,13 +348,20 @@ class PredictML:
             ["elevAperIndex", "isTxAperModulationEn"]
         )["AI_param"].idxmax()
 
-        # Step 2: zero_idx - N = full_idx (같은 GroupIndex 쌍으로 매핑)
-        paired_full_idx = selected_zero_idx.values - n
-        selected_full = estParams_full.loc[paired_full_idx]
+        # Step 2: 선택된 zero 행의 GroupIndex로 paired full 행 찾기
+        selected_group_indices = estParams_zero.loc[selected_zero_idx][
+            "GroupIndex"
+        ].values
+        selected_full = estParams_full[
+            estParams_full["GroupIndex"].isin(selected_group_indices)
+        ].sort_values("GroupIndex")
 
-        # Step 3: self.temp_df에서 동일 위치의 원본 행 가져오기
-        temp_df_reset = self.temp_df.reset_index(drop=True)
-        full_result_rows = temp_df_reset.iloc[paired_full_idx].copy()
+        # Step 3: self.temp_df에서 동일 GroupIndex의 원본 행 가져오기
+        full_result_rows = (
+            self.temp_df[self.temp_df["GroupIndex"].isin(selected_group_indices)]
+            .sort_values("GroupIndex")
+            .copy()
+        )
 
         # Step 4: estParams_full의 수정된 값들을 결과 행에 반영
         #   - AI_param: SA 모드 PRR 예측값
