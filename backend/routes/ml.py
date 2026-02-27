@@ -241,16 +241,20 @@ def get_prediction_points():
         db_manager = DatabaseManager()
         db = db_manager.get_mlflow_connection()
 
-        logger.info(f"[Scatter Debug] prediction_type={prediction_type}, model_name={model_name}, version_id={version_id}, latest_only={latest_only}")
+        logger.info(
+            f"[Scatter Debug] prediction_type={prediction_type}, model_name={model_name}, version_id={version_id}, latest_only={latest_only}"
+        )
 
         # 먼저 prediction_points 테이블 데이터 존재 여부 확인
         try:
             check_query = "SELECT COUNT(*) as cnt FROM ml_prediction_points"
             check_result = db.execute_query(check_query)
-            pp_count = check_result.iloc[0]['cnt'] if not check_result.empty else 0
+            pp_count = check_result.iloc[0]["cnt"] if not check_result.empty else 0
             logger.info(f"[Scatter Debug] Total prediction_points in DB: {pp_count}")
         except Exception as check_err:
-            logger.error(f"[Scatter Debug] Cannot query ml_prediction_points table: {check_err}")
+            logger.error(
+                f"[Scatter Debug] Cannot query ml_prediction_points table: {check_err}"
+            )
 
         if version_id:
             # 특정 버전 ID로 직접 조회
@@ -336,14 +340,18 @@ def get_prediction_points():
 
             result_df = db.execute_query(query, tuple(params))
 
-        logger.info(f"[Scatter Debug] Query returned {len(result_df)} rows, columns: {list(result_df.columns) if not result_df.empty else 'N/A'}")
+        logger.info(
+            f"[Scatter Debug] Query returned {len(result_df)} rows, columns: {list(result_df.columns) if not result_df.empty else 'N/A'}"
+        )
 
         if result_df.empty:
-            return jsonify({
-                "status": "success",
-                "data": [],
-                "message": "예측 포인트 데이터가 없습니다. Training을 먼저 실행해주세요.",
-            })
+            return jsonify(
+                {
+                    "status": "success",
+                    "data": [],
+                    "message": "예측 포인트 데이터가 없습니다. Training을 먼저 실행해주세요.",
+                }
+            )
 
         # 모델/버전별로 데이터 구조화
         models_dict = {}
@@ -361,12 +369,18 @@ def get_prediction_points():
                     "points": [],
                 }
 
-            models_dict[key]["points"].append({
-                "target_value": float(row["target_value"]),
-                "estimation_value": float(row["estimation_value"]),
-                "data_index": int(row["data_index"]) if row["data_index"] is not None else None,
-                "dataset_type": row["dataset_type"],
-            })
+            models_dict[key]["points"].append(
+                {
+                    "target_value": float(row["target_value"]),
+                    "estimation_value": float(row["estimation_value"]),
+                    "data_index": (
+                        int(row["data_index"])
+                        if row["data_index"] is not None
+                        else None
+                    ),
+                    "dataset_type": row["dataset_type"],
+                }
+            )
 
         result_data = list(models_dict.values())
         total_points = sum(len(m["points"]) for m in result_data)
@@ -378,7 +392,5 @@ def get_prediction_points():
         return jsonify({"status": "success", "data": result_data})
 
     except Exception as e:
-        logger.error(
-            f"Failed to retrieve prediction points: {str(e)}", exc_info=True
-        )
+        logger.error(f"Failed to retrieve prediction points: {str(e)}", exc_info=True)
         return error_response(str(e), 500)

@@ -856,7 +856,9 @@ class AOP_MLflowTracker:
         except Exception as e:
             self.logger.error(f"Failed to log model performance: {e}")
 
-    def log_prediction_points(self, version_id, target_values, estimation_values, dataset_type="test"):
+    def log_prediction_points(
+        self, version_id, target_values, estimation_values, dataset_type="test"
+    ):
         """
         Target vs Estimation 데이터 포인트를 ml_prediction_points 테이블에 저장
         (산점도 시각화용)
