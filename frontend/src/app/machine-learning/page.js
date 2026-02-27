@@ -1,13 +1,16 @@
 "use client";
 import React, { useEffect, useState, useMemo } from "react";
 import Layout from '../../components/Layout';
-import { Line } from 'react-chartjs-2';
+import { Line, Scatter } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  LineController,
+  ScatterController,
+  Filler,
   Title,
   Tooltip,
   Legend
@@ -19,6 +22,9 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  LineController,
+  ScatterController,
+  Filler,
   Title,
   Tooltip,
   Legend
@@ -35,7 +41,13 @@ export default function MachineLearningPage() {
   // 새로운 state: 모델 버전 성능 데이터
   const [versionsData, setVersionsData] = useState([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
-  
+
+  // 🆕 Target vs Estimation 산점도 데이터
+  const [scatterData, setScatterData] = useState([]);
+  const [scatterLoading, setScatterLoading] = useState(false);
+
+  // 🆕 선택된 모델/버전 (그래프 클릭 또는 훈련 후 자동 선택)
+  const [selectedScatterInfo, setSelectedScatterInfo] = useState(null);
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
@@ -79,6 +91,8 @@ export default function MachineLearningPage() {
     
     fetchModels();
     fetchVersionsPerformance();
+    // 초기 로드: 전체 모델의 최신 버전 산점도
+    fetchPredictionPointsLatest();
   }, [API_BASE_URL]);
 
   const handleTraining = async () => {
@@ -109,6 +123,12 @@ export default function MachineLearningPage() {
         
         // 훈련 후 버전 데이터 다시 로드
         await fetchVersionsPerformance();
+
+        // 훈련된 모델의 최신 산점도 자동 로드
+        const trainedModelName = selectedModel.includes('_AOP_') 
+          ? selectedModel 
+          : `${selectedModel}_AOP_Intensity`;
+        await fetchPredictionPointsByModel(trainedModelName);
       } else {
         setError(data.message || "모델 훈련에 실패했습니다.");
       }
@@ -133,6 +153,69 @@ export default function MachineLearningPage() {
       console.error("Failed to fetch versions performance:", e);
     } finally {
       setVersionsLoading(false);
+    }
+  };
+
+  // 전체 모델 최신 버전의 산점도 로드 (초기 로드용)
+  const fetchPredictionPointsLatest = async () => {
+    setScatterLoading(true);
+    setSelectedScatterInfo(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/prediction_points?prediction_type=intensity&latest_only=true`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.status === "success") {
+        setScatterData(data.data || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch prediction points:", e);
+    } finally {
+      setScatterLoading(false);
+    }
+  };
+
+  // 특정 version_id의 산점도 로드 (그래프 클릭용)
+  const fetchPredictionPointsByVersion = async (versionId, modelName, versionNumber) => {
+    setScatterLoading(true);
+    setSelectedScatterInfo({ model_name: modelName, version_number: versionNumber, version_id: versionId });
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/prediction_points?version_id=${versionId}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.status === "success") {
+        setScatterData(data.data || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch prediction points by version:", e);
+    } finally {
+      setScatterLoading(false);
+    }
+  };
+
+  // 특정 모델의 최신 버전 산점도 로드 (훈련 후 자동 로드용)
+  const fetchPredictionPointsByModel = async (modelName) => {
+    setScatterLoading(true);
+    setSelectedScatterInfo({ model_name: modelName, version_number: 'latest', version_id: null });
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/prediction_points?prediction_type=intensity&model_name=${encodeURIComponent(modelName)}&latest_only=true`,
+        { credentials: "include" }
+      );
+      const data = await res.json();
+      if (data.status === "success") {
+        setScatterData(data.data || []);
+        // 실제 반환된 데이터로 info 업데이트
+        if (data.data && data.data.length > 0) {
+          const m = data.data[0];
+          setSelectedScatterInfo({ model_name: m.model_name, version_number: m.version_number, version_id: m.version_id });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch prediction points by model:", e);
+    } finally {
+      setScatterLoading(false);
     }
   };
 
@@ -254,10 +337,31 @@ export default function MachineLearningPage() {
     return { datasets };
   }, [versionsData]);
 
+  // 그래프 포인트 클릭 → 해당 모델/버전의 산점도 로드
+  const handleChartClick = (event, elements, chart) => {
+    if (!elements || elements.length === 0) return;
+    const el = elements[0];
+    const datasetIndex = el.datasetIndex;
+    const pointIndex = el.index;
+    const dataset = chart.data.datasets[datasetIndex];
+    const point = dataset.data[pointIndex];
+    const versionNumber = point.x;
+
+    // versionsData에서 해당 모델 & 버전의 version_id 찾기
+    const modelName = versionsData[datasetIndex]?.model_name;
+    const modelData = versionsData.find(m => m.model_name === modelName);
+    if (!modelData) return;
+    const versionData = modelData.versions.find(v => v.version_number === versionNumber);
+    if (!versionData) return;
+
+    fetchPredictionPointsByVersion(versionData.version_id, modelName, versionNumber);
+  };
+
   // 차트 옵션
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    onClick: handleChartClick,
     plugins: {
       legend: {
         display: true,
@@ -274,7 +378,7 @@ export default function MachineLearningPage() {
       tooltip: {
         callbacks: {
           label: function(context) {
-            return `${context.dataset.label} v${context.parsed.x}: R² = ${context.parsed.y.toFixed(4)}`;
+            return `${context.dataset.label} v${context.parsed.x}: R² = ${context.parsed.y.toFixed(4)} (클릭하여 산점도 보기)`;
           }
         }
       }
@@ -303,15 +407,147 @@ export default function MachineLearningPage() {
           }
         }
       }
-    }
+    },
+    interaction: {
+      mode: 'nearest',
+      intersect: true,
+    },
+    onHover: (event, elements) => {
+      event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+    },
+  };
+
+  // 🆕 산점도 데이터 준비 (Target vs Estimation)
+  const scatterChartData = useMemo(() => {
+    if (scatterData.length === 0) return null;
+
+    const modelColors = [
+      'rgb(255, 99, 132)',
+      'rgb(54, 162, 235)',
+      'rgb(255, 206, 86)',
+      'rgb(75, 192, 192)',
+      'rgb(153, 102, 255)',
+      'rgb(255, 159, 64)',
+      'rgb(199, 199, 199)',
+      'rgb(83, 102, 255)',
+      'rgb(255, 99, 255)',
+      'rgb(99, 255, 132)',
+    ];
+
+    // 전체 데이터 범위 계산 (y=x 기준선용)
+    let globalMin = Infinity;
+    let globalMax = -Infinity;
+    scatterData.forEach(model => {
+      model.points.forEach(p => {
+        const minVal = Math.min(p.target_value, p.estimation_value);
+        const maxVal = Math.max(p.target_value, p.estimation_value);
+        if (minVal < globalMin) globalMin = minVal;
+        if (maxVal > globalMax) globalMax = maxVal;
+      });
+    });
+
+    // 약간의 여백 추가
+    const margin = (globalMax - globalMin) * 0.05;
+    globalMin = globalMin - margin;
+    globalMax = globalMax + margin;
+
+    // 각 모델별 scatter dataset
+    const datasets = scatterData.map((model, idx) => {
+      const color = modelColors[idx % modelColors.length];
+      const points = model.points.map(p => ({
+        x: p.target_value,
+        y: p.estimation_value,
+      }));
+
+      const displayName = model.model_name.replace('_AOP_Intensity', '');
+      const stageLabel = model.stage === 'Production' ? ' ⭐' : '';
+
+      return {
+        label: `${displayName} v${model.version_number}${stageLabel}`,
+        data: points,
+        backgroundColor: color.replace('rgb', 'rgba').replace(')', ', 0.6)'),
+        borderColor: color,
+        borderWidth: 1,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointStyle: 'circle',
+        showLine: false,
+      };
+    });
+
+    // y=x 이상적 기준선 (대각선) — scatter 타입 + showLine으로 표시
+    datasets.unshift({
+      label: 'Ideal (y = x)',
+      data: [
+        { x: globalMin, y: globalMin },
+        { x: globalMax, y: globalMax },
+      ],
+      borderColor: 'rgba(0, 0, 0, 0.3)',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [6, 4],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      showLine: true,
+      fill: false,
+    });
+
+    return { datasets };
+  }, [scatterData]);
+
+  // 🆕 산점도 옵션
+  const scatterChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top',
+        labels: {
+          usePointStyle: true,
+          font: { size: 11 },
+        },
+      },
+      title: {
+        display: true,
+        text: 'Target vs Estimation (Test Set)',
+        font: { size: 16, weight: 'bold' },
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            if (context.dataset.label === 'Ideal (y = x)') return null;
+            return `${context.dataset.label}: Target=${context.parsed.x.toFixed(2)}, Est=${context.parsed.y.toFixed(2)}`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        type: 'linear',
+        title: {
+          display: true,
+          text: 'Target Value (실제 값)',
+          font: { size: 13, weight: 'bold' },
+        },
+      },
+      y: {
+        type: 'linear',
+        title: {
+          display: true,
+          text: 'Estimation Value (예측 값)',
+          font: { size: 13, weight: 'bold' },
+        },
+      },
+    },
   };
 
   return (
     <Layout>
       <div className="container-fluid mt-4">
-        <div className="row align-items-start">
+        <div className="row align-items-stretch">
           {/* 왼쪽: 모델 버전별 성능 그래프 및 테이블 */}
-          <div className="col-lg-8 mb-4">
+          <div className="col-lg-6 mb-4 d-flex flex-column">
             {/* 차트 카드 */}
             <div className="card shadow-sm mb-4">
               <div className="card-header bg-success text-white">
@@ -451,8 +687,68 @@ export default function MachineLearningPage() {
         </div>
       </div>
 
-      {/* 오른쪽: 머신러닝 모델 선택 */}
-      <div className="col-lg-4 mb-4">
+      {/* 오른쪽: 산점도 + 머신러닝 모델 선택 */}
+      <div className="col-lg-6 mb-4 d-flex flex-column">
+        {/* 🆕 산점도 카드: Target vs Estimation */}
+        <div className="card shadow-sm mb-4">
+          <div className="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+            <h5 className="mb-0">
+              Target vs Estimation 산점도
+              <small className="ms-2 fw-normal">(Test Set)</small>
+            </h5>
+            {selectedScatterInfo && (
+              <div className="d-flex align-items-center gap-2">
+                <span className="badge bg-dark">
+                  {selectedScatterInfo.model_name?.replace('_AOP_Intensity', '')} v{selectedScatterInfo.version_number}
+                </span>
+                <button
+                  className="btn btn-sm btn-outline-dark py-0 px-2"
+                  onClick={() => fetchPredictionPointsLatest()}
+                  title="전체 모델 최신 버전으로 초기화"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="card-body" style={{height: '400px'}}>
+            {scatterLoading ? (
+              <div className="text-center py-5">
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                산점도 데이터 로딩 중...
+              </div>
+            ) : scatterData.length === 0 ? (
+              <div className="alert alert-warning">
+                예측 포인트 데이터가 없습니다. Training을 먼저 실행해주세요.
+              </div>
+            ) : scatterChartData ? (
+              <Scatter data={scatterChartData} options={scatterChartOptions} />
+            ) : null}
+          </div>
+          {scatterData.length > 0 && (
+            <div className="card-footer bg-light">
+              <div className="d-flex align-items-start">
+                <div className="flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" className="bi bi-info-circle-fill text-warning" viewBox="0 0 16 16">
+                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2"/>
+                  </svg>
+                </div>
+                <div className="flex-grow-1 ms-2">
+                  <p className="mb-0 small text-muted">
+                    <strong>점선 대각선</strong>은 이상적인 예측(y=x)을 나타냅니다.
+                    점이 대각선에 가까울수록 모델의 예측 정확도가 높습니다.
+                    {scatterData.map((m, i) => (
+                      <span key={i} className="badge bg-secondary ms-1">
+                        {m.model_name.replace('_AOP_Intensity', '')} v{m.version_number}: {m.points.length}개 포인트
+                      </span>
+                    ))}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="card shadow-sm sticky-top" style={{top: '20px'}}>
           <div className="card-header bg-primary text-white">
             <h5 className="mb-0">머신러닝 모델 선택</h5>

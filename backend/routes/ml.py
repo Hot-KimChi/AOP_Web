@@ -211,3 +211,174 @@ def get_model_versions_performance():
             f"Failed to retrieve model versions performance: {str(e)}", exc_info=True
         )
         return error_response(str(e), 500)
+
+
+@ml_bp.route("/prediction_points", methods=["GET"])
+@handle_exceptions
+@require_auth
+def get_prediction_points():
+    """
+    특정 모델 버전의 Target vs Estimation 예측 포인트를 조회하는 API
+    (산점도 시각화용)
+
+    Query Parameters:
+        - prediction_type (optional): 'intensity', 'power', 'temperature' (기본: 'intensity')
+        - model_name (optional): 특정 모델만 조회
+        - version_id (optional): 특정 버전 ID만 조회
+        - latest_only (optional): 'true'이면 각 모델의 최신 버전만 조회 (기본: 'true')
+
+    Returns:
+        JSON: 모델별 target vs estimation 데이터 포인트
+    """
+    try:
+        from utils.database_manager import DatabaseManager
+
+        prediction_type = request.args.get("prediction_type", "intensity")
+        model_name = request.args.get("model_name", None)
+        version_id = request.args.get("version_id", None)
+        latest_only = request.args.get("latest_only", "true").lower() == "true"
+
+        db_manager = DatabaseManager()
+        db = db_manager.get_mlflow_connection()
+
+        logger.info(f"[Scatter Debug] prediction_type={prediction_type}, model_name={model_name}, version_id={version_id}, latest_only={latest_only}")
+
+        # 먼저 prediction_points 테이블 데이터 존재 여부 확인
+        try:
+            check_query = "SELECT COUNT(*) as cnt FROM ml_prediction_points"
+            check_result = db.execute_query(check_query)
+            pp_count = check_result.iloc[0]['cnt'] if not check_result.empty else 0
+            logger.info(f"[Scatter Debug] Total prediction_points in DB: {pp_count}")
+        except Exception as check_err:
+            logger.error(f"[Scatter Debug] Cannot query ml_prediction_points table: {check_err}")
+
+        if version_id:
+            # 특정 버전 ID로 직접 조회
+            query = """
+                SELECT 
+                    rm.model_name,
+                    mv.version_id,
+                    mv.version_number,
+                    mv.stage,
+                    pp.target_value,
+                    pp.estimation_value,
+                    pp.data_index,
+                    pp.dataset_type
+                FROM ml_prediction_points pp
+                JOIN ml_model_versions mv ON pp.model_version_id = mv.version_id
+                JOIN ml_registered_models rm ON mv.model_id = rm.model_id
+                WHERE pp.model_version_id = ?
+                ORDER BY pp.data_index
+            """
+            result_df = db.execute_query(query, (int(version_id),))
+        else:
+            # 동적 WHERE 절 구성
+            where_conditions = ["mv.prediction_type = ?"]
+            params = [prediction_type]
+
+            if model_name:
+                where_conditions.append("rm.model_name = ?")
+                params.append(model_name)
+
+            where_clause = " AND ".join(where_conditions)
+
+            if latest_only:
+                # 각 모델의 최신 버전만 조회 (Production 우선, 없으면 가장 높은 version_number)
+                query = f"""
+                    WITH LatestVersions AS (
+                        SELECT 
+                            mv.version_id,
+                            mv.model_id,
+                            mv.version_number,
+                            mv.stage,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY mv.model_id 
+                                ORDER BY 
+                                    CASE mv.stage WHEN 'Production' THEN 0 ELSE 1 END,
+                                    mv.version_number DESC
+                            ) as rn
+                        FROM ml_model_versions mv
+                        JOIN ml_registered_models rm ON mv.model_id = rm.model_id
+                        WHERE {where_clause}
+                    )
+                    SELECT 
+                        rm.model_name,
+                        lv.version_id,
+                        lv.version_number,
+                        lv.stage,
+                        pp.target_value,
+                        pp.estimation_value,
+                        pp.data_index,
+                        pp.dataset_type
+                    FROM LatestVersions lv
+                    JOIN ml_prediction_points pp ON lv.version_id = pp.model_version_id
+                    JOIN ml_registered_models rm ON lv.model_id = rm.model_id
+                    WHERE lv.rn = 1
+                    ORDER BY rm.model_name, pp.data_index
+                """
+            else:
+                query = f"""
+                    SELECT 
+                        rm.model_name,
+                        mv.version_id,
+                        mv.version_number,
+                        mv.stage,
+                        pp.target_value,
+                        pp.estimation_value,
+                        pp.data_index,
+                        pp.dataset_type
+                    FROM ml_prediction_points pp
+                    JOIN ml_model_versions mv ON pp.model_version_id = mv.version_id
+                    JOIN ml_registered_models rm ON mv.model_id = rm.model_id
+                    WHERE {where_clause}
+                    ORDER BY rm.model_name, mv.version_number DESC, pp.data_index
+                """
+
+            result_df = db.execute_query(query, tuple(params))
+
+        logger.info(f"[Scatter Debug] Query returned {len(result_df)} rows, columns: {list(result_df.columns) if not result_df.empty else 'N/A'}")
+
+        if result_df.empty:
+            return jsonify({
+                "status": "success",
+                "data": [],
+                "message": "예측 포인트 데이터가 없습니다. Training을 먼저 실행해주세요.",
+            })
+
+        # 모델/버전별로 데이터 구조화
+        models_dict = {}
+        for _, row in result_df.iterrows():
+            model_name_key = row["model_name"]
+            version_id_val = int(row["version_id"])
+            key = f"{model_name_key}_v{version_id_val}"
+
+            if key not in models_dict:
+                models_dict[key] = {
+                    "model_name": model_name_key,
+                    "version_id": version_id_val,
+                    "version_number": int(row["version_number"]),
+                    "stage": row["stage"],
+                    "points": [],
+                }
+
+            models_dict[key]["points"].append({
+                "target_value": float(row["target_value"]),
+                "estimation_value": float(row["estimation_value"]),
+                "data_index": int(row["data_index"]) if row["data_index"] is not None else None,
+                "dataset_type": row["dataset_type"],
+            })
+
+        result_data = list(models_dict.values())
+        total_points = sum(len(m["points"]) for m in result_data)
+
+        logger.info(
+            f"Prediction points retrieved: {len(result_data)} models, {total_points} total points"
+        )
+
+        return jsonify({"status": "success", "data": result_data})
+
+    except Exception as e:
+        logger.error(
+            f"Failed to retrieve prediction points: {str(e)}", exc_info=True
+        )
+        return error_response(str(e), 500)

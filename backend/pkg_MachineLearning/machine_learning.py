@@ -134,6 +134,23 @@ class MachineLearning:
                             f"(version_id: {model_version_id})"
                         )
 
+                        # 🆕 Target vs Estimation 예측 포인트 저장 (산점도용)
+                        try:
+                            mlflow_tracker.log_prediction_points(
+                                version_id=model_version_id,
+                                target_values=test_target,
+                                estimation_values=evaluator.prediction,
+                                dataset_type="test",
+                            )
+                            self.logger.info(
+                                f"Prediction points saved for scatter plot "
+                                f"({len(test_target)} points)"
+                            )
+                        except Exception as point_err:
+                            self.logger.warning(
+                                f"Failed to save prediction points: {point_err}"
+                            )
+
                 except Exception as e:
                     self.logger.warning(f"Model registration failed: {e}")
                     # 에러 상세 정보 출력

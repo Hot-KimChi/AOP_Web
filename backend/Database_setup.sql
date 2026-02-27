@@ -153,6 +153,21 @@ CREATE TABLE aop_prediction_logs (
     FOREIGN KEY (model_version_id) REFERENCES ml_model_versions(version_id)
 );
 
+-- 9. ml_prediction_points 테이블 (Target vs Estimation 산점도용)
+CREATE TABLE ml_prediction_points (
+    point_id INT IDENTITY(1,1) PRIMARY KEY,
+    model_version_id INT NOT NULL,
+    target_value FLOAT NOT NULL,          -- 실제 값 (X축)
+    estimation_value FLOAT NOT NULL,      -- 모델 예측 값 (Y축)
+    data_index INT,                       -- 원본 데이터 인덱스 (선택적)
+    dataset_type NVARCHAR(20) DEFAULT 'test',  -- 'train' or 'test'
+    created_time DATETIME2 DEFAULT GETDATE(),
+    FOREIGN KEY (model_version_id) REFERENCES ml_model_versions(version_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IX_ml_prediction_points_version ON ml_prediction_points(model_version_id);
+CREATE INDEX IX_ml_prediction_points_dataset ON ml_prediction_points(dataset_type);
+
 -- 기본 실험 데이터 삽입
 INSERT INTO ml_experiments (experiment_name, artifact_location, lifecycle_stage) 
 VALUES ('AOP_Model_Training', '/models/artifacts', 'active');

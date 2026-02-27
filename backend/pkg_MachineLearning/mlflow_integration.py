@@ -856,6 +856,68 @@ class AOP_MLflowTracker:
         except Exception as e:
             self.logger.error(f"Failed to log model performance: {e}")
 
+    def log_prediction_points(self, version_id, target_values, estimation_values, dataset_type="test"):
+        """
+        Target vs Estimation 데이터 포인트를 ml_prediction_points 테이블에 저장
+        (산점도 시각화용)
+
+        Args:
+            version_id (int): 모델 버전 ID
+            target_values (array-like): 실제 값 배열 (X축)
+            estimation_values (array-like): 예측 값 배열 (Y축)
+            dataset_type (str): 'train' or 'test'
+        """
+        if not self.tracking_enabled:
+            return
+
+        try:
+            import numpy as np
+
+            target_arr = np.array(target_values).flatten()
+            estimation_arr = np.array(estimation_values).flatten()
+
+            if len(target_arr) != len(estimation_arr):
+                self.logger.error(
+                    f"Target and estimation arrays must have the same length: "
+                    f"{len(target_arr)} vs {len(estimation_arr)}"
+                )
+                return
+
+            # 배치 INSERT로 성능 최적화 (단일 커넥션에서 executemany 사용)
+            insert_query = """
+                INSERT INTO ml_prediction_points 
+                    (model_version_id, target_value, estimation_value, data_index, dataset_type)
+                VALUES (?, ?, ?, ?, ?)
+            """
+
+            # 모든 파라미터를 리스트로 한번에 준비
+            batch_params = [
+                (
+                    version_id,
+                    float(target_arr[idx]),
+                    float(estimation_arr[idx]),
+                    idx,
+                    dataset_type,
+                )
+                for idx in range(len(target_arr))
+            ]
+
+            # 단일 커넥션으로 배치 실행
+            with self.db.connect() as connection:
+                raw_conn = connection.connection
+                cursor = raw_conn.cursor()
+                cursor.fast_executemany = True
+                cursor.executemany(insert_query, batch_params)
+                raw_conn.commit()
+                cursor.close()
+
+            self.logger.info(
+                f"Prediction points logged: {len(target_arr)} points for version_id {version_id} ({dataset_type})"
+            )
+
+        except Exception as e:
+            self.logger.error(f"Failed to log prediction points: {e}")
+
     def _auto_promote_best_model(self, model_id, new_version_id, new_test_score):
         """
         새 모델이 최고 성능이면 자동으로 Production으로 승격

@@ -1,5 +1,14 @@
-# AOP Web Application Stop Script
-# Safely stops backend and frontend processes
+# ============================================================
+#  Stop_AOP_Web.ps1
+#  AOP Web Application - Shutdown Script
+#
+#  Purpose  : Backend(5000) / Frontend(3000) 프로세스를 안전하게 종료
+#  Usage    : .\Stop_AOP_Web.ps1 [-Force] [-Help]
+#  Requires : 관리자 권한 (자동 상승)
+#  Created  : 2025-12-13
+#  Modified : 2026-02-27  관리자 권한 자동 상승 추가, 가독성 개선
+#  Ref      : Start_AOP_Web.ps1 과 동일한 로깅/구조 패턴
+# ============================================================
 
 param(
     [switch]$Force,
@@ -166,6 +175,38 @@ function Stop-ServiceOnPort {
 }
 #endregion
 
+#region Admin Elevation
+# ── 관리자 권한 확인 및 자동 상승 ──────────────────────────
+# Get-NetTCPConnection, Stop-Process -Force 등은 관리자 권한이 필요합니다.
+# 일반 사용자로 실행된 경우 UAC 를 통해 자동으로 관리자 권한으로 재실행합니다.
+$currentPrincipal = New-Object Security.Principal.WindowsPrincipal(
+    [Security.Principal.WindowsIdentity]::GetCurrent()
+)
+$isAdmin = $currentPrincipal.IsInRole(
+    [Security.Principal.WindowsBuiltInRole]::Administrator
+)
+
+if (-not $isAdmin) {
+    Write-Host "[INFO] Requesting administrator privileges..." -ForegroundColor Yellow
+
+    # 현재 스크립트의 인자를 그대로 전달하여 관리자 권한으로 재실행
+    $arguments = @("-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"")
+    if ($Force) { $arguments += "-Force" }
+    if ($Help)  { $arguments += "-Help"  }
+
+    try {
+        Start-Process powershell.exe -Verb RunAs -ArgumentList $arguments
+    } catch {
+        Write-Host "[ERROR] Failed to elevate privileges: $($_.Exception.Message)" -ForegroundColor Red
+        Read-Host "`nPress Enter to exit"
+        Exit 1
+    }
+
+    # 현재(비관리자) 세션은 종료
+    Exit 0
+}
+#endregion
+
 #region Help
 if ($Help) {
     Write-Host "AOP Web Application Stop Script" -ForegroundColor Green
@@ -182,53 +223,59 @@ if ($Help) {
 
 #region Main Execution
 try {
-    Write-Host "`n=== AOP Web Application Shutdown ===" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "=============================================" -ForegroundColor Green
+    Write-Host "  AOP Web Application Shutdown"               -ForegroundColor Green
+    Write-Host "=============================================" -ForegroundColor Green
+    Write-Host ""
     Write-Log "=== Starting shutdown process ===" "INFO"
-    
-    # Clean old logs
+
+    # ── Step 1: 오래된 로그 정리 ──
     Clean-OldLogs -LogDirectory $logDir -RetentionDays $logRetentionDays -MaxSizeMB $maxLogDirSizeMB
-    
+
     $stopped = $false
-    
-    # Stop Frontend (Port 3000)
+
+    # ── Step 2: Frontend 종료 (Port 3000) ──
+    Write-Host "---- Frontend (Port 3000) ----" -ForegroundColor Cyan
     if (Stop-ServiceOnPort -Port 3000 -ServiceName "Frontend") {
         $stopped = $true
     }
-    
     Write-Host ""
-    
-    # Stop Backend (Port 5000)
+
+    # ── Step 3: Backend 종료 (Port 5000) ──
+    Write-Host "---- Backend  (Port 5000) ----" -ForegroundColor Cyan
     if (Stop-ServiceOnPort -Port 5000 -ServiceName "Backend") {
         $stopped = $true
     }
-    
     Write-Host ""
-    
+
+    # ── 결과 출력 ──
+    Write-Host "=============================================" -ForegroundColor Green
     if ($stopped) {
         Write-Log "=== Shutdown complete ===" "INFO"
-        Write-Host "=== Shutdown Complete ===" -ForegroundColor Green
+        Write-Host "  Result : Shutdown Complete"               -ForegroundColor Green
     } else {
         Write-Log "No running services found" "INFO"
-        Write-Host "=== No Running Services Found ===" -ForegroundColor Yellow
+        Write-Host "  Result : No Running Services Found"       -ForegroundColor Yellow
     }
-    
-    Write-Host "Log file: $logFile" -ForegroundColor Cyan
-    
-    # Save JSON log
+    Write-Host "  Log    : $logFile"                            -ForegroundColor Cyan
+    Write-Host "=============================================" -ForegroundColor Green
+
+    # JSON 로그 저장
     Save-JsonLog
-    
+
     if (-not $Force) {
         Read-Host "`nPress Enter to exit"
     }
-    
+
 } catch {
     Write-Log "ERROR: $($_.Exception.Message)" "ERROR"
-    Write-Host "`nError: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Log: $logFile" -ForegroundColor Yellow
-    
-    # Save JSON log even on error
+    Write-Host "`n[ERROR] $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "  Log  : $logFile"                  -ForegroundColor Yellow
+
+    # 오류 발생 시에도 JSON 로그 저장
     Save-JsonLog
-    
+
     Read-Host "`nPress Enter to exit"
     Exit 1
 }

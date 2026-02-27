@@ -120,8 +120,9 @@ class SQL:
 
             with self.connect() as connection:
                 # 쿼리 타입 확인 (SELECT vs INSERT/UPDATE/DELETE)
+                # WITH로 시작하는 CTE(Common Table Expression)도 SELECT 쿼리로 처리
                 query_upper = query.strip().upper()
-                if query_upper.startswith("SELECT"):
+                if query_upper.startswith("SELECT") or query_upper.startswith("WITH"):
                     # SELECT 쿼리는 pandas DataFrame으로 반환
                     if params:
                         # pyodbc 스타일의 ? 플레이스홀더 사용
