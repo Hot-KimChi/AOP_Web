@@ -1,0 +1,188 @@
+﻿[
+    {
+        "timestamp":  "2026-02-27T22:03:57.138Z",
+        "level":  "INFO",
+        "message":  "=== Starting AOP Web (Development Mode) ===",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:03:57.177Z",
+        "level":  "INFO",
+        "message":  "Cleaning old logs...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:03:57.255Z",
+        "level":  "INFO",
+        "message":  "Setting up backend...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:03:57.320Z",
+        "level":  "INFO",
+        "message":  "Using virtual environment",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:03:59.093Z",
+        "level":  "INFO",
+        "message":  "Python version: Python 3.12.9",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:03:59.175Z",
+        "level":  "INFO",
+        "message":  "Checking port 5000...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:07.399Z",
+        "level":  "INFO",
+        "message":  "Starting backend server (Port 5000)...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:07.793Z",
+        "level":  "INFO",
+        "message":  "Backend PID: 3340",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+                         "port":  5000,
+                         "pid":  3340,
+                         "service":  "backend",
+                         "python":  "D:\\GitHub\\AOP_Web\\backend\\.venv\\Scripts\\python.exe"
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:07.843Z",
+        "level":  "INFO",
+        "message":  "Verifying backend startup...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:38.863Z",
+        "level":  "INFO",
+        "message":  "Backend is listening on port 5000",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:38.863Z",
+        "level":  "INFO",
+        "message":  "Backend started successfully",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:38.863Z",
+        "level":  "INFO",
+        "message":  "Setting up frontend...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:41.132Z",
+        "level":  "INFO",
+        "message":  "Node v20.15.0 | npm 10.7.0",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:41.134Z",
+        "level":  "INFO",
+        "message":  "Checking port 3000...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:42.773Z",
+        "level":  "INFO",
+        "message":  "Starting frontend server (Port 3000)...",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:42.856Z",
+        "level":  "INFO",
+        "message":  "Frontend PID: 27304",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+                         "port":  3000,
+                         "pid":  27304,
+                         "service":  "frontend",
+                         "mode":  "Development"
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:44.879Z",
+        "level":  "INFO",
+        "message":  "=== Startup Complete ===",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:44.930Z",
+        "level":  "INFO",
+        "message":  "Backend:  http://localhost:5000",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:44.963Z",
+        "level":  "INFO",
+        "message":  "Frontend: http://localhost:3000",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    },
+    {
+        "timestamp":  "2026-02-27T22:04:44.970Z",
+        "level":  "INFO",
+        "message":  "Log file: D:\\GitHub\\AOP_Web\\logs\\startup_20260227_220357.log",
+        "script":  "Start_AOP_Web.ps1",
+        "metadata":  {
+
+                     }
+    }
+]

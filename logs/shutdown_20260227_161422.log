@@ -1,0 +1,10 @@
+﻿[2026-02-27 16:14:22] [INFO] === Starting shutdown process ===
+[2026-02-27 16:14:22] [INFO] Checking Frontend on port 3000...
+[2026-02-27 16:14:25] [INFO] Found process: node (PID: 17272)
+[2026-02-27 16:14:25] [INFO] Found process: Idle (PID: 0)
+[2026-02-27 16:14:25] [INFO] Stopped process PID: 17272
+[2026-02-27 16:14:25] [ERROR] Failed to stop PID: 0 - 다음 오류가 발생하여 "Idle (0)" 프로세스를 중지할 수 없습니다. 액세스가 거부되었습니다
+[2026-02-27 16:14:26] [INFO] Checking Backend on port 5000...
+[2026-02-27 16:14:28] [INFO] Found process: python (PID: 13744)
+[2026-02-27 16:14:28] [INFO] Stopped process PID: 13744
+[2026-02-27 16:14:28] [INFO] === Shutdown complete ===
