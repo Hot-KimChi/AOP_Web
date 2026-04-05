@@ -4,8 +4,11 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import DataViewer from '../../../components/DataViewer';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+
 function DataViewContent() {
   const [data, setData] = useState([]);
+  const [columns, setColumns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const searchParams = useSearchParams();
@@ -20,19 +23,21 @@ function DataViewContent() {
           throw new Error('Database and table parameters are required');
         }
 
-        const response = await fetch(`/api/viewer?databaseName=${database}&tableName=${table}`, {
-          method: 'GET',
-          credentials: 'include',
-        });
+        const response = await fetch(
+          `${API_BASE_URL}/api/get_viewer_data?database=${encodeURIComponent(database)}&table=${encodeURIComponent(table)}`,
+          { method: 'GET', credentials: 'include' }
+        );
 
         if (!response.ok) {
-          throw new Error('Failed to fetch data');
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.message || `Server error: ${response.status}`);
         }
 
         const result = await response.json();
         setData(result.data || []);
-      } catch (error) {
-        setError(error.message);
+        setColumns(result.columns || []);
+      } catch (err) {
+        setError(err.message);
       } finally {
         setIsLoading(false);
       }
@@ -51,12 +56,15 @@ function DataViewContent() {
     );
   }
   if (error) {
-    return <div className="alert alert-danger">{error}</div>;
+    return <div className="alert alert-danger m-3">{error}</div>;
   }
   return (
     <DataViewer
       data={data}
-      title={searchParams.get('database') && searchParams.get('table') ? `${searchParams.get('database')} / ${searchParams.get('table')}` : '데이터'}
+      columns={columns}
+      title={searchParams.get('database') && searchParams.get('table')
+        ? `${searchParams.get('database')} / ${searchParams.get('table')}`
+        : '데이터'}
       showExport={true}
       minWidth={800}
     />

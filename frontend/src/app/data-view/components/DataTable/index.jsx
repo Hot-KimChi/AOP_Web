@@ -12,7 +12,7 @@ export const DataTable = React.memo(({
   editableKeys,
   sortConfig,
   filters,
-  comboBoxOptions,
+  cascadedOptions,
   editedData,
   validationErrors,
   showChanges,
@@ -39,7 +39,7 @@ export const DataTable = React.memo(({
           <FilterRow
             headers={headers}
             filters={filters}
-            comboBoxOptions={comboBoxOptions}
+            cascadedOptions={cascadedOptions}
             onFilterChange={onFilterChange}
             onClearFilter={onClearFilter}
           />
@@ -60,10 +60,10 @@ export const DataTable = React.memo(({
           overflow: auto;
           max-height: calc(100vh - 150px);
           white-space: nowrap;
-          background-color: white;
+          background-color: var(--surface);
           border-radius: 12px;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-          border: 1px solid #e5e7eb;
+          box-shadow: var(--shadow-md);
+          border: 1px solid var(--border);
         }
 
         .data-table {
@@ -77,10 +77,11 @@ export const DataTable = React.memo(({
         .data-table :global(td) {
           font-size: 12px;
           text-align: left;
-          border: 0.5px solid #e5e7eb !important;
+          border: 0.5px solid var(--border) !important;
           padding: 4px !important;
           line-height: 1.3;
           box-sizing: border-box;
+          color: var(--text);
         }
 
         .data-table :global(tbody td) {
@@ -88,24 +89,25 @@ export const DataTable = React.memo(({
         }
 
         .data-table :global(tbody tr:hover) {
-          background-color: #f9fafb;
+          background-color: var(--table-hover);
         }
 
         .table-container :global(thead tr:first-child th) {
           position: sticky;
           top: 0;
           z-index: 20;
-          background: linear-gradient(to bottom, #f3f4f6, #e5e7eb);
+          background: var(--surface);
           padding: 4px !important;
           font-weight: 600;
-          color: #374151;
+          color: var(--text);
+          border-bottom: 1px solid var(--border) !important;
         }
 
         .table-container :global(thead tr:nth-child(2) th) {
           position: sticky;
           top: 38px;
-          z-index: 10;
-          background-color: #fafafa;
+          z-index: 21;
+          background-color: var(--bg);
           padding: 4px !important;
         }
       `}</style>

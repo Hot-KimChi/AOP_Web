@@ -5,16 +5,18 @@
 
 import os
 import logging
+from contextlib import contextmanager
 from flask import session, g
 from pkg_SQL.database import SQL
-from typing import Optional, Union
+from typing import Optional
+from utils.error_handler import CredentialsRequired
 
 
 class DatabaseManager:
     """
     중앙집중화된 데이터베이스 연결 관리자
-    - 세션 기반 자동 인증
-    - 연결 풀링 및 재사용
+    - 세션 기반 자동 인증 (로그인 시 저장된 username/password 사용)
+    - 요청 단위 연결 캐싱 (Flask g 컨텍스트)
     - 에러 처리 통합
     """
 
@@ -27,9 +29,27 @@ class DatabaseManager:
             cls._instance.logger = logging.getLogger("DatabaseManager")
         return cls._instance
 
+    @staticmethod
+    @contextmanager
+    def create_explicit_connection(username: str, password: str, database: str):
+        """
+        명시적 자격증명으로 DB 연결 (로그인 처리 전용 — 세션 미사용).
+
+        Args:
+            username: DB 사용자명
+            password: DB 비밀번호
+            database: 대상 데이터베이스명
+        """
+        connection = SQL(username=username, password=password, database=database)
+        try:
+            yield connection
+        finally:
+            if hasattr(connection, "close"):
+                connection.close()
+
     def get_connection(self, database: Optional[str] = None) -> SQL:
         """
-        데이터베이스 연결 반환 (자동 인증 및 캐싱)
+        로그인 세션의 username/password 로 데이터베이스 연결을 반환합니다.
 
         Args:
             database (str, optional): 데이터베이스명. None이면 환경변수 기본값 사용
@@ -38,51 +58,42 @@ class DatabaseManager:
             SQL: 데이터베이스 연결 객체
 
         Raises:
-            ValueError: 인증 정보가 없거나 연결 실패 시
+            CredentialsRequired: 세션에 로그인 정보가 없을 때 (422 로 변환됨)
         """
-        try:
-            # 1. 세션에서 인증 정보 가져오기
-            username = session.get("username")
-            password = session.get("password")
+        # 로그인 세션에서 인증 정보 가져오기
+        username = session.get("username")
+        password = session.get("password")
 
-            if not username or not password:
-                raise ValueError("세션에 사용자 인증 정보가 없습니다.")
-
-            # 2. 데이터베이스명 결정
-            if database is None:
-                database = self._get_default_database()
-
-            # 3. 연결 키 생성 (사용자별 + DB별 캐싱)
-            connection_key = f"{username}:{database}"
-
-            # 4. 기존 연결 재사용 (Flask g 컨텍스트 활용)
-            if hasattr(g, "db_connections") and connection_key in g.db_connections:
-                return g.db_connections[connection_key]
-
-            # 5. 새 연결 생성
-            connection = SQL(username=username, password=password, database=database)
-
-            # 6. Flask g 컨텍스트에 캐싱
-            if not hasattr(g, "db_connections"):
-                g.db_connections = {}
-            g.db_connections[connection_key] = connection
-
-            self.logger.info(
-                f"Database connection created: {database} for user {username}"
+        if not username or not password:
+            raise CredentialsRequired(
+                "세션에 사용자 인증 정보가 없습니다. 다시 로그인해 주세요."
             )
-            return connection
 
-        except Exception as e:
-            self.logger.error(f"Failed to create database connection: {e}")
-            raise
+        if database is None:
+            database = self._get_default_database()
+
+        # 요청 단위 캐싱 (사용자별 + DB별)
+        connection_key = f"{username}:{database}"
+        if hasattr(g, "db_connections") and connection_key in g.db_connections:
+            return g.db_connections[connection_key]
+
+        connection = SQL(username=username, password=password, database=database)
+
+        if not hasattr(g, "db_connections"):
+            g.db_connections = {}
+        g.db_connections[connection_key] = connection
+
+        self.logger.info(
+            f"Database connection created: {database} for user {username}"
+        )
+        return connection
 
     def get_mlflow_connection(self) -> SQL:
-        """MLflow 전용 데이터베이스 연결 반환"""
+        """MLflow 전용 데이터베이스 연결 반환 (로그인 세션 자격증명 사용)"""
         return self.get_connection("AOP_MLflow_Tracking")
 
     def get_aop_connection(self) -> SQL:
-        """AOP 메인 데이터베이스 연결 반환"""
-        # AOP 메인 DB명은 환경변수나 설정에서 가져오기
+        """AOP 메인 데이터베이스 연결 반환 (로그인 세션 자격증명 사용)"""
         return self.get_connection()
 
     def execute_query(self, query: str, params: tuple = None, database: str = None):
@@ -95,26 +106,15 @@ class DatabaseManager:
             database (str): 대상 데이터베이스
 
         Returns:
-            쿼리 결과
+            쿼리 결과 DataFrame
         """
-        try:
-            connection = self.get_connection(database)
-
-            if params:
-                return connection.execute_query(query, params)
-            else:
-                return connection.execute_query(query)
-
-        except Exception as e:
-            self.logger.error(f"Query execution failed: {e}")
-            self.logger.error(f"Query: {query}")
-            if params:
-                self.logger.error(f"Params: {params}")
-            raise
+        connection = self.get_connection(database)
+        if params:
+            return connection.execute_query(query, params)
+        return connection.execute_query(query)
 
     def _get_default_database(self) -> str:
         """환경변수에서 기본 데이터베이스명 가져오기"""
-        # 기본값 또는 환경변수에서 가져오기
         return os.environ.get("DEFAULT_DATABASE", "AOP_Database")
 
     @staticmethod
@@ -127,12 +127,10 @@ class DatabaseManager:
                         connection.close()
                 except Exception as e:
                     logging.error(f"Failed to close connection {connection_key}: {e}")
-
-            # g에서 연결 정보 제거
             g.db_connections = {}
 
 
-# 전역 인스턴스 (싱글톤)
+# 전역 싱글톤 인스턴스
 db_manager = DatabaseManager()
 
 

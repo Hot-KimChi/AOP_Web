@@ -33,20 +33,23 @@ export default function ModelVersionsTable({
       style={{ minHeight: 0, maxHeight: '550px', overflow: 'hidden' }}
     >
       {/* 카드 헤더 */}
-      <div className="card-header bg-info text-white py-2">
-        <h6 className="mb-0">모델 버전별 Test 성능 (R² Score)</h6>
+      <div className="card-header">
+        <div className="card-title-row">
+          <span style={{ fontSize: '0.875rem' }}>📊</span>
+          <h6>Model Version Performance (R² Score)</h6>
+        </div>
       </div>
 
       {/* 카드 바디 — 스크롤 가능 */}
       <div className="card-body flex-grow-1 overflow-auto" style={{ minHeight: 0 }}>
         {versionsLoading ? (
-          <div className="text-center py-4">
-            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
-            로딩 중...
+          <div className="spinner-center">
+            <div className="spinner-border spinner-border-sm text-secondary" role="status" />
+            Loading…
           </div>
         ) : versionsData.length === 0 ? (
-          <div className="alert alert-warning mb-0">
-            훈련된 모델 버전이 없습니다. Training을 먼저 실행해주세요.
+          <div className="alert" style={{ background: 'var(--status-warning-bg)', border: '1px solid var(--status-warning-border)', color: 'var(--status-warning-text)', fontSize: '0.875rem' }}>
+            No trained model versions found. Run Training first.
           </div>
         ) : (
           <VersionsTable
@@ -130,7 +133,7 @@ function ModelRows({ model, displayVersions, isExpanded, onToggle }) {
             {/* 확장 아이콘 + 버전 수 배지 (첫 행만) */}
             {isFirstRow ? (
               <td className="text-center">
-                <span style={{ fontSize: '10px', color: '#6c757d' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                   {isExpanded ? '▼' : '▶'}
                 </span>
                 {model.versions.length > 1 && (
@@ -183,36 +186,21 @@ function ModelRows({ model, displayVersions, isExpanded, onToggle }) {
   );
 }
 
-// ── ScoreGuide 서브 컴포넌트 ─────────────────────────────────
-/** 테이블 하단 성능 지표 안내 박스 */
 function ScoreGuide() {
   return (
-    <div className="mt-4 p-3 bg-light rounded border-start border-4 border-info">
-      <div className="d-flex align-items-start">
-        {/* 정보 아이콘 */}
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20" height="20"
-          fill="currentColor"
-          className="bi bi-info-circle-fill text-info flex-shrink-0 mt-1"
-          viewBox="0 0 16 16"
-        >
-          <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2"/>
-        </svg>
-
-        <div className="flex-grow-1 ms-3">
-          <p className="mb-2 fw-semibold text-dark">💡 성능 지표 안내</p>
-          <p className="mb-2 small text-secondary">
-            • Test Score (R²)가{' '}
-            <strong className="text-primary">높을수록</strong> 예측 성능이 우수합니다.<br />
-            • <span className="badge bg-warning text-dark">⭐ 골드 별</span>{' '}
-            표시는 전체 모델 중 최고 성능을 나타냅니다.
+    <div className="mt-4 p-3 rounded" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderLeft: '3px solid var(--brand)' }}>
+      <div className="d-flex align-items-start gap-3">
+        <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: '2px' }}>ℹ️</span>
+        <div>
+          <p className="mb-2 fw-semibold" style={{ color: 'var(--text)', fontSize: '0.875rem' }}>Performance Guide</p>
+          <p className="mb-2 small" style={{ color: 'var(--text-sec)', fontSize: '0.8rem' }}>
+            • Higher Test Score (R²) indicates better prediction accuracy.<br />
+            • <span className="badge" style={{ background: '#fef9c3', color: '#854d0e' }}>⭐ Gold star</span>{' '}
+            marks the best-performing version across all models.
           </p>
-          <p className="mb-0 small">
+          <p className="mb-0 small" style={{ fontSize: '0.8rem' }}>
             <span className="badge bg-success me-2">Production</span>
-            <span className="text-muted">
-              단계의 R² 최고값 모델이 MeasSet Generation에 자동 적용됩니다.
-            </span>
+            <span style={{ color: 'var(--text-sec)' }}>stage models with the highest R² are automatically applied in MeasSet Generation.</span>
           </p>
         </div>
       </div>

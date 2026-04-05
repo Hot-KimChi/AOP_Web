@@ -10,12 +10,21 @@ from routes.ml import ml_bp
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    # 세션 암호화 키 (Config → 환경변수 우선, 하드코딩 제거)
+    app.secret_key = Config.FLASK_SECRET_KEY
+
+    # 세션 쿠키 보안 설정
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = Config.COOKIE_SECURE
+
+    # CORS: ALLOWED_ORIGINS 환경변수 기반 (개발: *, 운영: 명시 도메인)
     CORS(
         app,
         supports_credentials=True,
         resources={r"/api/*": {"origins": Config.ALLOWED_ORIGINS}},
     )
-    app.secret_key = b"AOP_Web_Secret_Key"  # 실제 운영시 환경변수로 관리 권장
 
     # 디버그 모드에서 더 자세한 로깅 활성화
     if app.debug:

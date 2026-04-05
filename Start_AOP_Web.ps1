@@ -135,9 +135,18 @@ function Stop-ProcessOnPort {
     
     $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
     if ($connections) {
-        $processIds = $connections | Select-Object -ExpandProperty OwningProcess -Unique
-        
-        foreach ($processId in $processIds) {
+        # PID 0 = Windows System Idle Process (TCP TIME_WAIT state owned by kernel).
+        # These transient connections do NOT block new server bindings — skip them.
+        $realProcessIds = $connections |
+            Where-Object { $_.OwningProcess -ne 0 } |
+            Select-Object -ExpandProperty OwningProcess -Unique
+
+        if (-not $realProcessIds) {
+            Write-Log "Port $Port has only TIME_WAIT connections (PID 0) — no real process to stop" "INFO"
+            return
+        }
+
+        foreach ($processId in $realProcessIds) {
             try {
                 $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
                 if ($process) {
@@ -158,7 +167,7 @@ function Stop-ProcessOnPort {
         }
         
         if ($choice -eq 'Y' -or $choice -eq 'y') {
-            foreach ($processId in $processIds) {
+            foreach ($processId in $realProcessIds) {
                 try {
                     Stop-Process -Id $processId -Force -ErrorAction Stop
                     Write-Log "Stopped process PID: $processId on port $Port" "INFO"

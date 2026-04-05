@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
+import { Database, Eye } from 'lucide-react';
 
 export default function Viewer() {
   const [DBList, setDBList] = useState([]);
@@ -17,23 +18,14 @@ export default function Viewer() {
   useEffect(() => {
     const fetchDatabases = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/get_list_database`, {
-          method: 'GET',
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch databases');
-        }
-
+        const response = await fetch(`${API_BASE_URL}/api/get_list_database`, { credentials: 'include' });
+        if (!response.ok) throw new Error('Failed to fetch databases');
         const data = await response.json();
         setDBList(data.databases || []);
-      } catch (error) {
-        console.error('Failed to fetch databases:', error);
+      } catch {
         setError('Failed to fetch databases');
       }
     };
-
     fetchDatabases();
   }, []);
 
@@ -42,104 +34,92 @@ export default function Viewer() {
       const fetchTables = async () => {
         try {
           setIsLoading(true);
-          const response = await fetch(`${API_BASE_URL}/api/get_list_table`, {
-            method: 'GET',
-            credentials: 'include',
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to fetch tables');
-          }
-
+          const response = await fetch(`${API_BASE_URL}/api/get_list_table`, { credentials: 'include' });
+          if (!response.ok) throw new Error('Failed to fetch tables');
           const result = await response.json();
           setTableList(result.tables || []);
-        } catch (error) {
-          console.error('Failed to fetch tables:', error);
+        } catch {
           setError('Failed to fetch tables');
         } finally {
           setIsLoading(false);
         }
       };
-
       fetchTables();
     }
   }, [selectedDatabase]);
 
-  const handleDatabaseChange = (event) => {
-    setSelectedDatabase(event.target.value);
+  const handleDatabaseChange = (e) => {
+    setSelectedDatabase(e.target.value);
     setSelectedTable('');
     setTableList([]);
     setError(null);
   };
 
-  const handleTableChange = (event) => {
-    setSelectedTable(event.target.value);
-  };
-
   const handleViewData = () => {
     if (selectedDatabase && selectedTable) {
       const url = `/viewer/data-view-standalone?database=${selectedDatabase}&table=${selectedTable}`;
-      const windowFeatures = 'width=2000,height=1200,menubar=no,toolbar=no,location=no,status=no';
-      window.open(url, '_blank', windowFeatures);
+      window.open(url, '_blank', 'width=2000,height=1200,menubar=no,toolbar=no,location=no,status=no');
     }
   };
 
   return (
     <Layout>
-      <div className="container mt-4">
-        <div className="card shadow-sm">
-          <div className="card-header bg-primary text-white">
-            <h5 className="mb-0">Database Viewer</h5>
+      <div className="page-wrapper">
+        <div className="card">
+
+          {/* Header */}
+          <div className="card-header">
+            <div className="card-title-row">
+              <Database size={16} color="#6366f1" />
+              <h5>Database Viewer</h5>
+            </div>
           </div>
-          <div className="card-body">
-            <div className="row g-3">
+
+          {/* Body */}
+          <div className="card-body" style={{ padding: '1.25rem' }}>
+            <div className="row g-3 align-items-end">
+
               <div className="col-md-5">
-                <label htmlFor="database" className="form-label">데이터베이스 선택</label>
+                <label className="form-label">Database</label>
                 <select
-                  id="database"
                   className="form-select"
                   value={selectedDatabase}
                   onChange={handleDatabaseChange}
                   disabled={isLoading}
                 >
-                  <option value="">Select Database</option>
-                  {DBList.map((db, index) => (
-                    <option key={index} value={db}>{db}</option>
-                  ))}
+                  <option value="">Select database…</option>
+                  {DBList.map((db, i) => <option key={i} value={db}>{db}</option>)}
                 </select>
               </div>
 
               <div className="col-md-5">
-                <label htmlFor="table" className="form-label">SQL 테이블 선택</label>
+                <label className="form-label">Table</label>
                 <select
-                  id="table"
                   className="form-select"
                   value={selectedTable}
-                  onChange={handleTableChange}
+                  onChange={(e) => setSelectedTable(e.target.value)}
                   disabled={!selectedDatabase || isLoading}
                 >
-                  <option value="">Select Table</option>
-                  {tableList.map((table, index) => (
-                    <option key={index} value={table}>{table}</option>
-                  ))}
+                  <option value="">Select table…</option>
+                  {tableList.map((t, i) => <option key={i} value={t}>{t}</option>)}
                 </select>
               </div>
 
-              <div className="col-md-2 d-flex align-items-end">
+              <div className="col-md-2">
                 <button
-                  className="btn btn-primary w-100"
+                  className="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2"
                   onClick={handleViewData}
                   disabled={!selectedDatabase || !selectedTable}
+                  style={{ background: 'var(--brand)', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                 >
-                  View Data
+                  <Eye size={14} />
+                  View
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="alert alert-danger mt-3">
-                {error}
-              </div>
+              <div className="alert alert-danger mt-3" style={{ fontSize: '0.875rem' }}>{error}</div>
             )}
           </div>
         </div>

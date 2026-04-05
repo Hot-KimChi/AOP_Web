@@ -33,14 +33,17 @@ export default function ModelTrainingCard({
       style={{ minHeight: 0, maxHeight: '550px', overflow: 'hidden' }}
     >
       {/* 카드 헤더 */}
-      <div className="card-header bg-primary text-white py-2">
-        <h6 className="mb-0">머신러닝 모델 선택</h6>
+      <div className="card-header">
+        <div className="card-title-row">
+          <span style={{ fontSize: '0.875rem' }}>🤖</span>
+          <h6>Model Training</h6>
+        </div>
       </div>
 
       <div className="card-body">
         {/* 모델 선택 드롭다운 */}
         <div className="mb-3">
-          <label htmlFor="ml-model" className="form-label">모델 선택</label>
+          <label htmlFor="ml-model" className="form-label">Select Model</label>
           <select
             id="ml-model"
             className="form-select"
@@ -48,7 +51,7 @@ export default function ModelTrainingCard({
             onChange={(e) => setSelectedModel(e.target.value)}
             disabled={loading}
           >
-            <option value="">모델을 선택하세요</option>
+            <option value="">Choose a model…</option>
             {models.map((model, idx) => (
               <option key={idx} value={model}>{model}</option>
             ))}
@@ -59,18 +62,21 @@ export default function ModelTrainingCard({
         <div className="d-grid">
           <button
             type="button"
-            className="btn btn-success btn-lg"
+            className="btn btn-lg"
             onClick={onTrain}
             disabled={!selectedModel || loading || trainingLoading}
+            style={{
+              background: !selectedModel || loading || trainingLoading ? 'var(--brand-light)' : 'var(--brand)',
+              color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600',
+              transition: 'background 0.15s',
+            }}
           >
             {trainingLoading ? (
               <>
                 <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
-                Training 중...
+                Training…
               </>
-            ) : (
-              'Training'
-            )}
+            ) : 'Start Training'}
           </button>
         </div>
 
@@ -94,29 +100,21 @@ export default function ModelTrainingCard({
 function StatusMessages({ loading, error, trainingResult, selectedModel }) {
   if (loading) {
     return (
-      <div className="mt-3 p-3 bg-light rounded text-center border">
-        <div className="spinner-border spinner-border-sm text-primary me-2" role="status">
-          <span className="visually-hidden">로딩 중...</span>
+      <div className="mt-3 p-3 rounded text-center" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        <div className="spinner-border spinner-border-sm text-secondary me-2" role="status">
+          <span className="visually-hidden">Loading…</span>
         </div>
-        <span className="text-muted">로딩 중...</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Loading…</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="mt-3 p-3 bg-danger bg-opacity-10 rounded border border-danger">
-        <div className="d-flex align-items-center">
-          {/* 경고 아이콘 */}
-          <svg
-            xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-            fill="currentColor"
-            className="bi bi-exclamation-triangle-fill text-danger flex-shrink-0"
-            viewBox="0 0 16 16"
-          >
-            <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
-          </svg>
-          <span className="ms-2 text-danger small">{error}</span>
+      <div className="mt-3 p-3 rounded" style={{ background: 'var(--status-error-bg)', border: '1px solid var(--status-error-border)' }}>
+        <div className="d-flex align-items-center gap-2">
+          <span style={{ color: 'var(--status-error-text)', fontSize: '1rem' }}>⚠️</span>
+          <span style={{ color: 'var(--status-error-text)', fontSize: '0.8125rem' }}>{error}</span>
         </div>
       </div>
     );
@@ -124,18 +122,10 @@ function StatusMessages({ loading, error, trainingResult, selectedModel }) {
 
   if (trainingResult) {
     return (
-      <div className="mt-3 p-3 bg-success bg-opacity-10 rounded border border-success">
-        <div className="d-flex align-items-center">
-          {/* 완료 체크 아이콘 */}
-          <svg
-            xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-            fill="currentColor"
-            className="bi bi-check-circle-fill text-success flex-shrink-0"
-            viewBox="0 0 16 16"
-          >
-            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-          </svg>
-          <span className="ms-2 text-success small fw-semibold">{trainingResult}</span>
+      <div className="mt-3 p-3 rounded" style={{ background: 'var(--status-success-bg)', border: '1px solid var(--status-success-border)' }}>
+        <div className="d-flex align-items-center gap-2">
+          <span style={{ fontSize: '1rem' }}>✅</span>
+          <span style={{ color: 'var(--status-success-text)', fontSize: '0.8125rem', fontWeight: '600' }}>{trainingResult}</span>
         </div>
       </div>
     );
@@ -143,9 +133,9 @@ function StatusMessages({ loading, error, trainingResult, selectedModel }) {
 
   if (selectedModel) {
     return (
-      <div className="mt-3 p-3 bg-primary bg-opacity-10 rounded border border-primary">
-        <p className="mb-1 small text-primary fw-semibold">✓ 선택된 모델</p>
-        <p className="mb-0 small text-dark">{selectedModel}</p>
+      <div className="mt-3 p-3 rounded" style={{ background: 'var(--brand-light)', border: '1px solid var(--border-focus)' }}>
+        <p style={{ margin: '0 0 4px', fontSize: '0.75rem', fontWeight: '600', color: 'var(--brand)' }}>✓ Selected model</p>
+        <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text)' }}>{selectedModel}</p>
       </div>
     );
   }

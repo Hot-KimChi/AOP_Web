@@ -1,16 +1,14 @@
-// src/app/viewer/data-view-standalone/layout.js
+import 'bootstrap/dist/css/bootstrap.min.css';
+import '../../../globals.css';
+
 export const metadata = {
-    title: 'Verification Report',
-  }
-  
-  export default function StandaloneLayout({ children }) {
-    return (
-      <div className="standalone-viewer bg-light">
-        <link 
-          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" 
-          rel="stylesheet"
-        />
-        {children}
-      </div>
-    );
-  }
+  title: 'Data View — Verification Report',
+}
+
+export default function StandaloneLayout({ children }) {
+  return (
+    <div className="standalone-viewer">
+      {children}
+    </div>
+  );
+}

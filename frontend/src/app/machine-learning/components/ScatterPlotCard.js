@@ -16,13 +16,13 @@
 'use client';
 
 import { Scatter } from 'react-chartjs-2';
-import { SCATTER_CHART_OPTIONS } from '../_constants';
 
 // ── ScatterPlotCard ───────────────────────────────────────────
 export default function ScatterPlotCard({
   scatterData,
   scatterLoading,
   scatterChartData,
+  scatterChartOptions,
   scatterNoDataMsg,
   selectedVersionsMeta,
   onRemove,
@@ -34,13 +34,15 @@ export default function ScatterPlotCard({
     <div className="card shadow-sm h-100 d-flex flex-column">
       {/* 카드 헤더 — 선택된 버전 배지 + 초기화 버튼 */}
       <div
-        className="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2"
+        className="card-header d-flex justify-content-between align-items-center"
         style={{ flexWrap: 'wrap', gap: '4px' }}
       >
-        <h6 className="mb-0">
-          Target vs Estimation 산점도
-          <small className="ms-2 fw-normal">(Test Set)</small>
-        </h6>
+        <div className="card-title-row">
+          <span style={{ fontSize: '0.875rem' }}>🎯</span>
+          <h6>Target vs Estimation
+            <span style={{ fontWeight: '400', color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '6px' }}>(Test Set)</span>
+          </h6>
+        </div>
 
         {/* 선택된 버전 배지 목록 */}
         <div className="d-flex align-items-center gap-1 flex-wrap justify-content-end">
@@ -53,8 +55,8 @@ export default function ScatterPlotCard({
           {selectedVersionsMeta.map((meta) => (
             <span
               key={meta.version_id}
-              className="badge bg-dark d-inline-flex align-items-center"
-              style={{ fontSize: '11px', gap: '4px' }}
+              className="badge d-inline-flex align-items-center"
+              style={{ fontSize: '11px', gap: '4px', background: 'var(--border)', color: 'var(--text)' }}
             >
               {meta.model_name.replace('_AOP_Intensity', '')} v{meta.version_number}
               <button
@@ -70,12 +72,12 @@ export default function ScatterPlotCard({
           {/* best model 초기화 버튼 */}
           {selectedVersionsMeta.length > 0 && (
             <button
-              className="btn btn-sm btn-outline-dark py-0 px-2"
+              className="btn btn-sm"
               onClick={() => onReset()}
-              title="최고 score 모델로 초기화"
-              style={{ fontSize: '11px' }}
+              title="Reset to best score model"
+              style={{ fontSize: '11px', padding: '0 8px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-sec)', borderRadius: '4px' }}
             >
-              ↺ 초기화
+              ↺ Reset
             </button>
           )}
         </div>
@@ -84,28 +86,27 @@ export default function ScatterPlotCard({
       {/* 산점도 차트 영역 — flex-grow-1 로 헤더·푸터를 제외한 나머지 높이를 차지 */}
       <div className="card-body p-2 flex-grow-1" style={{ position: 'relative', minHeight: '300px' }}>
         {scatterLoading ? (
-          <div className="text-center py-5">
-            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
-            산점도 데이터 로딩 중...
+          <div className="spinner-center">
+            <span className="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true" />
+            Loading scatter data…
           </div>
         ) : scatterData.length === 0 ? (
-          // scatterNoDataMsg 가 있으면 특정 버전 데이터 없음, 없으면 초기 빈 상태
-          <div className={`alert mb-0 ${scatterNoDataMsg ? 'alert-danger' : 'alert-warning'}`}>
+          <div className={`alert`} style={scatterNoDataMsg ? { background: 'var(--status-error-bg)', border: '1px solid var(--status-error-border)', color: 'var(--status-error-text)', fontSize: '0.875rem', margin: '1rem' } : { background: 'var(--status-warning-bg)', border: '1px solid var(--status-warning-border)', color: 'var(--status-warning-text)', fontSize: '0.875rem', margin: '1rem' }}>
             {scatterNoDataMsg
-              ? <><strong>데이터 없음</strong><br />{scatterNoDataMsg}</>
-              : '예측 포인트 데이터가 없습니다. Training을 먼저 실행해주세요.'}
+              ? <><strong>No data</strong><br />{scatterNoDataMsg}</>
+              : 'No prediction data found. Run Training first.'}
           </div>
         ) : scatterChartData ? (
           // Chart.js 는 flex-grow 컨테이너 안에서 canvas 높이를 100%로 채우려면
           // position:relative 인 wrapper 가 별도로 필요합니다.
           <div style={{ position: 'absolute', inset: 0, padding: '4px' }}>
-            <Scatter data={scatterChartData} options={SCATTER_CHART_OPTIONS} />
+            <Scatter data={scatterChartData} options={scatterChartOptions} />
           </div>
         ) : null}
       </div>
 
       {/* 현재 표시 상태 안내 푸터 */}
-      <div className="card-footer bg-light py-1" style={{ minHeight: '56px', overflowY: 'auto' }}>
+      <div className="card-footer py-2" style={{ minHeight: '52px', overflowY: 'auto' }}>
         {scatterData.length > 0 ? (
           <ScatterFooterInfo
             scatterData={scatterData}
@@ -141,27 +142,24 @@ function ScatterFooterInfo({ scatterData, selectedVersionsMeta }) {
 
       <div className="flex-grow-1 ms-2">
         {isSingle ? (
-          // 단일 모델 안내
-          <p className="mb-0 small text-muted">
+          <p className="mb-0 small text-muted" style={{ fontSize: '0.775rem' }}>
             <strong>
               {selectedVersionsMeta[0].model_name.replace('_AOP_Intensity', '')}
               {' '}v{selectedVersionsMeta[0].version_number}
             </strong>
-            {' — '}{scatterData[0]?.points?.length ?? 0}개 포인트.{' '}
-            왼쪽 그래프를 <strong>Ctrl+클릭</strong>하면 모델을 추가해 비교할 수 있습니다.{' '}
-            <strong>점선 대각선</strong>은 이상적인 예측(y=x)입니다.
+            {' — '}{scatterData[0]?.points?.length ?? 0} points.{' '}
+            <strong>Ctrl+Click</strong> on the left chart to add more models for comparison.{' '}
+            <strong>Dashed diagonal</strong> = ideal prediction (y=x).
           </p>
         ) : (
-          // 멀티 모델 비교 안내
-          <p className="mb-0 small text-muted">
-            <strong>{selectedVersionsMeta.length}개 모델 비교 중</strong>{' — '}
+          <p className="mb-0 small text-muted" style={{ fontSize: '0.775rem' }}>
+            <strong>{selectedVersionsMeta.length} models compared</strong>{' — '}
             {selectedVersionsMeta.map((m) => (
-              <span key={m.version_id} className="badge bg-secondary me-1" style={{ fontSize: '10px' }}>
+              <span key={m.version_id} className="badge me-1" style={{ fontSize: '10px', background: 'var(--border)', color: 'var(--text)' }}>
                 {m.model_name.replace('_AOP_Intensity', '')} v{m.version_number}
               </span>
             ))}
-            {' '}왼쪽 그래프를 <strong>Ctrl+클릭</strong>으로 추가/제거,
-            헤더의 × 로 개별 제거할 수 있습니다.
+            {' '}<strong>Ctrl+Click</strong> to add/remove, × in header to remove individually.
           </p>
         )}
       </div>

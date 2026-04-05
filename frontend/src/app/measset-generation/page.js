@@ -42,8 +42,6 @@ export default function MeasSetGen() {
         : updatedData;
         
       if (parsedData) {
-        console.log('필터링된 데이터 업데이트됨:', parsedData);
-        
         // 전체 데이터에 업데이트 적용
         if (fullCsvData) {
           // 세션 스토리지에서 최신 전체 데이터 가져오기
@@ -123,31 +121,21 @@ export default function MeasSetGen() {
       });
     };
     
-    // 디버깅을 위해 필터링된 데이터 샘플 출력
-    console.log('필터링된 데이터 샘플:', updatedFilteredData.slice(0, 2));
-    
-    // 기존 행만 업데이트 맵에 포함 (새로운 행은 제외)
+    // 기존 행만 업데이트 맵에 포함(새로운 행은 제외)
     const updatedMap = new Map();
     updatedFilteredData.forEach(filteredRow => {
       const indexInfo = normalizeKey(filteredRow);
       
       if (indexInfo && existsInFullData(filteredRow)) {
         updatedMap.set(indexInfo.value, filteredRow);
-      } else if (!indexInfo) {
-        console.warn('groupIndex가 없는 필터링된 행:', filteredRow);
-      } else {
-        console.log('새로운 행이므로 전체 데이터 업데이트에서 제외:', filteredRow);
       }
     });
-    
-    console.log(`업데이트 맵 크기 (기존 행만): ${updatedMap.size}`);
     
     // 전체 데이터 순회하며 기존 행만 업데이트
     newFullData.forEach((fullRow, index) => {
       const indexInfo = normalizeKey(fullRow);
       
       if (!indexInfo) {
-        console.warn(`전체 데이터 행 ${index}에 groupIndex가 없습니다:`, fullRow);
         return; // 이 행은 건너뜀
       }
       
@@ -163,7 +151,6 @@ export default function MeasSetGen() {
         // 특별히 수정 가능한 열에 대해서만 업데이트
         editableKeys.forEach(key => {
           if (updatedRow[key] !== undefined && fullRow[key] !== updatedRow[key]) {
-            console.log(`행 ${index}의 ${key} 열 업데이트: '${fullRow[key]}' -> '${updatedRow[key]}'`);
             fullRow[key] = updatedRow[key];
             rowUpdated = true;
           }
@@ -176,15 +163,12 @@ export default function MeasSetGen() {
     });
     
     // 업데이트 수 설정
-    console.log(`총 ${updateCount}개의 기존 데이터가 업데이트되었습니다.`);
-    
     return newFullData;
   };
 
   // 팝업 창 상태 확인 함수
   const checkPopupStatus = () => {
     if (dataWindowReference && dataWindowReference.closed) {
-      console.log('팝업 창이 닫힘 감지됨');
       const updatedData = sessionStorage.getItem('csvData');
       if (updatedData) {
         handleCSVUpdate(updatedData);
@@ -199,7 +183,6 @@ export default function MeasSetGen() {
     // 스토리지 변경 이벤트 리스너
     const handleStorageChange = (event) => {
       if (event && event.key === 'csvData') {
-        console.log('스토리지 변경 감지됨:', event.newValue);
         handleCSVUpdate(event.newValue);
       }
     };
@@ -207,7 +190,6 @@ export default function MeasSetGen() {
     // 메시지 이벤트 리스너
     const handleMessageEvent = (event) => {
       if (event.data && event.data.type === 'DATA_MODIFIED') {
-        console.log('메시지 이벤트 감지됨:', event.data.data);
         handleCSVUpdate(event.data.data);
       }
     };
@@ -273,7 +255,6 @@ export default function MeasSetGen() {
           }
           
           const data = await response.json();
-          console.log('받은 데이터:', data); // 디버깅용 로그
           setProbeList(data.probes || []);
         } catch (err) {
           console.error('프로브 목록 가져오기 실패:', err);
@@ -414,7 +395,6 @@ export default function MeasSetGen() {
     // 1. 팝업 창이 열려있다면 최신 데이터 요청 및 대기
     if (dataWindowReference && !dataWindowReference.closed) {
       try {
-        console.log('팝업 창에 최신 데이터 요청 중...');
         dataWindowReference.postMessage({ type: 'REQUEST_LATEST_DATA' }, '*');
         
         // 데이터 동기화를 위한 충분한 대기 시간
@@ -428,11 +408,6 @@ export default function MeasSetGen() {
     const storedFilteredData = sessionStorage.getItem('csvData');
     const storedFullData = sessionStorage.getItem('fullCsvData');
     
-    console.log('세션 스토리지 데이터 확인:', {
-      storedFilteredData: storedFilteredData ? '있음' : '없음',
-      storedFullData: storedFullData ? '있음' : '없음'
-    });
-    
     // 3. 데이터 변수 초기화
     let latestFilteredData = null;
     let latestFullData = null;
@@ -441,19 +416,14 @@ export default function MeasSetGen() {
       // 세션 스토리지의 필터링된 데이터가 있으면 파싱
       if (storedFilteredData) {
         latestFilteredData = JSON.parse(storedFilteredData);
-        console.log(`세션 스토리지에서 ${latestFilteredData.length}개의 필터링 데이터 로드됨`);
       } else if (filterCsvData) {
         latestFilteredData = filterCsvData;
-        console.log(`상태에서 ${latestFilteredData.length}개의 필터링 데이터 로드됨`);
       }
       
-      // 세션 스토리지의 전체 데이터가 있으면 파싱
       if (storedFullData) {
         latestFullData = JSON.parse(storedFullData);
-        console.log(`세션 스토리지에서 ${latestFullData.length}개의 전체 데이터 로드됨`);
       } else if (fullCsvData) {
         latestFullData = fullCsvData;
-        console.log(`상태에서 ${latestFullData.length}개의 전체 데이터 로드됨`);
       }
     } catch (err) {
       console.error('세션 스토리지 데이터 파싱 오류:', err);
@@ -482,7 +452,6 @@ export default function MeasSetGen() {
 
     // 5. 필터링된 데이터의 변경사항을 전체 데이터에 동기화 - 기존 행만 업데이트, 새로운 행은 제외
   if (latestFilteredData && latestFilteredData.length > 0 && latestFullData && latestFullData.length > 0) {
-    console.log('필터링된 데이터를 전체 데이터에 반영하는 중...');
     
     // 인덱스 키를 정규화하는 함수
     const normalizeKey = (obj) => {
@@ -519,22 +488,13 @@ export default function MeasSetGen() {
     // 기존 행만 업데이트 맵에 포함 (새로운 행은 제외)
     const updatedMap = new Map();
     
-    // 디버깅을 위해 필터링된 데이터 샘플 출력
-    console.log('필터링된 데이터 샘플:', latestFilteredData.slice(0, 2));
-    
     latestFilteredData.forEach(filteredRow => {
       const indexInfo = normalizeKey(filteredRow);
       
       if (indexInfo && existsInFullData(filteredRow)) {
         updatedMap.set(indexInfo.value, filteredRow);
-      } else if (!indexInfo) {
-        console.warn('groupIndex가 없는 필터링된 행:', filteredRow);
-      } else {
-        console.log('새로운 행이므로 전체 데이터 업데이트에서 제외:', filteredRow);
       }
     });
-    
-    console.log(`업데이트 맵 크기 (기존 행만): ${updatedMap.size}`);
     
     // 전체 데이터 순회하며 기존 행만 업데이트
     let updateCount = 0;
@@ -542,7 +502,6 @@ export default function MeasSetGen() {
       const indexInfo = normalizeKey(fullRow);
       
       if (!indexInfo) {
-        console.warn(`전체 데이터 행에 groupIndex가 없습니다:`, fullRow);
         return fullRow;
       }
       
@@ -561,7 +520,6 @@ export default function MeasSetGen() {
         // 특별히 수정 가능한 열에 대해서만 업데이트
         editableKeys.forEach(key => {
           if (updatedRow[key] !== undefined && fullRow[key] !== updatedRow[key]) {
-            console.log(`행의 ${key} 열 업데이트: '${fullRow[key]}' -> '${updatedRow[key]}'`);
             newRow[key] = updatedRow[key];
             rowUpdated = true;
           }
@@ -576,7 +534,6 @@ export default function MeasSetGen() {
       return fullRow;
     });
     
-    console.log(`총 ${updateCount}개의 기존 데이터 행이 동기화되었습니다.`);
     setUpdatedCount(updateCount);
     
     // 업데이트된 전체 데이터를 사용
@@ -615,15 +572,9 @@ export default function MeasSetGen() {
         ? latestFilteredData.filter(fRow => !latestFullData.some(fullRow => isRowEqual(fRow, fullRow)))
         : [];
       
-      console.log(`발견된 새로운 행 수: ${newRows.length}`);
-      if (newRows.length > 0) {
-        console.log('새로운 행들:', newRows);
-      }
-      
       // 전체데이터 + 신규행만 DB에 저장
       // 신규행은 groupIndex 중복과 상관없이 모두 추가됨
       const mergedData = [...latestFullData, ...newRows];
-      console.log('SQL에 저장할 데이터(최종, 전체데이터+신규행, 신규행 내 groupIndex 중복 허용):', mergedData);
       const requestData = {
         database: selectedDatabase,
         table: 'meas_setting',
@@ -640,7 +591,6 @@ export default function MeasSetGen() {
         throw new Error(`SQL 삽입 실패: ${text}`);
       }
       const result = await sqlResponse.json();
-      console.log('SQL 삽입 결과:', result);
       setError(null);
       setDataModified(false);
       alert('SQL 데이터가 성공적으로 삽입되었습니다!');
@@ -766,18 +716,22 @@ export default function MeasSetGen() {
   };
 
   return (
-    <div className="container mt-4">
-      <div className="card shadow-sm">
-        <div className="card-header bg-primary text-white">
-          <h5 className="mb-0">MeasSet Generation</h5>
+    <div className="page-wrapper">
+      <div className="card">
+        {/* Header */}
+        <div className="card-header">
+          <div className="card-title-row">
+            <span style={{ fontSize: '1rem' }}>⚙️</span>
+            <h5>MeasSet Generation</h5>
+          </div>
         </div>
-        <div className="card-body">
+
+        <div className="card-body" style={{ padding: '1.25rem' }}>
           <div className="row g-3">
-            {/* 데이터베이스 선택 */}
+
+            {/* Database */}
             <div className="col-md-4">
-              <label htmlFor="databaseSelect" className="form-label">
-                데이터베이스 선택
-              </label>
+              <label htmlFor="databaseSelect" className="form-label">Database</label>
               <select
                 id="databaseSelect"
                 className="form-select"
@@ -785,20 +739,14 @@ export default function MeasSetGen() {
                 onChange={(e) => setSelectedDatabase(e.target.value)}
                 disabled={isLoading}
               >
-                <option value="">Select Database</option>
-                {DBList.map((db, index) => (
-                  <option key={index} value={db}>
-                    {db}
-                  </option>
-                ))}
+                <option value="">Select database…</option>
+                {DBList.map((db, index) => <option key={index} value={db}>{db}</option>)}
               </select>
             </div>
-            
-            {/* 프로브 선택 */}
+
+            {/* Probe */}
             <div className="col-md-4">
-              <label htmlFor="probeSelect" className="form-label">
-                프로브 선택
-              </label>
+              <label htmlFor="probeSelect" className="form-label">Transducer</label>
               <select
                 id="probeSelect"
                 className="form-select"
@@ -806,23 +754,18 @@ export default function MeasSetGen() {
                 onChange={(e) => setSelectedProbe(JSON.parse(e.target.value))}
                 disabled={isLoading || !selectedDatabase}
               >
-                <option value="">Select Transducer</option>
+                <option value="">Select transducer…</option>
                 {probeList.map((probe) => (
-                  <option
-                    key={probe.probeId}
-                    value={JSON.stringify({ id: probe.probeId, name: probe.probeName })}
-                  >
+                  <option key={probe.probeId} value={JSON.stringify({ id: probe.probeId, name: probe.probeName })}>
                     {probe.probeName} ({probe.probeId})
                   </option>
                 ))}
               </select>
             </div>
-            
-            {/* 파일 선택 */}
+
+            {/* File */}
             <div className="col-md-4">
-              <label htmlFor="fileInput" className="form-label">
-                파일 선택
-              </label>
+              <label htmlFor="fileInput" className="form-label">Input File</label>
               <input
                 type="file"
                 id="fileInput"
@@ -831,60 +774,59 @@ export default function MeasSetGen() {
                 disabled={isLoading}
               />
             </div>
-            
-            {/* CSV 파일 생성 버튼 */}
+
+            {/* Generate & View */}
             <div className="col-md-4">
               <button
-                className="btn btn-primary w-100"
-                onClick={() => {
-                  handleFileUpload().then((parsedData) => {
-                    if (parsedData) {
-                      openDataInNewWindow(parsedData);
-                    }
-                  });
-                }}
+                className="btn w-100"
+                style={{ background: '#6366f1', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
+                onClick={() => { handleFileUpload().then((parsedData) => { if (parsedData) openDataInNewWindow(parsedData); }); }}
                 disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
               >
-                {isLoading ? '처리 중...' : 'Generation & CSV 파일 생성'}
+                {isLoading ? 'Processing…' : '⚡ Generate & View CSV'}
               </button>
             </div>
-            
-            {/* CSV 데이터 새 창에서 보기 버튼 */}
+
+            {/* Open in new window */}
             <div className="col-md-4">
               <button
-                className="btn btn-success w-100"
+                className="btn w-100"
+                style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                 onClick={() => openDataInNewWindow()}
                 disabled={!filterCsvData || filterCsvData.length === 0}
               >
-                {isLoading ? '처리 중...' : `데이터 새 창에서 보기`}
+                {isLoading ? 'Processing…' : '🔍 Open Data in New Window'}
               </button>
             </div>
-            
-            {/* SQL 데이터 삽입 버튼 */}
+
+            {/* Save to SQL */}
             <div className="col-md-4">
               <button
-                className="btn btn-primary w-100"
+                className="btn w-100"
+                style={{ background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                 onClick={parseDatabase}
                 disabled={!selectedDatabase || !selectedProbe || (!fullCsvData && !file) || isLoading}
               >
-                {isLoading ? '처리 중...' : 'SQL 데이터베이스로'}
+                {isLoading ? 'Processing…' : '💾 Save to SQL Database'}
               </button>
             </div>
-            
-            {/* 데이터 새로고침 버튼 */}
+
+            {/* Refresh data */}
             {dataModified && (
-              <div className="col-md-12 mt-2">
+              <div className="col-md-12">
                 <button
-                  className="btn btn-outline-primary"
+                  className="btn btn-sm"
+                  style={{ background: 'transparent', border: '1px solid #6366f1', color: '#6366f1', borderRadius: '6px', fontWeight: '500', fontSize: '0.8125rem' }}
                   onClick={refreshData}
                 >
-                  데이터 새로고침
+                  ↻ Refresh Data
                 </button>
               </div>
             )}
           </div>
+
           {renderModifiedMessage()}
-          {error && <div className="alert alert-danger mt-3">{error}</div>}
+          {error && <div className="alert alert-danger mt-3" style={{ fontSize: '0.875rem' }}>{error}</div>}
         </div>
       </div>
     </div>

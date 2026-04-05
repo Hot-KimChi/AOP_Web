@@ -1,10 +1,13 @@
+import logging
 import pandas as pd
 from pkg_SQL.database import SQL
 import numpy as np
-from flask import jsonify, session
+from flask import session
 from pkg_MachineLearning.mlflow_integration import AOP_MLflowTracker
 from utils.database_manager import get_db_connection
 from pkg_MeasSetGen.Temp_Prr_predict import find_prr_for_temprise
+
+logger = logging.getLogger("PredictML")
 
 # Pandas 다운캐스팅 옵션 설정
 pd.set_option("future.no_silent_downcasting", True)
@@ -28,7 +31,7 @@ class PredictML:
         self.password = session.get("password")
 
         if not self.username or not self.password:
-            return jsonify({"error": "User not authenticated"}), 401
+            raise ValueError("User not authenticated")
 
     def _paramForIntensity(self):
         ## take parameters for ML from measSet_gen file.
@@ -46,14 +49,14 @@ class PredictML:
 
         ## load parameters from SQL database
         connect = get_db_connection(self.database)
-        query = f"""
+        query = """
             SELECT [probePitchCm], [probeRadiusCm], [probeElevAperCm0], [probeElevAperCm1], [probeElevFocusRangCm], [probeElevFocusRangCm1]
             FROM probe_geo 
-            WHERE probeid = {self.probeId}
+            WHERE probeid = ?
             ORDER BY 1
             """
 
-        probeGeo_df = connect.execute_query(query)
+        probeGeo_df = connect.execute_query(query, (self.probeId,))
         probeGeo_df = probeGeo_df.fillna(0).infer_objects()
 
         if len(probeGeo_df) == 1:
@@ -118,14 +121,14 @@ class PredictML:
 
         ## load parameters from SQL database
         connect = get_db_connection(self.database)
-        query = f"""
+        query = """
             SELECT [probePitchCm], [probeRadiusCm], [probeElevAperCm0], [probeNumElements]            
             FROM probe_geo 
-            WHERE probeid = {self.probeId}
+            WHERE probeid = ?
             ORDER BY 1
             """
 
-        probeGeo_df = connect.execute_query(query)
+        probeGeo_df = connect.execute_query(query, (self.probeId,))
         probeGeo_df = probeGeo_df.fillna(0).infer_objects()
 
         if len(probeGeo_df) == 1:
@@ -230,14 +233,14 @@ class PredictML:
 
         ## load parameters from SQL database for transducer pitch
         connect = get_db_connection(self.database)
-        query = f"""
+        query = """
             SELECT [probePitchCm]
             FROM probe_geo 
-            WHERE probeid = {self.probeId}
+            WHERE probeid = ?
             ORDER BY 1
             """
 
-        pitchCm_df = connect.execute_query(query)
+        pitchCm_df = connect.execute_query(query, (self.probeId,))
         oneCmElement = np.ceil(1 / pitchCm_df["probePitchCm"].iloc[0])
 
         # 각 GroupIndex 내에서 최대 TxFocusLocCm 값을 찾기

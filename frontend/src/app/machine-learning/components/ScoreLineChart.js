@@ -21,8 +21,11 @@ export default function ScoreLineChart({ versionsData, versionsLoading, chartDat
     // d-flex flex-column: header / body(flex-grow) / footer 수직 분배
     <div className="card shadow-sm h-100 d-flex flex-column">
       {/* 카드 헤더 */}
-      <div className="card-header bg-success text-white py-2">
-        <h6 className="mb-0">모델 Test Score (R²) 추이 그래프</h6>
+      <div className="card-header">
+        <div className="card-title-row">
+          <span style={{ fontSize: '0.875rem' }}>📈</span>
+          <h6>Model Test Score (R²) Trend</h6>
+        </div>
       </div>
 
       {/* 차트 영역 — flex-grow-1 로 헤더·푸터를 제외한 나머지 높이를 차지 */}
@@ -40,31 +43,30 @@ export default function ScoreLineChart({ versionsData, versionsLoading, chartDat
         ) : null}
       </div>
 
-      {/* 사용 안내 푸터 — ScatterPlotCard 와 높이 통일 */}
-      <div className="card-footer bg-light py-1" style={{ minHeight: '56px' }}>
-        <p className="mb-0 small text-muted">
-          💡 포인트 <strong>클릭</strong> → 해당 버전 단일 표시&nbsp;&nbsp;|&nbsp;&nbsp;
-          <strong>Ctrl+클릭</strong> → 산점도에 추가/제거 (멀티 비교)
+      {/* 카드 푸터 */}
+      <div className="card-footer py-2" style={{ minHeight: '52px' }}>
+        <p className="mb-0 small text-muted" style={{ fontSize: '0.775rem' }}>
+          💡 <strong>Click</strong> a point to show that version alone &nbsp;|&nbsp;
+          <strong>Ctrl+Click</strong> to add/remove from scatter plot
         </p>
       </div>
     </div>
   );
 }
 
-// ── 내부 서브 컴포넌트 ─────────────────────────────────────────
 function LoadingSpinner() {
   return (
-    <div className="text-center py-5">
-      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
-      로딩 중...
+    <div className="spinner-center">
+      <span className="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true" />
+      Loading…
     </div>
   );
 }
 
 function EmptyAlert() {
   return (
-    <div className="alert alert-warning mb-0">
-      훈련된 모델 버전이 없습니다. Training을 먼저 실행해주세요.
+    <div className="alert" style={{ background: 'var(--status-warning-bg)', border: '1px solid var(--status-warning-border)', color: 'var(--status-warning-text)', fontSize: '0.875rem', margin: '1rem' }}>
+      No trained model versions found. Run Training first.
     </div>
   );
 }

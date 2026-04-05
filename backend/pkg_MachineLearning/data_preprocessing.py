@@ -10,8 +10,12 @@ class DataPreprocess:
         self.train_input = train_input
         self.test_input = test_input
 
-    def preprocess(self, model_type="other", scaler=StandardScaler()):
+    def preprocess(self, model_type="other", scaler=None):
         import pandas as pd
+
+        # scaler가 전달되지 않으면 매 호출마다 새 인스턴스 생성 (mutable default 버그 방지)
+        if scaler is None:
+            scaler = StandardScaler()
 
         # model_type에 다항식 및 standard 사용하기.
         if "PolynomialFeatures" in model_type.lower() or "Ridge" in model_type.lower():

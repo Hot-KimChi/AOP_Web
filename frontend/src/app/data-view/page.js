@@ -3,6 +3,7 @@
 
 import { useEffect, Suspense, useCallback } from 'react';
 import { downloadCSV as downloadCSVFile } from './utils/csvExport';
+import { MESSAGES } from './constants/messages';
 
 // Custom Hooks
 import { useDataManagement } from './hooks/useDataManagement';
@@ -34,7 +35,6 @@ function DataViewContent() {
     displayData,
     isLoading,
     error,
-    comboBoxOptions,
     editableColumns,
     setCsvData,
     setDisplayData,
@@ -48,6 +48,7 @@ function DataViewContent() {
   // 2. 필터링
   const {
     filters,
+    cascadedOptions,
     handleComboBoxChange,
     clearFilter,
   } = useDataFilter(csvData, setDisplayData);
@@ -179,7 +180,7 @@ function DataViewContent() {
               editableKeys={editableColumns.editableKeys}
               sortConfig={sortConfig}
               filters={filters}
-              comboBoxOptions={comboBoxOptions}
+              cascadedOptions={cascadedOptions}
               editedData={editedData}
               validationErrors={validationErrors}
               showChanges={showChanges}

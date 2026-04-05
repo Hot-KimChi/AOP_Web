@@ -93,6 +93,7 @@ export default function MachineLearningPage() {
     chartData,
     chartOptions,
     scatterChartData,
+    scatterChartOptions,
   } = useMLPageData();
 
   return (
@@ -129,6 +130,7 @@ export default function MachineLearningPage() {
               scatterData={scatterData}
               scatterLoading={scatterLoading}
               scatterChartData={scatterChartData}
+              scatterChartOptions={scatterChartOptions}
               scatterNoDataMsg={scatterNoDataMsg}
               selectedVersionsMeta={selectedVersionsMeta}
               onRemove={handleRemoveVersion}

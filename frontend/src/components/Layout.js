@@ -2,27 +2,18 @@
 'use client';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
+import '../globals.css';
 import dynamic from 'next/dynamic';
-import Head from 'next/head';
 import Navbar from '../components/Navbar';
 
 const Layout = ({ children }) => {
   return (
-    <>
-      <Head>
-        <title>AOP Platform</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="description" content="Advanced Operations Platform" />
-      </Head>
-      
-      <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
-        <Navbar />
-        
-        <main className="w-100">
-          {children}
-        </main>
-      </div>
-    </>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      <Navbar />
+      <main>{children}</main>
+      {/* 버전 정보 — 모든 페이지 우측 하단 고정 */}
+      <div className="version-badge">v 0.9.20</div>
+    </div>
   );
 };
 

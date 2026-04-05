@@ -19,13 +19,13 @@ const BASE_INPUT_STYLE = {
 
 // 상태별 색상 매핑
 const STYLE_VARIANTS = {
-  error:   { border: '1px solid #ef4444', background: '#fef2f2' },
-  changed: { border: '1px solid #fbbf24', background: '#fffbeb' },
-  normal:  { border: '1px solid #d1d5db', background: 'white' },
+  error:   { border: '1px solid var(--status-error-border)',   background: 'var(--status-error-bg)' },
+  changed: { border: '1px solid var(--status-warning-border)', background: 'var(--status-warning-bg)' },
+  normal:  { border: '1px solid var(--border)', background: 'var(--surface)' },
 };
 
 // 포커스 시 보더 색상
-const FOCUS_COLORS = { error: '#ef4444', changed: '#fbbf24', normal: '#3b82f6' };
+const FOCUS_COLORS = { error: 'var(--status-error-border)', changed: 'var(--status-warning-border)', normal: 'var(--brand)' };
 
 // 아이콘 위치 스타일
 const ICON_POSITION_STYLE = {

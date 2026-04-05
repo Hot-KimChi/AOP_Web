@@ -114,12 +114,10 @@ export default function VerificationReport() {
   // 소프트웨어 데이터 로딩 함수
   const loadSoftwareData = async () => {
     try {
-      // URL 객체 생성 및 파라미터 추가 (필드 선택)
       const url = new URL(`${API_BASE_URL}/api/get_table_data`);
       url.searchParams.append('database', selectedDatabase);
       url.searchParams.append('table', 'Tx_summary');
       url.searchParams.append('fields', 'ProbeID,Software_version');
-      console.log('소프트웨어 데이터 로딩 URL:', url.toString());
       
       const response = await fetch(url, { 
         method: 'GET', 
@@ -127,21 +125,16 @@ export default function VerificationReport() {
       });
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`에러 응답: ${response.status} - ${errorText}`);
-        throw new Error(`소프트웨어 데이터를 가져오는데 실패했습니다: ${response.status}`);
+        throw new Error(`소프트웨어 데이터를 가져오는데 실패했습니다: ${response.status} - ${errorText}`);
       }
       
-      // 서버에서 반환하는 결과는 객체 형태임
       const data = await response.json();
-      console.log('받은 소프트웨어 데이터:', data);
       
-      // 서버에서 이미 probes, software, mapping이 전달됨
       setProbeList(data.probes || []);
       setSoftwareList(data.software || []);
       setProbeSoftwareMapping(data.mapping || {});
       setHasSoftwareData(data.hasSoftwareData);
       
-      // 현재 선택된 프로브가 있으면 해당 프로브의 소프트웨어를 필터링
       if (selectedProbe && data.mapping && data.mapping[selectedProbe]) {
         const softwareForProbe = data.mapping[selectedProbe] || [];
         const softwareVersions = softwareForProbe.map(item => item.softwareVersion);
@@ -153,8 +146,7 @@ export default function VerificationReport() {
       
       return data;
     } catch (err) {
-      console.error('소프트웨어 데이터 가져오기 실패:', err);
-      throw err; // 상위 함수에서 처리하도록 에러 전파
+      throw err;
     }
   };
 
@@ -164,7 +156,6 @@ export default function VerificationReport() {
       const url = new URL(`${API_BASE_URL}/api/get_table_data`);
       url.searchParams.append('database', selectedDatabase);
       url.searchParams.append('table', 'WCS');
-      console.log('Loading WCS from:', url.toString());
   
       const response = await fetch(url.toString(), {
         method: 'GET',
@@ -176,9 +167,7 @@ export default function VerificationReport() {
       }
   
       const data = await response.json();
-      console.log('WCS raw data:', data);
   
-      // ✔️ 성공 시 항상 wcsVersionList 세팅
       const wcsData = Array.isArray(data.wcsVersions)
         ? data.wcsVersions.map(wcs => ({
             ...wcs,
@@ -189,7 +178,6 @@ export default function VerificationReport() {
   
       setWcsVersionList(wcsData);
   
-      // ✔️ 현재 선택 probe 기준으로도 필터링
       if (selectedProbe) {
         setFilteredWcsVersions(
           wcsData.filter(wcs => wcs.probeId === String(selectedProbe))
@@ -200,10 +188,9 @@ export default function VerificationReport() {
       
       return data;
     } catch (err) {
-      console.error('WCS 데이터 로딩 오류:', err);
       setWcsVersionList([]);
       setFilteredWcsVersions([]);
-      throw err; // 상위 함수에서 처리하도록 에러 전파
+      throw err;
     }
   };
 
@@ -211,17 +198,11 @@ export default function VerificationReport() {
   useEffect(() => {
     if (selectedProbe && wcsVersionList.length > 0) {
       const probeIdStr = String(selectedProbe);
-      console.log("필터링 중: 선택된 probeId:", probeIdStr);
-      console.log("필터링 대상 WCS 목록:", wcsVersionList);
-      
       const filtered = wcsVersionList.filter(wcs => wcs.probeId === probeIdStr);
-      console.log("필터링 결과:", filtered);
-      
       setFilteredWcsVersions(filtered);
     } else {
       setFilteredWcsVersions([]);
     }
-    // 새 WCS 목록이 들어오면 선택된 WCS 소프트웨어 초기화
     setSelectedWcsSoftware('');
   }, [selectedProbe, wcsVersionList]);
 
@@ -439,73 +420,62 @@ export default function VerificationReport() {
 
   return (
     <Layout>
-      <div className="container mt-4">
-        {/* 첫 번째 카드: Verification Report 부분 */}
-        <div className="card shadow-sm mb-4">
-          <div className="card-header bg-primary text-white">
-            <h5 className="mb-0">Verification Report</h5>
+      <div className="page-wrapper">
+
+        {/* Card 1: Verification Report */}
+        <div className="card mb-3">
+          <div className="card-header">
+            <div className="card-title-row">
+              <span style={{ fontSize: '1rem' }}>📋</span>
+              <h5>Verification Report</h5>
+            </div>
           </div>
-          <div className="card-body">
+          <div className="card-body" style={{ padding: '1.25rem' }}>
             <div className="row g-3">
-              {/* 첫 번째 줄: 데이터베이스, 프로브, WCS_S/W, 소프트웨어 선택, 데이터 새로고침 버튼 */}
+
               <div className="col-md-2">
-                <label htmlFor="databaseSelect" className="form-label">
-                  데이터베이스 선택
-                </label>
+                <label htmlFor="databaseSelect" className="form-label">Database</label>
                 <select
                   id="databaseSelect"
                   className="form-select"
                   value={selectedDatabase}
                   onChange={(e) => {
-                    const newDatabase = e.target.value;
-                    setSelectedDatabase(newDatabase);
+                    setSelectedDatabase(e.target.value);
                     setSelectedProbe('');
                     setSelectedSoftware('');
                     setSelectedWcsSoftware('');
                   }}
                   disabled={isLoading}
                 >
-                  <option value="">데이터베이스 선택</option>
-                  {DBList.map((db, index) => (
-                    <option key={index} value={db}>
-                      {db}
-                    </option>
-                  ))}
+                  <option value="">Select database…</option>
+                  {DBList.map((db, i) => <option key={i} value={db}>{db}</option>)}
                 </select>
               </div>
-              
+
               <div className="col-md-2">
-                <label htmlFor="probeSelect" className="form-label">
-                  프로브 선택
-                </label>
+                <label htmlFor="probeSelect" className="form-label">Probe</label>
                 <select
                   id="probeSelect"
                   className="form-select"
                   value={selectedProbe}
                   onChange={(e) => {
-                    const probeId = e.target.value;
-                    setSelectedProbe(probeId);
+                    setSelectedProbe(e.target.value);
                     setSelectedSoftware('');
                     setSelectedWcsSoftware('');
                   }}
                   disabled={isLoading || !selectedDatabase}
                 >
-                  <option value="">프로브 선택</option>
+                  <option value="">Select probe…</option>
                   {probeList.map((probe) => (
-                    <option
-                      key={probe._id}
-                      value={probe.probeId}
-                    >
+                    <option key={probe._id} value={probe.probeId}>
                       {probe.probeName} ({Number(probe.probeId).toString()})
                     </option>
                   ))}
                 </select>
               </div>
-              
+
               <div className="col-md-2">
-                <label htmlFor="wcsSoftwareSelect" className="form-label">
-                  WCS_S/W 선택
-                </label>
+                <label htmlFor="wcsSoftwareSelect" className="form-label">WCS S/W</label>
                 <select
                   id="wcsSoftwareSelect"
                   className="form-select"
@@ -513,27 +483,16 @@ export default function VerificationReport() {
                   onChange={(e) => setSelectedWcsSoftware(e.target.value)}
                   disabled={isLoading || !selectedProbe || filteredWcsVersions.length === 0}
                 >
-                  <option value="">WCS_S/W 선택</option>
-                  {filteredWcsVersions.map((wcsVersion, index) => (
-                    <option
-                      key={`wcs_${index}`}
-                      value={wcsVersion.myVersion}
-                    >
-                      {wcsVersion.myVersion}
-                    </option>
-                  ))}
+                  <option value="">Select WCS S/W…</option>
+                  {filteredWcsVersions.map((w, i) => <option key={i} value={w.myVersion}>{w.myVersion}</option>)}
                 </select>
                 {selectedProbe && filteredWcsVersions.length === 0 && (
-                  <small className="text-muted">
-                    선택한 프로브에 WCS_S/W 데이터가 없습니다.
-                  </small>
+                  <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No WCS S/W for this probe</small>
                 )}
               </div>
-              
+
               <div className="col-md-2">
-                <label htmlFor="softwareSelect" className="form-label">
-                  소프트웨어 선택
-                </label>
+                <label htmlFor="softwareSelect" className="form-label">TX Software</label>
                 <select
                   id="softwareSelect"
                   className="form-select"
@@ -541,198 +500,148 @@ export default function VerificationReport() {
                   onChange={(e) => setSelectedSoftware(e.target.value)}
                   disabled={isLoading || !selectedProbe || !hasSoftwareData}
                 >
-                  <option value="">소프트웨어 선택</option>
-                  {filteredSoftwareList.map((software) => (
-                    <option
-                      key={software._id}
-                      value={software.softwareVersion}
-                    >
-                      {software.softwareVersion}
-                    </option>
+                  <option value="">Select software…</option>
+                  {filteredSoftwareList.map((sw) => (
+                    <option key={sw._id} value={sw.softwareVersion}>{sw.softwareVersion}</option>
                   ))}
                 </select>
                 {!hasSoftwareData && selectedDatabase && (
-                  <small className="text-muted">
-                    선택한 테이블에 소프트웨어 데이터가 없습니다.
-                  </small>
+                  <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No software data</small>
                 )}
               </div>
-              
-              <div className="col-md-4 d-flex align-items-end mb-3">
-                <button 
-                  className="btn btn-outline-secondary w-100" 
+
+              <div className="col-md-4 d-flex align-items-end">
+                <button
+                  className="btn w-100"
+                  style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-sec)', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                   onClick={refreshAllData}
                   disabled={!selectedDatabase || isLoading}
                 >
-                  데이터 새로고침
+                  ↻ Refresh Data
                 </button>
               </div>
-              
-              {/* 두 번째 줄: Temperature, MI, Ispta 입력 필드 (같은 줄에 배치) */}
+
               <div className="col-md-4">
-                <label htmlFor="temperatureInput" className="form-label">
-                  Temperature measSSid
-                </label>
-                <input
-                  type="text"
-                  id="temperatureInput"
-                  className="form-control"
-                  value={temperature}
-                  onChange={(e) => setTemperature(e.target.value)}
-                  disabled={isLoading}
-                />
+                <label htmlFor="temperatureInput" className="form-label">Temperature measSSid</label>
+                <input type="text" id="temperatureInput" className="form-control" value={temperature} onChange={(e) => setTemperature(e.target.value)} disabled={isLoading} placeholder="e.g. 1001" />
               </div>
-    
+
               <div className="col-md-4">
-                <label htmlFor="MI_Input" className="form-label">
-                  MI measSSid
-                </label>
-                <input
-                  type="text"
-                  id="MI_Input"
-                  className="form-control"
-                  value={MI}
-                  onChange={(e) => setMI(e.target.value)}
-                  disabled={isLoading}
-                />
+                <label htmlFor="MI_Input" className="form-label">MI measSSid</label>
+                <input type="text" id="MI_Input" className="form-control" value={MI} onChange={(e) => setMI(e.target.value)} disabled={isLoading} placeholder="e.g. 1002" />
               </div>
-              
+
               <div className="col-md-4">
-                <label htmlFor="IsptaInput" className="form-label">
-                  Ispta.3 measSSid
-                </label>
-                <input
-                  type="text"
-                  id="IsptaInput"
-                  className="form-control"
-                  value={Ispta}
-                  onChange={(e) => setIspta(e.target.value)}
-                  disabled={isLoading}
-                />
+                <label htmlFor="IsptaInput" className="form-label">Ispta.3 measSSid</label>
+                <input type="text" id="IsptaInput" className="form-control" value={Ispta} onChange={(e) => setIspta(e.target.value)} disabled={isLoading} placeholder="e.g. 1003" />
               </div>
-              
-              {/* 세 번째 줄: Report Table 추출 버튼 */}
+
               <div className="col-md-12">
                 <button
-                  className="btn btn-success w-100"
+                  className="btn w-100"
+                  style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                   onClick={extractReportData}
                   disabled={!selectedDatabase || !selectedProbe || !selectedWcsSW || (!selectedTxSW && hasSoftwareData) || !MI || !temperature || isLoading}
                 >
-                  {isLoading ? '처리 중...' : 'Report Table 추출'}
+                  {isLoading ? 'Processing…' : '📊 Extract Report Table'}
                 </button>
               </div>
             </div>
           </div>
         </div>
-    
-        {/* 두 번째 카드: Tx summary Input 부분 */}
-        <div className="card shadow-sm mb-4">
-          <div className="card-header bg-info text-white">
-            <h5 className="mb-0">Tx summary Input</h5>
+
+        {/* Card 2: Tx Summary Input */}
+        <div className="card mb-3">
+          <div className="card-header">
+            <div className="card-title-row">
+              <span style={{ fontSize: '1rem' }}>📑</span>
+              <h5>Tx Summary Input</h5>
+            </div>
           </div>
-          <div className="card-body">
+          <div className="card-body" style={{ padding: '1.25rem' }}>
             <div className="row g-3">
-              {/* 첫 번째 줄: 파일 선택 필드 */}
-              <div className="col-md-12 mb-3">
-                <label htmlFor="fileInput" className="form-label">
-                  파일 선택
-                </label>
-                <input
-                  type="file"
-                  id="fileInput"
-                  className="form-control"
-                  onChange={handleFileChange}
-                  disabled={isLoading}
-                />
+              <div className="col-md-12">
+                <label htmlFor="fileInput" className="form-label">Input File</label>
+                <input type="file" id="fileInput" className="form-control" onChange={handleFileChange} disabled={isLoading} />
               </div>
-              
-              {/* 두 번째 줄: Summary Table 추출 버튼 */}
               <div className="col-md-12">
                 <button
-                  className="btn btn-primary w-100"
+                  className="btn w-100"
+                  style={{ background: '#6366f1', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                   onClick={parsingTxSum}
                   disabled={!selectedDatabase || !selectedProbe || (!selectedTxSW && hasSoftwareData) || isLoading}
                 >
-                  {isLoading ? '처리 중...' : 'Summary Table 추출'}
+                  {isLoading ? 'Processing…' : '📥 Extract Summary Table'}
                 </button>
               </div>
             </div>
           </div>
         </div>
-    
-        {error && <div className="alert alert-danger mt-3">{error}</div>}
-        
-        {/* 이하 미리보기 부분은 동일하게 유지 */}
+
+        {error && <div className="alert alert-danger" style={{ fontSize: '0.875rem' }}>{error}</div>}
+
+        {/* Summary preview */}
         {summaryData && (
-          <div className="card shadow-sm mb-4">
-            <div className="card-header bg-light">
-              <h5 className="mb-0">요약 테이블 미리보기</h5>
+          <div className="card mb-3">
+            <div className="card-header">
+              <div className="card-title-row">
+                <h5>Summary Table Preview</h5>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>showing first 5 rows</span>
+              </div>
             </div>
-            <div className="card-body">
+            <div className="card-body" style={{ padding: '1rem 1.25rem' }}>
               <div className="table-responsive">
-                <table className="table table-bordered table-hover">
-                  <thead className="table-light">
+                <table className="table table-sm" style={{ fontSize: '0.8rem' }}>
+                  <thead style={{ background: 'var(--bg)' }}>
                     {summaryData.length > 0 && (
-                      <tr>
-                        {Object.keys(summaryData[0]).map((key, index) => (
-                          <th key={index}>{key}</th>
-                        ))}
-                      </tr>
+                      <tr>{Object.keys(summaryData[0]).map((k, i) => <th key={i} style={{ fontWeight: '600', color: 'var(--text-sec)', padding: '0.5rem 0.75rem' }}>{k}</th>)}</tr>
                     )}
                   </thead>
                   <tbody>
-                    {summaryData.slice(0, 5).map((row, rowIndex) => (
-                      <tr key={rowIndex}>
-                        {Object.values(row).map((value, cellIndex) => (
-                          <td key={cellIndex}>{value}</td>
-                        ))}
+                    {summaryData.slice(0, 5).map((row, ri) => (
+                      <tr key={ri}>
+                        {Object.values(row).map((v, ci) => <td key={ci} style={{ padding: '0.4rem 0.75rem' }}>{v}</td>)}
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {summaryData.length > 5 && (
-                  <p className="text-muted">총 {summaryData.length}개 행 중 5개만 표시됩니다.</p>
-                )}
+                {summaryData.length > 5 && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.5rem 0 0' }}>{summaryData.length} total rows — showing first 5</p>}
               </div>
             </div>
           </div>
         )}
-        
+
+        {/* Report preview */}
         {reportData && (
-          <div className="card shadow-sm">
-            <div className="card-header bg-light">
-              <h5 className="mb-0">보고서 데이터 미리보기</h5>
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title-row">
+                <h5>Report Data Preview</h5>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>showing first 5 rows</span>
+              </div>
             </div>
-            <div className="card-body">
+            <div className="card-body" style={{ padding: '1rem 1.25rem' }}>
               <div className="table-responsive">
-                <table className="table table-bordered table-hover">
-                  <thead className="table-light">
+                <table className="table table-sm" style={{ fontSize: '0.8rem' }}>
+                  <thead style={{ background: 'var(--bg)' }}>
                     {reportData.length > 0 && (
-                      <tr>
-                        {Object.keys(reportData[0]).map((key, index) => (
-                          <th key={index}>{key}</th>
-                        ))}
-                      </tr>
+                      <tr>{Object.keys(reportData[0]).map((k, i) => <th key={i} style={{ fontWeight: '600', color: 'var(--text-sec)', padding: '0.5rem 0.75rem' }}>{k}</th>)}</tr>
                     )}
                   </thead>
                   <tbody>
-                    {reportData.slice(0, 5).map((row, rowIndex) => (
-                      <tr key={rowIndex}>
-                        {Object.values(row).map((value, cellIndex) => (
-                          <td key={cellIndex}>{value}</td>
-                        ))}
+                    {reportData.slice(0, 5).map((row, ri) => (
+                      <tr key={ri}>
+                        {Object.values(row).map((v, ci) => <td key={ci} style={{ padding: '0.4rem 0.75rem' }}>{v}</td>)}
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {reportData.length > 5 && (
-                  <p className="text-muted">총 {reportData.length}개 행 중 5개만 표시됩니다.</p>
-                )}
+                {reportData.length > 5 && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.5rem 0 0' }}>{reportData.length} total rows — showing first 5</p>}
               </div>
             </div>
           </div>
         )}
       </div>
-    </Layout>    
+    </Layout>
   );
 }

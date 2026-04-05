@@ -1,0 +1,29 @@
+# ===== 런타임 생성 파일 =====
+logs/
+1_uploads/
+0_Docs/machine_learning_검증파일/
+
+# ===== OS 파일 =====
+*.lnk
+.DS_Store
+Thumbs.db
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+
+# ===== Node.js =====
+node_modules/
+.next/
+
+# ===== 환경설정 (로컬 오버라이드) =====
+.env.local
+.env.*.local
+
+# ===== IDE =====
+.vscode/settings.json

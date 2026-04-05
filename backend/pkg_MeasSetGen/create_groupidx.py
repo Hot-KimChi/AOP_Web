@@ -1,9 +1,12 @@
+import logging
 import pandas as pd
 from pkg_SQL.database import SQL
-from flask import jsonify, session
+from flask import session
 
 # Pandas 다운캐스팅 옵션 설정
 pd.set_option("future.no_silent_downcasting", True)
+
+logger = logging.getLogger("GroupIdx")
 
 
 class GroupIdx:
@@ -19,7 +22,7 @@ class GroupIdx:
         self.password = session.get("password")
 
         if not self.username or not self.password:
-            return jsonify({"error": "User not authenticated"}), 401
+            raise ValueError("User not authenticated")
 
     def getGroupIdx(self):
         ## 데이터베이스에서 마지막 groupIndex 값 load
@@ -27,18 +30,19 @@ class GroupIdx:
             connect = SQL(
                 username=self.username, password=self.password, database=self.database
             )
-            query = f"""
+            # SQL 인젝션 방지: 파라미터화된 쿼리 사용
+            query = """
                 SELECT MAX(groupIndex) AS maxGroupIndex from meas_setting
-                where probeid = {self.probeId}
+                where probeid = ?
             """
-            maxGroupIdx_df = connect.execute_query(query)
+            maxGroupIdx_df = connect.execute_query(query, (self.probeId,))
             maxGroupIdx = maxGroupIdx_df["maxGroupIndex"].iloc[0]
 
             return maxGroupIdx if maxGroupIdx is not None else 0
 
         except Exception as e:
-            pass
             # 오류 발생 시 0을 반환하여 1부터 시작하도록 함
+            logger.warning(f"getGroupIdx 오류 발생, 기본값 0 반환: {e}")
             return 0
 
     def createGroupIdx(self, df):

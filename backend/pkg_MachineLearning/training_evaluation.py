@@ -89,7 +89,11 @@ class ModelEvaluator:
         # 모델 저장
         try:
             joblib.dump(self.model, filepath)
+            import logging
+            logging.getLogger("ModelEvaluator").info(f"Model saved: {filepath}")
         except Exception as e:
+            import logging
+            logging.getLogger("ModelEvaluator").error(f"Model save failed: {e}")
             raise
 
     # def train_dnn_model(self):

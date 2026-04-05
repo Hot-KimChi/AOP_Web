@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, g, Response
 import os, io
+from pathlib import Path
 from docx import Document
 from utils.decorators import handle_exceptions, require_auth, with_db_connection
 from utils.error_handler import error_response
@@ -46,10 +47,21 @@ def get_csv_data():
     csv_key = request.args.get("csv_key")
     if not csv_key:
         return error_response("csv_key is required", 400)
-    csv_file_path = csv_key
-    if not os.path.exists(csv_file_path):
+
+    # 경로 탐색 공격 방지: 절대 경로로 변환 후 프로젝트 루트 내에 있는지 검증
+    try:
+        file_path = Path(csv_key).resolve()
+        project_root = Path(os.getcwd()).resolve()
+        file_path.relative_to(project_root)
+    except ValueError:
+        logger.warning(f"Path traversal attempt blocked: {csv_key!r}")
+        return error_response("Invalid file path", 400)
+    except Exception:
+        return error_response("Invalid file path", 400)
+
+    if not file_path.exists():
         return error_response("CSV data not found", 404)
-    with open(csv_file_path, "r") as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         csv_data = f.read()
     return jsonify({"status": "success", "data": csv_data}), 200
 
@@ -58,7 +70,8 @@ def get_csv_data():
 @handle_exceptions
 @require_auth
 def get_list_database():
-    databases = os.environ.get("DATABASE_NAME", "").split(",")
+    raw = os.environ.get("DATABASE_NAME", "")
+    databases = [d.strip() for d in raw.split(",") if d.strip()]
     return jsonify({"status": "success", "databases": databases})
 
 
@@ -66,7 +79,8 @@ def get_list_database():
 @handle_exceptions
 @require_auth
 def get_list_table():
-    tables = os.environ.get("SERVER_TABLE_TABLE", "").split(",")
+    raw = os.environ.get("SERVER_TABLE_TABLE", "")
+    tables = [t.strip() for t in raw.split(",") if t.strip()]
     return jsonify({"status": "success", "tables": tables})
 
 
@@ -88,10 +102,9 @@ def get_probes():
     df = g.current_db.execute_query(query)
     df["probeId"] = df["probeId"].fillna("empty")
     df_unique = df.drop_duplicates(subset=["probeId", "probeName"])
-    df_unique = df_unique.sort_values(by="probeName")
-    probes = []
-    for i, row in enumerate(df_unique.values.tolist()):
-        probes.append({"probeId": row[0], "probeName": row[1], "_id": f"{row[0]}_{i}"})
+    df_unique = df_unique.sort_values(by="probeName").reset_index(drop=True)
+    df_unique["_id"] = df_unique["probeId"].astype(str) + "_" + df_unique.index.astype(str)
+    probes = df_unique[["probeId", "probeName", "_id"]].to_dict("records")
     return jsonify({"status": "success", "probes": probes})
 
 
@@ -134,21 +147,16 @@ def get_table_data():
     if selected_table == "WCS":
         df["probeId"] = df["probeId"].astype(str)
         df["myVersion"] = df["myVersion"].astype(str)
-        df = df.drop_duplicates(subset=["probeId", "myVersion"])
-        wcs_versions = []
-        for i, row in enumerate(df.values.tolist()):
-            wcs_versions.append(
-                {"probeId": row[0], "myVersion": row[1], "_id": f"wcs_{i}"}
-            )
-        response_data["wcsVersions"] = wcs_versions
+        df = df.drop_duplicates(subset=["probeId", "myVersion"]).reset_index(drop=True)
+        df["_id"] = "wcs_" + df.index.astype(str)
+        response_data["wcsVersions"] = df[["probeId", "myVersion", "_id"]].to_dict("records")
         return jsonify(response_data)
     df_probes = df.drop_duplicates(subset=["probeId", "probeName"])
-    df_probes = df_probes.sort_values(by="probeName")
-    probes = []
-    for i, row in enumerate(df_probes[["probeId", "probeName"]].values.tolist()):
-        probes.append(
-            {"probeId": str(row[0]), "probeName": str(row[1]), "_id": f"{row[0]}_{i}"}
-        )
+    df_probes = df_probes.sort_values(by="probeName").reset_index(drop=True)
+    df_probes["probeId"] = df_probes["probeId"].astype(str)
+    df_probes["probeName"] = df_probes["probeName"].astype(str)
+    df_probes["_id"] = df_probes["probeId"] + "_" + df_probes.index.astype(str)
+    probes = df_probes[["probeId", "probeName", "_id"]].to_dict("records")
     response_data["probes"] = probes
     if selected_table == "Tx_summary":
         df["software_version"] = df["software_version"].fillna("Empty")
@@ -157,26 +165,22 @@ def get_table_data():
         df_software = df_software.sort_values(
             by="software_version", key=lambda x: x.astype(str)
         )
-        probe_software_map = {}
-        for _, row in df.iterrows():
-            probe_id = str(row["probeId"])
-            if probe_id not in probe_software_map:
-                probe_software_map[probe_id] = []
-            software_version = str(row["software_version"])
-            if (
-                software_version != "empty"
-                and {"softwareVersion": software_version}
-                not in probe_software_map[probe_id]
-            ):
-                probe_software_map[probe_id].append(
-                    {"softwareVersion": software_version}
-                )
-        software = []
-        for i, row in enumerate(df_software[["software_version"]].values.tolist()):
-            if row[0] != "empty":
-                software.append(
-                    {"softwareVersion": str(row[0]), "_id": f"sw_version_{i}"}
-                )
+        # probe_software_map: groupby로 O(n²) 중복 탐지 제거
+        df_sw_map = df[["probeId", "software_version"]].copy()
+        df_sw_map["probeId"] = df_sw_map["probeId"].astype(str)
+        df_sw_map = df_sw_map[df_sw_map["software_version"].str.lower() != "empty"]
+        probe_software_map = {
+            probe_id: [{"softwareVersion": v} for v in group["software_version"].unique()]
+            for probe_id, group in df_sw_map.groupby("probeId", sort=False)
+        }
+        # software 목록 벡터화
+        df_sw_filtered = df_software[
+            df_software["software_version"].str.lower() != "empty"
+        ].reset_index(drop=True)
+        df_sw_filtered["_id"] = "sw_version_" + df_sw_filtered.index.astype(str)
+        software = df_sw_filtered.rename(
+            columns={"software_version": "softwareVersion"}
+        )[["softwareVersion", "_id"]].to_dict("records")
         response_data["software"] = software
         response_data["mapping"] = probe_software_map
     return jsonify(response_data)
@@ -262,6 +266,13 @@ def export_table_to_word():
     measSSIds = request.args.get("measSSIds")
     if not selected_database or not selected_table:
         return error_response("database, table 파라미터가 필요합니다", 400)
+    # SQL 인젝션 방지: 테이블명 allowlist 검증
+    allowed_export_tables = ["SSR_table", "Tx_summary", "probe_geo", "WCS", "meas_station_setup"]
+    if selected_table not in allowed_export_tables:
+        return (
+            jsonify({"status": "error", "message": "유효하지 않은 테이블 이름입니다"}),
+            400,
+        )
     if measSSIds:
         id_list = [s for s in measSSIds.split(",") if s.isdigit()]
         if not id_list:
@@ -279,10 +290,10 @@ def export_table_to_word():
     hdr_cells = table.rows[0].cells
     for i, col in enumerate(df.columns):
         hdr_cells[i].text = str(col)
-    for row in df.itertuples(index=False):
+    for row_values in df.fillna("").astype(str).values.tolist():
         row_cells = table.add_row().cells
-        for i, value in enumerate(row):
-            row_cells[i].text = str(value) if value is not None else ""
+        for i, value in enumerate(row_values):
+            row_cells[i].text = value
     buf = io.BytesIO()
     doc.save(buf)
     buf.seek(0)
@@ -292,3 +303,35 @@ def export_table_to_word():
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+@db_api_bp.route("/get_viewer_data", methods=["GET"])
+@handle_exceptions
+@require_auth
+@with_db_connection()
+def get_viewer_data():
+    """Database Viewer 팝업 전용: 선택된 테이블의 전체 데이터(TOP 1000)를 반환합니다."""
+    selected_database = request.args.get("database")
+    selected_table = request.args.get("table")
+
+    if not selected_database or not selected_table:
+        return error_response("database, table 파라미터가 필요합니다", 400)
+
+    # SERVER_TABLE_TABLE 환경변수 기준 동적 allowlist (get_list_table과 동기화)
+    allowed_tables_raw = os.environ.get("SERVER_TABLE_TABLE", "")
+    allowed_tables = [t.strip() for t in allowed_tables_raw.split(",") if t.strip()]
+    if selected_table not in allowed_tables:
+        return error_response("유효하지 않은 테이블 이름입니다", 400)
+
+    import numpy as np
+
+    df = g.current_db.execute_query(f"SELECT TOP 1000 * FROM {selected_table}")
+    if df is None or df.empty:
+        return jsonify({"status": "success", "data": [], "columns": []})
+
+    df = df.replace({np.nan: None})
+    return jsonify({
+        "status": "success",
+        "data": df.to_dict(orient="records"),
+        "columns": list(df.columns),
+    })

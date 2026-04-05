@@ -106,10 +106,11 @@ export function buildLineChartData(versionsData) {
  * - 여러 모델이 있으면 색상을 달리해 동시에 표시합니다.
  * - 첫 번째 데이터셋으로 y=x 이상적 예측 기준선을 삽입합니다.
  *
- * @param {Array} scatterData - [{model_name, version_number, stage, points:[{target_value, estimation_value}]}]
+ * @param {Array}   scatterData - [{model_name, version_number, stage, points:[{target_value, estimation_value}]}]
+ * @param {boolean} isDark      - 다크모드 여부 (기준선 색상 결정)
  * @returns {{ datasets: Array } | null}
  */
-export function buildScatterChartData(scatterData) {
+export function buildScatterChartData(scatterData, isDark = false) {
   if (!scatterData || scatterData.length === 0) return null;
 
   // 전체 포인트 범위 계산 (y=x 기준선 범위 결정용)
@@ -149,7 +150,7 @@ export function buildScatterChartData(scatterData) {
   datasets.unshift({
     label:           'Ideal (y = x)',
     data:            [{ x: globalMin, y: globalMin }, { x: globalMax, y: globalMax }],
-    borderColor:     'rgba(0, 0, 0, 0.3)',
+    borderColor:     isDark ? 'rgba(255, 255, 255, 0.55)' : 'rgba(0, 0, 0, 0.3)',
     backgroundColor: 'transparent',
     borderWidth:     2,
     borderDash:      [6, 4],

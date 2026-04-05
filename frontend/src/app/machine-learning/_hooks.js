@@ -23,7 +23,7 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { findBestVersion, buildLineChartData, buildScatterChartData } from './_helpers';
-import { makeLineChartOptions } from './_constants';
+import { makeLineChartOptions, makeScatterChartOptions } from './_constants';
 
 export function useMLPageData() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
@@ -31,6 +31,18 @@ export function useMLPageData() {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // [상태 정의]
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 다크모드 감지 — data-theme 속성 변경을 MutationObserver로 추적
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () =>
+      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
   // 모델 선택·훈련
   const [models,          setModels]          = useState([]);
   const [loading,         setLoading]         = useState(true);
@@ -189,7 +201,7 @@ export function useMLPageData() {
       setVersionsLoading(false);
     }
     return [];
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [API_BASE_URL]);
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // [Step 4] scatter 상태 변경 함수들
@@ -362,7 +374,7 @@ export function useMLPageData() {
     } finally {
       setTrainingLoading(false);
     }
-  }, [selectedModel, refreshVersionsPerformance]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedModel, API_BASE_URL, refreshVersionsPerformance]);
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // [Step 7] 차트 데이터 · 옵션 파생 (useMemo)
@@ -371,11 +383,14 @@ export function useMLPageData() {
   // versionsData 변경 시만 재계산
   const chartData = useMemo(() => buildLineChartData(versionsData), [versionsData]);
 
-  // handleChartClick 이 versionsData 를 의존하므로 같이 갱신
-  const chartOptions = useMemo(() => makeLineChartOptions(handleChartClick), [handleChartClick]);
+  // handleChartClick 이 versionsData 를 의존하므로 같이 갱신; isDark 변경 시 색상 재계산
+  const chartOptions = useMemo(() => makeLineChartOptions(handleChartClick, isDark), [handleChartClick, isDark]);
 
-  // scatterData 변경 시만 재계산
-  const scatterChartData = useMemo(() => buildScatterChartData(scatterData), [scatterData]);
+  // scatterData 또는 isDark 변경 시 재계산 (ideal line 색상 포함)
+  const scatterChartData = useMemo(() => buildScatterChartData(scatterData, isDark), [scatterData, isDark]);
+
+  // isDark 변경 시 차트 텍스트·그리드 색상 재계산
+  const scatterChartOptions = useMemo(() => makeScatterChartOptions(isDark), [isDark]);
 
   /**
    * selectedVersionsMeta: scatterData 에서 파생되는 배지(badge) 메타 배열.
@@ -409,7 +424,7 @@ export function useMLPageData() {
     // 차트
     chartData, chartOptions,
     // 산점도
-    scatterData, scatterLoading, scatterChartData,
+    scatterData, scatterLoading, scatterChartData, scatterChartOptions,
     scatterNoDataMsg,
     selectedVersionsMeta,
     // page.js handle~ 형태로 통일

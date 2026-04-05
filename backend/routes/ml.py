@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+import pandas as pd
 from utils.decorators import handle_exceptions, require_auth
 from utils.logger import logger
 from utils.error_handler import error_response
@@ -76,21 +77,6 @@ def get_model_versions_performance():
         db_manager = DatabaseManager()
         db = db_manager.get_mlflow_connection()
 
-        # 먼저 데이터가 있는지 간단히 확인
-        check_query = """
-            SELECT COUNT(*) as count FROM ml_model_versions
-        """
-        count_result = db.execute_query(check_query)
-        logger.info(f"Total model versions in DB: {count_result.iloc[0]['count']}")
-
-        check_perf_query = """
-            SELECT COUNT(*) as count FROM ml_model_performance
-        """
-        perf_count_result = db.execute_query(check_perf_query)
-        logger.info(
-            f"Total performance records in DB: {perf_count_result.iloc[0]['count']}"
-        )
-
         # 동적 WHERE 절 구성
         where_conditions = []
         params = []
@@ -138,8 +124,6 @@ def get_model_versions_performance():
 
         # 디버깅: 쿼리 결과 로깅
         logger.info(f"Query returned {len(result_df)} rows")
-        if not result_df.empty:
-            logger.info(f"Sample data: {result_df.head(3).to_dict('records')}")
 
         if result_df.empty:
             logger.info("No model version data found")
@@ -151,54 +135,53 @@ def get_model_versions_performance():
                 }
             )
 
-        # 데이터 구조화: 모델별 -> 버전별 -> 메트릭
+        # 데이터 구조화: 모델별 -> 버전별 -> 메트릭 (groupby로 벡터화하여 iterrows 제거)
         models_dict = {}
 
-        for _, row in result_df.iterrows():
-            model_name = row["model_name"]
-            version_id = row["version_id"]
+        for (model_name, model_id), model_group in result_df.groupby(
+            ["model_name", "model_id"], sort=False
+        ):
+            first_model_row = model_group.iloc[0]
+            versions = {}
 
-            # 모델이 딕셔너리에 없으면 추가
-            if model_name not in models_dict:
-                models_dict[model_name] = {
-                    "model_id": int(row["model_id"]),
-                    "model_name": model_name,
-                    "model_type": row["model_type"],
-                    "description": row["description"],
-                    "prediction_type": row["prediction_type"],
-                    "versions": {},
-                }
+            for version_id, version_group in model_group.groupby("version_id", sort=False):
+                first_ver = version_group.iloc[0]
 
-            # 버전이 딕셔너리에 없으면 추가
-            if version_id not in models_dict[model_name]["versions"]:
-                models_dict[model_name]["versions"][version_id] = {
+                # 메트릭 빌드: zip으로 한 번에 구성 (iterrows 불필요)
+                mask = (
+                    version_group["metric_name"].notna()
+                    & version_group["metric_value"].notna()
+                )
+                metric_rows = version_group[mask]
+                metrics = dict(
+                    zip(metric_rows["metric_name"], metric_rows["metric_value"].astype(float))
+                )
+
+                ct = first_ver["creation_time"]
+                versions[version_id] = {
                     "version_id": int(version_id),
-                    "version_number": int(row["version_number"]),
-                    "stage": row["stage"],
+                    "version_number": int(first_ver["version_number"]),
+                    "stage": first_ver["stage"],
                     "creation_time": (
-                        row["creation_time"].isoformat()
-                        if row["creation_time"]
+                        ct.isoformat()
+                        if ct is not None and hasattr(ct, "isoformat")
                         else None
                     ),
-                    "user_id": row["user_id"],
-                    "model_class_name": row["model_class_name"],
-                    "metrics": {},
+                    "user_id": first_ver["user_id"],
+                    "model_class_name": first_ver["model_class_name"],
+                    "metrics": metrics,
                 }
 
-            # 메트릭 추가
-            if row["metric_name"] and row["metric_value"] is not None:
-                metric_name = row["metric_name"]
-                models_dict[model_name]["versions"][version_id]["metrics"][
-                    metric_name
-                ] = float(row["metric_value"])
+            models_dict[model_name] = {
+                "model_id": int(model_id),
+                "model_name": model_name,
+                "model_type": first_model_row["model_type"],
+                "description": first_model_row["description"],
+                "prediction_type": first_model_row["prediction_type"],
+                "versions": list(versions.values()),
+            }
 
-        # 딕셔너리를 리스트로 변환
-        result_data = []
-        for model_name, model_data in models_dict.items():
-            # 버전 딕셔너리를 리스트로 변환
-            versions_list = list(model_data["versions"].values())
-            model_data["versions"] = versions_list
-            result_data.append(model_data)
+        result_data = list(models_dict.values())
 
         logger.info(
             f"Model versions performance data retrieved: {len(result_data)} models"
@@ -242,19 +225,8 @@ def get_prediction_points():
         db = db_manager.get_mlflow_connection()
 
         logger.info(
-            f"[Scatter Debug] prediction_type={prediction_type}, model_name={model_name}, version_id={version_id}, latest_only={latest_only}"
+            f"prediction_type={prediction_type}, model_name={model_name}, version_id={version_id}, latest_only={latest_only}"
         )
-
-        # 먼저 prediction_points 테이블 데이터 존재 여부 확인
-        try:
-            check_query = "SELECT COUNT(*) as cnt FROM ml_prediction_points"
-            check_result = db.execute_query(check_query)
-            pp_count = check_result.iloc[0]["cnt"] if not check_result.empty else 0
-            logger.info(f"[Scatter Debug] Total prediction_points in DB: {pp_count}")
-        except Exception as check_err:
-            logger.error(
-                f"[Scatter Debug] Cannot query ml_prediction_points table: {check_err}"
-            )
 
         if version_id:
             # 특정 버전 ID로 직접 조회
@@ -341,7 +313,7 @@ def get_prediction_points():
             result_df = db.execute_query(query, tuple(params))
 
         logger.info(
-            f"[Scatter Debug] Query returned {len(result_df)} rows, columns: {list(result_df.columns) if not result_df.empty else 'N/A'}"
+            f"Query returned {len(result_df)} rows"
         )
 
         if result_df.empty:
@@ -353,34 +325,36 @@ def get_prediction_points():
                 }
             )
 
-        # 모델/버전별로 데이터 구조화
+        # 모델/버전별로 데이터 구조화 (groupby로 벡터화하여 iterrows 제거)
+        result_df["target_value"] = result_df["target_value"].astype(float)
+        result_df["estimation_value"] = result_df["estimation_value"].astype(float)
+
         models_dict = {}
-        for _, row in result_df.iterrows():
-            model_name_key = row["model_name"]
-            version_id_val = int(row["version_id"])
+        for (model_name_key, version_id_val), group in result_df.groupby(
+            ["model_name", "version_id"], sort=False
+        ):
+            version_id_val = int(version_id_val)
+            first_row = group.iloc[0]
             key = f"{model_name_key}_v{version_id_val}"
 
-            if key not in models_dict:
-                models_dict[key] = {
-                    "model_name": model_name_key,
-                    "version_id": version_id_val,
-                    "version_number": int(row["version_number"]),
-                    "stage": row["stage"],
-                    "points": [],
-                }
+            # 포인트 목록: to_dict로 한 번에 변환
+            pts = group[
+                ["target_value", "estimation_value", "data_index", "dataset_type"]
+            ].to_dict("records")
+            for p in pts:
+                di = p.get("data_index")
+                try:
+                    p["data_index"] = int(di) if di is not None else None
+                except (TypeError, ValueError):
+                    p["data_index"] = None
 
-            models_dict[key]["points"].append(
-                {
-                    "target_value": float(row["target_value"]),
-                    "estimation_value": float(row["estimation_value"]),
-                    "data_index": (
-                        int(row["data_index"])
-                        if row["data_index"] is not None
-                        else None
-                    ),
-                    "dataset_type": row["dataset_type"],
-                }
-            )
+            models_dict[key] = {
+                "model_name": model_name_key,
+                "version_id": version_id_val,
+                "version_number": int(first_row["version_number"]),
+                "stage": first_row["stage"],
+                "points": pts,
+            }
 
         result_data = list(models_dict.values())
         total_points = sum(len(m["points"]) for m in result_data)

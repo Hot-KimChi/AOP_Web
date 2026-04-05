@@ -2,9 +2,9 @@
  * machine-learning/_constants.js
  *
  * 머신러닝 페이지에서 공유하는 상수 및 차트 옵션을 정의합니다.
- *  - MODEL_COLORS       : 모델별 포인트/선 색상 팔레트
- *  - makeLineChartOptions: 추이 라인 차트 옵션 팩토리 (onClick 동적 주입)
- *  - SCATTER_CHART_OPTIONS: 산점도 정적 옵션
+ *  - MODEL_COLORS          : 모델별 포인트/선 색상 팔레트
+ *  - makeLineChartOptions  : 추이 라인 차트 옵션 팩토리 (onClick + isDark 주입)
+ *  - makeScatterChartOptions: 산점도 옵션 팩토리 (isDark 주입)
  */
 
 // ── 모델별 색상 팔레트 ──────────────────────────────────────────
@@ -22,16 +22,26 @@ export const MODEL_COLORS = [
   'rgb(99,  255, 132)', // 연두
 ];
 
+// ── 다크모드 공통 색상 헬퍼 ───────────────────────────────────────
+function chartColors(isDark) {
+  return {
+    text:  isDark ? '#f1f5f9'                    : '#374151',
+    tick:  isDark ? '#94a3b8'                    : '#6b7280',
+    grid:  isDark ? 'rgba(241, 245, 249, 0.12)'  : 'rgba(0, 0, 0, 0.1)',
+    border: isDark ? 'rgba(241, 245, 249, 0.2)'  : 'rgba(0, 0, 0, 0.15)',
+  };
+}
+
 // ── 추이 라인 차트 옵션 팩토리 ────────────────────────────────────
 /**
  * 버전별 Test Score 추이 라인 차트의 Chart.js 옵션 객체를 반환합니다.
- * onClick / onHover 는 컴포넌트 렌더 시점에서 주입해야 하므로
- * 팩토리 함수 형태로 제공합니다.
  *
  * @param {Function} onClickHandler - 포인트 클릭 시 호출될 이벤트 핸들러
+ * @param {boolean}  isDark         - 다크모드 여부
  * @returns {object} Chart.js options 객체
  */
-export function makeLineChartOptions(onClickHandler) {
+export function makeLineChartOptions(onClickHandler, isDark = false) {
+  const c = chartColors(isDark);
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -40,11 +50,13 @@ export function makeLineChartOptions(onClickHandler) {
       legend: {
         display: true,
         position: 'top',
+        labels: { color: c.text },
       },
       title: {
         display: true,
         text: '모델 버전별 Test Score (R²) 추이',
         font: { size: 16, weight: 'bold' },
+        color: c.text,
       },
       tooltip: {
         callbacks: {
@@ -57,14 +69,18 @@ export function makeLineChartOptions(onClickHandler) {
     scales: {
       x: {
         type: 'linear',
-        title: { display: true, text: 'Version Number' },
-        ticks: { stepSize: 1 },
+        title: { display: true, text: 'Version Number', color: c.text },
+        ticks: { stepSize: 1, color: c.tick },
+        grid:  { color: c.grid },
+        border: { color: c.border },
       },
       y: {
-        title: { display: true, text: 'Test Score (R²)' },
+        title: { display: true, text: 'Test Score (R²)', color: c.text },
         min: 0.85,
         max: 1.0,
-        ticks: { callback: (v) => v.toFixed(2) },
+        ticks: { callback: (v) => v.toFixed(2), color: c.tick },
+        grid:  { color: c.grid },
+        border: { color: c.border },
       },
     },
     interaction: { mode: 'nearest', intersect: true },
@@ -75,55 +91,69 @@ export function makeLineChartOptions(onClickHandler) {
   };
 }
 
-// ── 산점도 옵션 ───────────────────────────────────────────────
+// ── 산점도 옵션 팩토리 ─────────────────────────────────────────
 /**
- * Target vs Estimation 산점도의 Chart.js 옵션 객체입니다.
- * 런타임에 변경되는 값이 없으므로 정적 상수로 정의합니다.
+ * Target vs Estimation 산점도의 Chart.js 옵션 객체를 반환합니다.
+ *
+ * @param {boolean} isDark - 다크모드 여부
+ * @returns {object} Chart.js options 객체
  */
-export const SCATTER_CHART_OPTIONS = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: true,
-      position: 'top',
-      labels: { usePointStyle: true, font: { size: 11 } },
-    },
-    title: {
-      display: true,
-      text: 'Target vs Estimation (Test Set)',
-      font: { size: 16, weight: 'bold' },
-    },
-    tooltip: {
-      callbacks: {
-        label: (ctx) => {
-          // y=x 기준선은 툴팁 표시 생략
-          if (ctx.dataset.label === 'Ideal (y = x)') return null;
-          return (
-            `${ctx.dataset.label}: `
-            + `Target=${ctx.parsed.x.toFixed(2)}, `
-            + `Est=${ctx.parsed.y.toFixed(2)}`
-          );
+export function makeScatterChartOptions(isDark = false) {
+  const c = chartColors(isDark);
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top',
+        labels: { usePointStyle: true, font: { size: 11 }, color: c.text },
+      },
+      title: {
+        display: true,
+        text: 'Target vs Estimation (Test Set)',
+        font: { size: 16, weight: 'bold' },
+        color: c.text,
+      },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => {
+            // y=x 기준선은 툴팁 표시 생략
+            if (ctx.dataset.label === 'Ideal (y = x)') return null;
+            return (
+              `${ctx.dataset.label}: `
+              + `Target=${ctx.parsed.x.toFixed(2)}, `
+              + `Est=${ctx.parsed.y.toFixed(2)}`
+            );
+          },
         },
       },
     },
-  },
-  scales: {
-    x: {
-      type: 'linear',
-      title: {
-        display: true,
-        text: 'Target Value (실제 값)',
-        font: { size: 13, weight: 'bold' },
+    scales: {
+      x: {
+        type: 'linear',
+        title: {
+          display: true,
+          text: 'Target Value (실제 값)',
+          font: { size: 13, weight: 'bold' },
+          color: c.text,
+        },
+        ticks:  { color: c.tick },
+        grid:   { color: c.grid },
+        border: { color: c.border },
+      },
+      y: {
+        type: 'linear',
+        title: {
+          display: true,
+          text: 'Estimation Value (예측 값)',
+          font: { size: 13, weight: 'bold' },
+          color: c.text,
+        },
+        ticks:  { color: c.tick },
+        grid:   { color: c.grid },
+        border: { color: c.border },
       },
     },
-    y: {
-      type: 'linear',
-      title: {
-        display: true,
-        text: 'Estimation Value (예측 값)',
-        font: { size: 13, weight: 'bold' },
-      },
-    },
-  },
-};
+  };
+}

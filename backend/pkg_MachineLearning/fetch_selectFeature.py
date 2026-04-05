@@ -1,3 +1,4 @@
+import logging
 import os
 import pandas as pd
 from pkg_SQL.database import SQL
@@ -25,7 +26,7 @@ def fetchData():
         databases_ML = os.environ.get("DATABASE_ML_NAME")
 
     except Exception as e:
-        pass
+        logging.warning(f"Config 로드 중 오류 발생: {e}")
 
     if not all([server_address, databases_ML]):
         raise ValueError(
@@ -85,6 +86,7 @@ def fetchData():
                 return Raw_data
 
         except Exception as e:
+            logging.warning(f"DB '{db}' 데이터 조회 실패: {e}")
             return None
         finally:
             if sql_connection and hasattr(sql_connection, "engine"):

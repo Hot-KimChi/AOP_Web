@@ -2,6 +2,12 @@
 
 > 최신 변경 사항이 위에, 오래된 기록이 아래에 위치합니다.
 
+### 📎 관련 문서
+| 문서 | 설명 |
+|------|------|
+| **[AI_Rearch_summary.md](../../../../../AI_Rearch_summary.md)** | 프로젝트 전반 요약 — [§머신러닝 파이프라인](../../../../../AI_Rearch_summary.md#33-머신러닝-파이프라인), [§Frontend 페이지](../../../../../AI_Rearch_summary.md#35-frontend-페이지-구성) |
+| **[AI_Rearch_detail.md](../../../../../AI_Rearch_detail.md)** | 상세 코드 리뷰 — [§ML 파이프라인](../../../../../AI_Rearch_detail.md#3-ml-파이프라인-상세-분석), [§ML 페이지 분석](../../../../../AI_Rearch_detail.md#63-machine-learning-페이지-174줄), [§ml.py API](../../../../../AI_Rearch_detail.md#15-routesmlpy--머신러닝-api-397줄) |
+
 ---
 
 ## 2026-03-02 — 초기화 버튼 오류 + 전체 코드 정밀 리뷰 3종 버그 수정

@@ -61,7 +61,7 @@ export const TableBody = React.memo(({
   return (
     <tbody>
       {displayData.map((row, rowIndex) => (
-        <tr key={rowIndex} className="hover:bg-gray-50">
+        <tr key={rowIndex}>
           <RowActions
             rowIndex={rowIndex}
             onDelete={onDeleteRow}
@@ -78,7 +78,7 @@ export const TableBody = React.memo(({
                 className="border"
                 style={{
                   padding: '4px',
-                  backgroundColor: showHighlight ? '#fef3c7' : isEditable ? '#eff6ff' : 'white',
+                  backgroundColor: showHighlight ? 'var(--status-warning-bg)' : isEditable ? 'var(--brand-light)' : 'transparent',
                   fontSize: '12px',
                   maxWidth: isEditable ? '120px' : 'auto',
                   minWidth: isEditable ? '80px' : 'auto'

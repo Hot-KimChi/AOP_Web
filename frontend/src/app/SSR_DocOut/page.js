@@ -3,36 +3,32 @@
 
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
+import { FileText, Download } from 'lucide-react';
 
 export default function SSR_DocOut() {
   const [DBList, setDBList] = useState([]);
   const [selectedDatabase, setSelectedDatabase] = useState('');
   const [tableData, setTableData] = useState([]);
   const [columns, setColumns] = useState([]);
-  const [probeList, setProbeList] = useState([]);
-  const [selectedProbe, setSelectedProbe] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedRowIdxs, setSelectedRowIdxs] = useState([]); // 여러 행 선택 상태 추가
+  const [selectedRowIdxs, setSelectedRowIdxs] = useState([]);
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
   useEffect(() => {
     const fetchDatabases = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/get_list_database`, {
-          method: 'GET',
-          credentials: 'include',
-        });
+        const response = await fetch(`${API_BASE_URL}/api/get_list_database`, { credentials: 'include' });
         if (!response.ok) throw new Error('DB 목록 조회 실패');
         const data = await response.json();
         setDBList(data.databases || []);
-      } catch (error) {
+      } catch {
         setError('DB 목록 조회 실패');
       }
     };
     fetchDatabases();
-  }, []);
+  }, [API_BASE_URL]);
 
   useEffect(() => {
     if (selectedDatabase) {
@@ -40,41 +36,20 @@ export default function SSR_DocOut() {
         try {
           setIsLoading(true);
           const url = `${API_BASE_URL}/api/get_table_data?database=${encodeURIComponent(selectedDatabase)}&table=meas_station_setup`;
-          const response = await fetch(url, {
-            method: 'GET',
-            credentials: 'include',
-          });
+          const response = await fetch(url, { credentials: 'include' });
           if (!response.ok) throw new Error('테이블 데이터 조회 실패');
           const result = await response.json();
-          if (result.status === 'success' && result.data && result.data.length > 0) {
+          if (result.status === 'success' && result.data?.length > 0) {
             setTableData(result.data);
-            // columns 우선순위: result.columns → result.data[0]의 key
-            if (result.columns && Array.isArray(result.columns) && result.columns.length > 0) {
-              setColumns(result.columns);
-            } else {
-              setColumns(Object.keys(result.data[0]));
-            }
-            // probeId/measComments 추출 (probeName 대신 measComments 사용)
-            const probes = result.data
-              .map(row => {
-                const probeId = row.probeId;
-                const probeName = row.measComments;
-                return (probeId && probeName) ? { probeId, probeName } : null;
-              })
-              .filter(Boolean);
-            // 중복 제거
-            const uniqueProbes = Array.from(new Map(probes.map(p => [p.probeId, p])).values());
-            setProbeList(uniqueProbes);
+            setColumns(result.columns?.length ? result.columns : Object.keys(result.data[0]));
           } else {
             setTableData([]);
             setColumns([]);
-            setProbeList([]);
           }
-        } catch (error) {
+        } catch {
           setError('테이블 데이터 조회 실패');
           setTableData([]);
           setColumns([]);
-          setProbeList([]);
         } finally {
           setIsLoading(false);
         }
@@ -83,50 +58,34 @@ export default function SSR_DocOut() {
     } else {
       setTableData([]);
       setColumns([]);
-      setProbeList([]);
     }
-  }, [selectedDatabase]);
+  }, [selectedDatabase, API_BASE_URL]);
 
-  // Word 내보내기: 선택된 measSSId만 전달
   const handleExportWord = async () => {
-    if (selectedDatabase && selectedRowIdxs.length > 0) {
-      // 선택된 measSSId 값 추출
-      const selectedIds = selectedRowIdxs.map(idx => tableData[idx]?.measSSId).filter(Boolean);
-      if (selectedIds.length === 0) {
-        setError('선택된 행에 measSSId 값이 없습니다.');
-        return;
-      }
-      // SSR_table에서 선택된 measSSId만 워드로 요청
-      const url = `${API_BASE_URL}/api/export_table_to_word?database=${encodeURIComponent(selectedDatabase)}&table=SSR_table&measSSIds=${encodeURIComponent(selectedIds.join(','))}`;
-      try {
-        const response = await fetch(url, {
-          method: 'GET',
-          credentials: 'include',
-        });
-        if (!response.ok) throw new Error('Word 파일 생성 실패');
-        const blob = await response.blob();
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = `SSR_table_selected.docx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(downloadUrl);
-      } catch (err) {
-        setError('Word 파일 다운로드 실패');
-      }
-    } else {
+    if (!selectedDatabase || selectedRowIdxs.length === 0) {
       setError('행을 선택하세요.');
+      return;
+    }
+    const selectedIds = selectedRowIdxs.map(idx => tableData[idx]?.measSSId).filter(Boolean);
+    if (selectedIds.length === 0) { setError('선택된 행에 measSSId 값이 없습니다.'); return; }
+    try {
+      const url = `${API_BASE_URL}/api/export_table_to_word?database=${encodeURIComponent(selectedDatabase)}&table=SSR_table&measSSIds=${encodeURIComponent(selectedIds.join(','))}`;
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Word 파일 생성 실패');
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl; a.download = 'SSR_table_selected.docx';
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch {
+      setError('Word 파일 다운로드 실패');
     }
   };
 
-  // 행 클릭 핸들러 (ctrlKey 지원)
   const handleRowClick = (idx, event) => {
     if (event.ctrlKey) {
-      setSelectedRowIdxs(prev =>
-        prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
-      );
+      setSelectedRowIdxs(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]);
     } else {
       setSelectedRowIdxs([idx]);
     }
@@ -134,75 +93,105 @@ export default function SSR_DocOut() {
 
   return (
     <Layout>
-      <div className="container mt-4">
-        <div className="card shadow-sm">
-          <div className="card-header bg-primary text-white">
-            <h5 className="mb-0">SSR_DocOut - meas_station_setup 테이블 미리보기</h5>
-          </div>
-          <div className="card-body">
-            <div className="row g-3">
-              <div className="col-md-5">
-                <label htmlFor="database" className="form-label">데이터베이스 선택</label>
+      <div className="page-wrapper">
+        <div className="card">
+
+          {/* Header */}
+          <div className="card-header">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div className="card-title-row">
+                <FileText size={16} color="#6366f1" />
+                <h5>SSR DocOut</h5>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '400' }}>meas_station_setup</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <select
-                  id="database"
-                  className="form-select"
+                  className="form-select form-select-sm"
+                  style={{ width: 'auto', minWidth: '180px' }}
                   value={selectedDatabase}
-                  onChange={e => { setSelectedDatabase(e.target.value); setSelectedProbe(''); setError(null); }}
+                  onChange={e => { setSelectedDatabase(e.target.value); setSelectedRowIdxs([]); setError(null); }}
                   disabled={isLoading}
                 >
-                  <option value="">Select Database</option>
-                  {DBList.map((db, idx) => (
-                    <option key={idx} value={db}>{db}</option>
-                  ))}
+                  <option value="">Select database…</option>
+                  {DBList.map((db, i) => <option key={i} value={db}>{db}</option>)}
                 </select>
-              </div>
-              <div className="col-md-7 d-flex align-items-end">
                 <button
-                  className="btn btn-outline-success w-100"
                   onClick={handleExportWord}
-                  disabled={!selectedDatabase || tableData.length === 0}
+                  disabled={!selectedDatabase || selectedRowIdxs.length === 0}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.375rem',
+                    padding: '0.375rem 0.875rem', borderRadius: '6px',
+                    background: selectedDatabase && selectedRowIdxs.length > 0 ? '#10b981' : '#d1d5db',
+                    color: 'white', border: 'none', fontWeight: '500', fontSize: '0.8125rem',
+                    cursor: selectedDatabase && selectedRowIdxs.length > 0 ? 'pointer' : 'not-allowed',
+                    whiteSpace: 'nowrap',
+                  }}
                 >
-                  Word로 내보내기
+                  <Download size={13} />
+                  Export Word{selectedRowIdxs.length > 0 ? ` (${selectedRowIdxs.length})` : ''}
                 </button>
               </div>
             </div>
-            <hr />
-            {isLoading && <div>로딩 중...</div>}
-            {!isLoading && columns.length > 0 && (
-              <div className="table-responsive mt-3" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                <table className="table table-bordered table-sm" style={{ fontSize: '0.85rem' }}>
-                  <thead className="table-light" style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f8f9fa' }}>
-                    <tr>
-                      {columns.map(col => <th key={col}>{col}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableData.map((row, idx) => (
-                      <tr
-                        key={idx}
-                        onClick={e => handleRowClick(idx, e)}
-                        className={selectedRowIdxs.includes(idx) ? 'table-primary' : ''}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        {columns.map(col => (
-                          <td
-                            key={col}
-                            style={{ maxWidth: 120, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                            title={typeof row[col] === 'string' ? row[col] : undefined}
-                          >
-                            {typeof row[col] === 'string' && row[col].length > 20
-                              ? row[col].slice(0, 20) + '...'
-                              : row[col]}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          </div>
+
+          {/* Body */}
+          <div className="card-body" style={{ padding: '1rem 1.25rem' }}>
+
+            {isLoading && (
+              <div className="spinner-center">
+                <div className="spinner-border spinner-border-sm text-secondary" role="status" />
+                Loading…
               </div>
             )}
+
+            {!isLoading && columns.length > 0 && (
+              <>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 0.5rem' }}>
+                  Click to select a row · Ctrl+Click to multi-select · {tableData.length} rows total
+                </p>
+                <div style={{ maxHeight: '420px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                  <table className="table table-sm mb-0" style={{ fontSize: '0.8rem' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+                      <tr>
+                        {columns.map(col => (
+                          <th key={col} style={{ padding: '0.5rem 0.75rem', fontWeight: '600', color: 'var(--text-sec)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tableData.map((row, idx) => (
+                        <tr
+                          key={idx}
+                          onClick={e => handleRowClick(idx, e)}
+                          style={{
+                            cursor: 'pointer',
+                            background: selectedRowIdxs.includes(idx) ? 'var(--brand-light)' : 'transparent',
+                            transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => { if (!selectedRowIdxs.includes(idx)) e.currentTarget.style.background = 'var(--bg)'; }}
+                          onMouseLeave={e => { if (!selectedRowIdxs.includes(idx)) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          {columns.map(col => (
+                            <td
+                              key={col}
+                              style={{ padding: '0.4rem 0.75rem', maxWidth: '140px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', borderBottom: '1px solid var(--border)' }}
+                              title={typeof row[col] === 'string' ? row[col] : undefined}
+                            >
+                              {typeof row[col] === 'string' && row[col].length > 22 ? row[col].slice(0, 22) + '…' : row[col]}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
             {error && (
-              <div className="alert alert-danger mt-3">{error}</div>
+              <div className="alert alert-danger mt-3" style={{ fontSize: '0.875rem' }}>{error}</div>
             )}
           </div>
         </div>

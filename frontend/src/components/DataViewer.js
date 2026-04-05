@@ -1,112 +1,136 @@
 "use client";
-import { useState } from 'react';
-import { ArrowUpDown, X, FileSpreadsheet } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { ArrowUpDown, FileSpreadsheet } from 'lucide-react';
+import { MultiSelectDropdown } from '../app/data-view/components/MultiSelectDropdown';
 
 export default function DataViewer({
   data = [],
-  columns = [], // 추가: 컬럼 순서 정보
+  columns = [],
   title = '',
   onExport = null,
   showExport = true,
   minWidth = 800,
   style = {},
 }) {
-  const [displayData, setDisplayData] = useState(data);
+  const [filters,    setFilters]    = useState({});
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [filters, setFilters] = useState({});
-  const [comboBoxOptions, setComboBoxOptions] = useState(generateComboBoxOptions(data));
 
-  // 정렬
-  const handleSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-    const sortedData = [...displayData].sort((a, b) => {
-      if (a[key] === null) return 1;
-      if (b[key] === null) return -1;
-      const aVal = typeof a[key] === 'string' ? a[key].toLowerCase() : a[key];
-      const bVal = typeof b[key] === 'string' ? b[key].toLowerCase() : b[key];
-      if (aVal < bVal) return direction === 'asc' ? -1 : 1;
-      if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+  // 컬럼 목록
+  const columnList = useMemo(
+    () => (columns && columns.length > 0 ? columns : Object.keys(data[0] || {})),
+    [columns, data],
+  );
+
+  // ── 연쇄 필터 옵션 (cascaded) ─────────────────────────────
+  // 각 컬럼에 대해 "해당 컬럼을 제외한 나머지 필터를 적용한 결과"에서 고유값을 추출합니다.
+  const cascadedOptions = useMemo(() => {
+    if (!data.length) return {};
+    const result = {};
+    columnList.forEach(targetCol => {
+      let subset = data;
+      Object.entries(filters).forEach(([col, vals]) => {
+        if (col === targetCol || !vals || vals.length === 0) return;
+        subset = subset.filter(row => {
+          const v = String(row[col] ?? '').toLowerCase();
+          return vals.some(f => v === f.toLowerCase().trim());
+        });
+      });
+      const optionSet = new Set(subset.map(row => String(row[targetCol] ?? '')));
+      // 현재 선택된 값은 목록에서 사라지지 않도록 유지
+      (filters[targetCol] || []).forEach(v => optionSet.add(v));
+      result[targetCol] = [...optionSet].sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }),
+      );
+    });
+    return result;
+  }, [data, filters, columnList]);
+
+  // ── 필터 적용 (컬럼 내 OR, 컬럼 간 AND) ─────────────────
+  const filteredData = useMemo(() => {
+    let result = data;
+    Object.entries(filters).forEach(([col, vals]) => {
+      if (!vals || vals.length === 0) return;
+      result = result.filter(row => {
+        const v = String(row[col] ?? '').toLowerCase();
+        return vals.some(f => v === f.toLowerCase().trim());
+      });
+    });
+    return result;
+  }, [data, filters]);
+
+  // ── 정렬 적용 ────────────────────────────────────────────
+  const displayData = useMemo(() => {
+    if (!sortConfig.key) return filteredData;
+    const key = sortConfig.key;
+    const dir = sortConfig.direction;
+    return [...filteredData].sort((a, b) => {
+      if (a[key] == null) return 1;
+      if (b[key] == null) return -1;
+      const aV = typeof a[key] === 'string' ? a[key].toLowerCase() : a[key];
+      const bV = typeof b[key] === 'string' ? b[key].toLowerCase() : b[key];
+      if (aV < bV) return dir === 'asc' ? -1 : 1;
+      if (aV > bV) return dir === 'asc' ? 1 : -1;
       return 0;
     });
-    setDisplayData(sortedData);
-  };
+  }, [filteredData, sortConfig]);
 
-  // 필터
-  const applyFilters = (newFilters) => {
-    let filteredData = [...data];
-    Object.entries(newFilters).forEach(([column, filterValues]) => {
-      if (filterValues && filterValues.length > 0) {
-        filteredData = filteredData.filter(row => {
-          const cellValue = (row[column]?.toString() || '').toLowerCase();
-          return filterValues.every(filter => {
-            const filterValue = filter.toLowerCase().trim();
-            return cellValue === filterValue;
-          });
-        });
-      }
+  // ── 핸들러 ───────────────────────────────────────────────
+  const handleSort = useCallback((key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  }, []);
+
+  // MultiSelectDropdown과 동일 인터페이스: (column, values[])
+  const handleFilterChange = useCallback((column, values) => {
+    setFilters(prev => {
+      if (values && values.length > 0) return { ...prev, [column]: values };
+      const next = { ...prev };
+      delete next[column];
+      return next;
     });
-    setDisplayData(filteredData);
-    setComboBoxOptions(generateComboBoxOptions(filteredData));
-  };
+  }, []);
 
-  const handleComboBoxChange = (column, value) => {
-    const newFilters = { ...filters, [column]: [value] };
-    setFilters(newFilters);
-    applyFilters(newFilters);
-  };
+  const clearFilter = useCallback((column) => {
+    setFilters(prev => {
+      const next = { ...prev };
+      delete next[column];
+      return next;
+    });
+  }, []);
 
-  const clearFilter = (column) => {
-    const newFilters = { ...filters };
-    delete newFilters[column];
-    setFilters(newFilters);
-    applyFilters(newFilters);
-  };
-
-  // 엑셀 내보내기
-  const exportToExcel = () => {
+  // ── 엑셀 내보내기 ─────────────────────────────────────────
+  const exportToExcel = useCallback(() => {
     try {
       if (!displayData.length) throw new Error('내보낼 데이터가 없습니다.');
-      // Object.keys 대신 columnList 사용 (화면 표시 순서와 동일하게)
-      const headers = columnList;
       const csvContent = [
-        headers.join(','),
+        columnList.join(','),
         ...displayData.map(row =>
-          headers.map(header => {
-            const value = row[header];
-            // 소수점 2자리 적용 컬럼이면 반올림 적용
-            return formatNumber(value, header);
-          }).join(',')
-        )
+          columnList.map(h => formatNumber(row[h], h)).join(','),
+        ),
       ].join('\n');
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const fileName = `${title || 'data_export'}_${new Date().toISOString().split('T')[0]}.csv`;
+      const url  = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', fileName);
+      link.href = url;
+      link.download = `${title || 'data_export'}_${new Date().toISOString().split('T')[0]}.csv`;
       link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      if (onExport) onExport();
-    } catch (error) {
-      alert('내보내기 실패: ' + error.message);
+      onExport?.();
+    } catch (err) {
+      alert('내보내기 실패: ' + err.message);
     }
-  };
+  }, [displayData, columnList, title, onExport]);
 
-  // 유틸
+  // ── 유틸 ─────────────────────────────────────────────────
   function formatNumber(value, key) {
-    // 소수점 2자리까지 표시할 컬럼명 패턴 (MaxReportValue 추가)
     const float2Pattern = /^(XP_Value_\d+|reportValue_\d+|Difference_\d+|Ambient_Temp_\d+|MaxReportValue)$/;
     if (typeof value === 'number') {
-      if (key && float2Pattern.test(key)) {
-        return value.toFixed(2);
-      }
+      if (key && float2Pattern.test(key)) return value.toFixed(2);
       return value % 1 === 0 ? value : parseFloat(value.toFixed(4));
     }
     return value?.toString() || '';
@@ -117,24 +141,12 @@ export default function DataViewer({
     return str.length > 16 ? `${str.substring(0, 16)}...` : str;
   }
   function renderCellContent(value, key) {
-    if (value === null || value === undefined) {
-      return '';
-    }
-    const formattedValue = formatNumber(value, key);
-    return formattedValue === 0 ? '0' : truncateText(formattedValue);
-  }
-  function generateComboBoxOptions(data) {
-    const options = {};
-    const columns = Object.keys(data[0] || {});
-    columns.forEach((column) => {
-      options[column] = [...new Set(data.map(row => row[column]))];
-    });
-    return options;
+    if (value === null || value === undefined) return '';
+    const formatted = formatNumber(value, key);
+    return formatted === 0 ? '0' : truncateText(formatted);
   }
 
-  // 컬럼 정보 결정
-  const columnList = columns && columns.length > 0 ? columns : Object.keys(displayData[0] || {});
-
+  // ── 렌더 ─────────────────────────────────────────────────
   return (
     <div className="table-container" style={style}>
       <div className="flex justify-between items-center mb-3">
@@ -145,21 +157,17 @@ export default function DataViewer({
           </button>
         )}
       </div>
+
       <table className={`w-full min-w-[${minWidth}px] border-collapse`}>
         <thead>
-          <tr className="bg-gray-100 sticky-header">
-            {columnList.map((header, index) => (
-              <th key={index} className="border" style={{ padding: '2px 4px' }}>
+          {/* 헤더 행 */}
+          <tr className="sticky-header">
+            {columnList.map((header) => (
+              <th key={header} className="border" style={{ padding: '2px 4px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                  <span 
-                    title={header} 
-                    className="font-medium text-gray-700"
-                    style={{ 
-                      textAlign: 'center', 
-                      display: 'block', 
-                      fontSize: '12px',
-                      color: '#374151'
-                    }}
+                  <span
+                    title={header}
+                    style={{ textAlign: 'center', display: 'block', fontSize: '12px', color: 'var(--text)', fontWeight: 600 }}
                   >
                     {truncateText(header)}
                   </span>
@@ -171,59 +179,40 @@ export default function DataViewer({
                   >
                     <ArrowUpDown
                       size={9}
-                      className={`transition-colors ${sortConfig.key === header ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'}`}
+                      className={sortConfig.key === header ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'}
                     />
                   </button>
                 </div>
               </th>
             ))}
           </tr>
-        </thead>
-        <thead className="sticky-filter">
-          <tr>
-            {columnList.map((header, index) => (
-              <th key={index} className="border bg-gray-50" style={{ padding: '4px' }}>
-                <div className="relative">
-                  <select
-                    className="w-full text-sm border rounded focus:outline-none focus:border-blue-400"
-                    style={{ padding: '2px 20px 2px 4px', fontSize: '11px' }}
-                    value={filters[header]?.[0] || ''}
-                    onChange={(e) => handleComboBoxChange(header, e.target.value)}
-                  >
-                    <option value="">Select...</option>
-                    {comboBoxOptions[header]?.map((option, idx) => (
-                      <option key={idx} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                  {filters[header] && (
-                    <button
-                      className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 hover:bg-gray-200 rounded"
-                      onClick={() => clearFilter(header)}
-                      title="Clear filter"
-                    >
-                      <X size={10} className="text-gray-400" />
-                    </button>
-                  )}
-                </div>
+
+          {/* 필터 행 — MultiSelectDropdown (Portal 기반) */}
+          <tr className="sticky-filter">
+            {columnList.map((header) => (
+              <th key={header} className="border" style={{ padding: '2px' }}>
+                <MultiSelectDropdown
+                  column={header}
+                  options={cascadedOptions[header] ?? []}
+                  selected={filters[header] ?? []}
+                  onChange={handleFilterChange}
+                  onClear={clearFilter}
+                />
               </th>
             ))}
           </tr>
         </thead>
+
         <tbody>
           {displayData.length > 0 ? (
             displayData.map((row, rowIndex) => (
-              <tr key={rowIndex} className="hover:bg-gray-50">
-                {columnList.map((col, colIndex) => (
+              <tr key={rowIndex}>
+                {columnList.map((col) => (
                   <td
-                    key={colIndex}
+                    key={col}
                     className="border"
-                    style={{ 
-                      padding: '4px',
-                      fontSize: '12px'
-                    }}
-                    title={formatNumber(row[col], col)}
+                    style={{ padding: '4px', fontSize: '12px' }}
+                    title={String(formatNumber(row[col], col))}
                   >
                     {renderCellContent(row[col], col)}
                   </td>
@@ -239,58 +228,56 @@ export default function DataViewer({
           )}
         </tbody>
       </table>
+
       <style jsx>{`
         .table-container {
           width: 100%;
           overflow-x: auto;
           max-height: calc(100vh - 100px);
           white-space: nowrap;
-          background-color: white;
+          background-color: var(--surface);
           border-radius: 0.25rem;
           box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
         }
         table {
           border-collapse: collapse;
           border-spacing: 0;
-          border: 1px solid #dee2e6;
+          border: 1px solid var(--border);
         }
         .table-container th, .table-container td {
           font-size: 12px;
           text-align: left;
-          border: 0.5px solid #dee2e6 !important;
+          border: 0.5px solid var(--border) !important;
           line-height: 1.2;
           box-sizing: border-box;
+          color: var(--text);
         }
         .table-container tbody td {
           text-align: center;
+        }
+        .table-container tbody tr:hover td {
+          background-color: var(--table-hover);
         }
         .sticky-header {
           position: sticky;
           top: 0;
           z-index: 10;
-          background-color: #f8f8f8;
-          padding: 4px !important;
+        }
+        .sticky-header th {
+          background-color: var(--surface);
         }
         .sticky-filter {
           position: sticky;
           top: 38px;
           z-index: 9;
-          background-color: white;
-          padding: 4px !important;
         }
-        .table-container::-webkit-scrollbar {
-          height: 8px;
+        .sticky-filter th {
+          background-color: var(--bg);
         }
-        .table-container::-webkit-scrollbar-track {
-          background: #f1f1f1;
-        }
-        .table-container::-webkit-scrollbar-thumb {
-          background: #888;
-          border-radius: 4px;
-        }
-        .table-container::-webkit-scrollbar-thumb:hover {
-          background: #555;
-        }
+        .table-container::-webkit-scrollbar { height: 8px; }
+        .table-container::-webkit-scrollbar-track { background: var(--bg); }
+        .table-container::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: var(--text-sec); }
       `}</style>
     </div>
   );

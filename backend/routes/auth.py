@@ -1,8 +1,10 @@
 from flask import Blueprint, request, jsonify, session
 from datetime import datetime, timedelta
 import jwt
+import sqlalchemy.exc
+import pyodbc
 from config import Config
-from db.manager import DatabaseManager
+from utils.database_manager import DatabaseManager
 from utils.decorators import handle_exceptions
 from utils.error_handler import error_response
 
@@ -15,21 +17,38 @@ def login():
     data = request.get_json()
     username = data.get("username")
     password = data.get("password")
-    db = DatabaseManager()
-    with db.get_connection(username, password, database="master") as sql:
-        user_info = sql.get_user_info(username=username)
-        if user_info and sql.authenticate_user(username=username, password=password):
-            payload = {
-                "username": user_info["username"],
-                "id": str(user_info["sid"]),
-                "exp": datetime.utcnow() + timedelta(seconds=Config.EXPIRE_TIME),
-            }
-            token = jwt.encode(payload, Config.SECRET_KEY, algorithm="HS256")
-            session["username"] = username
-            session["password"] = password
-            response = jsonify({"status": "success", "message": "Login successful"})
-            response.set_cookie("auth_token", token, httponly=True, samesite="Lax")
-            return response
+
+    if not username or not password:
+        return error_response("Username and password are required", 400)
+
+    try:
+        with DatabaseManager.create_explicit_connection(username, password, "master") as sql:
+            user_info = sql.get_user_info(username=username)
+            if user_info and sql.authenticate_user(username=username, password=password):
+                payload = {
+                    "username": user_info["username"],
+                    "id": str(user_info["sid"]),
+                    "exp": datetime.utcnow() + timedelta(seconds=Config.EXPIRE_TIME),
+                }
+                token = jwt.encode(payload, Config.SECRET_KEY, algorithm="HS256")
+                # 세션에 로그인 자격증명 저장 — 이후 모든 DB 연결에 사용됨
+                session["username"] = username
+                session["password"] = password
+                session.permanent = False  # 브라우저 종료 시 세션 만료
+                response = jsonify({"status": "success", "message": "Login successful"})
+                response.set_cookie(
+                    "auth_token",
+                    token,
+                    httponly=True,
+                    samesite="Lax",
+                    secure=Config.COOKIE_SECURE,
+                )
+                return response
+    except (sqlalchemy.exc.InterfaceError, sqlalchemy.exc.OperationalError,
+            pyodbc.InterfaceError, pyodbc.OperationalError):
+        # SQL Server 인증 실패 → 401 (잘못된 자격증명)
+        return error_response("Invalid username or password", 401)
+
     return error_response("Invalid username or password", 401)
 
 

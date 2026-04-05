@@ -1,55 +1,63 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faCogs, 
-  faEye, 
-  faClipboardCheck, 
-  faBrain, 
-  faUserCircle
-} from '@fortawesome/free-solid-svg-icons';
+import { Settings, Eye, ClipboardCheck, FileOutput, Brain, User, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
+import '../globals.css';
+
+const menuItems = [
+  { href: '/measset-generation',  icon: Settings,       text: 'MeasSet Generation' },
+  { href: '/viewer',              icon: Eye,            text: 'Viewer' },
+  { href: '/verification-report', icon: ClipboardCheck, text: 'Verification Report' },
+  { href: '/SSR_DocOut',          icon: FileOutput,     text: 'SSR DocOut' },
+  { href: '/machine-learning',    icon: Brain,          text: 'Machine Learning' },
+];
 
 const Navbar = () => {
-  const router = useRouter();
+  const router   = useRouter();
+  const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState('');
-
-  const menuItems = [
-    { href: '/measset-generation', icon: faCogs, text: 'MeasSet Generation' },
-    { href: '/viewer', icon: faEye, text: 'Viewer' },
-    { href: '/verification-report', icon: faClipboardCheck, text: 'Verification Report' },
-    { href: '/SSR_DocOut', icon: faClipboardCheck, text: 'SSR_DocOut' }, // SSR_DocOut 메뉴 추가
-    { href: '/machine-learning', icon: faBrain, text: 'Machine Learning' },
-  ];
+  const [username,        setUsername]        = useState('');
+  const [menuOpen,        setMenuOpen]        = useState(false);
+  const [isDark,          setIsDark]          = useState(false);
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
+  // 저장된 테마 복원
   useEffect(() => {
-    checkAuthStatus();
+    const saved = localStorage.getItem('aop-theme');
+    if (saved === 'dark') {
+      setIsDark(true);
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
   }, []);
+
+  // 페이지 이동 시 모바일 메뉴 닫기
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+
+  // 창 크기 변경 시 모바일 메뉴 닫기 (데스크톱으로 전환 시)
+  useEffect(() => {
+    const handleResize = () => { if (window.innerWidth > 900) setMenuOpen(false); };
+    if (window.innerWidth > 900) setMenuOpen(false);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => { checkAuthStatus(); }, []);
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/status`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-  
-      const data = await response.json();
-  
-      if (response.ok && data.authenticated) {
+      const res  = await fetch(`${API_BASE_URL}/api/auth/status`, { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && data.authenticated) {
         setIsAuthenticated(true);
         setUsername(data.username);
       } else {
         setIsAuthenticated(false);
         setUsername('');
-        console.warn(data.message); // 인증 실패 메시지 로깅
       }
-    } catch (error) {
-      console.error('Auth status check failed:', error);
+    } catch {
       setIsAuthenticated(false);
       setUsername('');
     }
@@ -57,102 +65,158 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-
-      if (response.ok) {
+      const res = await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+      if (res.ok) {
         setIsAuthenticated(false);
         setUsername('');
         router.push('/');
-      } else {
-        console.error('Logout failed:', await response.text());
       }
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch {}
+  };
+
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    if (next) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('aop-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('aop-theme', 'light');
     }
   };
 
   return (
-    <nav className="navbar navbar-expand-lg bg-white shadow-sm border-bottom">
-      <div className="container-fluid px-4">
-        {/* Logo */}
-        <Link href="/" className="navbar-brand d-flex align-items-center">
-          <div className="bg-gradient rounded-3 p-2 me-2" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-            <span className="text-white fw-bold fs-5">A</span>
-          </div>
-          <span className="fw-bold" style={{ 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}>
-            AOP Web
-          </span>
+    <header className="navbar-root">
+      {/* ── 메인 바 ── */}
+      <div className="navbar-inner">
+
+        {/* 로고 — 항상 맨 왼쪽 */}
+        <Link href="/" className="navbar-logo">
+          <div className="navbar-logo-icon">A</div>
+          <span className="navbar-logo-text">AOP Web</span>
         </Link>
 
-        <button 
-          className="navbar-toggler" 
-          type="button" 
-          data-bs-toggle="collapse" 
-          data-bs-target="#navbarNav"
-        >
-          <span className="navbar-toggler-icon"></span>
-        </button>
+        <div className="navbar-divider" />
 
-        <div className="collapse navbar-collapse" id="navbarNav">
-          {/* Desktop Menu */}
-          <ul className="navbar-nav me-auto">
-            {menuItems.map((item, index) => (
-              <li className="nav-item" key={index}>
-                <Link
-                  href={item.href}
-                  className={`nav-link px-3 py-2 rounded ${
-                    isAuthenticated
-                      ? 'text-dark'
-                      : 'text-muted disabled'
-                  }`}
-                  style={isAuthenticated ? { transition: 'all 0.2s' } : {}}
-                  onClick={(e) => !isAuthenticated && e.preventDefault()}
-                >
-                  <FontAwesomeIcon icon={item.icon} className="me-2" />
-                  {item.text}
-                </Link>
-              </li>
-            ))}
-          </ul>
-
-          {/* Auth Section */}
-          <div className="d-flex align-items-center">
-            {isAuthenticated ? (
-              <>
-                <div className="d-none d-md-flex flex-column align-items-end me-3">
-                  <small className="text-muted">Logged in as</small>
-                  <strong className="text-dark">{username}</strong>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="btn btn-danger shadow-sm"
-                  style={{ transition: 'all 0.2s' }}
-                >
-                  <FontAwesomeIcon icon={faUserCircle} className="me-2" />
-                  Logout
-                </button>
-              </>
-            ) : (
+        {/* 메뉴 링크 — 중앙 (남은 공간 차지) */}
+        <nav className="navbar-links">
+          {menuItems.map((item) => {
+            const Icon     = item.icon;
+            const isActive = pathname?.startsWith(item.href);
+            const disabled = !isAuthenticated;
+            const cls      = ['navbar-link', isActive ? 'active' : '', disabled ? 'disabled' : ''].join(' ').trim();
+            return (
               <Link
-                href="/auth/login"
-                className="btn btn-primary shadow-sm"
-                style={{ transition: 'all 0.2s' }}
+                key={item.href}
+                href={disabled ? '#' : item.href}
+                className={cls}
+                onClick={(e) => disabled && e.preventDefault()}
+                aria-disabled={disabled}
               >
-                <FontAwesomeIcon icon={faUserCircle} className="me-2" />
-                Login
+                <Icon size={14} />
+                <span className="navbar-link-text">{item.text}</span>
               </Link>
-            )}
-          </div>
+            );
+          })}
+        </nav>
+
+        {/* Auth + 테마 토글 — 항상 맨 오른쪽 */}
+        <div className="navbar-auth">
+
+          {/* 다크/라이트 토글 */}
+          <button
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={isDark ? 'Light mode' : 'Dark mode'}
+          >
+            {isDark ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+
+          {isAuthenticated ? (
+            <>
+              <span className="navbar-username">
+                <span style={{ color: 'var(--text-muted)' }}>as </span>
+                <strong style={{ color: 'var(--text)' }}>{username}</strong>
+              </span>
+              <button
+                onClick={handleLogout}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.375rem',
+                  padding: '0.375rem 0.75rem', borderRadius: '6px',
+                  background: 'transparent', border: '1px solid var(--border)',
+                  color: 'var(--status-error-text)', fontSize: '0.8125rem', fontWeight: '500',
+                  cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--status-error-bg)'; e.currentTarget.style.borderColor = 'var(--status-error-border)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+              >
+                <LogOut size={13} />
+                Logout
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => {
+                const w = 480, h = 420;
+                const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
+                const top  = Math.round(window.screenY + (window.outerHeight - h) / 2);
+                window.open(
+                  '/auth/login',
+                  'login',
+                  `width=${w},height=${h},left=${left},top=${top},resizable=no,scrollbars=no,menubar=no,toolbar=no,location=no,status=no`
+                );
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.375rem',
+                padding: '0.375rem 0.875rem', borderRadius: '6px',
+                background: 'var(--brand)', color: 'white',
+                border: 'none', cursor: 'pointer',
+                fontSize: '0.8125rem', fontWeight: '500',
+                whiteSpace: 'nowrap', transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--brand-dark)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--brand)'; }}
+            >
+              <User size={13} />
+              Login
+            </button>
+          )}
+
+          {/* 햄버거 — 모바일 전용 (CSS로 표시/숨김) */}
+          <button
+            className="navbar-toggle"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Toggle navigation menu"
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
       </div>
-    </nav>
+
+      {/* ── 모바일 드롭다운 ── */}
+      <nav className={`navbar-mobile-menu${menuOpen ? ' open' : ''}`}>
+        {menuItems.map((item) => {
+          const Icon     = item.icon;
+          const isActive = pathname?.startsWith(item.href);
+          const disabled = !isAuthenticated;
+          const cls      = ['navbar-mobile-link', isActive ? 'active' : '', disabled ? 'disabled' : ''].join(' ').trim();
+          return (
+            <Link
+              key={item.href}
+              href={disabled ? '#' : item.href}
+              className={cls}
+              onClick={(e) => { if (disabled) e.preventDefault(); }}
+            >
+              <Icon size={15} />
+              {item.text}
+            </Link>
+          );
+        })}
+      </nav>
+    </header>
   );
 };
 

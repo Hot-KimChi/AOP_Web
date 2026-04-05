@@ -10,19 +10,19 @@ export const TableHeader = React.memo(({ headers, editableKeys, sortConfig, onSo
   return (
     <tr className="bg-gray-100">
       <th className="px-3 py-2 border text-center" style={{ width: '60px' }}>
-        <span title="행 삭제" className="font-medium text-gray-700">삭제</span>
+        <span title="행 삭제" className="font-medium">삭제</span>
       </th>
       {headers.map((header, index) => (
         <th key={index} className="border" style={{ padding: '4px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
             <span 
               title={header} 
-              className="font-medium text-gray-700" 
+              className="font-medium" 
               style={{ 
                 textAlign: 'center', 
                 display: 'block', 
                 fontSize: '12px',
-                color: editableKeys && editableKeys.includes(header) ? '#3b82f6' : '#374151'
+                color: editableKeys && editableKeys.includes(header) ? 'var(--brand)' : 'var(--text)'
               }}
             >
               {truncateText(header)}

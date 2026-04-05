@@ -83,13 +83,13 @@ export const useDataManagement = () => {
     sessionStorage.setItem(STORAGE_KEYS.CSV_DATA, JSON.stringify(updatedData));
     sessionStorage.setItem(STORAGE_KEYS.DATA_MODIFIED, 'true');
 
-    // 부모 창에 메시지 전송
+    // 부모 창에 메시지 전송 (같은 origin만 허용)
     if (window.opener && !window.opener.closed) {
       window.opener.postMessage({
         type: 'DATA_MODIFIED',
         data: updatedData,
         timestamp: Date.now()
-      }, '*');
+      }, window.location.origin);
     }
   }, []);
 
