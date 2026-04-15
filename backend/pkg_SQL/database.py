@@ -1,7 +1,6 @@
 import os
 import pyodbc
 import pandas as pd
-import bcrypt
 from sqlalchemy import create_engine, text
 import logging
 from urllib.parse import quote_plus
@@ -99,10 +98,6 @@ class SQL:
         except pyodbc.Error as e:
             logging.error(f"Authentication failed: {e}")
             return False
-
-    def verify_password(self, password, hashed_password):
-        """비밀번호 일치 여부를 확인합니다."""
-        return bcrypt.checkpw(password.encode(), hashed_password.encode())
 
     def execute_query(self, query, params=None, return_type=None):
         """SQL 쿼리를 실행하고 결과를 pandas DataFrame으로 반환합니다."""

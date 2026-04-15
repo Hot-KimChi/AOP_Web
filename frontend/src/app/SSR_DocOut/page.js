@@ -23,7 +23,8 @@ export default function SSR_DocOut() {
         if (!response.ok) throw new Error('DB 목록 조회 실패');
         const data = await response.json();
         setDBList(data.databases || []);
-      } catch {
+      } catch (err) {
+        console.error('DB 목록 조회 실패:', err);
         setError('DB 목록 조회 실패');
       }
     };
@@ -46,7 +47,8 @@ export default function SSR_DocOut() {
             setTableData([]);
             setColumns([]);
           }
-        } catch {
+        } catch (err) {
+          console.error('테이블 데이터 조회 실패:', err);
           setError('테이블 데이터 조회 실패');
           setTableData([]);
           setColumns([]);
@@ -78,7 +80,8 @@ export default function SSR_DocOut() {
       a.href = downloadUrl; a.download = 'SSR_table_selected.docx';
       document.body.appendChild(a); a.click(); a.remove();
       window.URL.revokeObjectURL(downloadUrl);
-    } catch {
+    } catch (err) {
+      console.error('Word 파일 다운로드 실패:', err);
       setError('Word 파일 다운로드 실패');
     }
   };
@@ -113,7 +116,7 @@ export default function SSR_DocOut() {
                   disabled={isLoading}
                 >
                   <option value="">Select database…</option>
-                  {DBList.map((db, i) => <option key={i} value={db}>{db}</option>)}
+                  {DBList.map((db) => <option key={db} value={db}>{db}</option>)}
                 </select>
                 <button
                   onClick={handleExportWord}
@@ -121,7 +124,7 @@ export default function SSR_DocOut() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: '0.375rem',
                     padding: '0.375rem 0.875rem', borderRadius: '6px',
-                    background: selectedDatabase && selectedRowIdxs.length > 0 ? '#10b981' : '#d1d5db',
+                    background: selectedDatabase && selectedRowIdxs.length > 0 ? 'var(--status-success-text)' : 'var(--border)',
                     color: 'white', border: 'none', fontWeight: '500', fontSize: '0.8125rem',
                     cursor: selectedDatabase && selectedRowIdxs.length > 0 ? 'pointer' : 'not-allowed',
                     whiteSpace: 'nowrap',

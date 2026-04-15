@@ -21,7 +21,6 @@ class DatabaseManager:
     """
 
     _instance = None
-    _connections = {}
 
     def __new__(cls):
         if cls._instance is None:

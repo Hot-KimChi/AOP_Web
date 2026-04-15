@@ -1,17 +1,250 @@
-# AOP_Web 프로젝트 AI 코드 리뷰 상세 (Detail)
+# AOP_Web 변경 이력 상세 (Detail)
 
-> **리뷰 일시:** 2026-04-04  
-> **프로젝트 버전:** v0.9.19
-
-### 📎 관련 문서
-| 문서 | 설명 |
-|------|------|
-| **[AI_Rearch_summary.md](./AI_Rearch_summary.md)** | 프로젝트 전반 요약, 기능별 개요, 코드 품질 주요 발견사항 |
-| **[RearchAI.md](./frontend/src/app/machine-learning/RearchAI.md)** | Machine Learning 페이지 리팩터링 이력 (버그 수정·구조 개선) |
+> 변경 상세: 무엇을, 왜, 어떻게 변경했는지. Before/After 비교 포함.
+> 
+> 📎 **[→ 변경 요약 (Summary)](./AI_Rearch_summary.md)**
 
 ---
 
-## 변경 이력 (v0.9.27 — 2026-04-05)
+## 변경 이력 (v0.9.31 — 2026-04-15)
+
+### Detailed Change Description
+
+[→ Summary](./AI_Rearch_summary.md#변경-이력-v0931--2026-04-15)
+
+프로젝트 전체 코드 리뷰를 통해 보안, 버그, 코드 품질 문제를 식별하고 수정.
+
+#### 1. SQL 인젝션 방어 강화 — `get_viewer_data`
+
+**파일:** `backend/routes/db_api.py`
+
+**Before:**
+```python
+id_df = g.current_db.execute_query(
+    f"SELECT TOP 1 c.name FROM sys.columns c "
+    f"JOIN sys.tables t ON c.object_id = t.object_id "
+    f"WHERE t.name = N'{selected_table}' AND c.is_identity = 1"
+)
+```
+
+**After:**
+```python
+id_df = g.current_db.execute_query(
+    "SELECT TOP 1 c.name FROM sys.columns c "
+    "JOIN sys.tables t ON c.object_id = t.object_id "
+    "WHERE t.name = ? AND c.is_identity = 1",
+    params=(selected_table,)
+)
+```
+
+**이유:** allowlist 검증 후에도 f-string SQL은 방어 심층(defense-in-depth) 원칙에 위배. 파라미터화 쿼리로 변경하여 SQL 인젝션 경로를 원천 차단.
+
+#### 2. `datetime.utcnow()` 지원 중단 대응
+
+**파일:** `backend/routes/auth.py`
+
+**Before:**
+```python
+"exp": datetime.utcnow() + timedelta(seconds=Config.EXPIRE_TIME),
+```
+
+**After:**
+```python
+"exp": datetime.now(timezone.utc) + timedelta(seconds=Config.EXPIRE_TIME),
+```
+
+**이유:** Python 3.12부터 `datetime.utcnow()`가 deprecated. timezone-aware datetime 사용으로 전환.
+
+#### 3. 로그인 실패 로깅 추가
+
+**파일:** `backend/routes/auth.py`
+
+**Before:** 로그인 실패 시 로깅 없음
+**After:** `logger.warning(f"Failed login attempt for user: {username}")` 추가
+
+**이유:** 무차별 대입(brute-force) 공격 탐지를 위한 보안 감사 로그 필수.
+
+#### 4. `auth/status` 세션 자격증명 확인 추가
+
+**파일:** `backend/routes/auth.py`, `frontend/src/components/Navbar.js`
+
+**Before:** JWT 토큰만 확인 → JWT 유효하나 세션 만료 시 인증됨으로 표시되지만 DB 요청에서 422 오류 발생
+**After:** `has_credentials` 필드 추가 → 세션 자격증명 없으면 프론트엔드에서 비인증 상태로 처리
+
+**이유:** JWT와 세션의 이중 인증 소스 불일치로 인한 사용자 혼란 방지.
+
+#### 5. 미사용 코드 제거
+
+- **`backend/pkg_SQL/database.py`:** 사용되지 않는 `verify_password()` 메서드 및 `import bcrypt` 제거
+- **`backend/utils/database_manager.py`:** 사용되지 않는 `_connections = {}` 클래스 변수 제거
+
+**이유:** 죽은 코드는 유지보수 혼란과 불완전한 보안 구현의 오해를 유발.
+
+#### 6. 프론트엔드 에러 핸들링 개선
+
+**파일:** `Navbar.js`, `SSR_DocOut/page.js`, `viewer/page.js`
+
+**Before:** `catch {}` (빈 catch 블록, 에러 무시)
+**After:** `catch (err) { console.error('...', err); ... }`
+
+**이유:** 빈 catch 블록은 네트워크 오류, CORS 문제, 서버 장애 등의 디버깅을 불가능하게 만듦.
+
+#### 7. 다크모드 호환성 수정
+
+**파일:** `frontend/src/app/SSR_DocOut/page.js`
+
+**Before:** `background: '#10b981'` / `'#d1d5db'` (하드코딩 색상)
+**After:** `background: 'var(--status-success-text)'` / `'var(--border)'` (CSS 변수)
+
+**이유:** 하드코딩 색상은 다크모드에서 가독성 문제 유발.
+
+#### 8. React key 및 의존성 배열 수정
+
+- **`viewer/page.js`, `SSR_DocOut/page.js`:** `<option key={i}>` → `<option key={db}>` (인덱스 대신 고유값 사용)
+- **`auth/login/page.js`:** `useCallback` deps에 `API_BASE_URL` 추가
+
+**이유:** 인덱스 기반 key는 리스트 재정렬 시 상태 누수 유발. 누락된 의존성은 stale closure 버그 가능.
+
+---
+
+## 변경 이력 (v0.9.30 — 2026-04-15)
+
+### Detailed Change Description
+
+[→ Summary](./AI_Rearch_summary.md#변경-이력-v0930--2026-04-15)
+
+하네스 엔지니어링(OpenAI "Harness Engineering") 원칙을 적용하여 AI 에이전트의 프롬프트/컨텍스트 시스템을 전면 재설계.
+
+#### 적용된 하네스 엔지니어링 원칙
+
+1. **Map, not encyclopedia**: `copilot-instructions.md`를 목차(TOC)로 전환. 도메인별 상세 지침은 각 폴더의 `AGENTS.md`로 분리하여 progressive disclosure 구현.
+2. **Context is scarce**: 에이전트가 필요한 폴더 작업 시에만 해당 `AGENTS.md`를 읽도록 경로 기반 지시.
+3. **Enforce invariants at boundaries**: Critical Invariants 섹션을 각 instructions 파일에 추가.
+4. **Describe actual patterns**: TypeScript → JavaScript(JSX), "session-based auth" → "JWT+Session hybrid" 등 실제 코드베이스 패턴으로 수정.
+
+#### 수정 파일 상세
+
+**`.github/copilot-instructions.md`** — 전면 재구성
+
+| 항목 | Before | After |
+|------|--------|-------|
+| 역할 | 규칙 나열 | 목차/맵 (도메인 문서로 안내) |
+| Context Architecture | 없음 | progressive disclosure 섹션 추가 |
+| Do-Not-Touch Zones | 없음 | 생성/런타임 파일 보호 규칙 추가 |
+| Change Log | Quality Gate 체크리스트 내 한 줄 | 독립 섹션 — 목적·작성법·상호 링크 규칙 명시 |
+| 기술 스택 Frontend | TypeScript | JavaScript (JSX) — 실제 반영 |
+
+**`.github/instructions/backend.instructions.md`** — 규칙 강화
+
+| 항목 | Before | After |
+|------|--------|-------|
+| 데코레이터 | 이름만 나열 | 순서 명시 (exceptions → auth → DB) |
+| Auth 패턴 | "session-based" | "JWT HttpOnly cookie + Flask session stores DB credentials" |
+| 응답 포맷 | 미기술 | Success/Error JSON 구조 + 상태 코드 표 |
+| Critical Invariants | 없음 | CORS, 쿠키 설정, 로깅 규칙 |
+
+**`.github/instructions/frontend.instructions.md`** — 규칙 강화
+
+| 항목 | Before | After |
+|------|--------|-------|
+| 'use client' | 미기술 | 모든 페이지/컴포넌트 필수 |
+| 테마 시스템 | 기본 언급 | storage key, hydration flash 방지, 셀렉터 규칙 |
+| Critical Invariants | 없음 | layout 순서, env prefix, Bootstrap override, DataViewer 필터 |
+
+**`backend/AGENTS.md`** (신규 생성)
+- 파일 구조 트리, Request Lifecycle, Auth Flow, DB 패턴 (CORRECT/WRONG 예시), Key Patterns 표
+
+**`frontend/AGENTS.md`** (신규 생성)
+- 파일 구조 트리, Layout Stack 순서, 테마 토큰 표, API 엔드포인트 표, "Do Not Simplify Away" 경고
+
+---
+
+## 변경 이력 (v0.9.29 — 2026-04-11)
+
+### Detailed Change Description
+
+Copilot 에이전트의 성능을 최적화하기 위해 `.github/copilot-instructions.md` 파일을 전면 재작성하였다.
+
+#### 문제 분석
+
+기존 파일(253줄)에는 LLM 성능을 저하시키는 다음과 같은 구조적 문제가 있었다:
+
+1. **가상 3-에이전트 모델 (~70줄)**: Planning/Implementation/Evaluation 에이전트의 역할 정의, 3×3 교차검증 매트릭스, 각 에이전트별 교차검증 의무 등을 상세히 기술. LLM은 실제로 병렬 내부 에이전트를 실행하지 않으므로 불필요한 역할극을 강제하여 인지 부하만 증가시킴.
+2. **병렬 실행 프로토콜**: 이미 시스템 프롬프트에 내장된 병렬 실행 기능을 4번 반복 지시.
+3. **Pre-Output Safety Checklist**: 섹션 2(에이전트 모델)와 섹션 3-5(코딩 규칙)의 내용을 그대로 중복.
+4. **기술 스택 불일치**: FastAPI로 기술되어 있으나 실제 프로젝트는 Flask 사용.
+
+#### 수정 내역
+
+**`.github/copilot-instructions.md`** — 전면 재작성
+
+| 항목 | Before | After |
+|------|--------|-------|
+| 전체 줄 수 | 253줄 | 106줄 (−58%) |
+| 에이전트 모델 | 가상 3-에이전트 + 교차검증 매트릭스 (70줄) | "Plan → Implement → Review" 3단계 워크플로우 (7줄) |
+| 병렬 실행 | 별도 프로토콜 + 테이블 (10줄, 4회 반복) | Core Principles에 1줄로 통합 |
+| 품질 검증 | Pre-Output Checklist (20줄, 섹션 2와 중복) | Quality Gate (8줄, scope/verification 체크 추가) |
+| 기술 스택 | FastAPI (프로젝트 불일치) | Flask (실제 프로젝트 반영) |
+| 프론트엔드 | "React or Next.js" (모호) | "Next.js 15 with React 18" (명확) |
+| DB | 일반적 기술 | MS-SQL Server + deterministic/transaction-safe 명시 |
+| 테스팅 | "No test → No acceptable code" (절대적) | "Behavior changes should include tests when practical" (실용적) |
+| 문서화 | AI_summary/AI_detail (예시와 혼재) | 정확한 파일명(`AI_Rearch_summary.md`, `AI_Rearch_detail.md`) 명시 |
+| 신규 추가 | — | scope control, "no implicit behavior", rubber-duck agent 활용 |
+
+#### 성능 최적화 근거
+
+- **토큰 절감**: 지시문이 58% 줄어 모델이 실제 작업에 더 많은 컨텍스트 윈도우를 할당 가능
+- **중복 제거**: 동일 규칙의 반복이 해석 혼란을 줄이고 일관된 행동을 유도
+- **실현 가능한 규칙**: 가상 에이전트 역할극 대신 실제 도구(rubber-duck agent)를 활용하는 실용적 검증 프로세스
+- **정확한 컨텍스트**: 실제 기술 스택과 일치하는 지시로 불필요한 추론 제거
+
+---
+
+## 변경 이력 (v0.9.28 — 2026-04-05)
+
+### Detailed Change Description
+
+Viewer 팝업에서 데이터 조회 시 최신 순이 아닌 임의 순서의 1000건이 반환되던 문제를 수정하였다.
+
+#### 문제 원인
+
+`get_viewer_data()` 엔드포인트의 쿼리가 `SELECT TOP 1000 * FROM {table}` 으로, `ORDER BY` 절이 없었다.  
+SQL Server는 `ORDER BY` 없는 `TOP N`을 물리적 페이지 할당 순서(heap scan 또는 clustered index leaf 순서)로 반환하므로, 가장 오래된 행이 먼저 나오게 된다.
+
+#### 수정 내역
+
+**`backend/routes/db_api.py` — `get_viewer_data()`**
+
+```python
+# Before (임의 순서)
+df = g.current_db.execute_query(f"SELECT TOP 1000 * FROM {selected_table}")
+
+# After (IDENTITY 컬럼 탐지 → 최신 순)
+order_clause = ""
+try:
+    id_df = g.current_db.execute_query(
+        f"SELECT TOP 1 c.name FROM sys.columns c "
+        f"JOIN sys.tables t ON c.object_id = t.object_id "
+        f"WHERE t.name = N'{selected_table}' AND c.is_identity = 1"
+    )
+    if id_df is not None and not id_df.empty:
+        identity_col = id_df.iloc[0, 0]
+        order_clause = f" ORDER BY [{identity_col}] DESC"
+except Exception:
+    pass
+df = g.current_db.execute_query(f"SELECT TOP 1000 * FROM {selected_table}{order_clause}")
+```
+
+| 항목 | 내용 |
+|------|------|
+| IDENTITY 탐지 | `sys.columns JOIN sys.tables WHERE is_identity = 1` |
+| 정렬 방향 | `DESC` — 최신(가장 큰 ID) 1000건 우선 반환 |
+| 폴백 동작 | IDENTITY 없거나 쿼리 실패 시 기존 `TOP 1000` (비정렬) 유지 |
+| 보안 | `selected_table`은 allowlist 검증 통과 후 사용, `identity_col`은 DB 카탈로그 직접 조회값이므로 SQL 인젝션 위험 없음 |
+
+---
+
+
 
 ### Detailed Change Description
 

@@ -22,7 +22,8 @@ export default function Viewer() {
         if (!response.ok) throw new Error('Failed to fetch databases');
         const data = await response.json();
         setDBList(data.databases || []);
-      } catch {
+      } catch (err) {
+        console.error('Failed to fetch databases:', err);
         setError('Failed to fetch databases');
       }
     };
@@ -38,9 +39,10 @@ export default function Viewer() {
           if (!response.ok) throw new Error('Failed to fetch tables');
           const result = await response.json();
           setTableList(result.tables || []);
-        } catch {
+        } catch (err) {
+          console.error('Failed to fetch tables:', err);
           setError('Failed to fetch tables');
-        } finally {
+        }finally {
           setIsLoading(false);
         }
       };
@@ -88,7 +90,7 @@ export default function Viewer() {
                   disabled={isLoading}
                 >
                   <option value="">Select database…</option>
-                  {DBList.map((db, i) => <option key={i} value={db}>{db}</option>)}
+                  {DBList.map((db) => <option key={db} value={db}>{db}</option>)}
                 </select>
               </div>
 
@@ -101,7 +103,7 @@ export default function Viewer() {
                   disabled={!selectedDatabase || isLoading}
                 >
                   <option value="">Select table…</option>
-                  {tableList.map((t, i) => <option key={i} value={t}>{t}</option>)}
+                  {tableList.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
 

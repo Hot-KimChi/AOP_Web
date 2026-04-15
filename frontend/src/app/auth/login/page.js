@@ -43,7 +43,7 @@ const LoginPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [username, password, router]);
+  }, [username, password, router, API_BASE_URL]);
 
   useEffect(() => {
     if (error) {

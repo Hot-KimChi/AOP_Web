@@ -1,18 +1,63 @@
-# AOP_Web 프로젝트 AI 코드 리뷰 요약 (Summary)
+# AOP_Web 변경 이력 요약 (Summary)
 
-> **리뷰 일시:** 2026-04-05  
-> **프로젝트 버전:** v0.9.26  
-> **리뷰 범위:** 전체 코드베이스 (Backend + Frontend + DevOps)
-
-### 📎 관련 문서
-| 문서 | 설명 |
-|------|------|
-| **[AI_Rearch_detail.md](./AI_Rearch_detail.md)** | 모듈별 상세 코드 리뷰, 보안 점검, 개선 로드맵 |
-| **[RearchAI.md](./frontend/src/app/machine-learning/RearchAI.md)** | Machine Learning 페이지 리팩터링 이력 (버그 수정·구조 개선) |
+> 사용자 요청 요약 + 해결 사항 간략 기술. 상세 내용은 각 항목의 `→ Detail` 링크 참조.
+> 
+> 📎 **[→ 상세 변경 이력 (Detail)](./AI_Rearch_detail.md)**
 
 ---
 
-## 변경 이력 (v0.9.27 — 2026-04-05)
+## 변경 이력 (v0.9.31 — 2026-04-15)
+
+### User Request
+프로젝트 전체 코드 리뷰 — 보안·버그·코드 품질 문제 점검 및 수정. [→ Detail](./AI_Rearch_detail.md#변경-이력-v0931--2026-04-15)
+
+### Change Summary
+- **`backend/routes/auth.py`**: `datetime.utcnow()` → `datetime.now(timezone.utc)` 마이그레이션. 로그인 실패 시 경고 로깅 추가. `/api/auth/status`에 세션 자격증명 존재 여부(`has_credentials`) 반환 추가.
+- **`backend/routes/db_api.py`**: `get_viewer_data` identity 컬럼 조회를 파라미터화 쿼리로 변경 (SQL 인젝션 방어).
+- **`backend/pkg_SQL/database.py`**: 미사용 `verify_password` 메서드 및 `bcrypt` import 제거.
+- **`backend/utils/database_manager.py`**: 미사용 `_connections` 클래스 변수 제거.
+- **`frontend/src/components/Navbar.js`**: 빈 catch 블록에 `console.error` 추가. `has_credentials` false 시 재로그인 유도.
+- **`frontend/src/app/SSR_DocOut/page.js`**: 하드코딩 색상(`#10b981`, `#d1d5db`) → CSS 변수로 교체. 빈 catch 블록에 에러 로깅 추가. `<option key>` 인덱스 → 값 기반으로 변경.
+- **`frontend/src/app/viewer/page.js`**: 빈 catch 블록에 에러 로깅 추가. `<option key>` 인덱스 → 값 기반으로 변경.
+- **`frontend/src/app/auth/login/page.js`**: `useCallback` 의존성 배열에 `API_BASE_URL` 추가.
+
+---
+
+## 변경 이력 (v0.9.30 — 2026-04-15)
+
+### User Request
+하네스 엔지니어링 적용 — 프롬프트/컨텍스트 최적화 및 폴더별 AGENTS.md 도입. [→ Detail](./AI_Rearch_detail.md#변경-이력-v0930--2026-04-15)
+
+### Change Summary
+- **`.github/copilot-instructions.md`**: "Map, not encyclopedia" 원칙 적용. Context Architecture·Do-Not-Touch Zones·Change Log 섹션 추가.
+- **`.github/instructions/backend.instructions.md`**: 데코레이터 순서, 응답 포맷, Critical Invariants 명시.
+- **`.github/instructions/frontend.instructions.md`**: 'use client' 필수, 테마 상세, Critical Invariants 추가.
+- **`backend/AGENTS.md`** (신규): 백엔드 아키텍처 맵.
+- **`frontend/AGENTS.md`** (신규): 프론트엔드 아키텍처 맵.
+
+---
+
+## 변경 이력 (v0.9.29 — 2026-04-11)
+
+### User Request
+Copilot 에이전트 성능 최적화를 위한 `.github/copilot-instructions.md` 재작성 요청.
+
+### Change Summary
+- **`.github/copilot-instructions.md`**: 253줄 → 106줄 (58% 감소). 가상 3-에이전트 모델·교차검증 매트릭스·중복 체크리스트 제거. 실용적 "Plan → Implement → Review" 워크플로우로 교체. 기술 스택을 실제 프로젝트(Flask, Next.js 15, MS-SQL Server)에 맞게 수정. Quality Gate를 scope/verification 체크 포함하여 재구성.
+
+---
+
+## 변경 이력 (v0.9.28 — 2026-04-05)
+
+### User Request
+Viewer 메뉴에서 데이터를 가져올 때 최신 데이터 1000건이 아닌 임의 순서의 1000건이 반환되는 문제 수정 요청.
+
+### Change Summary
+- **`backend/routes/db_api.py` — `get_viewer_data()`**: `SELECT TOP 1000 * FROM {table}` (ORDER BY 없음) → SQL Server `sys.columns`·`sys.tables`로 IDENTITY 컬럼을 런타임에 자동 탐지하여 `ORDER BY [identity_col] DESC` 추가. IDENTITY 컬럼이 없는 테이블은 기존 동작(비정렬 TOP 1000)으로 안전하게 폴백.
+
+---
+
+
 
 ### User Request
 창 크기 변화에 따라 Navbar 메뉴 아이템이 서로 겹치는 문제 수정 — 업계 표준 방식 반영 요청.

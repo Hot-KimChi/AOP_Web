@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 import sqlalchemy.exc
 import pyodbc
@@ -7,6 +7,7 @@ from config import Config
 from utils.database_manager import DatabaseManager
 from utils.decorators import handle_exceptions
 from utils.error_handler import error_response
+from utils.logger import logger
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -28,7 +29,7 @@ def login():
                 payload = {
                     "username": user_info["username"],
                     "id": str(user_info["sid"]),
-                    "exp": datetime.utcnow() + timedelta(seconds=Config.EXPIRE_TIME),
+                    "exp": datetime.now(timezone.utc) + timedelta(seconds=Config.EXPIRE_TIME),
                 }
                 token = jwt.encode(payload, Config.SECRET_KEY, algorithm="HS256")
                 # 세션에 로그인 자격증명 저장 — 이후 모든 DB 연결에 사용됨
@@ -47,8 +48,10 @@ def login():
     except (sqlalchemy.exc.InterfaceError, sqlalchemy.exc.OperationalError,
             pyodbc.InterfaceError, pyodbc.OperationalError):
         # SQL Server 인증 실패 → 401 (잘못된 자격증명)
+        logger.warning(f"Failed login attempt for user: {username}")
         return error_response("Invalid username or password", 401)
 
+    logger.warning(f"Failed login attempt for user: {username}")
     return error_response("Invalid username or password", 401)
 
 
@@ -63,8 +66,14 @@ def auth_status():
         )
     try:
         decoded_token = jwt.decode(token, Config.SECRET_KEY, algorithms=["HS256"])
+        # 세션에 DB 자격증명이 있는지도 확인 (JWT 유효하지만 세션 만료 시 422 방지)
+        has_credentials = bool(session.get("username") and session.get("password"))
         return (
-            jsonify({"authenticated": True, "username": decoded_token["username"]}),
+            jsonify({
+                "authenticated": True,
+                "username": decoded_token["username"],
+                "has_credentials": has_credentials,
+            }),
             200,
         )
     except jwt.ExpiredSignatureError:

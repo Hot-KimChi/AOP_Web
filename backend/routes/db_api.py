@@ -310,7 +310,7 @@ def export_table_to_word():
 @require_auth
 @with_db_connection()
 def get_viewer_data():
-    """Database Viewer 팝업 전용: 선택된 테이블의 전체 데이터(TOP 1000)를 반환합니다."""
+    """Database Viewer 팝업 전용: 선택된 테이블의 최신 데이터(TOP 1000)를 반환합니다."""
     selected_database = request.args.get("database")
     selected_table = request.args.get("table")
 
@@ -325,7 +325,22 @@ def get_viewer_data():
 
     import numpy as np
 
-    df = g.current_db.execute_query(f"SELECT TOP 1000 * FROM {selected_table}")
+    # IDENTITY 컬럼 탐지 → 최신 1000건 내림차순 정렬
+    order_clause = ""
+    try:
+        id_df = g.current_db.execute_query(
+            "SELECT TOP 1 c.name FROM sys.columns c "
+            "JOIN sys.tables t ON c.object_id = t.object_id "
+            "WHERE t.name = ? AND c.is_identity = 1",
+            params=(selected_table,)
+        )
+        if id_df is not None and not id_df.empty:
+            identity_col = id_df.iloc[0, 0]
+            order_clause = f" ORDER BY [{identity_col}] DESC"
+    except Exception:
+        pass
+
+    df = g.current_db.execute_query(f"SELECT TOP 1000 * FROM {selected_table}{order_clause}")
     if df is None or df.empty:
         return jsonify({"status": "success", "data": [], "columns": []})
 
