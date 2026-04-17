@@ -24,13 +24,10 @@ const Navbar = () => {
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
-  // 저장된 테마 복원
+  // ThemeInit에서 이미 data-theme을 설정하므로, DOM 상태만 읽어서 동기화
   useEffect(() => {
-    const saved = localStorage.getItem('aop-theme');
-    if (saved === 'dark') {
-      setIsDark(true);
-      document.documentElement.setAttribute('data-theme', 'dark');
-    }
+    const current = document.documentElement.getAttribute('data-theme');
+    setIsDark(current === 'dark');
   }, []);
 
   // 페이지 이동 시 모바일 메뉴 닫기

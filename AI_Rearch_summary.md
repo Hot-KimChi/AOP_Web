@@ -6,6 +6,43 @@
 
 ---
 
+## 변경 이력 (v0.9.33 — 2026-04-17)
+
+### User Request
+프로젝트 전체 분석 — 버그, 성능 저하, 가독성/효율성 개선. [→ Detail](./AI_Rearch_detail.md#변경-이력-v0933--2026-04-17)
+
+### Change Summary
+- **`backend/routes/auth.py`**: `get_json()` None 안전 처리, 에러 핸들링 중복 코드 제거
+- **`backend/routes/db_api.py`**: SQL 테이블명 bracket 이스케이프, IN절 파라미터화, NaN 상수 통일
+- **`backend/routes/ml.py`**: 미사용 import 제거, metric_value float 변환 안전 처리, data_index 일괄 변환
+- **`backend/pkg_SQL/database.py`**: execute_query 가독성 개선(헬퍼 메서드 분리), logging→logger 통일
+- **`backend/pkg_MeasSetGen/create_groupidx.py`**: for 루프 → pandas 벡터화 (10x+ 성능 향상)
+- **`backend/pkg_MeasSetGen/predictML.py`**: iterrows → to_dict('records'), 예외 무시(pass) → 로깅
+- **`backend/pkg_MeasSetGen/data_inout.py`**: `except OSError: pass` → 로깅 후 재발생
+- **`backend/pkg_MeasSetGen/remove_duplicate.py`**: concat 최적화, CEUS 모드 isDuplicate 누락 수정
+- **`backend/pkg_MachineLearning/data_splitting.py`**: random_state 파라미터 추가 (재현성)
+- **`backend/pkg_MachineLearning/training_evaluation.py`**: np.round_ → np.round, 로거 모듈화, 주석 코드 제거
+- **`frontend/src/components/Navbar.js`**: 테마 초기화 중복 제거 (localStorage → DOM 읽기)
+- **`frontend/src/app/(home)/layout.js`**: Bootstrap/globals.css 중복 import 제거
+- **`frontend/src/app/measset-generation/layout.js`**: globals.css 중복 import 제거
+- **`frontend/src/app/data-view/utils/csvExport.js`**: try/finally로 URL.revokeObjectURL 보장
+- **`frontend/src/app/data-view/hooks/useWindowSync.js`**: postMessage origin 검증 추가
+- **`frontend/src/app/data-view/components/DataTable/TableBody.jsx`**: displayData[0] undefined 접근 버그 수정
+- **`frontend/src/app/data-view/components/EditableCell.jsx`**: borderColor split 파싱 → 직접 CSS 변수 참조
+
+---
+
+## 변경 이력 (v0.9.32 — 2026-04-17)
+
+### User Request
+Machine Learning 페이지 다크모드에서 Model Version Performance 테이블 가독성 개선 + Viewer 페이지 테이블 셀렉트 중복 key 에러 수정. [→ Detail](./AI_Rearch_detail.md#변경-이력-v0932--2026-04-17)
+
+### Change Summary
+- **`frontend/src/globals.css`**: 다크모드 테이블에 Bootstrap 5.3 내부 CSS 변수(`--bs-table-color-type`, `--bs-table-color-state`) 오버라이드 추가. 모든 테이블 셀 텍스트·배경·hover 색상이 다크 테마 토큰을 사용하도록 수정.
+- **`frontend/src/app/viewer/page.js`**: `tableList.map()` key에 인덱스 포함하여 중복 key 에러 해결. 구분선 항목 `disabled` 처리.
+
+---
+
 ## 변경 이력 (v0.9.31 — 2026-04-15)
 
 ### User Request

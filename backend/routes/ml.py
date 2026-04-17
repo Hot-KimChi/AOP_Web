@@ -29,7 +29,6 @@ def get_ml_models():
 def train_model():
     """머신러닝 모델 훈련 API"""
     try:
-        from flask import session
         from pkg_MachineLearning.machine_learning import MachineLearning
 
         data = request.get_json()
@@ -153,9 +152,13 @@ def get_model_versions_performance():
                     & version_group["metric_value"].notna()
                 )
                 metric_rows = version_group[mask]
-                metrics = dict(
-                    zip(metric_rows["metric_name"], metric_rows["metric_value"].astype(float))
-                )
+                metrics = {}
+                for name, val in zip(metric_rows["metric_name"], metric_rows["metric_value"]):
+                    try:
+                        metrics[name] = float(val)
+                    except (TypeError, ValueError):
+                        logger.warning(f"Cannot convert metric value to float: {val}")
+                        metrics[name] = None
 
                 ct = first_ver["creation_time"]
                 versions[version_id] = {
@@ -329,6 +332,10 @@ def get_prediction_points():
         result_df["target_value"] = result_df["target_value"].astype(float)
         result_df["estimation_value"] = result_df["estimation_value"].astype(float)
 
+        # data_index 타입을 미리 정수로 변환
+        result_df["data_index"] = pd.to_numeric(result_df["data_index"], errors="coerce")
+        result_df["data_index"] = result_df["data_index"].where(result_df["data_index"].notna(), None)
+
         models_dict = {}
         for (model_name_key, version_id_val), group in result_df.groupby(
             ["model_name", "version_id"], sort=False
@@ -343,10 +350,7 @@ def get_prediction_points():
             ].to_dict("records")
             for p in pts:
                 di = p.get("data_index")
-                try:
-                    p["data_index"] = int(di) if di is not None else None
-                except (TypeError, ValueError):
-                    p["data_index"] = None
+                p["data_index"] = int(di) if di is not None else None
 
             models_dict[key] = {
                 "model_name": model_name_key,

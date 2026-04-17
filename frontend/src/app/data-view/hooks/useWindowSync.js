@@ -9,9 +9,12 @@ import { useEffect, useCallback } from 'react';
 
 export const useWindowSync = (refreshData, syncDataBeforeUnload, editedData, deletedRows) => {
   /**
-   * 메시지 수신 핸들러
+   * 메시지 수신 핸들러 (origin 검증 포함)
    */
   const receiveMessage = useCallback((event) => {
+    // 신뢰할 수 있는 origin만 허용
+    if (event.origin !== window.location.origin) return;
+
     if (event.data && event.data.type === 'REFRESH_DATA') {
       const freshData = event.data.data;
       if (freshData) {

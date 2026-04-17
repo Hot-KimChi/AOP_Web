@@ -6,6 +6,195 @@
 
 ---
 
+## 변경 이력 (v0.9.33 — 2026-04-17)
+
+### Detailed Change Description
+
+[→ Summary](./AI_Rearch_summary.md#변경-이력-v0933--2026-04-17)
+
+#### 1. auth.py — 입력 검증 및 에러 핸들링 (`backend/routes/auth.py`)
+
+**문제**: `request.get_json()`이 None을 반환할 때 `data.get()` 호출에서 AttributeError 발생 가능. 로그인 실패 시 동일한 에러 응답이 2번 중복.
+
+**Before**:
+```python
+data = request.get_json()
+username = data.get("username")  # data가 None이면 AttributeError
+```
+
+**After**:
+```python
+data = request.get_json(silent=True)
+if not data:
+    return error_response("Request body must be valid JSON", 400)
+```
+
+#### 2. db_api.py — SQL 안전성 강화 (`backend/routes/db_api.py`)
+
+**문제**: 
+- 테이블명이 f-string으로 직접 삽입 (allowlist 검증 후이지만 bracket 이스케이프 미적용)
+- IN절에서 문자열 연결 방식 사용 (파라미터화 미적용)
+- NaN 대체값 불일치 ("empty" vs "Empty")
+
+**Before**:
+```python
+query = f"SELECT * FROM {selected_table} WHERE measSSId IN ({id_str})"
+df["probeId"] = df["probeId"].fillna("empty")
+```
+
+**After**:
+```python
+placeholders = ",".join(["?" for _ in id_list])
+query = f"SELECT * FROM [{selected_table}] WHERE measSSId IN ({placeholders})"
+df = g.current_db.execute_query(query, params=id_list)
+df["probeId"] = df["probeId"].fillna("Empty")
+```
+
+#### 3. database.py — 가독성 개선 (`backend/pkg_SQL/database.py`)
+
+**문제**: execute_query 메서드가 170줄로 과도하게 길고, `logging.info()` vs `logger.info()` 혼용.
+
+**After**: `_sanitize_params_for_log()`, `_convert_params()` 헬퍼 메서드 분리. 모든 `logging.*` → `logger.*` 통일.
+
+#### 4. create_groupidx.py — 성능 벡터화 (`backend/pkg_MeasSetGen/create_groupidx.py`)
+
+**문제**: Python for 루프로 DataFrame 행을 순회하여 GroupIndex 생성 — 대용량 데이터에서 10x+ 느림.
+
+**Before**:
+```python
+for value in df["TxFocusLocCm"]:
+    if prev_value is None or value >= prev_value:
+        group_indices.append(group_index)
+    else:
+        group_index += 1
+        group_indices.append(group_index)
+    prev_value = value
+```
+
+**After**:
+```python
+decreased = df["TxFocusLocCm"] < df["TxFocusLocCm"].shift()
+df["GroupIndex"] = decreased.fillna(False).cumsum() + last_groupIdx + 1
+```
+
+#### 5. predictML.py — iterrows 제거 및 예외 로깅 (`backend/pkg_MeasSetGen/predictML.py`)
+
+**문제**: `iterrows()` 사용 (pandas에서 가장 느린 순회 방법). `except: pass`로 예외 무시.
+
+**After**: `to_dict('records')` 변환으로 100x+ 성능 향상. 모든 `pass` → `logger.debug()` 로깅.
+
+#### 6. data_inout.py — 예외 처리 (`backend/pkg_MeasSetGen/data_inout.py`)
+
+**문제**: `except OSError: pass` — 디렉토리 생성 실패를 무시하여 후속 파일 저장에서 원인 추적 불가.
+
+**After**: 로깅 후 예외 재발생 (`raise`).
+
+#### 7. remove_duplicate.py — 코드 최적화 (`backend/pkg_MeasSetGen/remove_duplicate.py`)
+
+**문제**: 모드별 필터링에서 불필요한 개별 변수 생성, `concat` 다회 호출, CEUS 모드에 isDuplicate 컬럼 누락.
+
+**After**: `isin()` 활용으로 간결화, `ignore_index=True`로 한 번에 concat, CEUS 모드 isDuplicate 초기화 추가.
+
+#### 8. data_splitting.py — 재현성 (`backend/pkg_MachineLearning/data_splitting.py`)
+
+**문제**: `random_state` 미지정으로 실행할 때마다 다른 분할 결과.
+
+**After**: `random_state=42` 기본값 추가, docstring 추가.
+
+#### 9. training_evaluation.py — 정리 (`backend/pkg_MachineLearning/training_evaluation.py`)
+
+**문제**: `np.round_` (deprecated alias), 메서드 내부 `import logging`, 주석처리된 DNN 코드.
+
+**After**: `np.round` 사용, 모듈 레벨 logger, 불필요 코드 제거.
+
+#### 10. Navbar.js — 테마 중복 제거 (`frontend/src/components/Navbar.js`)
+
+**문제**: `ThemeInit`에서 이미 `data-theme` 속성을 설정했는데, Navbar에서 `localStorage`를 다시 읽고 재설정 — 불필요한 I/O + race condition 가능성.
+
+**After**: localStorage 대신 `document.documentElement.getAttribute('data-theme')` 읽기만 수행.
+
+#### 11. Layout CSS 중복 import (`frontend/src/app/(home)/layout.js`, `measset-generation/layout.js`)
+
+**문제**: Layout.js가 이미 Bootstrap과 globals.css를 import하는데, Layout을 사용하는 레이아웃에서 다시 import — 번들 파싱 시간 증가.
+
+**After**: Layout 래퍼를 사용하는 레이아웃에서 중복 import 제거.
+
+#### 12. csvExport.js — 에러 안전성 (`frontend/src/app/data-view/utils/csvExport.js`)
+
+**문제**: 에러 발생 시 `URL.revokeObjectURL()`이 호출되지 않아 메모리 누수 가능.
+
+**After**: `try/finally` 패턴으로 항상 DOM 정리 및 URL 해제.
+
+#### 13. useWindowSync.js — 보안 (`frontend/src/app/data-view/hooks/useWindowSync.js`)
+
+**문제**: `postMessage` 수신 시 origin 검증 없어 XSS 공격에 취약.
+
+**After**: `event.origin !== window.location.origin` 검증 추가.
+
+#### 14. TableBody.jsx — 버그 수정 (`frontend/src/app/data-view/components/DataTable/TableBody.jsx`)
+
+**문제**: `displayData.length === 0`일 때 `displayData[0]`에 접근 → `Object.keys(undefined)` 에러.
+
+**After**: 안전한 colSpan 계산 (editableKeys 기반).
+
+#### 15. EditableCell.jsx — CSS 안정성 (`frontend/src/app/data-view/components/EditableCell.jsx`)
+
+**문제**: `border.split(' ')[2]`로 borderColor 추출 — CSS 변수 형식 변경 시 깨짐.
+
+**After**: STYLE_VARIANTS에 `borderColor` 속성 직접 추가, split 제거.
+
+---
+
+## 변경 이력 (v0.9.32 — 2026-04-17)
+
+### Detailed Change Description
+
+[→ Summary](./AI_Rearch_summary.md#변경-이력-v0932--2026-04-17)
+
+#### 1. 다크모드 테이블 가독성 수정 (`frontend/src/globals.css`)
+
+**문제**: Machine Learning 페이지의 Model Version Performance 테이블이 다크모드에서 텍스트/숫자가 보이지 않음. Bootstrap 5.3의 내부 CSS 변수 캐스케이드(`--bs-table-color-type`, `--bs-table-color-state`)가 커스텀 다크 테마 오버라이드보다 우선 적용되어 검은색 텍스트가 어두운 배경에 표시됨.
+
+**Before**:
+```css
+[data-theme="dark"] .table { color: var(--text); }
+[data-theme="dark"] .table-light,
+[data-theme="dark"] .table-light > * {
+  --bs-table-color: var(--text);
+  --bs-table-bg: var(--bg);
+}
+```
+
+**After**:
+```css
+[data-theme="dark"] .table {
+  --bs-table-color: var(--text);
+  --bs-table-bg: var(--surface);
+  --bs-table-hover-color: var(--text);
+  --bs-table-hover-bg: var(--table-hover);
+  color: var(--text);
+}
+[data-theme="dark"] .table-light,
+[data-theme="dark"] thead.table-light {
+  --bs-table-color-type: var(--text);   /* Bootstrap 5.3 cascade */
+  --bs-table-color-state: var(--text);  /* Bootstrap 5.3 cascade */
+}
+[data-theme="dark"] .table > :not(caption) > * > * {
+  --bs-table-color-type: var(--text);
+  --bs-table-color-state: var(--text);
+  color: var(--text);
+}
+```
+
+#### 2. Viewer 중복 key 에러 수정 (`frontend/src/app/viewer/page.js`)
+
+**문제**: 테이블 목록에 `"----------"` 구분선이 여러 개 포함되어 React key 중복 에러 발생.
+
+**Before**: `{tableList.map((t) => <option key={t} value={t}>{t}</option>)}`
+**After**: `{tableList.map((t, i) => <option key={\`${t}-${i}\`} value={t} disabled={t === '----------'}>{t}</option>)}`
+
+---
+
 ## 변경 이력 (v0.9.31 — 2026-04-15)
 
 ### Detailed Change Description

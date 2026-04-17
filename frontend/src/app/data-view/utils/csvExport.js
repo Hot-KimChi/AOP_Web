@@ -47,13 +47,16 @@ export const downloadCSV = (data, filename = '측정_데이터') => {
     throw new Error('다운로드할 데이터가 없습니다.');
   }
 
+  let url = null;
+  let link = null;
+
   try {
     const csvContent = generateCSVContent(data);
     
     // BOM 추가하여 한글 깨짐 방지
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+    url = URL.createObjectURL(blob);
+    link = document.createElement('a');
     
     // 파일명에 날짜 추가
     const dateStr = new Date().toLocaleDateString().replace(/\//g, '-');
@@ -65,10 +68,15 @@ export const downloadCSV = (data, filename = '측정_데이터') => {
     
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   } catch (error) {
     console.error('CSV 내보내기 실패:', error);
     throw new Error('다운로드 중 오류가 발생했습니다.');
+  } finally {
+    if (link?.parentNode) {
+      document.body.removeChild(link);
+    }
+    if (url) {
+      URL.revokeObjectURL(url);
+    }
   }
 };

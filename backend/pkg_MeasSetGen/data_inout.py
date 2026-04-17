@@ -104,7 +104,8 @@ class DataOut:
             try:
                 os.makedirs(self.directory)
             except OSError as e:
-                pass
+                logging.getLogger("DataOut").warning(f"Failed to create directory {self.directory}: {e}")
+                raise
 
     @arrangeParam
     @renameColumns

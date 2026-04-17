@@ -39,19 +39,7 @@ class RemoveDuplicate:
 
         df = self.selected_df
 
-        ##### B & M mode process #####
-        df_B_mode = df.loc[(df["Mode"] == "B")]
-        df_M_mode = df.loc[(df["Mode"] == "M")]
-        df_C_mode = df.loc[df["Mode"] == "Cb"]
-        df_D_mode = df.loc[df["Mode"] == "D"]
-        df_CEUS_mode = df.loc[df["Mode"] == "Contrast"]
-
-        # B and M-mode 데이터만 선택하여 데이터프레임으로 생성
-        df_BM = pd.concat([df_B_mode, df_M_mode])
-        df_BM = df_BM.reset_index(drop=True)
-        # df_BM = df_BM.fillna(0)
-
-        # 중복열 param 등록
+        # 중복 판단용 컬럼
         cols_to_drop = [
             "SysTxFreqIndex",
             "TxpgWaveformStyle",
@@ -63,25 +51,23 @@ class RemoveDuplicate:
             "NumTxElements",
         ]
 
-        # 중복 개수 열 확인
+        # B & M mode: 중복 시 M 모드 행 삭제
+        df_BM = df[df["Mode"].isin(["B", "M"])].reset_index(drop=True)
         duplicated_mask = df_BM.duplicated(subset=cols_to_drop, keep=False)
-        df_BM["isDuplicate"] = duplicated_mask.map({True: 1, False: 0})
-
-        # isDuplicate가 1이고 Mode가 'M'인 행 삭제 / count-group-index진행
+        df_BM["isDuplicate"] = duplicated_mask.astype(int)
         df_BM = df_BM[(df_BM["isDuplicate"] != 1) | (df_BM["Mode"] != "M")]
 
-        ## C and D-mode 데이터만 선택하여 데이터프레임으로 생성
-        df_CD = pd.concat([df_C_mode, df_D_mode])
-        df_CD = df_CD.reset_index(drop=True)
-        df_CD = df_CD.fillna(0)
-
-        # 중복 개수 열 확인
+        # C & D mode: 중복 시 D 모드 행 삭제
+        df_CD = df[df["Mode"].isin(["Cb", "D"])].reset_index(drop=True).fillna(0)
         duplicated_mask = df_CD.duplicated(subset=cols_to_drop, keep=False)
-        df_CD["isDuplicate"] = duplicated_mask.map({True: 1, False: 0})
-
-        # isDuplicate가 1이고 Mode가 'M'인 행 삭제 / count-group-index진행
+        df_CD["isDuplicate"] = duplicated_mask.astype(int)
         df_CD = df_CD[(df_CD["isDuplicate"] != 1) | (df_CD["Mode"] != "D")]
 
-        df_total = pd.concat([df_BM, df_CD, df_CEUS_mode])
+        # CEUS mode
+        df_CEUS = df[df["Mode"] == "Contrast"].copy()
+        if not df_CEUS.empty:
+            df_CEUS["isDuplicate"] = 0
+
+        df_total = pd.concat([df_BM, df_CD, df_CEUS], ignore_index=True)
 
         return df_total

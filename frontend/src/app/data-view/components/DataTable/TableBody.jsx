@@ -47,10 +47,12 @@ export const TableBody = React.memo(({
   };
 
   if (displayData.length === 0) {
+    // displayData가 비어있을 때 columns 수를 안전하게 계산
+    const colCount = (editableKeys?.length || 0) + 1;
     return (
       <tbody>
         <tr>
-          <td colSpan={Object.keys(displayData[0] || {}).length + 1} className="text-center py-3 text-gray-500">
+          <td colSpan={colCount} className="text-center py-3 text-gray-500">
             {MESSAGES.INFO_NO_MATCHING_DATA}
           </td>
         </tr>

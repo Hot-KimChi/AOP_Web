@@ -1,5 +1,4 @@
 import Layout from "../../components/Layout";
-import '../../globals.css';
 import ThemeInit from '../../components/ThemeInit';
 
 export const metadata = { title: 'AOP Web: MeasSet Generation' };

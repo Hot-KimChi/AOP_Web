@@ -187,7 +187,7 @@ class PredictML:
                     prediction_type="intensity",
                 )
             except Exception as e:
-                pass
+                logger.debug(f"MLflow simple prediction logging skipped: {e}")
             return self.df
 
         loaded_model = model_info["model"]
@@ -217,8 +217,7 @@ class PredictML:
                 processing_time_ms=prediction_time_ms,
             )
         except Exception as e:
-            # Prediction logging 실패해도 메인 기능은 계속 진행
-            pass
+            logger.debug(f"MLflow prediction logging skipped: {e}")
 
         # AI_param을 Series로 변환하고 이름을 지정
         self.df["AI_param"] = pd.Series(zt_est, name="AI_param")
@@ -287,8 +286,7 @@ class PredictML:
                 prediction_type="power",
             )
         except Exception as e:
-            # Prediction logging 실패해도 메인 기능은 계속 진행
-            pass
+            logger.debug(f"MLflow prediction logging skipped: {e}")
 
         return power_df
 
@@ -308,13 +306,11 @@ class PredictML:
             if c in estParams.columns:
                 estParams[c] = estParams[c].fillna(0).astype(int)
 
-        # 배치 처리를 위해 모든 user_input을 리스트로 준비
+        # iterrows 대신 to_dict('records')로 변환 (100x+ 빠름)
         user_inputs = []
         used_voltages = []
 
-        for idx, row in estParams.iterrows():
-            user_input = row.to_dict()
-
+        for user_input in estParams.to_dict("records"):
             # ML 모델 입력에서 제외할 컬럼 제거
             user_input.pop("GroupIndex", None)
 

@@ -19,9 +19,9 @@ const BASE_INPUT_STYLE = {
 
 // 상태별 색상 매핑
 const STYLE_VARIANTS = {
-  error:   { border: '1px solid var(--status-error-border)',   background: 'var(--status-error-bg)' },
-  changed: { border: '1px solid var(--status-warning-border)', background: 'var(--status-warning-bg)' },
-  normal:  { border: '1px solid var(--border)', background: 'var(--surface)' },
+  error:   { border: '1px solid var(--status-error-border)',   background: 'var(--status-error-bg)',   borderColor: 'var(--status-error-border)' },
+  changed: { border: '1px solid var(--status-warning-border)', background: 'var(--status-warning-bg)', borderColor: 'var(--status-warning-border)' },
+  normal:  { border: '1px solid var(--border)', background: 'var(--surface)', borderColor: 'var(--border)' },
 };
 
 // 포커스 시 보더 색상
@@ -57,7 +57,7 @@ export const EditableCell = React.memo(({
         value={value || ''}
         onChange={(e) => onChange(rowIndex, columnName, e.target.value)}
         onFocus={(e) => e.target.style.borderColor = FOCUS_COLORS[variant]}
-        onBlur={(e) => e.target.style.borderColor = STYLE_VARIANTS[variant].border.split(' ')[2]}
+        onBlur={(e) => e.target.style.borderColor = STYLE_VARIANTS[variant].borderColor}
       />
       {hasError && (
         <div style={ICON_POSITION_STYLE}>

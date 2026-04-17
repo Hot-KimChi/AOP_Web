@@ -1,6 +1,4 @@
 import Layout from "../../components/Layout";
-import 'bootstrap/dist/css/bootstrap.min.css';
-import '../../globals.css';
 import ThemeInit from '../../components/ThemeInit';
 
 export const metadata = { title: 'AOP Web' };

@@ -98,9 +98,9 @@ def get_probes():
             jsonify({"status": "error", "message": "유효하지 않은 테이블 이름입니다"}),
             400,
         )
-    query = f"SELECT probeId, probeName FROM {selected_table}"
+    query = f"SELECT probeId, probeName FROM [{selected_table}]"
     df = g.current_db.execute_query(query)
-    df["probeId"] = df["probeId"].fillna("empty")
+    df["probeId"] = df["probeId"].fillna("Empty")
     df_unique = df.drop_duplicates(subset=["probeId", "probeName"])
     df_unique = df_unique.sort_values(by="probeName").reset_index(drop=True)
     df_unique["_id"] = df_unique["probeId"].astype(str) + "_" + df_unique.index.astype(str)
@@ -124,17 +124,17 @@ def get_table_data():
         )
     if selected_table == "meas_station_setup":
         df = g.current_db.execute_query(
-            f"SELECT measSSId, measComments, probeId, measPersonName, measPurpose, imagingSysSn, probeSn, hydrophId FROM {selected_table} where measPurpose not like '%Beamstyle%' order by measSSId desc"
+            f"SELECT measSSId, measComments, probeId, measPersonName, measPurpose, imagingSysSn, probeSn, hydrophId FROM [{selected_table}] where measPurpose not like '%Beamstyle%' order by measSSId desc"
         )
         data = df.to_dict(orient="records") if df is not None else []
         columns = list(df.columns) if df is not None else []
         return jsonify({"status": "success", "data": data, "columns": columns})
     if selected_table == "Tx_summary":
-        query = f"SELECT DISTINCT ProbeID AS probeId, ProbeName AS probeName, Software_version AS software_version FROM {selected_table} ORDER BY software_version DESC"
+        query = f"SELECT DISTINCT ProbeID AS probeId, ProbeName AS probeName, Software_version AS software_version FROM [{selected_table}] ORDER BY software_version DESC"
     elif selected_table == "WCS":
-        query = f"SELECT DISTINCT probeId, myVersion FROM {selected_table} ORDER BY myVersion DESC"
+        query = f"SELECT DISTINCT probeId, myVersion FROM [{selected_table}] ORDER BY myVersion DESC"
     else:
-        query = f"SELECT DISTINCT probeId, probeName FROM {selected_table}"
+        query = f"SELECT DISTINCT probeId, probeName FROM [{selected_table}]"
     df = g.current_db.execute_query(query)
     if selected_table == "WCS":
         df = df.dropna(subset=["probeId", "myVersion"])
@@ -274,14 +274,15 @@ def export_table_to_word():
             400,
         )
     if measSSIds:
-        id_list = [s for s in measSSIds.split(",") if s.isdigit()]
+        id_list = [int(s) for s in measSSIds.split(",") if s.strip().isdigit()]
         if not id_list:
             return error_response("measSSIds 파라미터가 올바르지 않습니다", 400)
-        id_str = ",".join(id_list)
-        query = f"SELECT * FROM {selected_table} WHERE measSSId IN ({id_str})"
+        placeholders = ",".join(["?" for _ in id_list])
+        query = f"SELECT * FROM [{selected_table}] WHERE measSSId IN ({placeholders})"
+        df = g.current_db.execute_query(query, params=id_list)
     else:
-        query = f"SELECT * FROM {selected_table}"
-    df = g.current_db.execute_query(query)
+        query = f"SELECT * FROM [{selected_table}]"
+        df = g.current_db.execute_query(query)
     if df is None or df.empty:
         return error_response("해당 테이블에 데이터가 없습니다", 404)
     doc = Document()
@@ -340,7 +341,7 @@ def get_viewer_data():
     except Exception:
         pass
 
-    df = g.current_db.execute_query(f"SELECT TOP 1000 * FROM {selected_table}{order_clause}")
+    df = g.current_db.execute_query(f"SELECT TOP 1000 * FROM [{selected_table}]{order_clause}")
     if df is None or df.empty:
         return jsonify({"status": "success", "data": [], "columns": []})
 

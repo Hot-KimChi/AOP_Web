@@ -3,6 +3,9 @@ import numpy as np
 import os, sys
 import joblib
 import sklearn
+import logging
+
+logger = logging.getLogger("ModelEvaluator")
 
 
 class ModelEvaluator:
@@ -52,7 +55,7 @@ class ModelEvaluator:
 
     @staticmethod
     def calculate_mean_score(scores):
-        return np.round_(np.mean(scores), 3)
+        return np.round(np.mean(scores), 3)
 
     def evaluate_test_set(self):
         # 모델이 cross_validate에서 이미 훈련되었지만, 최종 모델을 위해 전체 훈련 데이터로 재훈련
@@ -61,10 +64,10 @@ class ModelEvaluator:
         # 테스트 세트 예측 및 점수 계산
         test_predictions = self.model.predict(self.test_input)
         test_score = self.model.score(self.test_input, self.test_target)
-        test_score_rounded = np.round_(test_score, 3)
+        test_score_rounded = np.round(test_score, 3)
 
         # 예측값 저장 (반올림)
-        self.prediction = np.round_(test_predictions, 2)
+        self.prediction = np.round(test_predictions, 2)
 
         return test_score_rounded, test_predictions
 
@@ -89,25 +92,7 @@ class ModelEvaluator:
         # 모델 저장
         try:
             joblib.dump(self.model, filepath)
-            import logging
-            logging.getLogger("ModelEvaluator").info(f"Model saved: {filepath}")
+            logger.info(f"Model saved: {filepath}")
         except Exception as e:
-            import logging
-            logging.getLogger("ModelEvaluator").error(f"Model save failed: {e}")
+            logger.error(f"Model save failed: {e}")
             raise
-
-    # def train_dnn_model(self):
-    #     from tensorflow import keras
-
-    #     early_stop = keras.callbacks.EarlyStopping(monitor="val_loss", patience=10)
-    #     history = self.model.fit(
-    #         self.train_input,
-    #         self.train_target,
-    #         epochs=1000,
-    #         batch_size=3,
-    #         validation_split=0.2,
-    #         verbose=0,
-    #         callbacks=[early_stop],
-    #     )
-    #     prediction = self.model.predict(self.test_input).flatten()
-    #     return history, prediction

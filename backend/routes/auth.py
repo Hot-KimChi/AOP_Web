@@ -15,7 +15,9 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 @auth_bp.route("/login", methods=["POST"])
 @handle_exceptions
 def login():
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not data:
+        return error_response("Request body must be valid JSON", 400)
     username = data.get("username")
     password = data.get("password")
 
@@ -47,9 +49,7 @@ def login():
                 return response
     except (sqlalchemy.exc.InterfaceError, sqlalchemy.exc.OperationalError,
             pyodbc.InterfaceError, pyodbc.OperationalError):
-        # SQL Server 인증 실패 → 401 (잘못된 자격증명)
-        logger.warning(f"Failed login attempt for user: {username}")
-        return error_response("Invalid username or password", 401)
+        pass  # 인증 실패 — 아래 공통 응답으로 처리
 
     logger.warning(f"Failed login attempt for user: {username}")
     return error_response("Invalid username or password", 401)

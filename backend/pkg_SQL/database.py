@@ -5,10 +5,7 @@ from sqlalchemy import create_engine, text
 import logging
 from urllib.parse import quote_plus
 
-# 로깅 설정
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logger = logging.getLogger("SQL")
 
 
 class SQL:
@@ -67,7 +64,7 @@ class SQL:
                 else:
                     return None
         except Exception as e:
-            logging.error(f"Query execution error: {str(e)}")
+            logger.error(f"Query execution error: {str(e)}")
             raise
 
     def authenticate_user(self, username, password):
@@ -75,14 +72,13 @@ class SQL:
         user_info = self.get_user_info(username)
 
         if not user_info:
-            logging.warning("User does not exist.")
+            logger.warning("User does not exist.")
             return False
 
         if user_info["is_disabled"]:
-            logging.warning("User account is disabled.")
+            logger.warning("User account is disabled.")
             return False
 
-        # 비밀번호를 실제로 확인하기 위해 DB 연결 시도
         try:
             connection_string = (
                 f"DRIVER={{ODBC Driver 17 for SQL Server}};"
@@ -93,118 +89,87 @@ class SQL:
             )
             connection = pyodbc.connect(connection_string)
             connection.close()
-            logging.info("Authentication successful.")
+            logger.info("Authentication successful.")
             return True
         except pyodbc.Error as e:
-            logging.error(f"Authentication failed: {e}")
+            logger.error(f"Authentication failed: {e}")
             return False
+
+    def _sanitize_params_for_log(self, params):
+        """로그에 출력할 때 바이너리 데이터를 안전하게 표시"""
+        sanitized = []
+        for param in params:
+            if isinstance(param, bytes):
+                sanitized.append(f"<binary_{len(param)}_bytes>")
+            else:
+                sanitized.append(str(param)[:50])
+        return sanitized
+
+    def _convert_params(self, params):
+        """파라미터를 Python 기본 타입으로 변환 (바이너리 데이터는 유지)"""
+        converted = []
+        for param in params:
+            if isinstance(param, bytes):
+                converted.append(param)
+            elif hasattr(param, "item"):  # numpy 타입
+                converted.append(param.item())
+            else:
+                converted.append(param)
+        return converted
 
     def execute_query(self, query, params=None, return_type=None):
         """SQL 쿼리를 실행하고 결과를 pandas DataFrame으로 반환합니다."""
         try:
-            # logging.info(f"Executing query: {query[:100]}...")
             if params:
-                # 바이너리 데이터가 포함된 경우 로그에서 제외
-                log_params = []
-                for i, param in enumerate(params):
-                    if isinstance(param, bytes):
-                        log_params.append(f"<binary_data_{len(param)}_bytes>")
-                    else:
-                        log_params.append(str(param)[:50])
-                logging.info(f"With params: {log_params}")
+                logger.info(f"With params: {self._sanitize_params_for_log(params)}")
 
             with self.connect() as connection:
-                # 쿼리 타입 확인 (SELECT vs INSERT/UPDATE/DELETE)
-                # WITH로 시작하는 CTE(Common Table Expression)도 SELECT 쿼리로 처리
                 query_upper = query.strip().upper()
-                if query_upper.startswith("SELECT") or query_upper.startswith("WITH"):
-                    # SELECT 쿼리는 pandas DataFrame으로 반환
-                    if params:
-                        # pyodbc 스타일의 ? 플레이스홀더 사용
-                        return pd.read_sql(query, connection, params=params)
-                    else:
-                        return pd.read_sql(query, connection)
-                else:
-                    # INSERT/UPDATE/DELETE 쿼리는 raw connection 사용
-                    if params:
-                        # 파라미터를 Python 기본 타입으로 변환 (바이너리 데이터는 그대로 유지)
-                        converted_params = []
-                        for param in params:
-                            if isinstance(param, bytes):
-                                # 바이너리 데이터는 그대로 전달
-                                converted_params.append(param)
-                            elif hasattr(param, "item"):  # numpy 타입인 경우
-                                converted_params.append(param.item())
-                            else:
-                                converted_params.append(param)
+                is_select = query_upper.startswith("SELECT") or query_upper.startswith("WITH")
 
-                        # raw connection 사용해서 직접 실행
-                        raw_conn = connection.connection
-                        cursor = raw_conn.cursor()
+                if is_select:
+                    return pd.read_sql(query, connection, params=params) if params else pd.read_sql(query, connection)
 
-                        # INSERT 쿼리 실행 및 ID 반환
-                        insert_id = None
-                        if return_type == "insert" and query_upper.startswith("INSERT"):
-                            # OUTPUT 절이 있는지 확인
-                            if "OUTPUT" in query_upper:
-                                # OUTPUT 절이 있으면 직접 결과를 가져옴
-                                cursor.execute(query, tuple(converted_params))
-                                result = cursor.fetchone()
-                                logging.info(f"OUTPUT INSERT result: {result}")
-                                if result and result[0] is not None:
-                                    insert_id = int(result[0])
-                                    logging.info(
-                                        f"Extracted insert_id from OUTPUT: {insert_id}"
-                                    )
-                            else:
-                                # OUTPUT 절이 없으면 SCOPE_IDENTITY 방식 사용
-                                cursor.execute(query, tuple(converted_params))
-                                cursor.execute("SELECT SCOPE_IDENTITY() AS insert_id")
-                                result = cursor.fetchone()
-                                logging.info(f"SCOPE_IDENTITY result: {result}")
-                                if result and result[0] is not None:
-                                    insert_id = int(result[0])
-                                    logging.info(f"Extracted insert_id: {insert_id}")
-                                else:
-                                    logging.warning(
-                                        "SCOPE_IDENTITY returned None or empty"
-                                    )
+                # INSERT/UPDATE/DELETE 쿼리
+                raw_conn = connection.connection
+                cursor = raw_conn.cursor()
+
+                if params:
+                    converted_params = self._convert_params(params)
+
+                    insert_id = None
+                    if return_type == "insert" and query_upper.startswith("INSERT"):
+                        if "OUTPUT" in query_upper:
+                            cursor.execute(query, tuple(converted_params))
+                            result = cursor.fetchone()
+                            if result and result[0] is not None:
+                                insert_id = int(result[0])
                         else:
                             cursor.execute(query, tuple(converted_params))
-
-                        raw_conn.commit()
-                        cursor.close()
-
-                        if return_type == "insert":
-                            if insert_id:
-                                return {"insert_id": insert_id}
+                            cursor.execute("SELECT SCOPE_IDENTITY() AS insert_id")
+                            result = cursor.fetchone()
+                            if result and result[0] is not None:
+                                insert_id = int(result[0])
                             else:
-                                # INSERT는 성공했지만 ID를 가져오지 못한 경우
-                                logging.warning(
-                                    "INSERT succeeded but could not retrieve ID"
-                                )
-                                return {"insert_id": None}
+                                logger.warning("SCOPE_IDENTITY returned None")
                     else:
-                        raw_conn = connection.connection
-                        cursor = raw_conn.cursor()
-                        cursor.execute(query)
-                        raw_conn.commit()
-                        cursor.close()
+                        cursor.execute(query, tuple(converted_params))
+                else:
+                    cursor.execute(query)
 
-                    logging.info(f"Non-SELECT query executed successfully")
-                    return pd.DataFrame()
+                raw_conn.commit()
+                cursor.close()
+
+                if return_type == "insert":
+                    return {"insert_id": insert_id}
+
+                logger.info("Non-SELECT query executed successfully")
+                return pd.DataFrame()
         except Exception as e:
-            logging.error(f"Query execution error: {str(e)}")
-            logging.error(f"Query was: {query}")
+            logger.error(f"Query execution error: {str(e)}")
+            logger.error(f"Query was: {query}")
             if params:
-                # 에러 로그에서도 바이너리 데이터 크기만 표시
-                error_params = []
-                for param in params:
-                    if isinstance(param, bytes):
-                        error_params.append(f"<binary_data_{len(param)}_bytes>")
-                    else:
-                        error_params.append(str(param)[:100])
-                logging.error(f"Params were: {error_params}")
+                logger.error(f"Params were: {self._sanitize_params_for_log(params)}")
             raise
 
     def execute_procedure(self, procedure_name, parameters=None):
@@ -249,10 +214,10 @@ class SQL:
             cursor.close()
             raw_conn.commit()
 
-            logging.info(f"Stored procedure '{procedure_name}' executed successfully")
+            logger.info(f"Stored procedure '{procedure_name}' executed successfully")
             return df
         except Exception as e:
-            logging.error(f"Stored procedure execution error: {str(e)}")
+            logger.error(f"Stored procedure execution error: {str(e)}")
             raise
         finally:
             try:
@@ -265,7 +230,7 @@ class SQL:
         try:
             with self.connect() as connection:
                 data.to_sql(table_name, connection, if_exists="append", index=False)
-                logging.info(f"Data inserted into [{table_name}] table")
+                logger.info(f"Data inserted into [{table_name}] table")
         except Exception as e:
-            logging.error(f"Data insertion error: {str(e)}")
+            logger.error(f"Data insertion error: {str(e)}")
             raise
