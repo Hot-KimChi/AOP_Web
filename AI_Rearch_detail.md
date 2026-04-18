@@ -6,6 +6,42 @@
 
 ---
 
+## 변경 이력 (v0.9.34 — 2026-04-18)
+
+### v0.9.34 — #1. 네비바 반응형 개선
+
+**문제:** 브라우저 창을 줄이면 5개 메뉴 + 로그인 버튼이 공간 부족으로 로그인 버튼이 메뉴 위로 올라감
+
+**해결 방식:** 3단계 프로그레시브 콜랩스 (현재 반응형 트렌드 반영)
+
+| 화면 크기 | 동작 |
+|-----------|------|
+| >1100px | 전체 표시 (아이콘 + 텍스트) |
+| 901–1100px | 아이콘 전용 모드 (텍스트 숨김, 툴팁으로 메뉴명 표시) |
+| ≤900px | 햄버거 메뉴 (메뉴 + 테마 토글 + 로그인/로그아웃 통합) |
+
+**변경 파일:**
+
+1. **`frontend/src/components/Navbar.js`**
+   - `handleLogin` 함수 추출 (데스크톱/모바일 공유)
+   - 인증 영역을 `.navbar-auth-buttons`로 래핑 (CSS 제어용)
+   - 모바일 드롭다운에 테마 토글, 로그인/로그아웃, 사용자명 섹션 추가
+   - 인라인 스타일 → CSS 클래스 전환 (`.navbar-login-btn`, `.navbar-logout-btn`)
+   - 메뉴 링크에 `title` 속성 추가 (아이콘 전용 모드에서 툴팁)
+
+2. **`frontend/src/globals.css`**
+   - `.navbar-auth-buttons`, `.navbar-login-btn`, `.navbar-logout-btn` 스타일 추가
+   - `button.navbar-mobile-link` 리셋, `.navbar-mobile-divider`, `.navbar-mobile-user-info` 등 모바일 인증 스타일 추가
+   - 중간 브레이크포인트 `@media (max-width: 1100px) and (min-width: 901px)` 추가 — `.navbar-link-text` 숨김
+   - 모바일 브레이크포인트에 `.navbar-auth-buttons { display: none }` 추가
+
+**Before:** 창 축소 시 로그인 버튼이 메뉴 영역 위로 겹침  
+**After:** 점진적 축소 — 중간 크기에서 아이콘 전용, 모바일에서 햄버거로 모든 컨트롤 통합
+
+📎 **[→ Summary](./AI_Rearch_summary.md)**
+
+---
+
 ## 변경 이력 (v0.9.33 — 2026-04-17)
 
 ### Detailed Change Description

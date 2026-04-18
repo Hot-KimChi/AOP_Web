@@ -92,6 +92,18 @@ const Navbar = () => {
     }
   };
 
+  const handleLogin = () => {
+    const w = 480, h = 420;
+    const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
+    const top  = Math.round(window.screenY + (window.outerHeight - h) / 2);
+    window.open(
+      '/auth/login',
+      'login',
+      `width=${w},height=${h},left=${left},top=${top},resizable=no,scrollbars=no,menubar=no,toolbar=no,location=no,status=no`
+    );
+    setMenuOpen(false);
+  };
+
   return (
     <header className="navbar-root">
       {/* ── 메인 바 ── */}
@@ -119,6 +131,7 @@ const Navbar = () => {
                 className={cls}
                 onClick={(e) => disabled && e.preventDefault()}
                 aria-disabled={disabled}
+                title={item.text}
               >
                 <Icon size={14} />
                 <span className="navbar-link-text">{item.text}</span>
@@ -129,66 +142,34 @@ const Navbar = () => {
 
         {/* Auth + 테마 토글 — 항상 맨 오른쪽 */}
         <div className="navbar-auth">
-
-          {/* 다크/라이트 토글 */}
-          <button
-            className="theme-toggle"
-            onClick={toggleTheme}
-            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={isDark ? 'Light mode' : 'Dark mode'}
-          >
-            {isDark ? <Sun size={15} /> : <Moon size={15} />}
-          </button>
-
-          {isAuthenticated ? (
-            <>
-              <span className="navbar-username">
-                <span style={{ color: 'var(--text-muted)' }}>as </span>
-                <strong style={{ color: 'var(--text)' }}>{username}</strong>
-              </span>
-              <button
-                onClick={handleLogout}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.375rem',
-                  padding: '0.375rem 0.75rem', borderRadius: '6px',
-                  background: 'transparent', border: '1px solid var(--border)',
-                  color: 'var(--status-error-text)', fontSize: '0.8125rem', fontWeight: '500',
-                  cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--status-error-bg)'; e.currentTarget.style.borderColor = 'var(--status-error-border)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--border)'; }}
-              >
-                <LogOut size={13} />
-                Logout
-              </button>
-            </>
-          ) : (
+          {/* 데스크톱 전용: 테마 토글 + 로그인/로그아웃 (모바일에서는 햄버거 메뉴 안으로 이동) */}
+          <div className="navbar-auth-buttons">
             <button
-              onClick={() => {
-                const w = 480, h = 420;
-                const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
-                const top  = Math.round(window.screenY + (window.outerHeight - h) / 2);
-                window.open(
-                  '/auth/login',
-                  'login',
-                  `width=${w},height=${h},left=${left},top=${top},resizable=no,scrollbars=no,menubar=no,toolbar=no,location=no,status=no`
-                );
-              }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.375rem',
-                padding: '0.375rem 0.875rem', borderRadius: '6px',
-                background: 'var(--brand)', color: 'white',
-                border: 'none', cursor: 'pointer',
-                fontSize: '0.8125rem', fontWeight: '500',
-                whiteSpace: 'nowrap', transition: 'background 0.15s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--brand-dark)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--brand)'; }}
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={isDark ? 'Light mode' : 'Dark mode'}
             >
-              <User size={13} />
-              Login
+              {isDark ? <Sun size={15} /> : <Moon size={15} />}
             </button>
-          )}
+            {isAuthenticated ? (
+              <>
+                <span className="navbar-username">
+                  <span style={{ color: 'var(--text-muted)' }}>as </span>
+                  <strong style={{ color: 'var(--text)' }}>{username}</strong>
+                </span>
+                <button onClick={handleLogout} className="navbar-logout-btn">
+                  <LogOut size={13} />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button onClick={handleLogin} className="navbar-login-btn">
+                <User size={13} />
+                Login
+              </button>
+            )}
+          </div>
 
           {/* 햄버거 — 모바일 전용 (CSS로 표시/숨김) */}
           <button
@@ -221,6 +202,30 @@ const Navbar = () => {
             </Link>
           );
         })}
+
+        {/* ── 모바일 전용: 테마·인증 ── */}
+        <div className="navbar-mobile-divider" />
+        <button className="navbar-mobile-link" onClick={toggleTheme}>
+          {isDark ? <Sun size={15} /> : <Moon size={15} />}
+          {isDark ? 'Light Mode' : 'Dark Mode'}
+        </button>
+        {isAuthenticated ? (
+          <>
+            <div className="navbar-mobile-user-info">
+              <User size={15} />
+              <span>as <strong>{username}</strong></span>
+            </div>
+            <button className="navbar-mobile-link navbar-mobile-logout" onClick={handleLogout}>
+              <LogOut size={15} />
+              Logout
+            </button>
+          </>
+        ) : (
+          <button className="navbar-mobile-link navbar-mobile-login" onClick={handleLogin}>
+            <User size={15} />
+            Login
+          </button>
+        )}
       </nav>
     </header>
   );
