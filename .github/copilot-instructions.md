@@ -1,7 +1,7 @@
 # GitHub Copilot Instructions
 
 > This file is a **map**, not an encyclopedia.
-> Architecture maps & rules: `backend/AGENTS.md`, `frontend/AGENTS.md`
+> Architecture & rules: `backend/AGENTS.md`, `frontend/AGENTS.md`
 
 ---
 
@@ -9,7 +9,14 @@
 
 - Priority: **Correctness > Safety > Maintainability > Performance**
 - Behave as a **senior engineer** — no speculative or redundant code
-- All side effects must be explicit; prefer simple, readable designs
+
+### 🚨 언어 규칙 (MANDATORY — 예외 없음)
+
+- **모든 출력은 반드시 한글(Korean)로 작성:**
+  - 사용자 응답, 설명, 요약
+  - `report_intent` (진행 상태 표시) — 예: `"코드베이스 탐색"`, `"테스트 실행 중"`, `"CSS 수정 중"`
+  - 커밋 메시지의 본문 (Co-authored-by 트레일러 제외)
+- **영어 사용 금지** (코드, 변수명, 기술 용어 인용은 예외)
 
 ---
 
@@ -38,9 +45,7 @@ Before modifying code, **read the relevant AGENTS.md**:
 
 1. **Plan** — clarify requirements, scope, constraints. Use rubber-duck agent for non-trivial tasks
 2. **Implement** — simplest correct solution
-3. **Review** — check correctness, security, edge cases
-
-If any phase finds issues, loop back.
+3. **Review** — check correctness, security, edge cases. Loop back if issues found
 
 ---
 
@@ -48,9 +53,7 @@ If any phase finds issues, loop back.
 
 - [ ] Solves the requested problem without unrelated changes
 - [ ] No redundant or unused code
-- [ ] No security vulnerabilities
-- [ ] No compile/runtime errors
-- [ ] Edge cases reviewed
+- [ ] No security vulnerabilities · No compile/runtime errors
 
 ---
 

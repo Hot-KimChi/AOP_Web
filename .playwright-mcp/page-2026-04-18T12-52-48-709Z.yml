@@ -1,0 +1,80 @@
+- generic [ref=e2]:
+  - generic [ref=e7] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e8]:
+      - img [ref=e9]
+    - generic [ref=e12]:
+      - button "Open issues overlay" [ref=e13]:
+        - generic [ref=e14]:
+          - generic [ref=e15]: "0"
+          - generic [ref=e16]: "1"
+        - generic [ref=e17]: Issue
+      - button "Collapse issues badge" [ref=e18]:
+        - img [ref=e19]
+  - alert [ref=e1]
+  - generic [ref=e21]:
+    - banner [ref=e22]:
+      - generic [ref=e23]:
+        - link "A AOP Web" [ref=e24] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e25]: A
+          - generic [ref=e26]: AOP Web
+        - navigation [ref=e28]:
+          - link "MeasSet Generation" [disabled]:
+            - /url: "#"
+            - img
+            - generic: MeasSet Generation
+          - link "Viewer" [disabled]:
+            - /url: "#"
+            - img
+            - generic: Viewer
+          - link "Verification Report" [disabled]:
+            - /url: "#"
+            - img
+            - generic: Verification Report
+          - link "SSR DocOut" [disabled]:
+            - /url: "#"
+            - img
+            - generic: SSR DocOut
+          - link "Machine Learning" [disabled]:
+            - /url: "#"
+            - img
+            - generic: Machine Learning
+        - generic [ref=e29]:
+          - button "Switch to dark mode" [active] [ref=e68] [cursor=pointer]:
+            - img [ref=e69]
+          - button "Login" [ref=e37] [cursor=pointer]:
+            - img [ref=e38]
+            - text: Login
+    - main [ref=e41]:
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - generic [ref=e44]: A
+          - heading "AOP Web Platform" [level=1] [ref=e45]
+          - paragraph [ref=e46]: Acoustic Output Power management platform — measurement generation, verification reporting, and ML-powered analysis.
+        - generic [ref=e47]:
+          - link "⚙️ MeasSet Generation Generate measurement setting data from probe configurations and upload to the SQL database." [ref=e48] [cursor=pointer]:
+            - /url: /measset-generation
+            - generic [ref=e49]: ⚙️
+            - heading "MeasSet Generation" [level=3] [ref=e50]
+            - paragraph [ref=e51]: Generate measurement setting data from probe configurations and upload to the SQL database.
+          - link "🔍 Viewer Browse and inspect any database table with real-time data exploration." [ref=e52] [cursor=pointer]:
+            - /url: /viewer
+            - generic [ref=e53]: 🔍
+            - heading "Viewer" [level=3] [ref=e54]
+            - paragraph [ref=e55]: Browse and inspect any database table with real-time data exploration.
+          - link "📋 Verification Report Extract and compare TX summary tables for acoustic output power verification." [ref=e56] [cursor=pointer]:
+            - /url: /verification-report
+            - generic [ref=e57]: 📋
+            - heading "Verification Report" [level=3] [ref=e58]
+            - paragraph [ref=e59]: Extract and compare TX summary tables for acoustic output power verification.
+          - link "📄 SSR DocOut Export station setup records to Word document format for compliance reporting." [ref=e60] [cursor=pointer]:
+            - /url: /SSR_DocOut
+            - generic [ref=e61]: 📄
+            - heading "SSR DocOut" [level=3] [ref=e62]
+            - paragraph [ref=e63]: Export station setup records to Word document format for compliance reporting.
+          - link "🧠 Machine Learning Train and evaluate predictive models to estimate acoustic output power intensity." [ref=e64] [cursor=pointer]:
+            - /url: /machine-learning
+            - generic [ref=e65]: 🧠
+            - heading "Machine Learning" [level=3] [ref=e66]
+            - paragraph [ref=e67]: Train and evaluate predictive models to estimate acoustic output power intensity.
+    - generic: v 0.9.33

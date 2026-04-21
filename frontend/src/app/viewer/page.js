@@ -103,7 +103,7 @@ export default function Viewer() {
                   disabled={!selectedDatabase || isLoading}
                 >
                   <option value="">Select table…</option>
-                  {tableList.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {tableList.map((t, i) => <option key={`${t}-${i}`} value={t} disabled={t === '----------'}>{t}</option>)}
                 </select>
               </div>
 

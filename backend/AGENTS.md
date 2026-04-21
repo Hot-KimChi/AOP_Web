@@ -16,33 +16,23 @@
 
 ```
 backend/
-├── app.py                  # Flask app factory (create_app, teardown, CORS)
-├── config.py               # Config class: AOP_config.cfg → env vars → class attrs
-├── AOP_config.cfg           # INI config → [SECTION]_KEY env vars
-├── routes/                  # Blueprints
-│   ├── auth.py              # /api/auth/* — login, logout, status, refresh
-│   ├── db_api.py            # /api/* — DB viewer, table data, CSV export
-│   ├── measset_gen.py       # /api/measset-generation/*
-│   └── ml.py                # /api/ml/* — ML model train/predict/list
-├── utils/
-│   ├── database_manager.py  # DatabaseManager (per-request cache via flask.g)
-│   ├── decorators.py        # @handle_exceptions, @require_auth, @with_db_connection
-│   ├── error_handler.py     # error_response(), CredentialsRequired
-│   └── logger.py            # Named logger "AOP_Web"
-├── pkg_SQL/                 # SQL class: SQLAlchemy engine + pyodbc
-├── pkg_MachineLearning/     # ML training/prediction
-├── pkg_MeasSetGen/          # Measurement set generation
-└── db/                      # DB schema/migration scripts
+├── app.py               # Flask app factory (create_app, teardown, CORS)
+├── config.py            # Config class: AOP_config.cfg → env vars → class attrs
+├── routes/              # Blueprints (auth, db_api, measset_gen, ml)
+├── utils/               # decorators, database_manager, error_handler, logger
+├── pkg_SQL/             # SQL class: SQLAlchemy + pyodbc
+├── pkg_MachineLearning/ # ML training/prediction
+├── pkg_MeasSetGen/      # Measurement set generation
+└── db/                  # DB schema/migration scripts
 ```
 
 ---
 
-## Request Lifecycle
+## Request Lifecycle & Decorator Order
 
 ```
-Client → route → @handle_exceptions → @require_auth → @with_db_connection()
-  → g.current_db.execute_query(sql, params)
-  → JSON response
+Request → @handle_exceptions → @require_auth → @with_db_connection()
+  → g.current_db.execute_query(sql, params) → JSON response
   → teardown_appcontext (close connections)
 ```
 
@@ -60,35 +50,27 @@ Decorator order is **mandatory**: `@handle_exceptions` → `@require_auth` → `
 
 ## Database (MS-SQL Server)
 
-All DB code is **safety-critical**.
+All DB code is **safety-critical**. Parameterized queries only (`?` placeholders). Never f-string SQL.
 
 ```python
 # CORRECT
-result = g.current_db.execute_query("SELECT * FROM dbo.T WHERE col = ?", params=["value"])
-# → SELECT returns pandas DataFrame, INSERT returns {"insert_id": ...}
+g.current_db.execute_query("SELECT * FROM dbo.T WHERE col = ?", params=["value"])
+# SELECT → DataFrame, INSERT → {"insert_id": ...}
 
 # WRONG — SQL injection
-result = g.current_db.execute_query(f"SELECT * FROM {user_input}")
+g.current_db.execute_query(f"SELECT * FROM {user_input}")
 ```
 
-- Parameterized queries only (`?` placeholders). Never f-string SQL
 - Allowlist table/database names in routes
 - Convert numpy types via `.item()` before cursor
 
 ---
 
-## Response & Error Format
+## Response Format & Critical Invariants
 
-- Success: `{"status": "success", "data": [...]}` or `{"message": "..."}`
-- Error: `error_response(msg, code)` → `{"status": "error", "message": "..."}`
-- Codes: 400 (bad input) · 401 (no token) · 403 (invalid token) · 422 (no credentials) · 500 (server)
-
----
-
-## Critical Invariants
-
-- `CORS supports_credentials=True`
-- `SESSION_COOKIE_HTTPONLY=True`, `SAMESITE="Lax"`
+- Success: `{"status": "success", "data": [...]}` · Error: `error_response(msg, code)`
+- Codes: 400 (bad input) · 401 (no token) · 403 (invalid) · 422 (no credentials) · 500 (server)
+- `CORS supports_credentials=True` · `SESSION_COOKIE_HTTPONLY=True` · `SAMESITE="Lax"`
 - `Config.load_config()` before `create_app()`
 - `logger.error(msg, exc_info=True)` — always include traceback
 

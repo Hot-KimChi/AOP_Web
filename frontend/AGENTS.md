@@ -15,31 +15,27 @@
 ## File Structure
 
 ```
-frontend/
-├── package.json             # Next.js 15, React 18, Bootstrap 5, Chart.js, lucide-react
-├── .env.development         # NEXT_PUBLIC_API_BASE_URL (dev)
-├── .env.production          # NEXT_PUBLIC_API_BASE_URL (prod)
-└── src/
-    ├── globals.css           # CSS variables (:root + [data-theme="dark"])
-    ├── components/
-    │   ├── Layout.js         # Navbar + main wrapper (dynamic, ssr: false)
-    │   ├── Navbar.js         # Navigation, auth check, theme toggle
-    │   ├── ThemeInit.js      # Applies saved theme on mount (renders null)
-    │   └── DataViewer.js     # Table: cascaded filters, sort, CSV export
-    └── app/
-        ├── (home)/           # Landing page
-        ├── auth/login/       # Login (popup window)
-        ├── viewer/           # DB browser
-        ├── data-view/        # Data editor (custom hooks, editable cells)
-        ├── measset-generation/  # Measurement set generation
-        ├── machine-learning/    # ML training, scoring charts
-        ├── verification-report/ # TX summary extraction
-        └── SSR_DocOut/       # Export to Word
+frontend/src/
+├── globals.css           # CSS variables (:root + [data-theme="dark"])
+├── components/
+│   ├── Layout.js         # Navbar + main wrapper (dynamic, ssr: false)
+│   ├── Navbar.js         # Navigation, auth check, theme toggle
+│   ├── ThemeInit.js      # Applies saved theme on mount (renders null)
+│   └── DataViewer.js     # Table: cascaded filters, sort, CSV export
+└── app/
+    ├── (home)/           # Landing page
+    ├── auth/login/       # Login (popup window)
+    ├── viewer/           # DB browser
+    ├── data-view/        # Data editor (custom hooks, editable cells)
+    ├── measset-generation/  # Measurement set generation
+    ├── machine-learning/    # ML training, scoring charts
+    ├── verification-report/ # TX summary extraction
+    └── SSR_DocOut/       # Export to Word
 ```
 
 ---
 
-## Layout Stack (must follow this order)
+## Layout Stack (order is mandatory)
 
 ```jsx
 <html lang="en" suppressHydrationWarning>
@@ -60,7 +56,7 @@ Do not reorder. Inline script must execute before React hydration.
 - Selector: `[data-theme="dark"]` — not `.dark`
 - Storage key: `'aop-theme'` (values: `'dark'` / `'light'`)
 - Use CSS variables only (`var(--bg)`, `var(--surface)`, `var(--text)`, etc.) — **no hardcoded colors**
-- Variable definitions: see `src/globals.css` `:root` and `[data-theme="dark"]`
+- Definitions: see `src/globals.css` `:root` and `[data-theme="dark"]`
 - Chart.js: use `isDark` parameter factory functions
 - Bootstrap overrides require `!important`
 
@@ -70,9 +66,8 @@ Do not reorder. Inline script must execute before React hydration.
 
 ```javascript
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
-
 const res = await fetch(`${API_BASE_URL}/api/endpoint`, {
-  credentials: 'include',  // MANDATORY for all authenticated requests
+  credentials: 'include',  // MANDATORY for authenticated requests
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(payload),
 });

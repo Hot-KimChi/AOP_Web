@@ -1,0 +1,14 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]: A
+    - generic [ref=e6]: AOP Web
+    - generic [ref=e7]: Sign in to your account
+  - generic [ref=e8]:
+    - generic [ref=e9]: Username
+    - textbox "Username" [active] [ref=e10]:
+      - /placeholder: Enter username
+  - generic [ref=e11]:
+    - generic [ref=e12]: Password
+    - textbox "Password" [ref=e13]:
+      - /placeholder: Enter password
+  - button "Sign In" [disabled] [ref=e14]
