@@ -6,6 +6,14 @@
 
 ---
 
+## 변경 이력 (v0.9.36 — 2026-04-29)
+
+| # | 요청 | 해결 | Detail |
+|---|------|------|--------|
+| 1 | MeasSet Generation 페이지에 Data Preview 버튼 추가 — GroupIndex별 Temperature/Power/Intensity 데이터 관계도 시각화 | `DataPreviewModal` 컴포넌트 신규 생성, 아코디언 UI로 그룹별 데이터 구조 표시, 다크모드 지원 | [→ Detail](#v0936--1-data-preview-모달-추가) |
+
+---
+
 ## 변경 이력 (v0.9.35 — 2026-04-25)
 
 | # | 요청 | 해결 | Detail |

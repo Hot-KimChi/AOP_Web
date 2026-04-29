@@ -6,6 +6,36 @@
 
 ---
 
+## 변경 이력 (v0.9.36 — 2026-04-29)
+
+### v0.9.36 — #1. Data Preview 모달 추가
+
+**문제:**
+- MeasSet Generation 후 생성되는 전체 데이터(Intensity/Power/Temperature)의 관계 구조를 한눈에 파악하기 어려움
+- 기존 UI는 Temperature 데이터만 필터링하여 표시, 전체 구조를 확인할 수 없음
+
+**해결 방식:**
+- `DataPreviewModal.js` 컴포넌트 신규 생성
+- measSetComments 기반 4가지 타입 분류: Intensity / Power / Temperature / Temperature_SA
+- GroupIndex별 아코디언 UI로 데이터 관계도 표시
+- 요약 통계(전체 rows, 그룹 수, 타입별 개수) 상단 표시
+- 모달 열기 전 세션 스토리지에서 최신 데이터 동기화 (팝업 편집 창과의 데이터 정합성 보장)
+- ESC 키 닫기, 백드롭 클릭 닫기, body 스크롤 잠금
+- 다크모드 완전 지원 (CSS 변수 + `[data-theme="dark"]` 선택자)
+
+**변경 파일:**
+
+| 파일 | 변경 |
+|------|------|
+| `frontend/src/components/DataPreviewModal.js` | 신규 — 모달 컴포넌트 |
+| `frontend/src/app/measset-generation/page.js` | 📊 Data Preview 버튼 추가, 모달 state/렌더링 통합 |
+| `frontend/src/globals.css` | DataPreview 모달 CSS + 다크모드 스타일 추가 |
+
+**Before:** Generate & View CSV / Open Data in New Window / Save to SQL — 3개 버튼
+**After:** + 📊 Data Preview 버튼 추가 (fullCsvData 존재 시 활성화), 클릭 시 GroupIndex별 관계도 모달 표시
+
+---
+
 ## 변경 이력 (v0.9.35 — 2026-04-25)
 
 ### v0.9.35 — #1. 스크립트 리팩토링

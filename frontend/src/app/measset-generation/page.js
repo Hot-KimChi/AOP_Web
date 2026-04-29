@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import DataPreviewModal from '../../components/DataPreviewModal';
 
 export default function MeasSetGen() {
   // 기본 상태 변수 선언
@@ -16,6 +17,7 @@ export default function MeasSetGen() {
   const [dataModified, setDataModified] = useState(false);       // 데이터 수정 여부
   const [dataWindowReference, setDataWindowReference] = useState(null); // 데이터 창 참조
   const [updatedCount, setUpdatedCount] = useState(0);           // 업데이트된 데이터 수
+  const [showPreviewModal, setShowPreviewModal] = useState(false); // Data Preview 모달
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
@@ -811,6 +813,36 @@ export default function MeasSetGen() {
               </button>
             </div>
 
+            {/* Data Preview */}
+            <div className="col-md-4">
+              <button
+                className="btn w-100"
+                style={{ background: '#f59e0b', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
+                onClick={() => {
+                  // 팝업 창이 열려 있으면 최신 데이터 동기화
+                  if (dataWindowReference && !dataWindowReference.closed) {
+                    try {
+                      dataWindowReference.postMessage({ type: 'REQUEST_LATEST_DATA' }, '*');
+                    } catch (err) {
+                      console.error('팝업 데이터 동기화 오류:', err);
+                    }
+                  }
+                  // 세션 스토리지에서 최신 전체 데이터 로드
+                  const stored = sessionStorage.getItem('fullCsvData');
+                  if (stored) {
+                    try {
+                      const parsed = JSON.parse(stored);
+                      setFullCsvData(parsed);
+                    } catch (e) { /* 파싱 실패 시 현재 state 사용 */ }
+                  }
+                  setShowPreviewModal(true);
+                }}
+                disabled={!fullCsvData || fullCsvData.length === 0}
+              >
+                📊 Data Preview
+              </button>
+            </div>
+
             {/* Refresh data */}
             {dataModified && (
               <div className="col-md-12">
@@ -829,6 +861,13 @@ export default function MeasSetGen() {
           {error && <div className="alert alert-danger mt-3" style={{ fontSize: '0.875rem' }}>{error}</div>}
         </div>
       </div>
+
+      {/* Data Preview Modal */}
+      <DataPreviewModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        data={fullCsvData}
+      />
     </div>
   );
 }
