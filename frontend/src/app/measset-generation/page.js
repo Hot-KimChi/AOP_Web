@@ -778,7 +778,7 @@ export default function MeasSetGen() {
             </div>
 
             {/* Generate & View */}
-            <div className="col-md-4">
+            <div className="col-md-3">
               <button
                 className="btn w-100"
                 style={{ background: '#6366f1', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
@@ -790,7 +790,7 @@ export default function MeasSetGen() {
             </div>
 
             {/* Open in new window */}
-            <div className="col-md-4">
+            <div className="col-md-3">
               <button
                 className="btn w-100"
                 style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
@@ -802,7 +802,7 @@ export default function MeasSetGen() {
             </div>
 
             {/* Save to SQL */}
-            <div className="col-md-4">
+            <div className="col-md-3">
               <button
                 className="btn w-100"
                 style={{ background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
@@ -814,7 +814,7 @@ export default function MeasSetGen() {
             </div>
 
             {/* Data Preview */}
-            <div className="col-md-4">
+            <div className="col-md-3">
               <button
                 className="btn w-100"
                 style={{ background: '#f59e0b', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
