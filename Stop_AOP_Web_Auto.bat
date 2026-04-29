@@ -16,10 +16,14 @@ echo =============================================
 REM -- 스크립트가 위치한 디렉토리로 이동 --
 cd /d "%~dp0"
 
-REM -- Stop 스크립트 존재 여부 확인 --
+REM -- 필수 파일 존재 여부 확인 --
 if not exist "Stop_AOP_Web.ps1" (
     echo [ERROR] Stop_AOP_Web.ps1 not found in %~dp0
-    echo         Please make sure the batch file is in the same directory as Stop_AOP_Web.ps1
+    pause
+    exit /b 1
+)
+if not exist "AOP_Web_Common.ps1" (
+    echo [ERROR] AOP_Web_Common.ps1 not found in %~dp0
     pause
     exit /b 1
 )

@@ -82,3 +82,25 @@ g.current_db.execute_query(f"SELECT * FROM {user_input}")
 - **Add query**: `g.current_db.execute_query(sql, params)`, never build SQL strings
 - **Add package**: `pkg_*/` directory, import via utils layer
 - **Add config**: `AOP_config.cfg` + `config.py` (re-assign in `load_config()`)
+
+---
+
+## ⚠️ Top 5 Costly Mistakes
+
+1. **Decorator 순서 위반** → 500 노출 (see: Request Lifecycle & Decorator Order)
+2. **SQL f-string** → 인젝션 취약점 (see: Database)
+3. **numpy 타입 직접 전달** → cursor 오류. `.item()` 필수 (see: Database)
+4. **session 자원 미정리** → 커넥션 풀 고갈 (see: Response Format & Critical Invariants)
+5. **`Config.load_config()` 누락** → 기본값 오작동 (see: Response Format & Critical Invariants)
+
+---
+
+## 🔍 Diagnostic Flow
+
+```
+문제 발생
+  ├─ 401/403 에러? → auth.py: JWT 만료/세션 credentials 확인
+  ├─ 500 에러? → logs/ 확인 → decorator 순서 → 쿼리 파라미터 타입
+  ├─ 빈 DataFrame? → SQL 쿼리 결과 확인 → 테이블/DB명 오타
+  └─ 연결 실패? → AOP_config.cfg 서버 주소 → ODBC 드라이버 → 방화벽
+```

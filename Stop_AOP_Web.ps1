@@ -31,100 +31,17 @@ if (!(Test-Path $logDir)) {
     New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 }
 
-# Initialize JSON log array
+# 초기화
 $script:jsonLogEntries = @()
+$script:scriptName = "Stop_AOP_Web.ps1"
 
-function Write-Log {
-    param(
-        $Message, 
-        $Level = "INFO",
-        $Metadata = @{}
-    )
-    
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $timestampISO = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
-    
-    # Text log
-    $logMessage = "[$timestamp] [$Level] $Message"
-    Write-Host $logMessage
-    $logMessage | Out-File -FilePath $logFile -Append -Encoding UTF8
-    
-    # JSON log entry
-    $jsonEntry = [PSCustomObject]@{
-        timestamp = $timestampISO
-        level = $Level
-        message = $Message
-        script = "Stop_AOP_Web.ps1"
-        metadata = $Metadata
-    }
-    
-    $script:jsonLogEntries += $jsonEntry
+# 공통 유틸리티 함수 로드 (Write-Log, Save-JsonLog, Clean-OldLogs)
+$commonScript = Join-Path $scriptPath "AOP_Web_Common.ps1"
+if (!(Test-Path $commonScript)) {
+    Write-Host "[ERROR] AOP_Web_Common.ps1 not found: $commonScript" -ForegroundColor Red
+    Exit 1
 }
-
-function Save-JsonLog {
-    try {
-        if ($script:jsonLogEntries.Count -gt 0) {
-            $script:jsonLogEntries | ConvertTo-Json -Depth 10 | 
-                Out-File -FilePath $jsonLogFile -Encoding UTF8
-        }
-    } catch {
-        Write-Host "Failed to save JSON log: $($_.Exception.Message)" -ForegroundColor Yellow
-    }
-}
-
-function Clean-OldLogs {
-    param(
-        [string]$LogDirectory,
-        [int]$RetentionDays,
-        [int]$MaxSizeMB
-    )
-    
-    try {
-        # Remove logs older than retention period (both .log and .json)
-        $cutoffDate = (Get-Date).AddDays(-$RetentionDays)
-        $oldLogs = Get-ChildItem -Path $LogDirectory -Include "*.log", "*.json" -Recurse | 
-                   Where-Object { $_.LastWriteTime -lt $cutoffDate }
-        
-        if ($oldLogs) {
-            $removedCount = 0
-            $removedSize = 0
-            
-            foreach ($log in $oldLogs) {
-                $removedSize += $log.Length
-                Remove-Item $log.FullName -Force -ErrorAction SilentlyContinue
-                $removedCount++
-            }
-            
-            $removedSizeMB = [math]::Round($removedSize / 1MB, 2)
-            Write-Log "Removed $removedCount old log files ($removedSizeMB MB)" "INFO"
-        }
-        
-        # Check total log directory size
-        $allLogs = Get-ChildItem -Path $LogDirectory -Include "*.log", "*.json" -Recurse
-        $totalSize = ($allLogs | Measure-Object -Property Length -Sum).Sum
-        $totalSizeMB = [math]::Round($totalSize / 1MB, 2)
-        
-        if ($totalSizeMB -gt $MaxSizeMB) {
-            Write-Log "Log directory size ($totalSizeMB MB) exceeds limit ($MaxSizeMB MB)" "WARN"
-            
-            # Remove oldest logs until under limit
-            $logsToRemove = $allLogs | Sort-Object LastWriteTime | 
-                            Select-Object -First ([math]::Ceiling($allLogs.Count * 0.3))
-            
-            $freedSize = 0
-            foreach ($log in $logsToRemove) {
-                $freedSize += $log.Length
-                Remove-Item $log.FullName -Force -ErrorAction SilentlyContinue
-            }
-            
-            $freedSizeMB = [math]::Round($freedSize / 1MB, 2)
-            Write-Log "Removed $($logsToRemove.Count) oldest logs to free $freedSizeMB MB" "INFO"
-        }
-        
-    } catch {
-        Write-Log "Log cleanup failed: $($_.Exception.Message)" "WARN"
-    }
-}
+. $commonScript
 
 function Stop-ServiceOnPort {
     param([int]$Port, [string]$ServiceName)
@@ -133,7 +50,16 @@ function Stop-ServiceOnPort {
     
     $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
     if ($connections) {
-        $processIds = $connections | Select-Object -ExpandProperty OwningProcess -Unique
+        # PID 0 = TIME_WAIT 상태 (커널 소유) — 실제 프로세스가 아니므로 제외
+        $processIds = $connections |
+            Where-Object { $_.OwningProcess -ne 0 } |
+            Select-Object -ExpandProperty OwningProcess -Unique
+
+        if (-not $processIds) {
+            Write-Log "Port $Port has only TIME_WAIT connections (PID 0) — no process to stop" "INFO"
+            Write-Host "  No active process on port $Port (TIME_WAIT only)" -ForegroundColor Gray
+            return $false
+        }
         
         Write-Host "`nFound $ServiceName processes:" -ForegroundColor Yellow
         foreach ($processId in $processIds) {

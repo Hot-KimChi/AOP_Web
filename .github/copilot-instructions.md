@@ -1,7 +1,7 @@
 # GitHub Copilot Instructions
 
-> This file is a **map**, not an encyclopedia.
-> Architecture & rules: `backend/AGENTS.md`, `frontend/AGENTS.md`
+> **이 파일은 라우터(map)이다.** 세부사항은 AGENTS.md와 .instructions.md 파일에 있다.
+> 구체적 지침이 일반 지침보다 우선. 안전/보안 불변식은 항상 최우선.
 
 ---
 
@@ -9,6 +9,7 @@
 
 - Priority: **Correctness > Safety > Maintainability > Performance**
 - Behave as a **senior engineer** — no speculative or redundant code
+- **예시(example) > 추상적 원칙** — 구체적 코드 패턴으로 설명
 
 ### 🚨 언어 규칙 (MANDATORY — 예외 없음)
 
@@ -30,30 +31,37 @@
 
 ---
 
-## 3. Context Architecture (Progressive Disclosure)
+## 3. Context Loading (Progressive Disclosure)
 
-Before modifying code, **read the relevant AGENTS.md**:
+### 라우팅 규칙
 
-- Changing `backend/**` → read `backend/AGENTS.md` first
-- Changing `frontend/**` → read `frontend/AGENTS.md` first
+| 변경 대상 | 먼저 읽을 파일 |
+|-----------|---------------|
+| `backend/**` | `backend/AGENTS.md` |
+| `frontend/**` | `frontend/AGENTS.md` |
+| 디버깅/오류 분석 | `.github/instructions/verification.instructions.md` |
+| 서브에이전트/병렬 작업 | `.github/instructions/agent-orchestration.instructions.md` |
 
-> Load only what the current task requires.
+### 컨텍스트 윈도우 관리
+
+- **필요한 것만 로드** — AGENTS.md + 대상 파일을 찾으면 구현 시작
+- **불확실할 때만** 주변 모듈 추가 읽기
+- 3개 이상 파일을 연속 읽어야 하면 → 먼저 가설을 세우고 검증 대상만 선별
+- 대화가 길어지면 `/compact`로 컨텍스트 정리
 
 ---
 
-## 4. Workflow: Plan → Implement → Review
+## 4. Workflow: Plan → Implement → Verify
 
-1. **Plan** — clarify requirements, scope, constraints. Use rubber-duck agent for non-trivial tasks
-2. **Implement** — simplest correct solution
-3. **Review** — check correctness, security, edge cases. Loop back if issues found
+1. **Plan** — 요구사항 명확화, 범위 확정. 비자명 작업은 `rubber-duck` 에이전트로 검증
+2. **Implement** — 가장 단순한 정확한 해결책
+3. **Verify** — `.github/instructions/verification.instructions.md` 체크리스트 수행. 문제 시 1로 복귀
 
 ---
 
-## 5. Quality Gate
+## 5. Agent & Tool Orchestration
 
-- [ ] Solves the requested problem without unrelated changes
-- [ ] No redundant or unused code
-- [ ] No security vulnerabilities · No compile/runtime errors
+> 상세: `.github/instructions/agent-orchestration.instructions.md`
 
 ---
 

@@ -8,10 +8,14 @@ echo Starting AOP Web Application...
 REM Change to the script directory
 cd /d "%~dp0"
 
-REM Check if PowerShell script exists
+REM Check if required files exist
 if not exist "Start_AOP_Web.ps1" (
     echo Error: Start_AOP_Web.ps1 not found in %~dp0
-    echo Please make sure the batch file is in the same directory as Start_AOP_Web.ps1
+    pause
+    exit /b 1
+)
+if not exist "AOP_Web_Common.ps1" (
+    echo Error: AOP_Web_Common.ps1 not found in %~dp0
     pause
     exit /b 1
 )

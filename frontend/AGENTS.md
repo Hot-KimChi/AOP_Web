@@ -101,3 +101,26 @@ const res = await fetch(`${API_BASE_URL}/api/endpoint`, {
 - `dynamic(() => ..., { ssr: false })` on Layout.js → prevents hydration mismatch
 - `suppressHydrationWarning` → inline theme script modifies DOM before React
 - `window.opener` / popup patterns in auth → login opens in popup window
+
+---
+
+## ⚠️ Top 5 Costly Mistakes
+
+1. **`'use client'` 누락** → 빌드 에러 (see: Coding Standards)
+2. **`credentials: 'include'` 누락** → 401 에러 (see: API Communication)
+3. **하드코딩 색상** → 다크모드 깨짐 (see: Theming)
+4. **`.dark` 선택자 오용** → 테마 미적용 (see: Theming)
+5. **Layout 순서 변경** → FOUC 발생 (see: Layout Stack)
+
+---
+
+## 🔍 Diagnostic Flow
+
+```
+문제 발생
+  ├─ 흰 화면 (hydration error)? → Layout.js dynamic import 확인 → suppressHydrationWarning
+  ├─ 401 Unauthorized? → fetch의 credentials: 'include' 확인 → 쿠키 도메인
+  ├─ 다크모드 깨짐? → CSS 변수 사용 여부 → [data-theme="dark"] 선택자 확인
+  ├─ 테마 깜빡임? → root layout의 inline script 존재 확인 → 순서 확인
+  └─ 빌드 에러? → 'use client' 선언 → import 경로 → 환경변수 NEXT_PUBLIC_ 접두사
+```

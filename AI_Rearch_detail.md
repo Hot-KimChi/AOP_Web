@@ -6,6 +6,71 @@
 
 ---
 
+## 변경 이력 (v0.9.35 — 2026-04-25)
+
+### v0.9.35 — #1. 스크립트 리팩토링
+
+**문제:**
+- `Write-Log`, `Save-JsonLog`, `Clean-OldLogs` 함수가 Start/Stop 스크립트에 완전히 동일하게 중복 (~90줄)
+- `Stop_AOP_Web.ps1`의 `Stop-ServiceOnPort`에서 PID 0 (TIME_WAIT 커널 연결) 필터링 누락 → `Stop-Process -Id 0` 실패 가능
+- `Start_AOP_Web.ps1`에 미사용 `Test-PortAvailability` 함수, `-NoAdmin` 파라미터 존재
+- JSON 로그 타임스탬프가 `fffZ` (로컬 시간인데 UTC 표기)
+
+**해결 방식:**
+
+| 항목 | Before | After |
+|------|--------|-------|
+| 공유 함수 | Start/Stop 각각에 동일 함수 복사 | `AOP_Web_Common.ps1` 신규 생성, dot-source 로 공유 |
+| PID 0 버그 | `Stop-ServiceOnPort`에서 PID 0 포함하여 `Stop-Process` 시도 | `Where-Object { $_.OwningProcess -ne 0 }` 필터 추가 + 조기 반환 |
+| 미사용 코드 | `Test-PortAvailability`, `-NoAdmin` 선언만 존재 | 완전 제거 |
+| 타임스탬프 | `"yyyy-MM-ddTHH:mm:ss.fffZ"` (잘못된 UTC 표기) | `[DateTimeOffset]::Now.ToString("o")` (ISO 8601 정확한 오프셋) |
+| bat 파일 | PS 스크립트 존재만 확인 | `AOP_Web_Common.ps1` 존재 여부도 확인 |
+
+**변경 파일:**
+- `AOP_Web_Common.ps1` — **신규 생성** (공통 로깅·정리 함수)
+- `Start_AOP_Web.ps1` — 중복 함수 제거, dot-source 추가, 미사용 코드 제거
+- `Stop_AOP_Web.ps1` — 중복 함수 제거, dot-source 추가, PID 0 버그 수정
+- `Start_AOP_Web_Auto.bat` — `AOP_Web_Common.ps1` 존재 확인 추가
+- `Stop_AOP_Web_Auto.bat` — `AOP_Web_Common.ps1` 존재 확인 추가
+
+---
+
+### v0.9.35 — #2. Copilot CLI 5대 엔지니어링 최적화
+
+**목적:** Claude Code의 5대 핵심 엔지니어링 개념(프롬프트·컨텍스트·스킬·MCP·하네스)을 Copilot CLI에 적용하여 에이전트 성능 최대화
+
+**설계 원칙:**
+- 루트 = 라우터(map) — 전역 규칙 + 라우팅만, 세부사항은 하위 파일에
+- AGENTS.md = 도메인 아키텍처/불변식 — 코드 예시 포함 (canonical source)
+- .instructions.md = 작업 모드 — 트리거 기반 조건부 로딩
+- 중복 금지 — 같은 체크리스트를 두 곳에 쓰지 않음, 참조로 대체
+
+**해결 방식:**
+
+| 항목 | Before | After |
+|------|--------|-------|
+| 루트 instruction | 모든 규칙을 한 파일에 나열 (map + workflow + quality gate) | **라우터 전용**: 전역 규칙 + 컨텍스트 라우팅 테이블 + 파일 포인터 |
+| 컨텍스트 관리 | "read AGENTS.md first" 1줄 | **라우팅 테이블** (변경 대상 → 읽을 파일 매핑) + **윈도우 관리 규칙** (필요한 것만 로드, 중단 조건) |
+| 오케스트레이션 | 없음 | `agent-orchestration.instructions.md` **신규**: 서브에이전트 선택 매트릭스, 병렬 호출 규칙, 도구 우선순위, MCP 활용, 에러 복구 |
+| 검증 체크리스트 | Quality Gate 3줄 (generic) | `verification.instructions.md` **신규**: 스택별 체크 항목, 위험 변경 트리거, 검증 흐름 (AGENTS.md 참조 방식) |
+| backend AGENTS.md | 아키텍처 규칙만 | + **Top 5 Costly Mistakes** (1줄 요약 + 본문 섹션 포인터) + **Diagnostic Flow** (증상 기반 진단 트리) |
+| frontend AGENTS.md | 아키텍처 규칙만 | + **Top 5 Costly Mistakes** + **Diagnostic Flow** |
+| 지침 우선순위 | 없음 | 루트에 **precedence 규칙** 추가: "구체적 지침 > 일반 지침, 안전/보안 항상 최우선" |
+
+**변경 파일:**
+- `.github/copilot-instructions.md` — 라우터 구조로 재설계, 컨텍스트 라우팅·우선순위 규칙 추가, 오케스트레이션 섹션을 포인터로 축소
+- `.github/instructions/agent-orchestration.instructions.md` — **신규 생성** (하네스/오케스트레이션/스킬/MCP)
+- `.github/instructions/verification.instructions.md` — **신규 생성** (품질 게이트/검증 체크리스트)
+- `backend/AGENTS.md` — Top 5 Costly Mistakes + Diagnostic Flow 추가
+- `frontend/AGENTS.md` — Top 5 Costly Mistakes + Diagnostic Flow 추가
+
+**중복 제거 내역:**
+- verification.instructions.md: 코드 예시 블록 전면 삭제 → AGENTS.md 참조로 대체 (decorator order, SQL, theming 등 8건)
+- AGENTS.md Top 5: 본문 반복 설명 삭제 → 1줄 요약 + 섹션 포인터 (backend 5건, frontend 5건)
+- copilot-instructions.md section 5: 요약 bullets 전면 삭제 → 파일 포인터만 유지
+
+---
+
 ## 변경 이력 (v0.9.34 — 2026-04-18)
 
 ### v0.9.34 — #1. 네비바 반응형 개선
