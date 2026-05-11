@@ -28,7 +28,7 @@ export default function Viewer() {
       }
     };
     fetchDatabases();
-  }, []);
+  }, [API_BASE_URL]);
 
   useEffect(() => {
     if (selectedDatabase) {
@@ -48,7 +48,7 @@ export default function Viewer() {
       };
       fetchTables();
     }
-  }, [selectedDatabase]);
+  }, [selectedDatabase, API_BASE_URL]);
 
   const handleDatabaseChange = (e) => {
     setSelectedDatabase(e.target.value);

@@ -6,6 +6,96 @@
 
 ---
 
+## 변경 이력 (v0.9.38 — 2026-05-12)
+
+### v0.9.38 — #1. 전체 프로젝트 코드 리뷰
+
+**요청:**
+- 전체 프로젝트(Backend + Frontend)를 리뷰하여 버그, 보안 취약점, 중복 코드, 가독성 문제 수정
+
+**수정 내역 (11건):**
+
+#### 🔴 런타임 버그 (2건)
+
+| 파일 | 문제 | 수정 |
+|------|------|------|
+| `pkg_MeasSetGen/data_inout.py` | `logging` 모듈 미임포트 → 108행 `logging.getLogger()` NameError | `import logging` 추가 |
+| `backend/app.py` | `Config.load_config()`가 `if __name__ == "__main__"` 블록에만 존재 → WSGI/gunicorn 실행 시 설정 미로드 | `create_app()` 내부로 이동 |
+
+#### 🟠 보안 취약점 (2건)
+
+| 파일 | 문제 | 수정 |
+|------|------|------|
+| `routes/db_api.py` `insert_sql_measset()` | 임의 테이블명 입력 가능 (SQL 인젝션 위험) | `allowed_insert_tables = ["meas_setting"]` allowlist 검증 추가 |
+| `utils/decorators.py` `with_db_connection()` | 임의 데이터베이스명 입력 가능 | `DATABASE_NAME` 환경변수 + `AOP_MLflow_Tracking` 기반 allowlist 검증 추가 |
+
+#### 🟡 코드 품질 (7건)
+
+| 파일 | 문제 | 수정 |
+|------|------|------|
+| `app.py` | `g.pop("db", None)` — 존재하지 않는 `g.db` 정리 시도 (dead code) | teardown에서 제거, `DatabaseManager.close_connections()`만 유지 |
+| `routes/db_api.py` `run_tx_compare()` | `@handle_exceptions`와 중복되는 내부 try/except | 내부 try/except 제거 (decorator가 동일 처리) |
+| `routes/db_api.py` | `import json`, `import numpy as np`, `from io import StringIO` 함수 내부 인라인 임포트 | 파일 상단으로 이동 |
+| `pkg_MeasSetGen/Temp_Prr_predict.py` | 340-341행 `pandas`/`numpy` 중복 임포트, 352행 함수 내부 `numpy` 중복 임포트 | 중복 3건 삭제 (1-5행의 기존 임포트 유지) |
+| `pkg_MeasSetGen/predictML.py` | 미사용 `from pkg_SQL.database import SQL`, 함수 내부 `import time` | `SQL` 제거, `time`을 파일 상단으로 이동 |
+| `pkg_MeasSetGen/create_groupidx.py` | 직접 `SQL()` 생성 → 중앙화된 `get_db_connection()` 미사용, 생성자에서 불필요한 session 접근 | `get_db_connection()` 사용으로 통일, session 접근 제거 |
+| `pkg_MachineLearning/fetch_selectFeature.py` | 매 호출 시 `Config.load_config()` 반복 실행 | `create_app()`에서 1회 호출로 통합되어 삭제 |
+
+#### 🔵 프론트엔드 (1건)
+
+| 파일 | 문제 | 수정 |
+|------|------|------|
+| `frontend/src/app/viewer/page.js` | `useEffect` 의존성 배열에 `API_BASE_URL` 누락 → React lint 경고 | 두 `useEffect`에 `API_BASE_URL` 추가 |
+
+**Before/After:**
+- Before: 런타임 NameError 가능, WSGI 시 설정 미로드, 테이블/DB 이름 미검증, 중복·인라인 임포트 산재
+- After: 모든 런타임 버그 수정, 보안 allowlist 적용, 임포트 정리, DB 접근 패턴 통일
+
+---
+
+## 변경 이력 (v0.9.37 — 2026-05-11)
+
+### v0.9.37 — #1. awesome-copilot 확장 설치
+
+**요청:**
+- GitHub awesome-copilot 리포지토리에서 프로젝트 기술 스택(Python/Flask + Next.js 15 + MS-SQL + Playwright)에 맞는 instructions, skills, agents를 분석하여 적용
+
+**해결 방식:**
+- 프로젝트 기술 스택을 분석하여 awesome-copilot에서 관련성 높은 항목 선별
+- 🔴 필수 + 🟡 권장 우선순위로 설치 범위 결정
+
+**설치 내역:**
+
+| 카테고리 | 항목 | 파일 수 |
+|----------|------|---------|
+| Instructions | `nextjs`, `ms-sql-dba`, `sql-sp-generation`, `security-and-owasp`, `html-css-style-color-guide`, `context7` | 6 |
+| Skills | `sql-code-review`, `sql-optimization`, `playwright-generate-test`, `playwright-explore-website`, `security-review`(+5 refs), `acquire-codebase-knowledge`(+10 assets), `conventional-commit` | 22 |
+| Agents | `ms-sql-dba`, `playwright-tester`, `expert-nextjs-developer`, `principal-software-engineer`, `plan` | 5 |
+
+**Before:** Instructions 2개(커스텀), Skills 4개(suggest/make 도구), Agents 0개
+**After:** Instructions 8개, Skills 11개 폴더(26 파일), Agents 4개
+
+**최적화 조치 (심층 감사):**
+
+| 항목 | 조치 | 이유 |
+|------|------|------|
+| `security-and-owasp.instructions.md` (29.7KB) | **제거** | 너무 큼. AGENTS.md + security-review 스킬로 대체 |
+| `nextjs.instructions.md` (9.6KB) | **제거** | Next.js 16 기준. frontend/AGENTS.md에 v15 규칙 있음 |
+| `context7.instructions.md` (4.3KB) | **제거** | MCP 도구 설명에 이미 포함. 중복 |
+| `html-css-style-color-guide` (3.2KB) | **제거** | 일반 색상 이론이 프로젝트 CSS 변수와 충돌 |
+| `sql-sp-generation` (3.1KB) | **제거** | `id` 필수 등 기존 DB 스키마와 충돌 |
+| `expert-nextjs-developer.agent.md` (18.4KB) | **제거** | Next.js 16 + TypeScript → 잘못된 안내 위험 |
+| `conventional-commit` 스킬 | **제거** | 영어 커밋 포맷 → 한글 커밋 규칙과 충돌 |
+| `playwright-tester.agent.md` | TypeScript → **JavaScript** 수정 | 프로젝트 JS 사용 |
+| `ms-sql-dba.instructions.md` | applyTo: `**` → `**/*.sql,**/*.py` | 불필요한 로드 방지 |
+
+**컨텍스트 로드 변화:**
+- JS 작업 최악: 51.8KB → **5.0KB** (90% 감소)
+- SQL 작업: 43.5KB → **6.4KB** (85% 감소)
+- 항상 로드: 9.3KB → **5.0KB** (46% 감소)
+
+---
+
 ## 변경 이력 (v0.9.36 — 2026-04-29)
 
 ### v0.9.36 — #1. Data Preview 모달 추가
@@ -33,6 +123,52 @@
 
 **Before:** Generate & View CSV / Open Data in New Window / Save to SQL — 3개 버튼
 **After:** + 📊 Data Preview 버튼 추가 (fullCsvData 존재 시 활성화), 클릭 시 GroupIndex별 관계도 모달 표시
+
+---
+
+### v0.9.36 — #2. Data Preview 아이콘 및 메타정보 변경
+
+**문제:**
+- Power 아이콘(⚡)과 Intensity 아이콘(📐)이 직관적이지 않음
+- GroupIndex 헤더에서 해당 그룹의 주요 측정 파라미터(주파수, 파형, 사이클)를 즉시 확인 불가
+
+**해결 방식:**
+- Power 아이콘: ⚡ → ⚖️ (저울 모양)으로 변경
+- Intensity 아이콘: 📐 → 💧 (물방울 모양)으로 변경
+- GroupIndex 헤더 순서 변경: `Group N` → `Freq/WF/Cycle` → (오른쪽 정렬) `아이콘 배지` → `rows`
+
+**변경 파일:**
+
+| 파일 | 변경 |
+|------|------|
+| `frontend/src/components/DataPreviewModal.js` | 아이콘 변경 (typeConfig, summary bar, group badges), GroupIndex 메타정보 렌더링 추가 |
+| `frontend/src/globals.css` | `.dp-group-meta`, `.dp-meta-sep` 스타일 추가 |
+
+**Before:** `Group {N}` + 타입 배지 + 전체 rows 수만 표시
+**After:** `Group {N}` + 타입 배지 + `Freq: 값 | WF: 값 | Cycle: 값` + 전체 rows 수 표시
+
+---
+
+### v0.9.36 — #3. Data Preview 배지 위치 통일
+
+**문제:**
+- 그룹 헤더의 🌡️ Temperature, 🌡️SA, ⚖️ Power, 💧 Intensity 배지가 조건부 렌더링으로 인해 데이터가 없는 그룹에서는 배지가 생략되어 나머지 배지의 위치가 밀림
+- 그룹마다 아이콘 위치가 달라 시각적으로 정렬되지 않음
+
+**해결 방식:**
+- 4개 주요 배지(Temperature, Temperature SA, Power, Intensity)를 항상 렌더링
+- 데이터가 0개인 배지에 `.dp-badge-empty` 클래스 적용 (opacity: 0.3)
+- `.dp-badge`에 `min-width: 3rem; text-align: center` 추가하여 크기 일관성 확보
+
+**변경 파일:**
+
+| 파일 | 변경 |
+|------|------|
+| `frontend/src/components/DataPreviewModal.js` | 배지 조건부 렌더링 → 항상 렌더링 + `dp-badge-empty` 클래스 조건 추가 |
+| `frontend/src/globals.css` | `.dp-badge-empty` 스타일 추가, `.dp-badge`에 min-width/text-align 추가 |
+
+**Before:** 데이터 없는 타입의 배지가 생략되어 그룹마다 아이콘 위치가 다름
+**After:** 모든 배지가 항상 동일 위치에 표시, 0개 데이터는 흐리게(opacity 0.3) 처리
 
 ---
 

@@ -1,11 +1,13 @@
 from flask import Blueprint, request, jsonify, g, Response
-import os, io
+import os, io, json
+from io import StringIO
 from pathlib import Path
 from docx import Document
 from utils.decorators import handle_exceptions, require_auth, with_db_connection
 from utils.error_handler import error_response
 from utils.logger import logger
 import pandas as pd
+import numpy as np
 
 db_api_bp = Blueprint("db_api", __name__, url_prefix="/api")
 
@@ -20,10 +22,10 @@ def insert_sql_measset():
     records = data.get("data")
     if not table_name or not records:
         return error_response("Invalid data: table and data fields are required", 400)
+    allowed_insert_tables = ["meas_setting"]
+    if table_name not in allowed_insert_tables:
+        return error_response("유효하지 않은 테이블 이름입니다", 400)
     try:
-        import json
-        from io import StringIO
-
         json_str = json.dumps(records)
         df = pd.read_json(StringIO(json_str), orient="records")
     except Exception as e:
@@ -191,69 +193,62 @@ def get_table_data():
 @require_auth
 @with_db_connection()
 def run_tx_compare():
-    try:
-        if not request.is_json:
-            return error_response(
-                "요청 형식이 잘못되었습니다. JSON 형식이 필요합니다.", 400
-            )
-        data = request.get_json()
-        required_params = ["probeId", "TxSumSoftware", "wcsSoftware"]
-        missing_params = [param for param in required_params if not data.get(param)]
-        if missing_params:
-            return error_response(
-                f"필수 파라미터가 누락되었습니다: {', '.join(missing_params)}", 400
-            )
-        ssid_temp = data.get("measSSId_Temp")
-        ssid_mi = data.get("measSSId_MI")
-        ssid_ispta3 = data.get("measSSId_Ispta")
-        if not (ssid_temp or ssid_mi or ssid_ispta3):
-            return error_response(
-                "measSSId_Temp, measSSId_MI, measSSId_Ispta 중 적어도 하나는 입력해야 합니다.",
-                400,
-            )
-        probeid = int(float(data.get("probeId")))
-        tx_sw = data.get("TxSumSoftware")
-        wcs_sw = data.get("wcsSoftware")
-        ssid_temp = None if ssid_temp == "" or ssid_temp is None else ssid_temp
-        ssid_mi = None if ssid_mi == "" or ssid_mi is None else ssid_mi
-        ssid_ispta3 = None if ssid_ispta3 == "" or ssid_ispta3 is None else ssid_ispta3
-        logger.info(
-            f"TxCompare 실행 요청: probeId={probeid}, Tx_SW={tx_sw}, WCS_SW={wcs_sw}, SSid_Temp={ssid_temp}, SSid_MI={ssid_mi}, SSid_Ispta3={ssid_ispta3}"
+    if not request.is_json:
+        return error_response(
+            "요청 형식이 잘못되었습니다. JSON 형식이 필요합니다.", 400
         )
-        params = (probeid, tx_sw, wcs_sw, ssid_temp, ssid_mi, ssid_ispta3)
-        result_df = g.current_db.execute_procedure("TxCompare", params)
-        import numpy as np
+    data = request.get_json()
+    required_params = ["probeId", "TxSumSoftware", "wcsSoftware"]
+    missing_params = [param for param in required_params if not data.get(param)]
+    if missing_params:
+        return error_response(
+            f"필수 파라미터가 누락되었습니다: {', '.join(missing_params)}", 400
+        )
+    ssid_temp = data.get("measSSId_Temp")
+    ssid_mi = data.get("measSSId_MI")
+    ssid_ispta3 = data.get("measSSId_Ispta")
+    if not (ssid_temp or ssid_mi or ssid_ispta3):
+        return error_response(
+            "measSSId_Temp, measSSId_MI, measSSId_Ispta 중 적어도 하나는 입력해야 합니다.",
+            400,
+        )
+    probeid = int(float(data.get("probeId")))
+    tx_sw = data.get("TxSumSoftware")
+    wcs_sw = data.get("wcsSoftware")
+    ssid_temp = None if ssid_temp == "" or ssid_temp is None else ssid_temp
+    ssid_mi = None if ssid_mi == "" or ssid_mi is None else ssid_mi
+    ssid_ispta3 = None if ssid_ispta3 == "" or ssid_ispta3 is None else ssid_ispta3
+    logger.info(
+        f"TxCompare 실행 요청: probeId={probeid}, Tx_SW={tx_sw}, WCS_SW={wcs_sw}, SSid_Temp={ssid_temp}, SSid_MI={ssid_mi}, SSid_Ispta3={ssid_ispta3}"
+    )
+    params = (probeid, tx_sw, wcs_sw, ssid_temp, ssid_mi, ssid_ispta3)
+    result_df = g.current_db.execute_procedure("TxCompare", params)
 
-        result_df = result_df.replace({np.nan: None})
-        if result_df is None or result_df.empty:
-            return (
-                jsonify(
-                    {
-                        "status": "success",
-                        "message": "비교 보고서 데이터가 없습니다.",
-                        "reportData": [],
-                    }
-                ),
-                200,
-            )
-        report_data = result_df.to_dict(orient="records")
-        columns = list(result_df.columns)
+    result_df = result_df.replace({np.nan: None})
+    if result_df is None or result_df.empty:
         return (
             jsonify(
                 {
                     "status": "success",
-                    "message": "비교 보고서 데이터를 성공적으로 추출했습니다.",
-                    "reportData": report_data,
-                    "columns": columns,
+                    "message": "비교 보고서 데이터가 없습니다.",
+                    "reportData": [],
                 }
             ),
             200,
         )
-    except Exception as e:
-        logger.error(f"TxCompare 실행 중 오류 발생: {str(e)}", exc_info=True)
-        return error_response(
-            f"비교 보고서 데이터 추출 중 오류가 발생했습니다: {str(e)}", 500
-        )
+    report_data = result_df.to_dict(orient="records")
+    columns = list(result_df.columns)
+    return (
+        jsonify(
+            {
+                "status": "success",
+                "message": "비교 보고서 데이터를 성공적으로 추출했습니다.",
+                "reportData": report_data,
+                "columns": columns,
+            }
+        ),
+        200,
+    )
 
 
 @db_api_bp.route("/export_table_to_word", methods=["GET"])
@@ -323,8 +318,6 @@ def get_viewer_data():
     allowed_tables = [t.strip() for t in allowed_tables_raw.split(",") if t.strip()]
     if selected_table not in allowed_tables:
         return error_response("유효하지 않은 테이블 이름입니다", 400)
-
-    import numpy as np
 
     # IDENTITY 컬럼 탐지 → 최신 1000건 내림차순 정렬
     order_clause = ""

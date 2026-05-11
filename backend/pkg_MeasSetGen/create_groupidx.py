@@ -1,7 +1,7 @@
 import logging
 import pandas as pd
-from pkg_SQL.database import SQL
 from flask import session
+from utils.database_manager import get_db_connection
 
 # Pandas 다운캐스팅 옵션 설정
 pd.set_option("future.no_silent_downcasting", True)
@@ -18,19 +18,10 @@ class GroupIdx:
         self.probeId = probeId
         self.database = database
 
-        self.username = session.get("username")
-        self.password = session.get("password")
-
-        if not self.username or not self.password:
-            raise ValueError("User not authenticated")
-
     def getGroupIdx(self):
         ## 데이터베이스에서 마지막 groupIndex 값 load
         try:
-            connect = SQL(
-                username=self.username, password=self.password, database=self.database
-            )
-            # SQL 인젝션 방지: 파라미터화된 쿼리 사용
+            connect = get_db_connection(self.database)
             query = """
                 SELECT MAX(groupIndex) AS maxGroupIndex from meas_setting
                 where probeid = ?

@@ -337,8 +337,6 @@ def find_prr_for_temprise(
 
 
 ## ======== feature / target 분리 (TempRise 예측기) + one-hot encoding
-import pandas as pd
-import numpy as np
 
 
 def apply_one_hot_encoding(
@@ -349,8 +347,6 @@ def apply_one_hot_encoding(
 
 ## ===== 물리적 관계 feature 정의 =====
 def _add_physics_features(df: pd.DataFrame) -> pd.DataFrame:
-    import numpy as np
-
     out = df.copy()
 
     eps = 0.001

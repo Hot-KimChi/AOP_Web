@@ -16,17 +16,8 @@ def fetchData():
     if not username or not password:
         raise ValueError("세션에 사용자 인증 정보가 없습니다.")
 
-    # config 모듈을 통해 설정 로드
-    try:
-        from config import Config
-
-        Config.load_config()
-
-        server_address = os.environ.get("SERVER_ADDRESS_ADDRESS")
-        databases_ML = os.environ.get("DATABASE_ML_NAME")
-
-    except Exception as e:
-        logging.warning(f"Config 로드 중 오류 발생: {e}")
+    server_address = os.environ.get("SERVER_ADDRESS_ADDRESS")
+    databases_ML = os.environ.get("DATABASE_ML_NAME")
 
     if not all([server_address, databases_ML]):
         raise ValueError(

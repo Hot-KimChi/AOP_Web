@@ -6,11 +6,29 @@
 
 ---
 
+## 변경 이력 (v0.9.38 — 2026-05-12)
+
+| # | 요청 | 해결 | Detail |
+|---|------|------|--------|
+| 1 | 전체 프로젝트 코드 리뷰: 버그·보안·중복·가독성 개선 | Backend 8개 파일 + Frontend 1개 파일에서 11개 이슈 수정. 런타임 버그 2건, 보안 취약점 2건, 코드 품질 7건 해결 | [→ Detail](#v0938--1-전체-프로젝트-코드-리뷰) |
+
+---
+
+## 변경 이력 (v0.9.37 — 2026-05-11)
+
+| # | 요청 | 해결 | Detail |
+|---|------|------|--------|
+| 1 | awesome-copilot에서 프로젝트에 맞는 instructions/skills/agents 적용 및 최적화 | 설치 후 심층 감사: Instructions 6→3개, Skills 7→6개, Agents 5→4개로 정리. 컨텍스트 로드 51.8→5.0KB (90% 감소) | [→ Detail](#v0937--1-awesome-copilot-확장-설치) |
+
+---
+
 ## 변경 이력 (v0.9.36 — 2026-04-29)
 
 | # | 요청 | 해결 | Detail |
 |---|------|------|--------|
 | 1 | MeasSet Generation 페이지에 Data Preview 버튼 추가 — GroupIndex별 Temperature/Power/Intensity 데이터 관계도 시각화 | `DataPreviewModal` 컴포넌트 신규 생성, 아코디언 UI로 그룹별 데이터 구조 표시, 다크모드 지원 | [→ Detail](#v0936--1-data-preview-모달-추가) |
+| 2 | Data Preview 아이콘 변경 및 GroupIndex 메타정보 추가 | Power ⚡→⚖️, Intensity 📐→💧 아이콘 변경. GroupIndex 헤더에 Freq/WF/Cycle 정보 표시, 배지를 오른쪽 정렬 | [→ Detail](#v0936--2-data-preview-아이콘-및-메타정보-변경) |
+| 3 | Data Preview 아이콘 배지 위치 통일 | 그룹별로 데이터 유무에 따라 배지 위치가 밀리는 문제 수정. 모든 배지를 항상 표시하고 0일 때 흐리게 처리 | [→ Detail](#v0936--3-data-preview-배지-위치-통일) |
 
 ---
 

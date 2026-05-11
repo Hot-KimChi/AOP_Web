@@ -1,7 +1,7 @@
 import logging
 import pandas as pd
-from pkg_SQL.database import SQL
 import numpy as np
+import time
 from flask import session
 from pkg_MachineLearning.mlflow_integration import AOP_MLflowTracker
 from utils.database_manager import get_db_connection
@@ -165,8 +165,6 @@ class PredictML:
 
     def intensity_zt_est(self):
         ## predict zt by Machine Learning model.
-        import time
-
         start_time = time.time()
 
         estParams = self._paramForIntensity()

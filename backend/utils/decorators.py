@@ -1,5 +1,6 @@
 from functools import wraps
 from flask import request, g
+import os
 import jwt
 from config import Config
 from utils.database_manager import db_manager
@@ -50,6 +51,12 @@ def with_db_connection(database=None):
                     db_name = json_data["database"]
             if not db_name:
                 return error_response("No database specified", 400)
+            # DB 이름 allowlist 검증 (환경변수 DATABASE_NAME + MLflow DB)
+            allowed_dbs_raw = os.environ.get("DATABASE_NAME", "")
+            allowed_dbs = [d.strip() for d in allowed_dbs_raw.split(",") if d.strip()]
+            allowed_dbs.append("AOP_MLflow_Tracking")
+            if db_name not in allowed_dbs:
+                return error_response("유효하지 않은 데이터베이스입니다", 400)
             # CredentialsRequired가 발생하면 handle_exceptions에서 422로 처리
             g.current_db = db_manager.get_connection(db_name)
             return f(*args, **kwargs)

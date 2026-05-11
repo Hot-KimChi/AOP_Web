@@ -108,8 +108,8 @@ export default function DataPreviewModal({ isOpen, onClose, data }) {
   const typeConfig = {
     temperature:    { icon: '🌡️', label: 'Temperature',    cls: 'dp-type-temp' },
     temperature_sa: { icon: '🌡️', label: 'Temperature SA', cls: 'dp-type-tempsa' },
-    power:          { icon: '⚡',  label: 'Power',          cls: 'dp-type-power' },
-    intensity:      { icon: '📐', label: 'Intensity',      cls: 'dp-type-intensity' },
+    power:          { icon: '⚖️',  label: 'Power',          cls: 'dp-type-power' },
+    intensity:      { icon: '💧', label: 'Intensity',      cls: 'dp-type-intensity' },
     unknown:        { icon: '❓', label: 'Unknown',        cls: 'dp-type-unknown' },
   };
 
@@ -166,8 +166,8 @@ export default function DataPreviewModal({ isOpen, onClose, data }) {
         <div className="dp-summary">
           <span className="dp-summary-chip">전체 <strong>{summary.totalRows}</strong> rows</span>
           <span className="dp-summary-chip">그룹 <strong>{summary.totalGroups}</strong></span>
-          <span className="dp-summary-chip dp-chip-intensity">📐 Intensity <strong>{summary.intensity}</strong></span>
-          <span className="dp-summary-chip dp-chip-power">⚡ Power <strong>{summary.power}</strong></span>
+          <span className="dp-summary-chip dp-chip-intensity">💧 Intensity <strong>{summary.intensity}</strong></span>
+          <span className="dp-summary-chip dp-chip-power">⚖️ Power <strong>{summary.power}</strong></span>
           <span className="dp-summary-chip dp-chip-temp">🌡️ Temp <strong>{summary.temperature}</strong></span>
           {summary.temperature_sa > 0 && (
             <span className="dp-summary-chip dp-chip-tempsa">🌡️ SA <strong>{summary.temperature_sa}</strong></span>
@@ -202,11 +202,28 @@ export default function DataPreviewModal({ isOpen, onClose, data }) {
                 <div className="dp-group-header" onClick={() => toggleGroup(gKey)}>
                   <span className="dp-expand-icon">{isExpanded ? '▼' : '▶'}</span>
                   <strong className="dp-group-label">Group {gKey}</strong>
+                  {(() => {
+                    const allRows = [...g.temperature, ...g.temperature_sa, ...g.power, ...g.intensity, ...g.unknown];
+                    const firstRow = allRows[0];
+                    if (!firstRow) return null;
+                    const freq = col(firstRow, 'TxFrequencyHz');
+                    const wf = col(firstRow, 'TxpgWaveformStyle', 'txpgWaveformStyle');
+                    const cycle = col(firstRow, 'numTxCycles', 'ProbeNumTxCycles', 'TxCycles');
+                    return (
+                      <span className="dp-group-meta">
+                        Freq: <strong>{freq}</strong>
+                        <span className="dp-meta-sep">|</span>
+                        WF: <strong>{wf}</strong>
+                        <span className="dp-meta-sep">|</span>
+                        Cycle: <strong>{cycle}</strong>
+                      </span>
+                    );
+                  })()}
                   <span className="dp-group-badges">
-                    {g.temperature.length > 0 && <span className="dp-badge dp-badge-temp">🌡️ {g.temperature.length}</span>}
-                    {g.temperature_sa.length > 0 && <span className="dp-badge dp-badge-tempsa">🌡️SA {g.temperature_sa.length}</span>}
-                    {g.power.length > 0 && <span className="dp-badge dp-badge-power">⚡ {g.power.length}</span>}
-                    <span className="dp-badge dp-badge-intensity">📐 {g.intensity.length}</span>
+                    <span className={`dp-badge dp-badge-temp${g.temperature.length === 0 ? ' dp-badge-empty' : ''}`}>🌡️ {g.temperature.length}</span>
+                    <span className={`dp-badge dp-badge-tempsa${g.temperature_sa.length === 0 ? ' dp-badge-empty' : ''}`}>🌡️SA {g.temperature_sa.length}</span>
+                    <span className={`dp-badge dp-badge-power${g.power.length === 0 ? ' dp-badge-empty' : ''}`}>⚖️ {g.power.length}</span>
+                    <span className={`dp-badge dp-badge-intensity${g.intensity.length === 0 ? ' dp-badge-empty' : ''}`}>💧 {g.intensity.length}</span>
                     {g.unknown.length > 0 && <span className="dp-badge dp-badge-unknown">❓ {g.unknown.length}</span>}
                   </span>
                   <span className="dp-group-total">{total} rows</span>
