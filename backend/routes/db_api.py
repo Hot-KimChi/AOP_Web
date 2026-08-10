@@ -336,51 +336,6 @@ def export_table_to_word():
     )
 
 
-@db_api_bp.route("/run_tx_compare", methods=["POST"])
-@handle_exceptions
-@require_auth
-@with_db_connection()
-def run_tx_compare():
-    """TX Comparison: DB에서 조건에 맞는 TX Summary 행들을 추출하고 비교"""
-    data = request.get_json()
-    required_params = ["probeId", "TxSumSoftware", "wcsSoftware"]
-    if not all(data.get(p) for p in required_params):
-        return error_response("Missing required parameters", 400)
-    
-    probe_id = data.get("probeId")
-    tx_sw = data.get("TxSumSoftware")
-    wcs_sw = data.get("wcsSoftware")
-    
-    selected_database = data.get("database", os.environ.get("SERVER_NAME_DB", "AOP_DB"))
-    try:
-        # Mode='M'인 행들의 combined_mode를 자동 계산으로 보정하는 UPDATE
-        # (사용자가 명시적으로 설정하지 않아도 일관성 유지)
-        update_sql = (
-            f"UPDATE [{selected_database}].[dbo].[Tx_summary] "
-            "SET combined_mode = CASE "
-            "  WHEN Mode = 'M' THEN 1 "
-            "  ELSE 0 "
-            "END "
-            "WHERE ProbeID = ? AND Mode = 'M'"
-        )
-        g.current_db.execute_query(update_sql, params=(probe_id,))
-        
-        # TX Summary 추출
-        query = (
-            f"SELECT * FROM [{selected_database}].[dbo].[Tx_summary] "
-            "WHERE ProbeID = ? AND Software_version = ?"
-        )
-        df = g.current_db.execute_query(query, params=(probe_id, tx_sw))
-        
-        if df is None or df.empty:
-            return jsonify({"status": "error", "message": "No TX Summary found"}), 404
-        
-        return jsonify({"status": "success", "data": df.to_dict(orient="records")})
-    except Exception as e:
-        logger.error(f"TX compare error: {str(e)}", exc_info=True)
-        return error_response(str(e), 500)
-
-
 @db_api_bp.route("/upload_tx_summary", methods=["POST"])
 @handle_exceptions
 @require_auth

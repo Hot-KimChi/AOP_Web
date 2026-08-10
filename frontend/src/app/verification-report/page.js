@@ -579,18 +579,76 @@ export default function VerificationReport() {
           </div>
           <div className="card-body" style={{ padding: '1.25rem' }}>
             <div className="row g-3">
-              <div className="col-md-12">
-                <label htmlFor="fileInput" className="form-label">Input File</label>
-                <input type="file" id="fileInput" className="form-control" onChange={handleFileChange} disabled={isLoading} />
+              <div className="col-md-3">
+                <label htmlFor="txDBSelect" className="form-label">Database</label>
+                <select
+                  id="txDBSelect"
+                  className="form-select"
+                  value={selectedDatabase}
+                  onChange={(e) => {
+                    setSelectedDatabase(e.target.value);
+                    setSelectedProbe('');
+                    setSelectedSoftware('');
+                  }}
+                  disabled={isLoading}
+                >
+                  <option value="">Select database…</option>
+                  {DBList.map((db, i) => <option key={i} value={db}>{db}</option>)}
+                </select>
               </div>
+
+              <div className="col-md-3">
+                <label htmlFor="txProbeSelect" className="form-label">Probe</label>
+                <select
+                  id="txProbeSelect"
+                  className="form-select"
+                  value={selectedProbe}
+                  onChange={(e) => {
+                    setSelectedProbe(e.target.value);
+                    setSelectedSoftware('');
+                  }}
+                  disabled={isLoading || !selectedDatabase}
+                >
+                  <option value="">Select probe…</option>
+                  {probeList.map((probe) => (
+                    <option key={probe._id} value={probe.probeId}>
+                      {probe.probeName} ({Number(probe.probeId).toString()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="col-md-3">
+                <label htmlFor="txSoftwareSelect" className="form-label">TX Software</label>
+                <select
+                  id="txSoftwareSelect"
+                  className="form-select"
+                  value={selectedTxSW}
+                  onChange={(e) => setSelectedSoftware(e.target.value)}
+                  disabled={isLoading || !selectedProbe || filteredSoftwareList.length === 0}
+                >
+                  <option value="">Select TX Software…</option>
+                  {filteredSoftwareList.map((sw) => (
+                    <option key={sw._id} value={sw.softwareVersion}>
+                      {sw.softwareVersion}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="col-md-3">
+                <label htmlFor="txFileInput" className="form-label">Input File</label>
+                <input type="file" id="txFileInput" className="form-control" onChange={handleFileChange} disabled={isLoading} />
+              </div>
+
               <div className="col-md-12">
                 <button
                   className="btn w-100"
                   style={{ background: '#6366f1', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                   onClick={parsingTxSum}
-                  disabled={!selectedDatabase || !selectedProbe || (!selectedTxSW && hasSoftwareData) || isLoading}
+                  disabled={!selectedDatabase || !selectedProbe || !selectedTxSW || !file || isLoading}
                 >
-                  {isLoading ? 'Processing…' : '📥 Extract Summary Table'}
+                  {isLoading ? 'Processing…' : '📥 Upload TX Summary to DB'}
                 </button>
               </div>
             </div>
