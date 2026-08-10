@@ -11,6 +11,41 @@ import numpy as np
 
 db_api_bp = Blueprint("db_api", __name__, url_prefix="/api")
 
+# (database, table) -> {소문자 컬럼명: 실제 컬럼명}. 스키마는 런타임 중 바뀌지 않으므로
+# 요청마다 INFORMATION_SCHEMA를 조회하는 왕복 비용을 제거한다.
+_COLUMN_CACHE: dict = {}
+
+
+def _get_column_lookup(database: str, table: str) -> dict:
+    cache_key = (database, table)
+    cached = _COLUMN_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    schema_df = g.current_db.execute_query(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?",
+        params=(table,),
+    )
+    actual_columns = (
+        [str(c) for c in schema_df["COLUMN_NAME"].tolist()]
+        if schema_df is not None and not schema_df.empty
+        else []
+    )
+    lookup = {c.strip().lower(): c for c in actual_columns}
+    if lookup:
+        _COLUMN_CACHE[cache_key] = lookup
+    return lookup
+
+
+def compute_combined_mode(mode: str) -> int:
+    """Mode 문자열을 기준으로 combined_mode 계산 (0 또는 1)"""
+    if not mode:
+        return 0
+    mode_str = str(mode).strip().upper()
+    # Mode='M' (또는 'M*') → combined_mode=1, 나머지는 0
+    if mode_str == 'M' or mode_str.startswith('M'):
+        return 1
+    return 0
+
 
 @db_api_bp.route("/insert-sql", methods=["POST"])
 @handle_exceptions
@@ -299,6 +334,125 @@ def export_table_to_word():
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+@db_api_bp.route("/run_tx_compare", methods=["POST"])
+@handle_exceptions
+@require_auth
+@with_db_connection()
+def run_tx_compare():
+    """TX Comparison: DB에서 조건에 맞는 TX Summary 행들을 추출하고 비교"""
+    data = request.get_json()
+    required_params = ["probeId", "TxSumSoftware", "wcsSoftware"]
+    if not all(data.get(p) for p in required_params):
+        return error_response("Missing required parameters", 400)
+    
+    probe_id = data.get("probeId")
+    tx_sw = data.get("TxSumSoftware")
+    wcs_sw = data.get("wcsSoftware")
+    
+    selected_database = data.get("database", os.environ.get("SERVER_NAME_DB", "AOP_DB"))
+    try:
+        # Mode='M'인 행들의 combined_mode를 자동 계산으로 보정하는 UPDATE
+        # (사용자가 명시적으로 설정하지 않아도 일관성 유지)
+        update_sql = (
+            f"UPDATE [{selected_database}].[dbo].[Tx_summary] "
+            "SET combined_mode = CASE "
+            "  WHEN Mode = 'M' THEN 1 "
+            "  ELSE 0 "
+            "END "
+            "WHERE ProbeID = ? AND Mode = 'M'"
+        )
+        g.current_db.execute_query(update_sql, params=(probe_id,))
+        
+        # TX Summary 추출
+        query = (
+            f"SELECT * FROM [{selected_database}].[dbo].[Tx_summary] "
+            "WHERE ProbeID = ? AND Software_version = ?"
+        )
+        df = g.current_db.execute_query(query, params=(probe_id, tx_sw))
+        
+        if df is None or df.empty:
+            return jsonify({"status": "error", "message": "No TX Summary found"}), 404
+        
+        return jsonify({"status": "success", "data": df.to_dict(orient="records")})
+    except Exception as e:
+        logger.error(f"TX compare error: {str(e)}", exc_info=True)
+        return error_response(str(e), 500)
+
+
+@db_api_bp.route("/upload_tx_summary", methods=["POST"])
+@handle_exceptions
+@require_auth
+@with_db_connection()
+def upload_tx_summary():
+    """TX Summary CSV 파일을 DB의 Tx_summary 테이블에 업로드"""
+    if "file" not in request.files:
+        return error_response("No file provided", 400)
+    
+    file = request.files["file"]
+    if not file.filename.endswith('.csv'):
+        return error_response("Only CSV files are allowed", 400)
+    
+    selected_database = request.form.get("database", os.environ.get("SERVER_NAME_DB", "AOP_DB"))
+    
+    try:
+        # CSV 읽기
+        content = file.read().decode('utf-8')
+        df = pd.read_csv(StringIO(content))
+        
+        if df.empty:
+            return error_response("CSV file is empty", 400)
+        
+        # 1. 빈 헤더 사전 제거 (trailing delimiter 때문에 빈 컬럼 생성 가능)
+        valid_header_indexes = [i for i, col in enumerate(df.columns) if str(col).strip()]
+        df = df.iloc[:, valid_header_indexes]
+        
+        # 2. DB 스키마 조회 및 컬럼 매칭
+        column_lookup = _get_column_lookup(selected_database, "Tx_summary")
+        
+        # 3. CSV 컬럼을 DB 스키마와 매칭, 없는 컬럼은 제외
+        df_normalized = pd.DataFrame()
+        excluded_cols = []
+        
+        for csv_col in df.columns:
+            normalized_col = csv_col.strip().lower()
+            if normalized_col in column_lookup:
+                # DB의 실제 컬럼명 사용
+                db_col = column_lookup[normalized_col]
+                df_normalized[db_col] = df[csv_col]
+            else:
+                excluded_cols.append(csv_col)
+                logger.warning(f"Column excluded (not in DB schema): {csv_col}")
+        
+        if excluded_cols:
+            logger.warning(f"Excluded {len(excluded_cols)} columns not in DB schema")
+        
+        if df_normalized.empty:
+            return error_response("No valid columns after schema matching", 400)
+        
+        # 4. IsProcessed를 1로 강제 설정
+        for idx in range(len(df_normalized)):
+            row = df_normalized.iloc[idx].to_dict()
+            row["IsProcessed"] = 1
+            df_normalized.iloc[idx] = pd.Series(row)
+        
+        # 5. Mode에 따라 combined_mode 자동 계산
+        if "Mode" in df_normalized.columns:
+            df_normalized["combined_mode"] = df_normalized["Mode"].apply(compute_combined_mode)
+        
+        # 6. numpy 타입 변환 후 DB에 삽입
+        for col in df_normalized.columns:
+            df_normalized[col] = df_normalized[col].apply(
+                lambda x: x.item() if isinstance(x, (np.integer, np.floating)) else x
+            )
+        
+        g.current_db.insert_data("Tx_summary", df_normalized)
+        return jsonify({"status": "success", "message": f"Uploaded {len(df_normalized)} rows"}), 200
+        
+    except Exception as e:
+        logger.error(f"TX Summary upload error: {str(e)}", exc_info=True)
+        return error_response(f"TX Summary 업로드 실패: {str(e)}", 500)
 
 
 @db_api_bp.route("/get_viewer_data", methods=["GET"])

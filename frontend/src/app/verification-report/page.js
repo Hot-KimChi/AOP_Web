@@ -3,6 +3,17 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 
+// v0.9.49: Mode 기준 combined_mode 계산 함수
+function computeCombinedMode(mode) {
+  if (!mode) return 0;
+  const modeStr = String(mode).trim().toUpperCase();
+  // Mode='M' 또는 'M*' → combined_mode=1, 나머지는 0
+  if (modeStr === 'M' || modeStr.startsWith('M')) {
+    return 1;
+  }
+  return 0;
+}
+
 export default function VerificationReport() {
   // 기본 상태 변수 선언
   const [probeList, setProbeList] = useState([]);                       // 프로브 목록
@@ -132,11 +143,19 @@ export default function VerificationReport() {
       
       setProbeList(data.probes || []);
       setSoftwareList(data.software || []);
-      setProbeSoftwareMapping(data.mapping || {});
+      
+      // v0.9.46: 매핑률 계산에서 TxsummaryID 제외
+      const mapping = data.mapping || {};
+      const filteredMapping = {};
+      for (const probeId in mapping) {
+        filteredMapping[probeId] = (mapping[probeId] || []).filter(item => item.softwareVersion);
+      }
+      
+      setProbeSoftwareMapping(filteredMapping);
       setHasSoftwareData(data.hasSoftwareData);
       
-      if (selectedProbe && data.mapping && data.mapping[selectedProbe]) {
-        const softwareForProbe = data.mapping[selectedProbe] || [];
+      if (selectedProbe && filteredMapping && filteredMapping[selectedProbe]) {
+        const softwareForProbe = filteredMapping[selectedProbe] || [];
         const softwareVersions = softwareForProbe.map(item => item.softwareVersion);
         const filteredSoftware = (data.software || []).filter(sw => 
           softwareVersions.includes(sw.softwareVersion)
