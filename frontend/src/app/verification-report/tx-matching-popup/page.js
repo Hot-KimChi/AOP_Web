@@ -2,98 +2,123 @@
 
 import { useEffect, useState, Suspense } from 'react';
 
-const C = {
+/* ─── 스타일 상수 ─── */
+const HDR_BG  = '#1e3a5f';
+const BORDER  = '#d1d5db';
+const ROW_ODD = '#f9fafb';
+
+const S = {
   page: {
-    fontFamily: "'Segoe UI', system-ui, sans-serif",
+    fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
     background: '#f0f4f8',
     minHeight: '100vh',
-    padding: 16,
+    padding: '12px 16px',
+    boxSizing: 'border-box',
   },
-  card: {
+  /* ─ 상단 요약 바 ─ */
+  summaryBar: {
     background: '#fff',
-    borderRadius: 10,
-    padding: '14px 20px',
-    marginBottom: 14,
-    boxShadow: '0 1px 6px rgba(0,0,0,.1)',
+    borderRadius: 8,
+    padding: '10px 18px',
+    marginBottom: 12,
+    boxShadow: '0 1px 4px rgba(0,0,0,.1)',
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 14,
+    gap: 6,
+    rowGap: 6,
   },
-  title: { fontSize: 17, fontWeight: 700, margin: 0, color: '#1e293b' },
-  info:  { fontSize: 13, color: '#475569' },
-  badges: { marginLeft: 'auto', display: 'flex', gap: 8 },
-  badge: (t) => {
-    const m = { neutral:['#e2e8f0','#334155'], success:['#dcfce7','#166534'], danger:['#fee2e2','#991b1b'] };
-    const [bg, color] = m[t] || m.neutral;
-    return { padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: bg, color };
+  pageTitle: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: '#1e293b',
+    marginRight: 10,
+    whiteSpace: 'nowrap',
   },
-  msg: { width:'100%', fontSize:12, color:'#64748b', marginTop:4 },
-  wrap: {
+  divider: { color: '#cbd5e1', fontSize: 14 },
+  metaItem: { fontSize: 13, color: '#475569', whiteSpace: 'nowrap' },
+  metaVal:  { fontWeight: 700, color: '#1e293b' },
+  chip: (type) => {
+    const map = {
+      total:   ['#e2e8f0', '#334155'],
+      rate:    ['#dbeafe', '#1d4ed8'],
+      success: ['#dcfce7', '#166534'],
+      danger:  ['#fee2e2', '#991b1b'],
+    };
+    const [bg, color] = map[type] || map.total;
+    return {
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '3px 10px', borderRadius: 20,
+      fontSize: 12, fontWeight: 600,
+      background: bg, color,
+      whiteSpace: 'nowrap',
+    };
+  },
+  /* ─ 테이블 래퍼 ─ */
+  tableWrap: {
+    background: '#fff',
+    borderRadius: 8,
+    boxShadow: '0 1px 4px rgba(0,0,0,.1)',
     overflowX: 'auto',
     overflowY: 'auto',
-    maxHeight: 'calc(100vh - 150px)',
-    borderRadius: 10,
-    boxShadow: '0 1px 6px rgba(0,0,0,.1)',
-    background: '#fff',
+    maxHeight: 'calc(100vh - 110px)',
   },
-  table: { borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: 13 },
-  /* 헤더: 파라미터명 행 */
+  table: {
+    borderCollapse: 'collapse',
+    width: '100%',
+    fontSize: 12,
+    tableLayout: 'auto',
+  },
+  /* 헤더: 파라미터명 */
   th: {
-    position: 'sticky', top: 0,
-    background: '#1e3a5f', color: '#fff',
-    padding: '9px 12px',
-    textAlign: 'center', whiteSpace: 'nowrap',
-    borderRight: '1px solid rgba(255,255,255,.15)',
-    fontWeight: 600, zIndex: 10, minWidth: 100,
-  },
-  thMode: {
-    position: 'sticky', top: 0, left: 0,
-    background: '#1e3a5f', color: '#fff',
-    padding: '9px 16px',
+    position: 'sticky', top: 0, zIndex: 10,
+    background: HDR_BG, color: '#fff',
+    padding: '8px 10px',
     textAlign: 'center',
-    borderRight: '2px solid rgba(255,255,255,.3)',
-    fontWeight: 600, zIndex: 20, minWidth: 70,
+    whiteSpace: 'nowrap',
+    border: `1px solid rgba(255,255,255,.15)`,
+    fontWeight: 600,
+    fontSize: 12,
+    minWidth: 90,
   },
-  /* 데이터 행 */
-  tdMode: {
-    position: 'sticky', left: 0,
-    background: '#f1f5f9',
-    fontWeight: 700, fontSize: 14,
-    padding: '10px 16px',
+  /* 데이터 셀 */
+  td: (hasData, rowIdx) => ({
+    padding: '7px 10px',
     textAlign: 'center',
-    borderRight: '2px solid #e2e8f0',
-    borderBottom: '1px solid #e2e8f0',
-    color: '#1e293b', zIndex: 5,
-  },
-  td: (hasData) => ({
-    padding: '10px 12px',
-    textAlign: 'center',
-    borderRight: '1px solid #e2e8f0',
-    borderBottom: '1px solid #e2e8f0',
-    background: hasData ? 'rgba(16,185,129,.05)' : 'rgba(239,68,68,.05)',
-    color: hasData ? '#1e293b' : '#ef4444',
+    border: `1px solid ${BORDER}`,
+    background: hasData
+      ? (rowIdx % 2 === 0 ? '#fff' : ROW_ODD)
+      : (rowIdx % 2 === 0 ? 'rgba(239,68,68,.06)' : 'rgba(239,68,68,.10)'),
+    color: hasData ? '#1e293b' : '#dc2626',
     fontWeight: hasData ? 400 : 700,
-    fontSize: hasData ? 13 : 15,
-    minWidth: 100,
+    fontSize: hasData ? 12 : 13,
+    whiteSpace: 'nowrap',
   }),
+  /* 범례 */
+  legend: {
+    marginTop: 8, fontSize: 11, color: '#94a3b8',
+    display: 'flex', gap: 16, flexWrap: 'wrap',
+  },
 };
 
+/* ─── 메인 컴포넌트 ─── */
 function TxMatchingContent() {
-  const [pivot, setPivot] = useState(null);
-  const [meta, setMeta]   = useState(null);
+  const [pivot,    setPivot]    = useState(null);
+  const [meta,     setMeta]     = useState(null);
   const [fallback, setFallback] = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
 
   useEffect(() => {
     try {
       const sp  = new URLSearchParams(window.location.search);
       const key = sp.get('storageKey');
       if (!key) { setError('storageKey 없음'); return; }
+
       const pRaw = sessionStorage.getItem(`${key}_pivot`);
       const mRaw = sessionStorage.getItem(`${key}_meta`);
       const fRaw = sessionStorage.getItem(key);
+
       if (pRaw) setPivot(JSON.parse(pRaw));
       if (mRaw) setMeta(JSON.parse(mRaw));
       if (!pRaw && fRaw) setFallback(JSON.parse(fRaw));
@@ -106,62 +131,83 @@ function TxMatchingContent() {
   }, []);
 
   if (loading) return (
-    <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh' }}>
-      <div className="spinner-border text-primary" role="status" />
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <span style={{ color: '#64748b', fontSize: 14 }}>불러오는 중…</span>
     </div>
   );
-  if (error) return <div className="alert alert-danger m-3">{error}</div>;
+  if (error) return (
+    <div style={{ margin: 24, padding: 16, background: '#fee2e2', borderRadius: 8, color: '#991b1b', fontSize: 13 }}>
+      {error}
+    </div>
+  );
 
-  /* ── 피벗 테이블: 파라미터명 1행 + 데이터 행 ── */
+  /* ────────────── 피벗 테이블 뷰 ────────────── */
   if (pivot) {
-    const { modes, params, rows } = pivot;
-    return (
-      <div style={C.page}>
+    const { params, rows } = pivot;
 
-        {/* 요약 카드 */}
-        <div style={C.card}>
-          <span style={C.title}>Tx Summary Parameter Matching</span>
+    /* 매칭률 계산: TxSummaryID 제외 */
+    const SKIP = new Set(['TxSummaryID']);
+    const calcParams = params.filter(p => !SKIP.has(p));
+
+    let totalCells = 0, matchedCells = 0;
+    rows.forEach(row => {
+      calcParams.forEach(p => {
+        totalCells++;
+        const cell = row[p];
+        if (cell && cell.fileValue !== '—' && cell.fileValue !== '') matchedCells++;
+      });
+    });
+    const matchRate = totalCells > 0 ? Math.round((matchedCells / totalCells) * 100) : 0;
+    const paramCount = calcParams.length;   // 파라미터 개수 (TxSummaryID 제외)
+
+    return (
+      <div style={S.page}>
+
+        {/* ── 상단 요약 바 ── */}
+        <div style={S.summaryBar}>
+          <span style={S.pageTitle}>Tx Summary Parameter Matching</span>
+          <span style={S.divider}>|</span>
+
+          <span style={S.chip('total')}>
+            총 {paramCount}개 parameter
+          </span>
+
+          <span style={S.chip(matchRate >= 80 ? 'success' : matchRate >= 50 ? 'rate' : 'danger')}>
+            매칭률 {matchRate}%
+          </span>
+
           {meta && (
             <>
-              <span style={C.info}>
-                ProbeID: <strong>{meta.selectedProbeId}</strong>
-                &nbsp;|&nbsp;SW: <strong>{meta.selectedSoftwareVersion}</strong>
+              <span style={S.divider}>|</span>
+              <span style={S.metaItem}>
+                선택한 ProbeID: <strong style={S.metaVal}>{meta.selectedProbeId || '—'}</strong>
               </span>
-              <div style={C.badges}>
-                <span style={C.badge('neutral')}>총 {meta.totalCount}</span>
-                <span style={C.badge('success')}>✓ {meta.matchCount}</span>
-                <span style={C.badge(meta.mismatchCount > 0 ? 'danger' : 'neutral')}>
-                  ✗ {meta.mismatchCount}
-                </span>
-              </div>
-              {meta.message && <p style={C.msg}>{meta.message}</p>}
+              <span style={S.divider}>|</span>
+              <span style={S.metaItem}>
+                선택한 SW version: <strong style={S.metaVal}>{meta.selectedSoftwareVersion || '—'}</strong>
+              </span>
             </>
           )}
         </div>
 
-        {/* 테이블: 1행=파라미터명, 이후=실제 데이터 */}
-        <div style={C.wrap}>
-          <table style={C.table}>
+        {/* ── 테이블: 헤더=파라미터명, 행=실제 데이터 ── */}
+        <div style={S.tableWrap}>
+          <table style={S.table}>
             <thead>
               <tr>
-                {/* 1행: 파라미터명 헤더 */}
-                <th style={C.thMode}>Mode</th>
                 {params.map(p => (
-                  <th key={p} style={C.th}>{p}</th>
+                  <th key={p} style={S.th}>{p}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.Mode}>
-                  {/* Mode 열 */}
-                  <td style={C.tdMode}>{row.Mode || '—'}</td>
-                  {/* 각 파라미터 셀: 실제 파일 데이터 또는 X */}
+              {rows.map((row, rowIdx) => (
+                <tr key={row.Mode ?? rowIdx}>
                   {params.map(p => {
-                    const cell = row[p] || { match: 'X', fileValue: '—', dbValue: '—' };
-                    const hasData = cell.fileValue !== '—' && cell.fileValue !== '';
+                    const cell = row[p] || { fileValue: '—' };
+                    const hasData = cell.fileValue !== '—' && cell.fileValue !== '' && cell.fileValue != null;
                     return (
-                      <td key={p} style={C.td(hasData)}>
+                      <td key={p} style={S.td(hasData, rowIdx)}>
                         {hasData ? cell.fileValue : 'X'}
                       </td>
                     );
@@ -172,35 +218,33 @@ function TxMatchingContent() {
           </table>
         </div>
 
-        {/* 범례 */}
-        <div style={{ marginTop: 10, fontSize: 11, color: '#94a3b8', display: 'flex', gap: 16 }}>
-          <span style={{ color: '#ef4444', fontWeight: 700 }}>X</span>
-          <span>= 파일에 데이터 없음 또는 매핑 불가</span>
-          <span style={{ color: '#10b981', fontWeight: 600, marginLeft: 8 }}>초록 셀</span>
-          <span>= 데이터 존재</span>
+        {/* ── 범례 ── */}
+        <div style={S.legend}>
+          <span><span style={{ color: '#dc2626', fontWeight: 700 }}>X</span> = 파일에 데이터 없음 또는 매핑 불가</span>
+          <span style={{ color: '#16a34a' }}>초록/흰 셀 = 데이터 존재</span>
         </div>
       </div>
     );
   }
 
-  /* ── 폴백 ── */
+  /* ────────────── 폴백 뷰 ────────────── */
   if (fallback && fallback.length > 0) {
     const cols = Object.keys(fallback[0]);
     return (
-      <div style={C.page}>
-        <div style={C.card}>
-          <span style={C.title}>Tx Summary Parameter Matching</span>
+      <div style={S.page}>
+        <div style={S.summaryBar}>
+          <span style={S.pageTitle}>Tx Summary Parameter Matching</span>
         </div>
-        <div style={C.wrap}>
-          <table style={C.table}>
+        <div style={S.tableWrap}>
+          <table style={S.table}>
             <thead>
-              <tr>{cols.map(c => <th key={c} style={C.th}>{c}</th>)}</tr>
+              <tr>{cols.map(c => <th key={c} style={S.th}>{c}</th>)}</tr>
             </thead>
             <tbody>
               {fallback.map((r, i) => (
                 <tr key={i}>
                   {cols.map(c => (
-                    <td key={c} style={{ ...C.td(true), textAlign: 'left', padding: '8px 12px' }}>
+                    <td key={c} style={{ ...S.td(true, i), textAlign: 'left' }}>
                       {String(r[c] ?? '—')}
                     </td>
                   ))}
@@ -213,14 +257,18 @@ function TxMatchingContent() {
     );
   }
 
-  return <div style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}>표시할 데이터가 없습니다.</div>;
+  return (
+    <div style={{ textAlign: 'center', padding: 64, color: '#94a3b8', fontSize: 14 }}>
+      표시할 데이터가 없습니다.
+    </div>
+  );
 }
 
 export default function TxMatchingPopup() {
   return (
     <Suspense fallback={
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <div className="spinner-border text-primary" role="status" />
+        <span style={{ color: '#64748b', fontSize: 14 }}>불러오는 중…</span>
       </div>
     }>
       <TxMatchingContent />

@@ -262,13 +262,17 @@ export default function VerificationReport() {
     const storageKey = `txValidation_${Date.now()}`;
 
     if (comparisonRows) {
-      // 피벗 구조 생성: 행=Mode, 열=Parameter
+      // 피벗 구조 생성: 행=Mode, 열=Parameter (Mode 컬럼을 첫 번째로 포함)
       const modes = [...new Set(comparisonRows.map(r => r.Mode))].sort();
-      const params = [...new Set(comparisonRows.map(r => r.Parameter))];
+      const paramNames = [...new Set(comparisonRows.map(r => r.Parameter))];
+      // 헤더: Mode를 첫 컬럼으로 포함
+      const params = ['Mode', ...paramNames];
 
       const pivotRows = modes.map(mode => {
-        const row = { Mode: mode };
-        params.forEach(param => {
+        const row = {};
+        // Mode 셀
+        row['Mode'] = { fileValue: mode, match: 'O' };
+        paramNames.forEach(param => {
           const found = comparisonRows.find(r => r.Mode === mode && r.Parameter === param);
           row[param] = found
             ? { match: found.Match, fileValue: found.FileValue, dbValue: found.DBValue }
