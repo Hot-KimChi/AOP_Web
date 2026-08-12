@@ -312,27 +312,16 @@ export default function VerificationReport() {
     return ok;
   };
 
-  const handleTxFileChange = async (event) => {
+  const handleTxFileChange = (event) => {
     const selectedFile = event.target.files?.[0] || null;
     setTxFile(selectedFile);
     setTxValidationMessage('');
     setTxValidationOk(false);
     setTxError('');
-    if (!selectedFile) {
-      return;
-    }
-    if (!txDatabase || !txProbe || !txSoftwareVersion) {
+    if (selectedFile && (!txDatabase || !txProbe || !txSoftwareVersion)) {
       setTxValidationMessage('파일이 선택되었습니다. Database/Probe/Software version 선택 후 자동 검증됩니다.');
-      return;
     }
-    try {
-      setTxLoading(true);
-      await validateTxFile(selectedFile, txDatabase, txProbe, txSoftwareVersion);
-    } catch (err) {
-      setTxError(err.message || '파일 검증 실패');
-    } finally {
-      setTxLoading(false);
-    }
+    // 실제 검증/매칭 팝업은 아래 useEffect가 단독으로 담당한다(팝업 중복 방지).
   };
 
   useEffect(() => {
@@ -357,13 +346,13 @@ export default function VerificationReport() {
       alert('Database, Probe, Software version, Input file을 모두 선택하세요.');
       return;
     }
+    if (!txValidationOk) {
+      alert('파일 파라미터 검증이 완료되지 않았습니다. 검증 결과를 확인하세요.');
+      return;
+    }
     setTxLoading(true);
     setTxError('');
     try {
-      const validationOk = await validateTxFile(txFile, txDatabase, txProbe, txSoftwareVersion);
-      if (!validationOk) {
-        throw new Error('파일 파라미터 검증이 완료되지 않았습니다. 검증 결과를 확인하세요.');
-      }
       const formData = new FormData();
       formData.append('file', txFile);
       formData.append('database', txDatabase);

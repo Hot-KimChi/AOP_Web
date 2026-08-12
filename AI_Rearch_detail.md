@@ -28,6 +28,61 @@
 
 ---
 
+### v0.9.51 — #2. Input file 매칭 팝업 흐름 복구
+
+**요청:** Tx Summary Input에서 Input file 선택 시 출력되는 매칭 팝업창을 이전 상태로 복구. 다른 부분은 변경 금지.
+
+**대상 파일:** `frontend/src/app/verification-report/page.js` (단일 파일, 7 insertions / 18 deletions)
+
+**히스토리 분석:**
+
+| 커밋 | 내용 |
+|------|------|
+| `79a6055` | **원래 흐름** — 파일 선택 시 검증 → 매칭 팝업(`Tx Summary Parameter Matching`) 출력. 업로드는 `txValidationOk` 게이트만 확인 |
+| `ebb4a26` | 파일 선택 시 CSV 미리보기 팝업으로 교체, DB 매칭 검증을 업로드 시점으로 이동 |
+| `e6d0b9a` | 되돌리려 했으나 **복원이 불완전** |
+
+**원인 (`e6d0b9a`의 누락 2건):**
+
+1. **매칭 팝업 중복 출력** — `handleTxFileChange`에서 `validateTxFile()`을 호출하는데, 동시에 `useEffect([txFile, ...])`도 같은 검증을 실행.
+   파일을 고르면 `setTxFile()`로 useEffect까지 트리거되어 **팝업이 2번** 열렸다.
+2. **업로드 시 팝업 재출력** — `ebb4a26`이 넣은 `uploadTxSummary` 내부의 `validateTxFile()` 재호출이 그대로 남아,
+   업로드 버튼을 누를 때 매칭 팝업이 또 열렸다. 원래는 `txValidationOk`만 확인했다.
+
+**변경 내용:**
+
+```javascript
+// ① handleTxFileChange: 파일 상태만 갱신 (검증 호출 제거)
+const handleTxFileChange = (event) => {
+  const selectedFile = event.target.files?.[0] || null;
+  setTxFile(selectedFile);
+  setTxValidationMessage('');
+  setTxValidationOk(false);
+  setTxError('');
+  if (selectedFile && (!txDatabase || !txProbe || !txSoftwareVersion)) {
+    setTxValidationMessage('파일이 선택되었습니다. Database/Probe/Software version 선택 후 자동 검증됩니다.');
+  }
+  // 실제 검증/매칭 팝업은 useEffect가 단독으로 담당한다(팝업 중복 방지).
+};
+
+// ② uploadTxSummary: 검증 재실행 → 게이트 확인으로 복원 (79a6055 방식)
+if (!txValidationOk) {
+  alert('파일 파라미터 검증이 완료되지 않았습니다. 검증 결과를 확인하세요.');
+  return;
+}
+```
+
+**동작 (복구 후)**
+- Database/Probe/Software version이 모두 선택된 상태에서 파일 선택 → 매칭 팝업 **1회** 출력
+- 파일을 먼저 선택한 경우 → 안내 메시지 표시 후, 선택값이 채워지면 자동 검증 및 팝업 출력
+- 업로드 버튼 → 추가 팝업 없이 검증 통과 여부만 확인 후 진행
+
+**변경하지 않은 것:** 팝업 내용/레이아웃(`openTxValidationWindow`), 검증 API(`/api/validate_tx_summary_file`), 백엔드, Verification Report 카드 등 나머지 전부
+
+**검증:** `npm run build` — Compiled successfully (exit 0), 변경 범위 1파일 확인
+
+---
+
 ## 변경 이력 (v0.9.38 — 2026-05-12)
 
 ### v0.9.38 — #1. 전체 프로젝트 코드 리뷰

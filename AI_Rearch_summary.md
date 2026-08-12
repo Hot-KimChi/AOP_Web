@@ -11,6 +11,7 @@
 | # | 요청 | 해결 | Detail |
 |---|------|------|--------|
 | 1 | 매 수정마다 자동 커밋 + 한글 커밋 설명 | `copilot-instructions.md`에 §7 자동 커밋 정책 신설. 논리적 변경 단위마다 검증 후 즉시 커밋, 변경 파일만 명시 스테이징(생성물·시크릿 제외), 한글 제목+본문+Co-authored-by 트레일러 규칙 명문화. Do-Not-Touch 섹션 §8로 이동 | [→ Detail](#v0951--1-자동-커밋-정책-신설) |
+| 2 | Tx Summary Input의 Input file 선택 시 매칭 팝업을 이전 상태로 복구 | 복원 커밋 `e6d0b9a`가 **불완전**했던 것이 원인. ① `handleTxFileChange`와 `useEffect`가 **둘 다 검증을 실행**해 매칭 팝업이 2번 열림 → 검증 실행 주체를 `useEffect` 단독으로 정리. ② `uploadTxSummary`가 검증을 재실행(`ebb4a26`에서 도입)해 업로드 시 팝업이 또 열림 → 원래 방식인 `txValidationOk` 게이트로 복원. 팝업 내용·API·다른 카드는 변경 없음 | [→ Detail](./AI_Rearch_detail.md) |
 
 ---
 
