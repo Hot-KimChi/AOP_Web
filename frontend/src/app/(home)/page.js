@@ -2,7 +2,8 @@
 'use client';
 
 const WEEKLY_SCHEDULE_URL = 'https://healthineersapc.sharepoint.com/:x:/r/teams/SUSKOUE/Shared%20Documents/AOP/Z_UE_AOP%20weekly/AOP%20weekly%20schedule.xlsx?d=wdfdc89b1439d4600b6af66d46b91b13b&csf=1&web=1&e=2FAyYg';
-const WEEKLY_SCHEDULE_EMBED_URL = `${WEEKLY_SCHEDULE_URL}&action=embedview&wdbipreview=true`;
+const WEEKLY_SCHEDULE_FILE_URL = 'https://healthineersapc.sharepoint.com/teams/SUSKOUE/Shared%20Documents/AOP/Z_UE_AOP%20weekly/AOP%20weekly%20schedule.xlsx';
+const WEEKLY_SCHEDULE_EMBED_URL = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(WEEKLY_SCHEDULE_FILE_URL)}`;
 
 export default function HomePage() {
   return (
