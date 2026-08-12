@@ -187,8 +187,9 @@ function TxMatchingContent() {
     rows.forEach(row => {
       calcParams.forEach(p => {
         totalCells++;
-        const val = row[p] ?? 'UNMATCHED';
-        if (val !== 'UNMATCHED' && val !== 'NULL') matchedCells++;
+        const raw = row[p];
+        const val = (raw !== null && typeof raw === 'object') ? (raw.fileValue ?? 'UNMATCHED') : (raw ?? 'UNMATCHED');
+        if (val !== 'UNMATCHED' && val !== '—' && val !== 'NULL' && val !== '') matchedCells++;
       });
     });
     const matchRate = totalCells > 0 ? Math.round((matchedCells / totalCells) * 100) : 0;
@@ -245,10 +246,18 @@ function TxMatchingContent() {
                         </td>
                       );
                     }
-                    const val = row[p] ?? 'UNMATCHED';
+                    const raw = row[p];
+                    // 구버전 호환: {match, fileValue, dbValue} 객체 → fileValue 추출
+                    const val = (raw !== null && typeof raw === 'object')
+                      ? (raw.fileValue ?? 'UNMATCHED')
+                      : (raw ?? 'UNMATCHED');
+                    // 구버전 '—' → 새 'UNMATCHED'로 정규화
+                    const display = (val === '—' || val === 'UNMATCHED') ? 'UNMATCHED'
+                                  : (val === 'NULL' || val === '')        ? 'NULL'
+                                  : val;
                     return (
-                      <td key={p} style={S.td(val, rowIdx)}>
-                        {val === 'UNMATCHED' ? 'X' : val === 'NULL' ? 'NULL' : val}
+                      <td key={p} style={S.td(display, rowIdx)}>
+                        {display === 'UNMATCHED' ? 'X' : display === 'NULL' ? 'NULL' : display}
                       </td>
                     );
                   })}

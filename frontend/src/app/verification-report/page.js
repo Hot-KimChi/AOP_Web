@@ -259,7 +259,7 @@ export default function VerificationReport() {
       ? validation.comparisonRows
       : null;
 
-    const storageKey = `txValidation_${Date.now()}`;
+    const storageKey = `txValidation_v2_${Date.now()}`;
 
     if (comparisonRows) {
       // 피벗 구조 생성: 행=No(행번호), 열=Parameter
