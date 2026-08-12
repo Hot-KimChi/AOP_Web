@@ -15,29 +15,28 @@ const S = {
     padding: '12px 16px',
     boxSizing: 'border-box',
   },
-  /* ─ 상단 요약 바 ─ */
-  summaryBar: {
+  /* ─ 상단 카드 ─ */
+  headerCard: {
     background: '#fff',
     borderRadius: 8,
-    padding: '10px 18px',
+    padding: '12px 18px',
     marginBottom: 12,
     boxShadow: '0 1px 4px rgba(0,0,0,.1)',
+  },
+  /* 첫 번째 줄: 제목 + 통계 칩 */
+  headerRow1: {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 6,
-    rowGap: 6,
+    gap: 8,
+    marginBottom: 8,
   },
   pageTitle: {
     fontSize: 15,
     fontWeight: 700,
     color: '#1e293b',
-    marginRight: 10,
-    whiteSpace: 'nowrap',
+    marginRight: 4,
   },
-  divider: { color: '#cbd5e1', fontSize: 14 },
-  metaItem: { fontSize: 13, color: '#475569', whiteSpace: 'nowrap' },
-  metaVal:  { fontWeight: 700, color: '#1e293b' },
   chip: (type) => {
     const map = {
       total:   ['#e2e8f0', '#334155'],
@@ -47,13 +46,33 @@ const S = {
     };
     const [bg, color] = map[type] || map.total;
     return {
-      display: 'inline-flex', alignItems: 'center', gap: 4,
+      display: 'inline-flex', alignItems: 'center',
       padding: '3px 10px', borderRadius: 20,
       fontSize: 12, fontWeight: 600,
       background: bg, color,
       whiteSpace: 'nowrap',
     };
   },
+  /* 두 번째 줄: 메타 텍스트 */
+  headerRow2: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 0,
+    borderTop: '1px solid #f1f5f9',
+    paddingTop: 8,
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 1.7,
+  },
+  metaLabel: { color: '#94a3b8', marginRight: 3 },
+  metaVal:   { fontWeight: 600, color: '#1e293b', marginRight: 18 },
+  msgText: (isWarn) => ({
+    fontSize: 12,
+    color: isWarn ? '#b45309' : '#475569',
+    fontStyle: 'italic',
+    marginTop: 0,
+  }),
   /* ─ 테이블 래퍼 ─ */
   tableWrap: {
     background: '#fff',
@@ -163,31 +182,32 @@ function TxMatchingContent() {
     return (
       <div style={S.page}>
 
-        {/* ── 상단 요약 바 ── */}
-        <div style={S.summaryBar}>
-          <span style={S.pageTitle}>Tx Summary Parameter Matching</span>
-          <span style={S.divider}>|</span>
-
-          <span style={S.chip('total')}>
-            총 {paramCount}개 parameter
-          </span>
-
-          <span style={S.chip(matchRate >= 80 ? 'success' : matchRate >= 50 ? 'rate' : 'danger')}>
-            매칭률 {matchRate}%
-          </span>
-
-          {meta && (
-            <>
-              <span style={S.divider}>|</span>
-              <span style={S.metaItem}>
-                선택한 ProbeID: <strong style={S.metaVal}>{meta.selectedProbeId || '—'}</strong>
-              </span>
-              <span style={S.divider}>|</span>
-              <span style={S.metaItem}>
-                선택한 SW version: <strong style={S.metaVal}>{meta.selectedSoftwareVersion || '—'}</strong>
-              </span>
-            </>
-          )}
+        {/* ── 상단 헤더 카드 ── */}
+        <div style={S.headerCard}>
+          {/* 줄 1: 제목 + 통계 칩 */}
+          <div style={S.headerRow1}>
+            <span style={S.pageTitle}>Tx Summary Parameter Matching</span>
+            <span style={S.chip('total')}>총 {paramCount}개 parameter</span>
+            <span style={S.chip(matchRate >= 80 ? 'success' : matchRate >= 50 ? 'rate' : 'danger')}>
+              매칭률 {matchRate}%
+            </span>
+          </div>
+          {/* 줄 2: ProbeID / SW version / 메시지 텍스트 */}
+          <div style={S.headerRow2}>
+            {meta && (
+              <>
+                <span style={S.metaLabel}>선택한 ProbeID</span>
+                <span style={S.metaVal}>{meta.selectedProbeId || '—'}</span>
+                <span style={S.metaLabel}>선택한 SW version</span>
+                <span style={S.metaVal}>{meta.selectedSoftwareVersion || '—'}</span>
+                {meta.message && (
+                  <span style={S.msgText(meta.message.includes('경고') || meta.message.includes('없음'))}>
+                    {meta.message}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* ── 테이블: 헤더=파라미터명, 행=실제 데이터 ── */}
@@ -232,8 +252,10 @@ function TxMatchingContent() {
     const cols = Object.keys(fallback[0]);
     return (
       <div style={S.page}>
-        <div style={S.summaryBar}>
-          <span style={S.pageTitle}>Tx Summary Parameter Matching</span>
+        <div style={S.headerCard}>
+          <div style={S.headerRow1}>
+            <span style={S.pageTitle}>Tx Summary Parameter Matching</span>
+          </div>
         </div>
         <div style={S.tableWrap}>
           <table style={S.table}>
