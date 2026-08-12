@@ -280,6 +280,39 @@ def _normalize_probe_id(value):
         return raw
 
 
+@db_api_bp.route("/preview_tx_summary_file", methods=["POST"])
+@handle_exceptions
+@require_auth
+def preview_tx_summary_file():
+    if "file" not in request.files:
+        return error_response("No file provided", 400)
+    file = request.files["file"]
+    if not file.filename.endswith(".csv"):
+        return error_response("Only CSV files are allowed", 400)
+    try:
+        raw_bytes = file.read()
+        try:
+            content = raw_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            content = raw_bytes.decode("cp949")
+        df = pd.read_csv(StringIO(content))
+    except Exception as e:
+        logger.error(f"CSV preview parse error: {str(e)}", exc_info=True)
+        return error_response("CSV 파일 파싱에 실패했습니다.", 400)
+    if df is None or df.empty:
+        return jsonify({"status": "success", "previewData": [], "columns": []})
+    df = df.replace({np.nan: None})
+    preview_df = df.head(300)
+    return jsonify(
+        {
+            "status": "success",
+            "previewData": preview_df.to_dict(orient="records"),
+            "columns": list(preview_df.columns),
+            "rowCount": int(len(df)),
+        }
+    )
+
+
 @db_api_bp.route("/validate_tx_summary_file", methods=["POST"])
 @handle_exceptions
 @require_auth

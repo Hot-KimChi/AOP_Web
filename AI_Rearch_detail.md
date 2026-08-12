@@ -1500,3 +1500,31 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 
 ### 결과
 - 선택한 database 기준으로 쿼리가 실행되어 `No database specified` 오류 해소
+
+---
+
+## 2026-08-12 파일 선택 즉시 미리보기 팝업 + 업로드 전 검증 분리
+
+### 요청
+- Input file 선택 시점에 DB 입력 전에 먼저 데이터 창(팝업)으로 내용을 확인하고 싶음
+
+### 변경
+1. **백엔드 미리보기 API 추가**
+   - 파일: `backend/routes/db_api.py`
+   - `POST /api/preview_tx_summary_file`
+   - 동작: CSV를 파싱해 상위 300행 + 컬럼 + 전체 행수 반환
+   - DB 연결/매칭 조회 없이 동작
+
+2. **프론트 흐름 변경**
+   - 파일: `frontend/src/app/verification-report/page.js`
+   - 파일 선택 시:
+     - `preview_tx_summary_file` 호출
+     - `verification-report/data-view-standalone` 팝업으로 미리보기 즉시 표시
+   - 자동 DB 매칭 검증(useEffect) 제거
+   - DB 매칭 검증은 **업로드 버튼 클릭 직전**에 수행
+     - 검증 실패 시 업로드 중단
+     - 검증 팝업(`Tx Summary Parameter Matching`)은 유지
+
+### 결과
+- 파일 선택 직후에는 DB 미조회 상태로 미리보기 팝업만 표시
+- 실제 DB 매칭 검증은 업로드 직전에 실행되어 사용자 의도와 순서가 일치

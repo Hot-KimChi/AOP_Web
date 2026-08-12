@@ -467,3 +467,12 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - 새 API에서 선택 database를 allowlist 검증 후 쿼리에 `[database].[dbo].[table]`로 명시
   - 대상 API: `get_imaging_sw_versions`, `validate_tx_summary_file`
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+
+## 2026-08-12 Input file 선택 시 선미리보기 팝업 분리
+
+- 요청: 데이터베이스 입력 전에 먼저 팝업 창으로 데이터 확인
+- 반영:
+  - `POST /api/preview_tx_summary_file` 추가 (DB 미조회, CSV 미리보기 전용)
+  - 파일 선택 시 즉시 미리보기 팝업 출력
+  - DB 매칭 검증은 업로드 버튼 클릭 시점으로 이동
+- 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
