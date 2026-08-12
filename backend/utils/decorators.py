@@ -49,6 +49,9 @@ def with_db_connection(database=None):
                 json_data = request.get_json(silent=True)
                 if json_data and "database" in json_data:
                     db_name = json_data["database"]
+            # multipart/form-data (파일 업로드 등) 에서도 database 파라미터 읽기
+            if not db_name and request.form:
+                db_name = request.form.get("database")
             if not db_name:
                 return error_response("No database specified", 400)
             # DB 이름 allowlist 검증 (환경변수 DATABASE_NAME + MLflow DB)
