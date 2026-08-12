@@ -223,6 +223,146 @@ def get_table_data():
     return jsonify(response_data)
 
 
+@db_api_bp.route("/get_imaging_sw_versions", methods=["GET"])
+@handle_exceptions
+@require_auth
+@with_db_connection()
+def get_imaging_sw_versions():
+    selected_database = request.args.get("database")
+    probe_id = request.args.get("probeId")
+    if not selected_database or not probe_id:
+        return error_response("database, probeId 파라미터가 필요합니다.", 400)
+    query = (
+        "SELECT measSSId, imagingSwVersion "
+        "FROM [meas_station_setup] "
+        "WHERE probeId = ? "
+        "  AND imagingSwVersion IS NOT NULL "
+        "  AND LTRIM(RTRIM(CAST(imagingSwVersion AS NVARCHAR(255)))) <> '' "
+        "ORDER BY measSSId DESC"
+    )
+    df = g.current_db.execute_query(query, params=(probe_id,))
+    if df is None or df.empty:
+        return jsonify({"status": "success", "softwareVersions": []})
+    seen = set()
+    software_versions = []
+    for idx, row in df.iterrows():
+        raw_version = row.get("imagingSwVersion")
+        version = str(raw_version).strip() if raw_version is not None else ""
+        if not version or version in seen:
+            continue
+        seen.add(version)
+        software_versions.append({"softwareVersion": version, "_id": f"imaging_sw_{idx}"})
+    return jsonify({"status": "success", "softwareVersions": software_versions})
+
+
+def _normalize_probe_id(value):
+    if value is None:
+        return ""
+    raw = str(value).strip()
+    if not raw:
+        return ""
+    try:
+        return str(int(float(raw)))
+    except Exception:
+        return raw
+
+
+@db_api_bp.route("/validate_tx_summary_file", methods=["POST"])
+@handle_exceptions
+@require_auth
+@with_db_connection()
+def validate_tx_summary_file():
+    if "file" not in request.files:
+        return error_response("No file provided", 400)
+    selected_database = request.form.get(
+        "database", os.environ.get("SERVER_NAME_DB", "AOP_DB")
+    )
+    selected_probe_id = request.form.get("probeId")
+    selected_sw_version = request.form.get("softwareVersion")
+    if not selected_probe_id or not selected_sw_version:
+        return error_response("probeId, softwareVersion 파라미터가 필요합니다.", 400)
+    file = request.files["file"]
+    if not file.filename.endswith(".csv"):
+        return error_response("Only CSV files are allowed", 400)
+    try:
+        raw_bytes = file.read()
+        try:
+            content = raw_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            content = raw_bytes.decode("cp949")
+        df = pd.read_csv(StringIO(content))
+    except Exception as e:
+        logger.error(f"CSV parse error: {str(e)}", exc_info=True)
+        return error_response("CSV 파일 파싱에 실패했습니다.", 400)
+    if df is None or df.empty:
+        return error_response("CSV file is empty", 400)
+
+    csv_probe_col = None
+    csv_sw_col = None
+    for col in df.columns:
+        norm = str(col).strip().lower()
+        if norm in {"probeid", "probe_id"} and csv_probe_col is None:
+            csv_probe_col = col
+        if norm in {"software_version", "softwareversion"} and csv_sw_col is None:
+            csv_sw_col = col
+    if csv_probe_col is None or csv_sw_col is None:
+        return error_response(
+            "CSV에 ProbeID, Software_version 컬럼이 필요합니다.", 400
+        )
+
+    file_probe_values = sorted(
+        {
+            _normalize_probe_id(v)
+            for v in df[csv_probe_col].dropna().tolist()
+            if _normalize_probe_id(v)
+        }
+    )
+    file_sw_values = sorted(
+        {str(v).strip() for v in df[csv_sw_col].dropna().tolist() if str(v).strip()}
+    )
+
+    selected_probe_norm = _normalize_probe_id(selected_probe_id)
+    selected_sw_norm = str(selected_sw_version).strip()
+    matches_selection = (
+        selected_probe_norm in file_probe_values and selected_sw_norm in file_sw_values
+    )
+
+    db_probe_param = selected_probe_norm
+    try:
+        db_probe_param = int(selected_probe_norm)
+    except Exception:
+        pass
+    db_match_df = g.current_db.execute_query(
+        "SELECT TOP 1 ProbeID "
+        "FROM [Tx_summary] "
+        "WHERE ProbeID = ? "
+        "  AND LTRIM(RTRIM(CAST(Software_version AS NVARCHAR(255)))) = LTRIM(RTRIM(CAST(? AS NVARCHAR(255))))",
+        params=(db_probe_param, selected_sw_norm),
+    )
+    db_has_matching_rows = db_match_df is not None and not db_match_df.empty
+
+    message = "파일 파라미터와 선택값이 일치합니다."
+    if not matches_selection:
+        message = "파일 파라미터(ProbeID/Software_version)가 선택값과 일치하지 않습니다."
+    elif not db_has_matching_rows:
+        message = "선택한 Probe/Software 버전이 Tx_summary 테이블에 없습니다."
+
+    return jsonify(
+        {
+            "status": "success",
+            "validation": {
+                "matchesSelection": matches_selection,
+                "dbHasMatchingRows": db_has_matching_rows,
+                "fileProbeIds": file_probe_values,
+                "fileSoftwareVersions": file_sw_values,
+                "selectedProbeId": selected_probe_norm,
+                "selectedSoftwareVersion": selected_sw_norm,
+                "message": message,
+            },
+        }
+    )
+
+
 @db_api_bp.route("/run_tx_compare", methods=["POST"])
 @handle_exceptions
 @require_auth

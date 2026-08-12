@@ -1344,3 +1344,59 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 > 📌 **본 리뷰는 코드 정적 분석 기반이며, 실행 환경 테스트는 포함하지 않았습니다.**  
 > 📌 **요약은 [AI_Rearch_summary.md](./AI_Rearch_summary.md) 를 참조하세요.**  
 > 📌 **ML 페이지 리팩터링 이력은 [RearchAI.md](./frontend/src/app/machine-learning/RearchAI.md) 를 참조하세요.**
+
+---
+
+## 2026-08-12 Verification Report 카드/소프트웨어/파일검증 개선
+
+### 요청 요약
+- Verification Report 메뉴에서
+  1) 2개 카드가 서로 상태에 영향 주지 않도록 분리
+  2) 카드 순서 변경
+  3) Tx Summary Input의 `Tx Software`를 `Software version`으로 변경하고, Probe 기준 `meas_station_setup.[imagingSwVersion]` 드롭다운(최신 우선) 적용
+  4) Input file 선택 시 파일 파라미터와 SQL(`Tx_summary`) 일치 여부 확인
+
+### 변경 파일
+- `frontend/src/app/verification-report/page.js`
+- `backend/routes/db_api.py`
+
+### 핵심 변경
+1. **카드 상태 완전 분리 (프론트)**
+   - 기존 공용 상태(`selectedDatabase`, `selectedProbe`, `selectedTxSW` 등) 제거
+   - `report*` 상태(Verification Report)와 `tx*` 상태(Tx Summary Input)로 분리
+   - 한 카드 선택/로딩/에러가 다른 카드에 영향을 주지 않게 개선
+
+2. **카드 순서 변경 (프론트)**
+   - 화면 상단: `Tx Summary Input`
+   - 화면 하단: `Verification Report`
+
+3. **Software version 소스 변경 (프론트+백엔드)**
+   - 라벨 변경: `TX Software` → `Software version` (Tx Summary Input 카드)
+   - 신규 API 추가: `GET /api/get_imaging_sw_versions`
+   - 쿼리 소스: `meas_station_setup.imagingSwVersion`
+   - 정렬 기준: `measSSId DESC`로 최신 데이터 우선
+   - 중복 버전은 프론트 표시 전 제거
+
+4. **Input file 선택 시 파라미터 검증 (프론트+백엔드)**
+   - 신규 API 추가: `POST /api/validate_tx_summary_file`
+   - 검증 항목:
+     - CSV의 `ProbeID`, `Software_version` 컬럼 존재
+     - 파일 내 값이 현재 선택된 `probeId/softwareVersion`과 일치하는지
+     - 선택값 조합이 `Tx_summary` 테이블에 존재하는지
+   - 프론트 동작:
+     - 파일 선택 시(또는 선택값 변경 후) 자동 검증
+     - 검증 메시지 표시(성공/경고)
+     - 검증 성공 전 업로드 버튼 비활성화
+
+### 동작 변화
+- **Before**
+  - 두 카드가 같은 선택 상태를 공유해 의도치 않은 상호 영향 발생
+  - Tx Summary Input 소프트웨어 목록이 `Tx_summary` 기반
+  - 파일 선택 시 DB 일치 검증 부재
+- **After**
+  - 카드 간 상태 독립
+  - Tx Summary Input 소프트웨어 목록을 `imagingSwVersion` 최신 기준으로 제공
+  - 파일-선택값-DB 일치 검증 후 업로드 진행
+
+### 연관 링크
+- 요약: [AI_Rearch_summary.md](./AI_Rearch_summary.md)

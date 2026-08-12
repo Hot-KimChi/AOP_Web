@@ -423,3 +423,15 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
 
 > 📌 **상세 분석 내용은 [AI_Rearch_detail.md](./AI_Rearch_detail.md) 파일을 참조하세요.**  
 > 📌 **ML 페이지 리팩터링 이력은 [RearchAI.md](./frontend/src/app/machine-learning/RearchAI.md) 를 참조하세요.**
+
+---
+
+## 2026-08-12 Verification Report 개선
+
+- 요청: Verification Report 2개 카드 독립화, 카드 순서 변경, Tx Summary Input의 Software version 소스 변경, 파일 선택 시 Tx_summary 일치 검증 추가
+- 반영:
+  - 카드 상태를 분리해 상호 영향 제거
+  - 카드 순서를 `Tx Summary Input` → `Verification Report`로 변경
+  - Tx Summary Input의 Software version을 `meas_station_setup.imagingSwVersion` 기반(최신 우선)으로 변경
+  - Input file 선택 시 파일 내 `ProbeID/Software_version`과 선택값 및 `Tx_summary` 존재 여부를 검증하는 API 연동 추가
+- 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
