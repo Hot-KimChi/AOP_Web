@@ -355,23 +355,19 @@ def validate_tx_summary_file():
     if not _is_allowed_tx_file(file.filename):
         return error_response("CSV 또는 TXT 파일만 업로드할 수 있습니다.", 400)
 
-    # --- 파일 읽기 (실패해도 팝업은 열린다) ---
-    df_norm = None
+    # ── 파일 읽기 ──
+    df_raw = None
     file_parse_warning = None
     try:
-        df = _read_tx_dataframe(file)
-        if df is not None and not df.empty:
-            valid_idxs = [i for i, col in enumerate(df.columns) if str(col).strip()]
-            df = df.iloc[:, valid_idxs]
-            column_lookup = _get_column_lookup(selected_database, "Tx_summary")
-            col_map = {col: column_lookup[str(col).strip().lower()]
-                       for col in df.columns if str(col).strip().lower() in column_lookup}
-            df_norm = df.rename(columns=col_map)
+        df_raw = _read_tx_dataframe(file)
+        if df_raw is not None and not df_raw.empty:
+            valid_idxs = [i for i, col in enumerate(df_raw.columns) if str(col).strip()]
+            df_raw = df_raw.iloc[:, valid_idxs]
     except Exception as e:
         logger.warning(f"Tx summary file parse warning: {str(e)}")
         file_parse_warning = str(e)
 
-    # --- DB에서 선택한 probe+sw 기준 전체 컬럼 조회 (reference) ---
+    # ── DB에서 probe+sw 기준 전체 컬럼 조회 (reference) ──
     selected_probe_norm = _normalize_probe_id(selected_probe_id)
     selected_sw_norm = str(selected_sw_version).strip()
     db_probe_param = selected_probe_norm
@@ -388,8 +384,38 @@ def validate_tx_summary_file():
     )
     db_has_matching_rows = db_match_df is not None and not db_match_df.empty
 
-    # --- 파일에서 비교 대상 행 선택 ---
-    # ProbeID+SW_version 컬럼이 있으면 필터, 없으면 파일 전체를 Mode 매핑에 사용
+    # ── 컬럼 매핑: 파일 컬럼 → DB 컬럼명 (퍼지 매칭) ──
+    # 알파뉴메릭만 남긴 키로 비교 (예: "Probe_ID" → "probeid", "ProbeID" → "probeid")
+    import re as _re
+    def _alphanumeric_key(s):
+        return _re.sub(r'[^a-z0-9]', '', str(s).strip().lower())
+
+    df_norm = None
+    column_map_log = {}          # {파일 원본 컬럼: 매핑된 DB 컬럼}
+    unmapped_file_cols = []      # 매핑 못한 파일 컬럼 목록
+
+    if df_raw is not None and not df_raw.empty:
+        column_lookup = _get_column_lookup(selected_database, "Tx_summary")
+        # 두 단계 룩업: ① 정확한 소문자 ② 알파뉴메릭 키
+        alpha_lookup = {_alphanumeric_key(k): v for k, v in column_lookup.items()}
+
+        col_map = {}
+        for col in df_raw.columns:
+            exact_key = str(col).strip().lower()
+            alpha_key = _alphanumeric_key(col)
+            if exact_key in column_lookup:
+                col_map[col] = column_lookup[exact_key]
+                column_map_log[col] = column_lookup[exact_key]
+            elif alpha_key in alpha_lookup:
+                col_map[col] = alpha_lookup[alpha_key]
+                column_map_log[col] = alpha_lookup[alpha_key]
+            else:
+                unmapped_file_cols.append(col)
+
+        df_norm = df_raw.rename(columns=col_map)
+        logger.info(f"Column mapping: {column_map_log}, unmapped: {unmapped_file_cols}")
+
+    # ── 파일 필터링: ProbeID+SW 있으면 필터, 없으면 전체 사용 ──
     df_filtered = None
     matches_selection = False
     file_probe_values = []
@@ -405,11 +431,10 @@ def validate_tx_summary_file():
             file_probe_values = sorted({_normalize_probe_id(str(v)) for v in df_norm["ProbeID"].dropna() if _normalize_probe_id(str(v))})
             file_sw_values = sorted({str(v).strip() for v in df_norm["Software_version"].dropna() if str(v).strip()})
         else:
-            # ProbeID/SW_version 컬럼 없음 → 파일 전체를 Mode 기준으로 매핑
             df_filtered = df_norm
-            matches_selection = True  # UI에서 이미 선택했으므로 일치로 간주
+            matches_selection = True
 
-    # --- DB 기준 파라미터별 비교 rows 생성 ---
+    # ── DB 기준 파라미터별 비교 rows 생성 ──
     comparison_rows = []
     if db_has_matching_rows:
         db_df = db_match_df.replace({np.nan: None})
@@ -429,12 +454,12 @@ def validate_tx_summary_file():
                 for _, row in df_filtered.iterrows():
                     file_by_mode[str(row.get("Mode", "")).strip()] = row
             else:
-                # Mode 컬럼이 없으면 DB Mode 목록에 맞춰 행 순서로 매핑
+                # Mode 컬럼 없으면 DB Mode 순서에 맞춰 행 순서로 매핑
                 for i, mode_key in enumerate(sorted(db_by_mode.keys())):
                     if i < len(df_filtered):
                         file_by_mode[mode_key] = df_filtered.iloc[i]
 
-        # DB Mode 목록을 기준으로 반복 (DB = reference)
+        # DB Mode 기준 순회
         all_modes = sorted(db_by_mode.keys()) if db_by_mode else [""]
         row_no = 1
         for mode in all_modes:
@@ -445,15 +470,17 @@ def validate_tx_summary_file():
             for param in db_cols:
                 dv = str(db_row[param]) if db_row is not None and param in db_row.index else "—"
                 fv = "—"
-                if file_row is not None and param in (file_row.index if hasattr(file_row, "index") else []):
-                    fv = str(file_row[param])
+                if file_row is not None:
+                    idx = file_row.index if hasattr(file_row, "index") else []
+                    if param in idx:
+                        fv = str(file_row[param])
 
                 if dv.lower() in ("nan", "none"):
                     dv = "—"
                 if fv.lower() in ("nan", "none"):
                     fv = "—"
 
-                # 파일에 데이터 없으면 명시적 X
+                # 파일 데이터 없으면 명시적 X
                 if fv == "—":
                     matched = False
                 else:
@@ -486,8 +513,11 @@ def validate_tx_summary_file():
     else:
         mismatch_cnt = sum(1 for r in comparison_rows if r.get("Match") == "X")
         total_cnt = len(comparison_rows)
-        col_note = "" if (df_norm is not None and "ProbeID" in df_norm.columns) else " (Mode 기준 매핑)"
-        message = f"비교 완료: {total_cnt}개 파라미터 중 {mismatch_cnt}개 불일치{col_note}"
+        mapped_cnt = len(column_map_log) if column_map_log else 0
+        message = (
+            f"비교 완료: {total_cnt}개 파라미터 중 {mismatch_cnt}개 불일치 "
+            f"(파일 컬럼 매핑: {mapped_cnt}개)"
+        )
 
     return jsonify(
         {
@@ -502,6 +532,8 @@ def validate_tx_summary_file():
                 "matchingCount": len(matching_rows_simple),
                 "matchingRows": matching_rows_simple,
                 "comparisonRows": comparison_rows,
+                "columnMapLog": column_map_log,
+                "unmappedFileCols": unmapped_file_cols,
                 "message": message,
             },
         }
