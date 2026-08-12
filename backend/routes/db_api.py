@@ -384,6 +384,14 @@ def validate_tx_summary_file():
     )
     db_has_matching_rows = db_match_df is not None and not db_match_df.empty
 
+    # ProbeID/SW 필터 매칭 없으면 → 컬럼 구조 참조용으로 TOP 1 조회
+    if not db_has_matching_rows:
+        db_schema_df = g.current_db.execute_query(
+            f"SELECT TOP 1 * FROM [{selected_database}].[dbo].[Tx_summary]"
+        )
+    else:
+        db_schema_df = db_match_df
+
     # ── 컬럼 매핑: 파일 컬럼 → DB 컬럼명 (퍼지 매칭) ──
     # 알파뉴메릭만 남긴 키로 비교 (예: "Probe_ID" → "probeid", "ProbeID" → "probeid")
     import re as _re
@@ -435,16 +443,19 @@ def validate_tx_summary_file():
             matches_selection = True
 
     # ── DB 기준 파라미터별 비교 rows 생성 ──
+    # db_has_matching_rows이면 DB값+파일값 비교, 아니면 파일값만 표시 (컬럼 구조는 db_schema_df 사용)
     comparison_rows = []
-    if db_has_matching_rows:
-        db_df = db_match_df.replace({np.nan: None})
-        skip_cols = {"IsProcessed", "combined_mode"}
-        db_cols = [c for c in db_df.columns if c not in skip_cols and c != "Mode"]
+    schema_ref = db_schema_df if (db_schema_df is not None and not db_schema_df.empty) else None
 
-        # DB Mode별 행 매핑
+    if schema_ref is not None:
+        schema_cols = list(schema_ref.columns)
+        skip_cols = {"IsProcessed", "combined_mode"}
+        db_cols = [c for c in schema_cols if c not in skip_cols and c != "Mode"]
+
+        # DB Mode별 행 매핑 (ProbeID/SW 매칭 있을 때만)
         db_by_mode = {}
-        if "Mode" in db_df.columns:
-            for _, row in db_df.iterrows():
+        if db_has_matching_rows and "Mode" in db_match_df.columns:
+            for _, row in db_match_df.replace({np.nan: None}).iterrows():
                 db_by_mode[str(row.get("Mode", "")).strip()] = row
 
         # 파일 Mode별 행 매핑
@@ -452,35 +463,40 @@ def validate_tx_summary_file():
         if df_filtered is not None and not df_filtered.empty:
             if "Mode" in df_filtered.columns:
                 for _, row in df_filtered.iterrows():
-                    file_by_mode[str(row.get("Mode", "")).strip()] = row
+                    mode_key = str(row.get("Mode", "")).strip()
+                    file_by_mode[mode_key] = row
             else:
-                # Mode 컬럼 없으면 DB Mode 순서에 맞춰 행 순서로 매핑
-                for i, mode_key in enumerate(sorted(db_by_mode.keys())):
-                    if i < len(df_filtered):
-                        file_by_mode[mode_key] = df_filtered.iloc[i]
+                # Mode 컬럼 없으면 첫 번째 행을 빈 모드로
+                file_by_mode[""] = df_filtered.iloc[0]
 
-        # DB Mode 기준 순회
-        all_modes = sorted(db_by_mode.keys()) if db_by_mode else [""]
+        # Mode 목록 결정: DB에 있으면 DB 기준, 없으면 파일 기준, 둘 다 없으면 [""]
+        if db_by_mode:
+            all_modes = sorted(db_by_mode.keys())
+        elif file_by_mode:
+            all_modes = sorted(file_by_mode.keys())
+        else:
+            all_modes = [""]
+
         row_no = 1
         for mode in all_modes:
-            db_row = db_by_mode.get(mode)
+            db_row  = db_by_mode.get(mode)
             file_row = file_by_mode.get(mode)
-            status = "DB_ONLY" if file_row is None else "BOTH"
+            status = "DB_ONLY" if file_row is None else ("BOTH" if db_row is not None else "FILE_ONLY")
 
             for param in db_cols:
-                dv = str(db_row[param]) if db_row is not None and param in db_row.index else "—"
+                dv = "—"
+                if db_row is not None and param in db_row.index:
+                    raw_dv = db_row[param]
+                    dv = "—" if (raw_dv is None or str(raw_dv).lower() in ("nan", "none", "")) else str(raw_dv)
+
                 fv = "—"
                 if file_row is not None:
                     idx = file_row.index if hasattr(file_row, "index") else []
                     if param in idx:
-                        fv = str(file_row[param])
+                        raw_fv = file_row[param]
+                        fv = "—" if (raw_fv is None or str(raw_fv).lower() in ("nan", "none", "")) else str(raw_fv)
 
-                if dv.lower() in ("nan", "none"):
-                    dv = "—"
-                if fv.lower() in ("nan", "none"):
-                    fv = "—"
-
-                # 파일 데이터 없으면 명시적 X
+                # 파일 데이터 없으면 X
                 if fv == "—":
                     matched = False
                 else:
@@ -508,8 +524,15 @@ def validate_tx_summary_file():
     # 메시지 결정
     if file_parse_warning:
         message = f"파일 파싱 경고: {file_parse_warning}"
-    elif not db_has_matching_rows:
+    elif not db_has_matching_rows and not comparison_rows:
         message = "선택한 Probe/Software 버전이 Tx_summary 테이블에 없습니다."
+    elif not db_has_matching_rows:
+        mismatch_cnt = sum(1 for r in comparison_rows if r.get("Match") == "X")
+        total_params = len(set(r["Parameter"] for r in comparison_rows))
+        message = (
+            f"DB에 ProbeID/SW 매칭 없음 — 파일 데이터 {total_params}개 파라미터 표시 "
+            f"({mismatch_cnt}개 매핑 불가)"
+        )
     else:
         mismatch_cnt = sum(1 for r in comparison_rows if r.get("Match") == "X")
         total_cnt = len(comparison_rows)
