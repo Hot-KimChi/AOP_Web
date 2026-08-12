@@ -83,6 +83,70 @@ if (!txValidationOk) {
 
 ---
 
+### v0.9.51 — #3. Tx Summary txt 파일 입력 지원
+
+**요청:** Tx summary 입력 파일이 txt 형태이다. 반영 필요. 에러: `Only CSV files are allowed`
+
+**원인:** Tx summary 파일은 `날짜_ProbeName_TxRequestSummary.txt` 형식인데, 백엔드 3개 엔드포인트가 모두 `.csv` 확장자만 허용하고 `pd.read_csv`를 콤마 구분자 기본값으로 호출하고 있었다.
+
+| 위치 | 기존 |
+|------|------|
+| `preview_tx_summary_file` | `endswith(".csv")` + `read_csv(...)` |
+| `validate_tx_summary_file` | `endswith(".csv")` + `read_csv(...)` |
+| `upload_tx_summary` | `endswith('.csv')` + `decode('utf-8')` + `read_csv(...)` |
+
+**대상 파일:** `backend/routes/db_api.py`, `frontend/src/app/verification-report/page.js`
+
+**변경 내용:**
+
+1. **공용 헬퍼 2개 신설** (`db_api.py`) — 3곳에 흩어진 확장자 검사/파싱 로직을 단일화
+
+```python
+_ALLOWED_TX_EXTENSIONS = (".csv", ".txt")
+
+
+def _is_allowed_tx_file(filename: str) -> bool:
+    return bool(filename) and filename.strip().lower().endswith(_ALLOWED_TX_EXTENSIONS)
+
+
+def _read_tx_dataframe(file_storage) -> pd.DataFrame:
+    """Tx summary 입력 파일(CSV/TXT)을 DataFrame으로 읽는다."""
+    raw_bytes = file_storage.read()
+    try:
+        content = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        content = raw_bytes.decode("cp949")
+    filename = (file_storage.filename or "").strip().lower()
+    if filename.endswith(".txt"):
+        try:
+            return pd.read_csv(StringIO(content), sep=None, engine="python")
+        except Exception:
+            return pd.read_csv(StringIO(content), sep="\t")
+    return pd.read_csv(StringIO(content))
+```
+
+   - **구분자 자동 감지** — txt는 `sep=None, engine="python"`으로 sniffing, 실패 시 tab 폴백
+   - **대소문자 무관** — `.TXT` / `.CSV`도 허용
+   - **인코딩 폴백** — `upload_tx_summary`는 기존에 `decode('utf-8')` 고정이라 BOM·cp949 파일에서 깨졌는데, 다른 두 엔드포인트와 동일하게 `utf-8-sig` → `cp949` 폴백으로 통일
+
+2. **3개 엔드포인트 적용** — 확장자 검사·파싱을 헬퍼 호출로 교체, 에러 메시지 한글화(`CSV 또는 TXT 파일만 업로드할 수 있습니다.` / `파일 파싱에 실패했습니다.` / `파일에 데이터가 없습니다.`)
+
+3. **프론트엔드** — 파일 선택기에 `accept=".csv,.txt"` 추가
+
+**검증:**
+
+| 케이스 | 결과 |
+|--------|------|
+| 확장자 허용 (`.csv` / `.txt` / `.TXT`) | 통과, `.xlsx` 거부 |
+| tab 구분 txt | 컬럼 3개 · 2행 정상 파싱 |
+| 콤마 구분 txt | 컬럼 3개 정상 파싱 (sniffing 동작) |
+| cp949 인코딩 txt (한글 값) | 정상 디코딩 |
+| 기존 csv | 회귀 없음 |
+
+- `py_compile` 통과, `npm run build` Compiled successfully (exit 0)
+
+---
+
 ## 변경 이력 (v0.9.38 — 2026-05-12)
 
 ### v0.9.38 — #1. 전체 프로젝트 코드 리뷰

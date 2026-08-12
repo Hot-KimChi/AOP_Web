@@ -42,6 +42,33 @@ def _get_column_lookup(database: str, table: str) -> dict:
     return lookup
 
 
+_ALLOWED_TX_EXTENSIONS = (".csv", ".txt")
+
+
+def _is_allowed_tx_file(filename: str) -> bool:
+    return bool(filename) and filename.strip().lower().endswith(_ALLOWED_TX_EXTENSIONS)
+
+
+def _read_tx_dataframe(file_storage) -> pd.DataFrame:
+    """Tx summary 입력 파일(CSV/TXT)을 DataFrame으로 읽는다.
+
+    TXT(`날짜_ProbeName_TxRequestSummary.txt`)는 tab 등 구분자가 다를 수 있어
+    sniffing으로 판별하고, 실패 시 tab 구분자로 재시도한다.
+    """
+    raw_bytes = file_storage.read()
+    try:
+        content = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        content = raw_bytes.decode("cp949")
+    filename = (file_storage.filename or "").strip().lower()
+    if filename.endswith(".txt"):
+        try:
+            return pd.read_csv(StringIO(content), sep=None, engine="python")
+        except Exception:
+            return pd.read_csv(StringIO(content), sep="\t")
+    return pd.read_csv(StringIO(content))
+
+
 def compute_combined_mode(mode: str) -> int:
     """Mode 문자열을 기준으로 combined_mode 계산 (0 또는 1)"""
     if not mode:
@@ -287,18 +314,13 @@ def preview_tx_summary_file():
     if "file" not in request.files:
         return error_response("No file provided", 400)
     file = request.files["file"]
-    if not file.filename.endswith(".csv"):
-        return error_response("Only CSV files are allowed", 400)
+    if not _is_allowed_tx_file(file.filename):
+        return error_response("CSV 또는 TXT 파일만 업로드할 수 있습니다.", 400)
     try:
-        raw_bytes = file.read()
-        try:
-            content = raw_bytes.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            content = raw_bytes.decode("cp949")
-        df = pd.read_csv(StringIO(content))
+        df = _read_tx_dataframe(file)
     except Exception as e:
-        logger.error(f"CSV preview parse error: {str(e)}", exc_info=True)
-        return error_response("CSV 파일 파싱에 실패했습니다.", 400)
+        logger.error(f"Tx summary preview parse error: {str(e)}", exc_info=True)
+        return error_response("파일 파싱에 실패했습니다.", 400)
     if df is None or df.empty:
         return jsonify({"status": "success", "previewData": [], "columns": []})
     df = df.replace({np.nan: None})
@@ -330,20 +352,15 @@ def validate_tx_summary_file():
     if not selected_database or not _is_allowed_database(selected_database):
         return error_response("유효하지 않은 database 이름입니다.", 400)
     file = request.files["file"]
-    if not file.filename.endswith(".csv"):
-        return error_response("Only CSV files are allowed", 400)
+    if not _is_allowed_tx_file(file.filename):
+        return error_response("CSV 또는 TXT 파일만 업로드할 수 있습니다.", 400)
     try:
-        raw_bytes = file.read()
-        try:
-            content = raw_bytes.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            content = raw_bytes.decode("cp949")
-        df = pd.read_csv(StringIO(content))
+        df = _read_tx_dataframe(file)
     except Exception as e:
-        logger.error(f"CSV parse error: {str(e)}", exc_info=True)
-        return error_response("CSV 파일 파싱에 실패했습니다.", 400)
+        logger.error(f"Tx summary parse error: {str(e)}", exc_info=True)
+        return error_response("파일 파싱에 실패했습니다.", 400)
     if df is None or df.empty:
-        return error_response("CSV file is empty", 400)
+        return error_response("파일에 데이터가 없습니다.", 400)
 
     csv_probe_col = None
     csv_sw_col = None
@@ -536,23 +553,22 @@ def export_table_to_word():
 @require_auth
 @with_db_connection()
 def upload_tx_summary():
-    """TX Summary CSV 파일을 DB의 Tx_summary 테이블에 업로드"""
+    """TX Summary 파일(CSV/TXT)을 DB의 Tx_summary 테이블에 업로드"""
     if "file" not in request.files:
         return error_response("No file provided", 400)
     
     file = request.files["file"]
-    if not file.filename.endswith('.csv'):
-        return error_response("Only CSV files are allowed", 400)
+    if not _is_allowed_tx_file(file.filename):
+        return error_response("CSV 또는 TXT 파일만 업로드할 수 있습니다.", 400)
     
     selected_database = request.form.get("database", os.environ.get("SERVER_NAME_DB", "AOP_DB"))
     
     try:
-        # CSV 읽기
-        content = file.read().decode('utf-8')
-        df = pd.read_csv(StringIO(content))
+        # 입력 파일 읽기 (TXT는 구분자 자동 감지)
+        df = _read_tx_dataframe(file)
         
         if df.empty:
-            return error_response("CSV file is empty", 400)
+            return error_response("파일에 데이터가 없습니다.", 400)
         
         # 1. 빈 헤더 사전 제거 (trailing delimiter 때문에 빈 컬럼 생성 가능)
         valid_header_indexes = [i for i, col in enumerate(df.columns) if str(col).strip()]

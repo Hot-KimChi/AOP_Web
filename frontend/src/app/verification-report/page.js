@@ -546,6 +546,7 @@ export default function VerificationReport() {
                   type="file"
                   id="txFileInput"
                   className="form-control"
+                  accept=".csv,.txt"
                   onChange={handleTxFileChange}
                   disabled={txLoading}
                 />
