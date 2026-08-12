@@ -7,6 +7,7 @@ import DataViewer from '../../../components/DataViewer';
 function DataViewContent() {
   const [data, setData] = useState([]);
   const [columns, setColumns] = useState([]);
+  const [meta, setMeta] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [title, setTitle] = useState('검증 결과');
@@ -20,10 +21,14 @@ function DataViewContent() {
       if (storageKey) {
         const storedData = sessionStorage.getItem(storageKey);
         const storedColumns = sessionStorage.getItem(`${storageKey}_columns`);
+        const storedMeta = sessionStorage.getItem(`${storageKey}_meta`);
         if (storedData) {
           setData(JSON.parse(storedData));
           if (storedColumns) {
             setColumns(JSON.parse(storedColumns));
+          }
+          if (storedMeta) {
+            setMeta(JSON.parse(storedMeta));
           }
         } else {
           setError('세션 데이터가 없습니다.');
@@ -51,13 +56,41 @@ function DataViewContent() {
     return <div className="alert alert-danger">{error}</div>;
   }
   return (
-    <DataViewer
-      data={data}
-      columns={columns}
-      title={title}
-      showExport={true}
-      minWidth={800}
-    />
+    <div>
+      {meta && (
+        <div className="card mb-3 mx-2 mt-2">
+          <div className="card-body py-2">
+            <div className="d-flex flex-wrap align-items-center gap-3">
+              <div>
+                <span className="text-muted small me-1">ProbeID:</span>
+                <strong>{meta.selectedProbeId}</strong>
+              </div>
+              <div>
+                <span className="text-muted small me-1">SW Version:</span>
+                <strong>{meta.selectedSoftwareVersion}</strong>
+              </div>
+              <div className="ms-auto d-flex gap-2 align-items-center">
+                <span className="badge bg-secondary fs-6">총 {meta.totalCount}개</span>
+                <span className="badge bg-success fs-6">일치 (O): {meta.matchCount}</span>
+                <span className={`badge fs-6 ${meta.mismatchCount > 0 ? 'bg-danger' : 'bg-secondary'}`}>
+                  불일치 (X): {meta.mismatchCount}
+                </span>
+              </div>
+            </div>
+            {meta.message && (
+              <div className="mt-1 text-muted small">{meta.message}</div>
+            )}
+          </div>
+        </div>
+      )}
+      <DataViewer
+        data={data}
+        columns={columns}
+        title={title}
+        showExport={true}
+        minWidth={800}
+      />
+    </div>
   );
 }
 

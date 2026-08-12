@@ -273,6 +273,20 @@ export default function VerificationReport() {
     const storageKey = `txValidation_${Date.now()}`;
     sessionStorage.setItem(storageKey, JSON.stringify(displayRows));
     sessionStorage.setItem(`${storageKey}_columns`, JSON.stringify(Object.keys(displayRows[0] || {})));
+
+    if (comparisonRows) {
+      const matchCnt = comparisonRows.filter(r => r.Match === 'O').length;
+      const mismatchCnt = comparisonRows.filter(r => r.Match === 'X').length;
+      sessionStorage.setItem(`${storageKey}_meta`, JSON.stringify({
+        selectedProbeId: validation.selectedProbeId ?? '',
+        selectedSoftwareVersion: validation.selectedSoftwareVersion ?? '',
+        totalCount: comparisonRows.length,
+        matchCount: matchCnt,
+        mismatchCount: mismatchCnt,
+        message: validation.message || '',
+      }));
+    }
+
     window.open(
       `/verification-report/data-view-standalone?pageLabel=${encodeURIComponent('Tx Summary Parameter Matching')}&storageKey=${encodeURIComponent(storageKey)}`,
       '_blank',
