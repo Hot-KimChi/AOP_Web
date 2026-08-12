@@ -6,8 +6,8 @@ const WEEKLY_SCHEDULE_EMBED_URL = 'https://healthineersapc.sharepoint.com/teams/
 
 export default function HomePage() {
   return (
-    <div className="page-wrapper" style={{ padding: '1rem' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="page-wrapper" style={{ padding: '0.5rem', height: 'calc(100vh - 1rem)' }}>
+      <div style={{ width: '100%', height: '100%' }}>
         <div
           style={{
             background: 'var(--surface)',
@@ -15,6 +15,9 @@ export default function HomePage() {
             border: '1px solid var(--border)',
             borderRadius: '12px',
             padding: '1rem',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
           <div
@@ -53,7 +56,8 @@ export default function HomePage() {
             src={WEEKLY_SCHEDULE_EMBED_URL}
             style={{
               width: '100%',
-              height: '760px',
+              flex: 1,
+              minHeight: '700px',
               border: '1px solid var(--border)',
               borderRadius: '8px',
               background: 'var(--bg)',
