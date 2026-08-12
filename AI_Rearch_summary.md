@@ -484,3 +484,13 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - 파일 미리보기를 서버 응답(JSON)에 의존하지 않고 브라우저 로컬 CSV 파싱으로 변경
   - 검증 API 응답은 text 기반 파싱 후 JSON 변환해 HTML 에러 응답도 안전 처리
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+
+## 2026-08-12 파일 선택 즉시 검증/출력 로직 복원
+
+- 요청: 과거 Copilot 세션에서 구현했던 파일 선택 후 검증 + 결과 출력 코드 복원
+- 반영:
+  - `handleTxFileChange`에서 조건 충족 시 즉시 `validateTxFile` 실행
+  - 파일/선택값 변경 시 자동 재검증(useEffect) 복원
+  - 업로드 버튼에 `txValidationOk` 게이트 복원
+  - 검증 결과 팝업(`Tx Summary Parameter Matching`) 출력 흐름 복원
+- 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)

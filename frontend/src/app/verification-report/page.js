@@ -278,70 +278,6 @@ export default function VerificationReport() {
     );
   };
 
-  const openTxFilePreviewWindow = (previewData, previewColumns, rowCount) => {
-    const rows = Array.isArray(previewData) ? previewData : [];
-    if (rows.length === 0) {
-      return;
-    }
-    const storageKey = `txFilePreview_${Date.now()}`;
-    sessionStorage.setItem(storageKey, JSON.stringify(rows));
-    sessionStorage.setItem(
-      `${storageKey}_columns`,
-      JSON.stringify(Array.isArray(previewColumns) && previewColumns.length > 0 ? previewColumns : Object.keys(rows[0] || {}))
-    );
-    window.open(
-      `/verification-report/data-view-standalone?pageLabel=${encodeURIComponent(`Tx Summary Input Preview (${rowCount} rows)`)}&storageKey=${encodeURIComponent(storageKey)}`,
-      '_blank',
-      'width=1500,height=900,menubar=no,toolbar=no,location=no,status=no'
-    );
-  };
-
-  const splitCsvLine = (line) => {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i += 1) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
-          i += 1;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (ch === ',' && !inQuotes) {
-        result.push(current);
-        current = '';
-      } else {
-        current += ch;
-      }
-    }
-    result.push(current);
-    return result.map((v) => v.trim());
-  };
-
-  const previewTxFile = async (file) => {
-    const content = await file.text();
-    const lines = content
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n')
-      .split('\n')
-      .filter((line) => line.trim() !== '');
-    if (lines.length === 0) {
-      throw new Error('빈 CSV 파일입니다.');
-    }
-    const headers = splitCsvLine(lines[0]).map((h) => h.trim());
-    const previewRows = lines.slice(1, 301).map((line) => {
-      const values = splitCsvLine(line);
-      const row = {};
-      headers.forEach((header, idx) => {
-        row[header || `col_${idx + 1}`] = values[idx] ?? '';
-      });
-      return row;
-    });
-    openTxFilePreviewWindow(previewRows, headers, Math.max(lines.length - 1, 0));
-  };
-
   const validateTxFile = async (file, database, probeId, softwareVersion) => {
     if (!file || !database || !probeId || !softwareVersion) {
       return;
@@ -385,16 +321,36 @@ export default function VerificationReport() {
     if (!selectedFile) {
       return;
     }
+    if (!txDatabase || !txProbe || !txSoftwareVersion) {
+      setTxValidationMessage('파일이 선택되었습니다. Database/Probe/Software version 선택 후 자동 검증됩니다.');
+      return;
+    }
     try {
       setTxLoading(true);
-      await previewTxFile(selectedFile);
-      setTxValidationMessage('파일 미리보기가 열렸습니다. 업로드 시점에 DB 매칭 검증이 실행됩니다.');
+      await validateTxFile(selectedFile, txDatabase, txProbe, txSoftwareVersion);
     } catch (err) {
-      setTxError(err.message || '파일 미리보기 실패');
+      setTxError(err.message || '파일 검증 실패');
     } finally {
       setTxLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!txFile || !txDatabase || !txProbe || !txSoftwareVersion) {
+      return;
+    }
+    const runValidation = async () => {
+      try {
+        setTxLoading(true);
+        await validateTxFile(txFile, txDatabase, txProbe, txSoftwareVersion);
+      } catch (err) {
+        setTxError(err.message || '파일 검증 실패');
+      } finally {
+        setTxLoading(false);
+      }
+    };
+    runValidation();
+  }, [txFile, txDatabase, txProbe, txSoftwareVersion]);
 
   const uploadTxSummary = async () => {
     if (!txDatabase || !txProbe || !txSoftwareVersion || !txFile) {
@@ -610,7 +566,7 @@ export default function VerificationReport() {
                   className="btn w-100"
                   style={{ background: '#6366f1', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                   onClick={uploadTxSummary}
-                  disabled={!txDatabase || !txProbe || !txSoftwareVersion || !txFile || txLoading}
+                  disabled={!txDatabase || !txProbe || !txSoftwareVersion || !txFile || txLoading || !txValidationOk}
                 >
                   {txLoading ? 'Processing…' : '📥 Upload TX Summary to DB'}
                 </button>

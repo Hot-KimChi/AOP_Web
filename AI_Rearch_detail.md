@@ -1552,3 +1552,24 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 
 ### 결과
 - 파일 선택 시 JSON 파싱 예외 없이 안정적으로 미리보기 팝업 표시
+
+---
+
+## 2026-08-12 파일 선택 후 검증/팝업 출력 로직 복원
+
+### 요청
+- 과거 세션에서 구현했던 “파일 선택 시 검증 + 출력(팝업)” 코드가 삭제되어 복원 필요
+
+### 조치
+- 파일: `frontend/src/app/verification-report/page.js`
+1. `handleTxFileChange`
+   - 선택값(Database/Probe/Software version)이 모두 있으면 파일 선택 즉시 `validateTxFile` 실행
+2. 자동 재검증 복원
+   - `txFile`, `txDatabase`, `txProbe`, `txSoftwareVersion` 변경 시 `useEffect`로 재검증 수행
+3. 업로드 게이트 복원
+   - 업로드 버튼 조건에 `txValidationOk` 재적용
+4. 검증 결과 출력 유지
+   - `validateTxFile` 내부 `openTxValidationWindow` 팝업 출력 흐름 유지
+
+### 결과
+- 파일 선택 후 검증과 결과 팝업 출력 동작이 과거 구현 방식대로 복원됨
