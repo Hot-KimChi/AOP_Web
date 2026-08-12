@@ -1453,3 +1453,26 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 
 ### 결과
 - `11821684.0` 형태 입력에서도 정수 probeId로 조회되어 변환 에러 없이 Software version 목록이 정상 조회됨
+
+---
+
+## 2026-08-12 Input file 선택 시 Tx_summary 매칭 결과 창 추가
+
+### 요청
+- Input file 선택 시, 선택한 database 기준 `Tx_summary` 파라미터 매칭 여부를 창으로 확인하고 싶음
+
+### 변경
+1. **백엔드 검증 응답 확장**
+   - 파일: `backend/routes/db_api.py`
+   - `/api/validate_tx_summary_file` 응답에 아래 필드 추가:
+     - `matchingCount`: 매칭된 Tx_summary 행 수
+     - `matchingRows`: 매칭 상세 행(최대 200행)
+
+2. **프론트 팝업 표시 추가**
+   - 파일: `frontend/src/app/verification-report/page.js`
+   - 파일 검증 완료 시 `openTxValidationWindow()` 실행
+   - `verification-report/data-view-standalone` 페이지를 팝업으로 열어 결과 표시
+   - 매칭 상세 행이 있으면 상세 테이블, 없으면 요약(선택값/파일값/일치 여부/메시지) 표시
+
+### 결과
+- Input file 선택 후 검증이 수행되면, 사용자가 즉시 매칭 결과를 별도 창에서 확인 가능

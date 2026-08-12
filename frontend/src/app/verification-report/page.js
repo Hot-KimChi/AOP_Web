@@ -254,6 +254,30 @@ export default function VerificationReport() {
     fetchVersions();
   }, [txDatabase, txProbe]);
 
+  const openTxValidationWindow = (validation) => {
+    const summaryRows = [
+      { category: 'selection', item: 'Selected ProbeID', value: validation.selectedProbeId ?? '' },
+      { category: 'selection', item: 'Selected Software version', value: validation.selectedSoftwareVersion ?? '' },
+      { category: 'file', item: 'File ProbeIDs', value: (validation.fileProbeIds || []).join(', ') },
+      { category: 'file', item: 'File Software versions', value: (validation.fileSoftwareVersions || []).join(', ') },
+      { category: 'match', item: 'Selection Match', value: validation.matchesSelection ? 'YES' : 'NO' },
+      { category: 'match', item: 'Tx_summary Rows', value: String(validation.matchingCount ?? 0) },
+      { category: 'message', item: 'Result', value: validation.message || '' },
+    ];
+    const detailRows = Array.isArray(validation.matchingRows) ? validation.matchingRows : [];
+    const displayRows = detailRows.length > 0
+      ? detailRows.map((row, idx) => ({ rowNo: idx + 1, ...row }))
+      : summaryRows;
+    const storageKey = `txValidation_${Date.now()}`;
+    sessionStorage.setItem(storageKey, JSON.stringify(displayRows));
+    sessionStorage.setItem(`${storageKey}_columns`, JSON.stringify(Object.keys(displayRows[0] || {})));
+    window.open(
+      `/verification-report/data-view-standalone?pageLabel=${encodeURIComponent('Tx Summary Parameter Matching')}&storageKey=${encodeURIComponent(storageKey)}`,
+      '_blank',
+      'width=1400,height=850,menubar=no,toolbar=no,location=no,status=no'
+    );
+  };
+
   const validateTxFile = async (file, database, probeId, softwareVersion) => {
     if (!file || !database || !probeId || !softwareVersion) {
       return;
@@ -278,6 +302,7 @@ export default function VerificationReport() {
     const ok = Boolean(validation.matchesSelection && validation.dbHasMatchingRows);
     setTxValidationOk(ok);
     setTxValidationMessage(validation.message || '');
+    openTxValidationWindow(validation);
   };
 
   const handleTxFileChange = async (event) => {

@@ -338,13 +338,18 @@ def validate_tx_summary_file():
     except Exception:
         pass
     db_match_df = g.current_db.execute_query(
-        "SELECT TOP 1 ProbeID "
+        "SELECT TOP 200 ProbeID, ProbeName, Software_version, Mode, combined_mode, IsProcessed "
         "FROM [Tx_summary] "
         "WHERE ProbeID = ? "
         "  AND LTRIM(RTRIM(CAST(Software_version AS NVARCHAR(255)))) = LTRIM(RTRIM(CAST(? AS NVARCHAR(255))))",
         params=(db_probe_param, selected_sw_norm),
     )
     db_has_matching_rows = db_match_df is not None and not db_match_df.empty
+    matching_rows = (
+        db_match_df.replace({np.nan: None}).to_dict(orient="records")
+        if db_has_matching_rows
+        else []
+    )
 
     message = "파일 파라미터와 선택값이 일치합니다."
     if not matches_selection:
@@ -362,6 +367,8 @@ def validate_tx_summary_file():
                 "fileSoftwareVersions": file_sw_values,
                 "selectedProbeId": selected_probe_norm,
                 "selectedSoftwareVersion": selected_sw_norm,
+                "matchingCount": len(matching_rows),
+                "matchingRows": matching_rows,
                 "message": message,
             },
         }

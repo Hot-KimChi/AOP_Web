@@ -451,3 +451,11 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - 백엔드 `/get_imaging_sw_versions`에서 `probeId`를 정규화 후 int 변환해 쿼리 파라미터로 사용
   - 프론트에서 Software version 조회 시 `probeId`를 정수 문자열로 정규화하여 전송
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+
+## 2026-08-12 Input file 선택 시 매칭 결과 창 출력
+
+- 요청: Input file 선택 시 선택한 database의 `Tx_summary` 파라미터 매칭 결과를 창으로 표시
+- 반영:
+  - 파일 검증 API 응답에 `matchingCount`, `matchingRows` 추가
+  - 파일 검증 완료 시 `verification-report/data-view-standalone` 팝업을 열어 매칭 결과 표시
+- 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
