@@ -263,9 +263,14 @@ export default function VerificationReport() {
 
     if (comparisonRows) {
       // 피벗 구조 생성: 행=No(행번호), 열=Parameter
-      // No는 백엔드에서 같은 Mode 여러 행을 구분하는 고유 식별자
       const rowNos = [...new Set(comparisonRows.map(r => r.No))].sort((a, b) => a - b);
-      const paramNames = [...new Set(comparisonRows.map(r => r.Parameter))];
+
+      // SQL 컬럼 순서 보존: 첫 번째 No 행에서 Parameter 순서 추출
+      const firstNo = rowNos[0];
+      const paramNames = comparisonRows
+        .filter(r => r.No === firstNo)
+        .map(r => r.Parameter);
+
       // 헤더: Mode를 첫 컬럼으로 포함
       const params = ['Mode', ...paramNames];
 
@@ -273,27 +278,18 @@ export default function VerificationReport() {
         const rowCells = comparisonRows.filter(r => r.No === no);
         const modeVal = rowCells.length > 0 ? String(rowCells[0].Mode ?? '') : '';
         const row = { _rowNo: no, _modeStr: modeVal };
-        // Mode 셀은 문자열로 저장
-        row['Mode'] = { fileValue: modeVal, match: 'O' };
         paramNames.forEach(param => {
           const found = rowCells.find(r => r.Parameter === param);
-          row[param] = found
-            ? { match: found.Match, fileValue: found.FileValue, dbValue: found.DBValue }
-            : { match: 'X', fileValue: '—', dbValue: '—' };
+          // FileValue: "UNMATCHED"(매핑불가) | "NULL"(값없음) | 실제값
+          row[param] = found ? (found.FileValue ?? 'UNMATCHED') : 'UNMATCHED';
         });
         return row;
       });
-
-      const matchCnt = comparisonRows.filter(r => r.Match === 'O').length;
-      const mismatchCnt = comparisonRows.filter(r => r.Match === 'X').length;
 
       sessionStorage.setItem(`${storageKey}_pivot`, JSON.stringify({ rowNos, params, rows: pivotRows }));
       sessionStorage.setItem(`${storageKey}_meta`, JSON.stringify({
         selectedProbeId: validation.selectedProbeId ?? '',
         selectedSoftwareVersion: validation.selectedSoftwareVersion ?? '',
-        totalCount: comparisonRows.length,
-        matchCount: matchCnt,
-        mismatchCount: mismatchCnt,
         message: validation.message || '',
       }));
     } else {

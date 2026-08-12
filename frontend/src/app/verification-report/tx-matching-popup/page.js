@@ -100,17 +100,31 @@ const S = {
     fontSize: 12,
     minWidth: 90,
   },
-  /* 데이터 셀 */
-  td: (hasData, rowIdx) => ({
-    padding: '7px 10px',
+  /* 데이터 셀 — 상태별 스타일 */
+  td: (val, rowIdx) => {
+    const isUnmatched = val === 'UNMATCHED';
+    const isNull      = val === 'NULL';
+    return {
+      padding: '7px 10px',
+      textAlign: 'center',
+      border: `1px solid ${BORDER}`,
+      background: isUnmatched
+        ? (rowIdx % 2 === 0 ? 'rgba(239,68,68,.07)' : 'rgba(239,68,68,.12)')
+        : (rowIdx % 2 === 0 ? '#fff' : ROW_ODD),
+      color: isUnmatched ? '#dc2626' : isNull ? '#94a3b8' : '#1e293b',
+      fontWeight: isUnmatched ? 700 : 400,
+      fontSize: 12,
+      whiteSpace: 'nowrap',
+    };
+  },
+  tdMode: (rowIdx) => ({
+    padding: '7px 12px',
     textAlign: 'center',
     border: `1px solid ${BORDER}`,
-    background: hasData
-      ? (rowIdx % 2 === 0 ? '#fff' : ROW_ODD)
-      : (rowIdx % 2 === 0 ? 'rgba(239,68,68,.06)' : 'rgba(239,68,68,.10)'),
-    color: hasData ? '#1e293b' : '#dc2626',
-    fontWeight: hasData ? 400 : 700,
-    fontSize: hasData ? 12 : 13,
+    background: rowIdx % 2 === 0 ? '#f8fafc' : '#f1f5f9',
+    color: '#1e293b',
+    fontWeight: 600,
+    fontSize: 12,
     whiteSpace: 'nowrap',
   }),
   /* 범례 */
@@ -164,20 +178,20 @@ function TxMatchingContent() {
   if (pivot) {
     const { params, rows } = pivot;
 
-    /* 매칭률 계산: Mode·TxSummaryID 제외 */
+    /* 파라미터 수 및 매칭률 계산: Mode·TxSummaryID 제외 */
     const SKIP = new Set(['TxSummaryID', 'Mode']);
     const calcParams = params.filter(p => !SKIP.has(p));
+    const paramCount = calcParams.length;
 
     let totalCells = 0, matchedCells = 0;
     rows.forEach(row => {
       calcParams.forEach(p => {
         totalCells++;
-        const cell = row[p];
-        if (cell && cell.fileValue !== '—' && cell.fileValue !== '') matchedCells++;
+        const val = row[p] ?? 'UNMATCHED';
+        if (val !== 'UNMATCHED' && val !== 'NULL') matchedCells++;
       });
     });
     const matchRate = totalCells > 0 ? Math.round((matchedCells / totalCells) * 100) : 0;
-    const paramCount = calcParams.length;   // 파라미터 개수 (TxSummaryID 제외)
 
     return (
       <div style={S.page}>
@@ -224,19 +238,17 @@ function TxMatchingContent() {
               {rows.map((row, rowIdx) => (
                 <tr key={row._rowNo ?? rowIdx}>
                   {params.map(p => {
-                    // Mode 컬럼은 _modeStr(문자열)로 직접 표시
                     if (p === 'Mode') {
                       return (
-                        <td key="Mode" style={{ ...S.td(true, rowIdx), fontWeight: 600 }}>
+                        <td key="Mode" style={S.tdMode(rowIdx)}>
                           {row._modeStr || '—'}
                         </td>
                       );
                     }
-                    const cell = row[p] || { fileValue: '—' };
-                    const hasData = cell.fileValue !== '—' && cell.fileValue !== '' && cell.fileValue != null;
+                    const val = row[p] ?? 'UNMATCHED';
                     return (
-                      <td key={p} style={S.td(hasData, rowIdx)}>
-                        {hasData ? cell.fileValue : 'X'}
+                      <td key={p} style={S.td(val, rowIdx)}>
+                        {val === 'UNMATCHED' ? 'X' : val === 'NULL' ? 'NULL' : val}
                       </td>
                     );
                   })}
@@ -248,8 +260,8 @@ function TxMatchingContent() {
 
         {/* ── 범례 ── */}
         <div style={S.legend}>
-          <span><span style={{ color: '#dc2626', fontWeight: 700 }}>X</span> = 파일에 데이터 없음 또는 매핑 불가</span>
-          <span style={{ color: '#16a34a' }}>초록/흰 셀 = 데이터 존재</span>
+          <span><span style={{ color: '#dc2626', fontWeight: 700 }}>X</span> = 파일에 해당 파라미터 없음 (매핑 불가)</span>
+          <span><span style={{ color: '#94a3b8', fontWeight: 600 }}>NULL</span> = 파라미터는 있으나 값이 비어 있음</span>
         </div>
       </div>
     );

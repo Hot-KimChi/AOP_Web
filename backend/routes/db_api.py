@@ -492,21 +492,21 @@ def validate_tx_summary_file():
                         raw_dv = db_row[param]
                         dv = "—" if (raw_dv is None or str(raw_dv).lower() in ("nan", "none", "")) else str(raw_dv)
 
-                    fv = "—"
+                    # fv 구분:
+                    #   "UNMATCHED" → 파일에 파라미터 컬럼 자체가 없음 (매핑 불가)
+                    #   "NULL"      → 파라미터 컬럼은 있으나 값이 null/비어있음
+                    #   실제 문자열 → 정상 데이터
+                    fv = "UNMATCHED"
                     if file_row is not None:
                         idx = file_row.index if hasattr(file_row, "index") else []
                         if param in idx:
                             raw_fv = file_row[param]
-                            fv = "—" if (raw_fv is None or str(raw_fv).lower() in ("nan", "none", "")) else str(raw_fv)
+                            if raw_fv is None or str(raw_fv).lower() in ("nan", "none", ""):
+                                fv = "NULL"
+                            else:
+                                fv = str(raw_fv)
 
-                    # 파일 데이터 없으면 X
-                    if fv == "—":
-                        matched = False
-                    else:
-                        try:
-                            matched = abs(float(fv) - float(dv)) < 1e-6
-                        except Exception:
-                            matched = fv.strip() == dv.strip()
+                    matched = fv not in ("UNMATCHED", "NULL")
 
                     comparison_rows.append({
                         "No": row_no,
