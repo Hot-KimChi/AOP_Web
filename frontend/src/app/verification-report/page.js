@@ -296,19 +296,50 @@ export default function VerificationReport() {
     );
   };
 
-  const previewTxFile = async (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch(`${API_BASE_URL}/api/preview_tx_summary_file`, {
-      method: 'POST',
-      credentials: 'include',
-      body: formData,
-    });
-    const data = await response.json();
-    if (!response.ok || data.status !== 'success') {
-      throw new Error(data.message || 'Input file 미리보기 실패');
+  const splitCsvLine = (line) => {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i += 1) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i += 1;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        result.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
     }
-    openTxFilePreviewWindow(data.previewData, data.columns, data.rowCount ?? 0);
+    result.push(current);
+    return result.map((v) => v.trim());
+  };
+
+  const previewTxFile = async (file) => {
+    const content = await file.text();
+    const lines = content
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .split('\n')
+      .filter((line) => line.trim() !== '');
+    if (lines.length === 0) {
+      throw new Error('빈 CSV 파일입니다.');
+    }
+    const headers = splitCsvLine(lines[0]).map((h) => h.trim());
+    const previewRows = lines.slice(1, 301).map((line) => {
+      const values = splitCsvLine(line);
+      const row = {};
+      headers.forEach((header, idx) => {
+        row[header || `col_${idx + 1}`] = values[idx] ?? '';
+      });
+      return row;
+    });
+    openTxFilePreviewWindow(previewRows, headers, Math.max(lines.length - 1, 0));
   };
 
   const validateTxFile = async (file, database, probeId, softwareVersion) => {
@@ -327,7 +358,13 @@ export default function VerificationReport() {
       credentials: 'include',
       body: formData,
     });
-    const data = await response.json();
+    const rawText = await response.text();
+    let data = null;
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      throw new Error(rawText || '파일 파라미터 검증 실패');
+    }
     if (!response.ok || data.status !== 'success') {
       throw new Error(data.message || '파일 파라미터 검증 실패');
     }

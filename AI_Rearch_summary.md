@@ -476,3 +476,11 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - 파일 선택 시 즉시 미리보기 팝업 출력
   - DB 매칭 검증은 업로드 버튼 클릭 시점으로 이동
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+
+## 2026-08-12 JSON 파싱 에러(Unexpected token '<') 수정
+
+- 요청: 파일 선택 시 `Unexpected token '<', "<!doctype ..."` 에러 발생
+- 반영:
+  - 파일 미리보기를 서버 응답(JSON)에 의존하지 않고 브라우저 로컬 CSV 파싱으로 변경
+  - 검증 API 응답은 text 기반 파싱 후 JSON 변환해 HTML 에러 응답도 안전 처리
+- 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)

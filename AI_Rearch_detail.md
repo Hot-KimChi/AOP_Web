@@ -1528,3 +1528,27 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 ### 결과
 - 파일 선택 직후에는 DB 미조회 상태로 미리보기 팝업만 표시
 - 실제 DB 매칭 검증은 업로드 직전에 실행되어 사용자 의도와 순서가 일치
+
+---
+
+## 2026-08-12 `Unexpected token '<'` JSON 파싱 오류 수정
+
+### 증상
+- 파일 선택 직후:
+  - `Unexpected token '<', "<!doctype ... is not valid JSON`
+
+### 원인
+- 미리보기/검증 경로에서 HTML 에러 응답(404/예외 페이지)을 JSON으로 직접 파싱
+
+### 조치
+1. **파일 미리보기 경로를 로컬 파싱으로 전환**
+   - 파일: `frontend/src/app/verification-report/page.js`
+   - `previewTxFile()`에서 `file.text()`로 CSV를 직접 파싱해 팝업 표시
+   - 서버 JSON 응답 의존 제거
+
+2. **검증 응답 파싱 보강**
+   - `validateTxFile()`에서 `response.text()`를 우선 읽고 JSON 파싱 시도
+   - 파싱 실패 시 원문 텍스트로 에러 처리해 예외 원인 노출
+
+### 결과
+- 파일 선택 시 JSON 파싱 예외 없이 안정적으로 미리보기 팝업 표시
