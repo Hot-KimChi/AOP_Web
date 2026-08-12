@@ -232,6 +232,11 @@ def get_imaging_sw_versions():
     probe_id = request.args.get("probeId")
     if not selected_database or not probe_id:
         return error_response("database, probeId 파라미터가 필요합니다.", 400)
+    normalized_probe_id = _normalize_probe_id(probe_id)
+    try:
+        probe_id_param = int(normalized_probe_id)
+    except Exception:
+        return error_response("probeId는 정수 값이어야 합니다.", 400)
     query = (
         "SELECT measSSId, imagingSwVersion "
         "FROM [meas_station_setup] "
@@ -240,7 +245,7 @@ def get_imaging_sw_versions():
         "  AND LTRIM(RTRIM(CAST(imagingSwVersion AS NVARCHAR(255)))) <> '' "
         "ORDER BY measSSId DESC"
     )
-    df = g.current_db.execute_query(query, params=(probe_id,))
+    df = g.current_db.execute_query(query, params=(probe_id_param,))
     if df is None or df.empty:
         return jsonify({"status": "success", "softwareVersions": []})
     seen = set()

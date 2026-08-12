@@ -1427,3 +1427,29 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 
 ### 결과
 - 최신 서버 반영 전/후 환경 모두에서 Software version 드롭다운이 동작하도록 호환성 확보
+
+---
+
+## 2026-08-12 probeId nvarchar→int 변환 실패 수정
+
+### 증상
+- Software version 조회 시 SQL 에러:
+  - `Conversion failed when converting the nvarchar value '11821684.0' to data type int`
+
+### 원인
+- `probeId`가 int 컬럼임에도 프론트/백엔드 경로에서 `'11821684.0'` 형태 문자열로 전달됨
+
+### 조치
+1. **백엔드 정수 강제 변환**
+   - 파일: `backend/routes/db_api.py`
+   - `/api/get_imaging_sw_versions`에서 `probeId`를 `_normalize_probe_id`로 정규화 후 `int`로 변환
+   - 변환 실패 시 400 에러 반환(`probeId는 정수 값이어야 합니다.`)
+
+2. **프론트 probeId 정규화**
+   - 파일: `frontend/src/app/verification-report/page.js`
+   - `normalizeProbeId()` 추가
+   - Software version 조회 API 호출 전 `probeId`를 정수 문자열로 변환해 전달
+   - 폴백 필터링에서도 동일 정규화 적용
+
+### 결과
+- `11821684.0` 형태 입력에서도 정수 probeId로 조회되어 변환 에러 없이 Software version 목록이 정상 조회됨

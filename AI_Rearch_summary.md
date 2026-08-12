@@ -443,3 +443,11 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - 프론트에 `/api/get_imaging_sw_versions` 404 시 `get_table_data(meas_station_setup)`로 자동 폴백 추가
   - 백엔드 `get_table_data(meas_station_setup)` 응답에 `imagingSwVersion` 컬럼 포함
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+
+## 2026-08-12 probeId 정수 변환 오류 수정
+
+- 요청: `probeId`가 int 컬럼인데 `11821684.0`(nvarchar)로 전달되어 SQL 변환 실패
+- 반영:
+  - 백엔드 `/get_imaging_sw_versions`에서 `probeId`를 정규화 후 int 변환해 쿼리 파라미터로 사용
+  - 프론트에서 Software version 조회 시 `probeId`를 정수 문자열로 정규화하여 전송
+- 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)

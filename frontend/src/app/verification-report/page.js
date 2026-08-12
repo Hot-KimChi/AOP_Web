@@ -6,6 +6,18 @@ import Layout from '../../components/Layout';
 export default function VerificationReport() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
+  const normalizeProbeId = (value) => {
+    const raw = String(value ?? '').trim();
+    if (!raw) {
+      return '';
+    }
+    const numeric = Number(raw);
+    if (!Number.isNaN(numeric)) {
+      return String(Math.trunc(numeric));
+    }
+    return raw;
+  };
+
   const [DBList, setDBList] = useState([]);
 
   const [reportDatabase, setReportDatabase] = useState('');
@@ -156,9 +168,10 @@ export default function VerificationReport() {
   };
 
   const loadTxSoftwareVersions = async (database, probeId) => {
+    const normalizedProbeId = normalizeProbeId(probeId);
     const url = new URL(`${API_BASE_URL}/api/get_imaging_sw_versions`);
     url.searchParams.append('database', database);
-    url.searchParams.append('probeId', probeId);
+    url.searchParams.append('probeId', normalizedProbeId);
     const response = await fetch(url.toString(), { method: 'GET', credentials: 'include' });
     if (response.status === 404) {
       const fallbackUrl = new URL(`${API_BASE_URL}/api/get_table_data`);
@@ -171,11 +184,11 @@ export default function VerificationReport() {
       }
       const fallbackData = await fallbackResponse.json();
       const rows = Array.isArray(fallbackData.data) ? fallbackData.data : [];
-      const selectedProbe = String(probeId);
+      const selectedProbe = normalizedProbeId;
       const seen = new Set();
       const versions = [];
       for (const row of rows) {
-        if (String(row.probeId) !== selectedProbe) {
+        if (normalizeProbeId(row.probeId) !== selectedProbe) {
           continue;
         }
         const version = String(row.imagingSwVersion ?? '').trim();
