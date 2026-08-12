@@ -259,24 +259,28 @@ export default function VerificationReport() {
       ? validation.comparisonRows
       : null;
 
-    const summaryRows = [
-      { Category: 'Selection', Item: 'Selected ProbeID', Value: validation.selectedProbeId ?? '' },
-      { Category: 'Selection', Item: 'Selected Software version', Value: validation.selectedSoftwareVersion ?? '' },
-      { Category: 'File', Item: 'File ProbeIDs', Value: (validation.fileProbeIds || []).join(', ') },
-      { Category: 'File', Item: 'File Software versions', Value: (validation.fileSoftwareVersions || []).join(', ') },
-      { Category: 'Result', Item: 'Selection Match', Value: validation.matchesSelection ? 'YES' : 'NO' },
-      { Category: 'Result', Item: 'Tx_summary Rows (DB)', Value: String(validation.matchingCount ?? 0) },
-      { Category: 'Result', Item: 'Message', Value: validation.message || '' },
-    ];
-
-    const displayRows = comparisonRows || summaryRows;
     const storageKey = `txValidation_${Date.now()}`;
-    sessionStorage.setItem(storageKey, JSON.stringify(displayRows));
-    sessionStorage.setItem(`${storageKey}_columns`, JSON.stringify(Object.keys(displayRows[0] || {})));
 
     if (comparisonRows) {
+      // 피벗 구조 생성: 행=Mode, 열=Parameter
+      const modes = [...new Set(comparisonRows.map(r => r.Mode))].sort();
+      const params = [...new Set(comparisonRows.map(r => r.Parameter))];
+
+      const pivotRows = modes.map(mode => {
+        const row = { Mode: mode };
+        params.forEach(param => {
+          const found = comparisonRows.find(r => r.Mode === mode && r.Parameter === param);
+          row[param] = found
+            ? { match: found.Match, fileValue: found.FileValue, dbValue: found.DBValue }
+            : { match: 'X', fileValue: '—', dbValue: '—' };
+        });
+        return row;
+      });
+
       const matchCnt = comparisonRows.filter(r => r.Match === 'O').length;
       const mismatchCnt = comparisonRows.filter(r => r.Match === 'X').length;
+
+      sessionStorage.setItem(`${storageKey}_pivot`, JSON.stringify({ modes, params, rows: pivotRows }));
       sessionStorage.setItem(`${storageKey}_meta`, JSON.stringify({
         selectedProbeId: validation.selectedProbeId ?? '',
         selectedSoftwareVersion: validation.selectedSoftwareVersion ?? '',
@@ -285,12 +289,22 @@ export default function VerificationReport() {
         mismatchCount: mismatchCnt,
         message: validation.message || '',
       }));
+    } else {
+      // 비교 데이터 없을 때 요약만 표시
+      const summaryRows = [
+        { Category: 'Selection', Item: 'Selected ProbeID', Value: validation.selectedProbeId ?? '' },
+        { Category: 'Selection', Item: 'Selected SW Version', Value: validation.selectedSoftwareVersion ?? '' },
+        { Category: 'Result', Item: 'DB Match', Value: validation.dbHasMatchingRows ? 'YES' : 'NO' },
+        { Category: 'Result', Item: 'Message', Value: validation.message || '' },
+      ];
+      sessionStorage.setItem(storageKey, JSON.stringify(summaryRows));
+      sessionStorage.setItem(`${storageKey}_columns`, JSON.stringify(Object.keys(summaryRows[0])));
     }
 
     window.open(
-      `/verification-report/data-view-standalone?pageLabel=${encodeURIComponent('Tx Summary Parameter Matching')}&storageKey=${encodeURIComponent(storageKey)}`,
+      `/verification-report/tx-matching-popup?storageKey=${encodeURIComponent(storageKey)}`,
       '_blank',
-      'width=1400,height=850,menubar=no,toolbar=no,location=no,status=no'
+      'width=1500,height=900,menubar=no,toolbar=no,location=no,status=no'
     );
   };
 
