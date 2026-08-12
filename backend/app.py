@@ -51,6 +51,5 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
 
-    # Always run in production mode (debug disabled, no reloader)
-    # For development debugging, manually set debug=True
-    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+    # Debug mode enabled for development
+    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
