@@ -435,3 +435,11 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - Tx Summary Input의 Software version을 `meas_station_setup.imagingSwVersion` 기반(최신 우선)으로 변경
   - Input file 선택 시 파일 내 `ProbeID/Software_version`과 선택값 및 `Tx_summary` 존재 여부를 검증하는 API 연동 추가
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+
+## 2026-08-12 Software version 404 보완
+
+- 요청: Tx Summary Input에서 Probe 선택 후 Software version 조회 시 404 발생
+- 반영:
+  - 프론트에 `/api/get_imaging_sw_versions` 404 시 `get_table_data(meas_station_setup)`로 자동 폴백 추가
+  - 백엔드 `get_table_data(meas_station_setup)` 응답에 `imagingSwVersion` 컬럼 포함
+- 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)

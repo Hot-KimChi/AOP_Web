@@ -161,7 +161,7 @@ def get_table_data():
         )
     if selected_table == "meas_station_setup":
         df = g.current_db.execute_query(
-            f"SELECT measSSId, measComments, probeId, measPersonName, measPurpose, imagingSysSn, probeSn, hydrophId FROM [{selected_table}] where measPurpose not like '%Beamstyle%' order by measSSId desc"
+            f"SELECT measSSId, measComments, probeId, measPersonName, measPurpose, imagingSysSn, probeSn, hydrophId, imagingSwVersion FROM [{selected_table}] where measPurpose not like '%Beamstyle%' order by measSSId desc"
         )
         data = df.to_dict(orient="records") if df is not None else []
         columns = list(df.columns) if df is not None else []

@@ -160,6 +160,37 @@ export default function VerificationReport() {
     url.searchParams.append('database', database);
     url.searchParams.append('probeId', probeId);
     const response = await fetch(url.toString(), { method: 'GET', credentials: 'include' });
+    if (response.status === 404) {
+      const fallbackUrl = new URL(`${API_BASE_URL}/api/get_table_data`);
+      fallbackUrl.searchParams.append('database', database);
+      fallbackUrl.searchParams.append('table', 'meas_station_setup');
+      const fallbackResponse = await fetch(fallbackUrl.toString(), { method: 'GET', credentials: 'include' });
+      if (!fallbackResponse.ok) {
+        const fallbackText = await fallbackResponse.text();
+        throw new Error(`Software version 조회 실패: ${fallbackText}`);
+      }
+      const fallbackData = await fallbackResponse.json();
+      const rows = Array.isArray(fallbackData.data) ? fallbackData.data : [];
+      const selectedProbe = String(probeId);
+      const seen = new Set();
+      const versions = [];
+      for (const row of rows) {
+        if (String(row.probeId) !== selectedProbe) {
+          continue;
+        }
+        const version = String(row.imagingSwVersion ?? '').trim();
+        if (!version || seen.has(version)) {
+          continue;
+        }
+        seen.add(version);
+        versions.push({
+          softwareVersion: version,
+          _id: `fallback_sw_${versions.length}`,
+        });
+      }
+      setTxSoftwareVersionList(versions);
+      return;
+    }
     if (!response.ok) {
       const txt = await response.text();
       throw new Error(`Software version 조회 실패: ${txt}`);

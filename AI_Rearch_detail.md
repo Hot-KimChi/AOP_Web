@@ -1400,3 +1400,30 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 
 ### 연관 링크
 - 요약: [AI_Rearch_summary.md](./AI_Rearch_summary.md)
+
+---
+
+## 2026-08-12 Tx Summary Input Software version 404 수정
+
+### 증상
+- Tx Summary Input에서 Probe 선택 후 Software version 조회 시:
+  - `Software version 조회 실패: ... 404 Not Found`
+
+### 원인
+- 프론트는 `/api/get_imaging_sw_versions` 호출을 전제로 동작
+- 실행 중 서버가 해당 라우트를 아직 반영하지 않은 경우 404 발생 가능
+
+### 조치
+1. **프론트 폴백 추가**
+   - `frontend/src/app/verification-report/page.js`
+   - `/api/get_imaging_sw_versions`가 404이면:
+     - `/api/get_table_data?table=meas_station_setup` 호출
+     - 선택 probe 기준 `imagingSwVersion`을 추출/중복 제거해 드롭다운 구성
+
+2. **백엔드 응답 보강**
+   - `backend/routes/db_api.py`
+   - `get_table_data(meas_station_setup)` 조회 컬럼에 `imagingSwVersion` 추가
+   - 폴백 경로에서도 Software version 표시 가능하도록 보장
+
+### 결과
+- 최신 서버 반영 전/후 환경 모두에서 Software version 드롭다운이 동작하도록 호환성 확보
