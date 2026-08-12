@@ -458,62 +458,65 @@ def validate_tx_summary_file():
             for _, row in db_match_df.replace({np.nan: None}).iterrows():
                 db_by_mode[str(row.get("Mode", "")).strip()] = row
 
-        # 파일 Mode별 행 매핑
-        file_by_mode = {}
+        # 파일 Mode별 행 목록 매핑 (같은 Mode 여러 행 모두 저장)
+        file_rows_by_mode: dict = {}
         if df_filtered is not None and not df_filtered.empty:
             if "Mode" in df_filtered.columns:
                 for _, row in df_filtered.iterrows():
                     mode_key = str(row.get("Mode", "")).strip()
-                    file_by_mode[mode_key] = row
+                    file_rows_by_mode.setdefault(mode_key, []).append(row)
             else:
-                # Mode 컬럼 없으면 첫 번째 행을 빈 모드로
-                file_by_mode[""] = df_filtered.iloc[0]
+                # Mode 컬럼 없으면 전체 행을 빈 모드로
+                for _, row in df_filtered.iterrows():
+                    file_rows_by_mode.setdefault("", []).append(row)
 
         # Mode 목록 결정: DB에 있으면 DB 기준, 없으면 파일 기준, 둘 다 없으면 [""]
         if db_by_mode:
             all_modes = sorted(db_by_mode.keys())
-        elif file_by_mode:
-            all_modes = sorted(file_by_mode.keys())
+        elif file_rows_by_mode:
+            all_modes = sorted(file_rows_by_mode.keys())
         else:
             all_modes = [""]
 
         row_no = 1
         for mode in all_modes:
-            db_row  = db_by_mode.get(mode)
-            file_row = file_by_mode.get(mode)
-            status = "DB_ONLY" if file_row is None else ("BOTH" if db_row is not None else "FILE_ONLY")
+            db_row = db_by_mode.get(mode)
+            file_rows = file_rows_by_mode.get(mode) or [None]
 
-            for param in db_cols:
-                dv = "—"
-                if db_row is not None and param in db_row.index:
-                    raw_dv = db_row[param]
-                    dv = "—" if (raw_dv is None or str(raw_dv).lower() in ("nan", "none", "")) else str(raw_dv)
+            for file_row in file_rows:
+                status = "DB_ONLY" if file_row is None else ("BOTH" if db_row is not None else "FILE_ONLY")
 
-                fv = "—"
-                if file_row is not None:
-                    idx = file_row.index if hasattr(file_row, "index") else []
-                    if param in idx:
-                        raw_fv = file_row[param]
-                        fv = "—" if (raw_fv is None or str(raw_fv).lower() in ("nan", "none", "")) else str(raw_fv)
+                for param in db_cols:
+                    dv = "—"
+                    if db_row is not None and param in db_row.index:
+                        raw_dv = db_row[param]
+                        dv = "—" if (raw_dv is None or str(raw_dv).lower() in ("nan", "none", "")) else str(raw_dv)
 
-                # 파일 데이터 없으면 X
-                if fv == "—":
-                    matched = False
-                else:
-                    try:
-                        matched = abs(float(fv) - float(dv)) < 1e-6
-                    except Exception:
-                        matched = fv.strip() == dv.strip()
+                    fv = "—"
+                    if file_row is not None:
+                        idx = file_row.index if hasattr(file_row, "index") else []
+                        if param in idx:
+                            raw_fv = file_row[param]
+                            fv = "—" if (raw_fv is None or str(raw_fv).lower() in ("nan", "none", "")) else str(raw_fv)
 
-                comparison_rows.append({
-                    "No": row_no,
-                    "Mode": mode,
-                    "Parameter": param,
-                    "DBValue": dv,
-                    "FileValue": fv,
-                    "Match": "O" if matched else "X",
-                    "Status": status,
-                })
+                    # 파일 데이터 없으면 X
+                    if fv == "—":
+                        matched = False
+                    else:
+                        try:
+                            matched = abs(float(fv) - float(dv)) < 1e-6
+                        except Exception:
+                            matched = fv.strip() == dv.strip()
+
+                    comparison_rows.append({
+                        "No": row_no,
+                        "Mode": mode,
+                        "Parameter": param,
+                        "DBValue": dv,
+                        "FileValue": fv,
+                        "Match": "O" if matched else "X",
+                        "Status": status,
+                    })
                 row_no += 1
 
     matching_rows_simple = (

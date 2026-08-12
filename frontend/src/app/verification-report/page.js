@@ -262,18 +262,21 @@ export default function VerificationReport() {
     const storageKey = `txValidation_${Date.now()}`;
 
     if (comparisonRows) {
-      // 피벗 구조 생성: 행=Mode, 열=Parameter (Mode 컬럼을 첫 번째로 포함)
-      const modes = [...new Set(comparisonRows.map(r => r.Mode))].sort();
+      // 피벗 구조 생성: 행=No(행번호), 열=Parameter
+      // No는 백엔드에서 같은 Mode 여러 행을 구분하는 고유 식별자
+      const rowNos = [...new Set(comparisonRows.map(r => r.No))].sort((a, b) => a - b);
       const paramNames = [...new Set(comparisonRows.map(r => r.Parameter))];
       // 헤더: Mode를 첫 컬럼으로 포함
       const params = ['Mode', ...paramNames];
 
-      const pivotRows = modes.map(mode => {
-        const row = {};
-        // Mode 셀
-        row['Mode'] = { fileValue: mode, match: 'O' };
+      const pivotRows = rowNos.map(no => {
+        const rowCells = comparisonRows.filter(r => r.No === no);
+        const modeVal = rowCells.length > 0 ? String(rowCells[0].Mode ?? '') : '';
+        const row = { _rowNo: no, _modeStr: modeVal };
+        // Mode 셀은 문자열로 저장
+        row['Mode'] = { fileValue: modeVal, match: 'O' };
         paramNames.forEach(param => {
-          const found = comparisonRows.find(r => r.Mode === mode && r.Parameter === param);
+          const found = rowCells.find(r => r.Parameter === param);
           row[param] = found
             ? { match: found.Match, fileValue: found.FileValue, dbValue: found.DBValue }
             : { match: 'X', fileValue: '—', dbValue: '—' };
@@ -284,7 +287,7 @@ export default function VerificationReport() {
       const matchCnt = comparisonRows.filter(r => r.Match === 'O').length;
       const mismatchCnt = comparisonRows.filter(r => r.Match === 'X').length;
 
-      sessionStorage.setItem(`${storageKey}_pivot`, JSON.stringify({ modes, params, rows: pivotRows }));
+      sessionStorage.setItem(`${storageKey}_pivot`, JSON.stringify({ rowNos, params, rows: pivotRows }));
       sessionStorage.setItem(`${storageKey}_meta`, JSON.stringify({
         selectedProbeId: validation.selectedProbeId ?? '',
         selectedSoftwareVersion: validation.selectedSoftwareVersion ?? '',

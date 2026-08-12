@@ -164,8 +164,8 @@ function TxMatchingContent() {
   if (pivot) {
     const { params, rows } = pivot;
 
-    /* 매칭률 계산: TxSummaryID 제외 */
-    const SKIP = new Set(['TxSummaryID']);
+    /* 매칭률 계산: Mode·TxSummaryID 제외 */
+    const SKIP = new Set(['TxSummaryID', 'Mode']);
     const calcParams = params.filter(p => !SKIP.has(p));
 
     let totalCells = 0, matchedCells = 0;
@@ -222,8 +222,16 @@ function TxMatchingContent() {
             </thead>
             <tbody>
               {rows.map((row, rowIdx) => (
-                <tr key={row.Mode ?? rowIdx}>
+                <tr key={row._rowNo ?? rowIdx}>
                   {params.map(p => {
+                    // Mode 컬럼은 _modeStr(문자열)로 직접 표시
+                    if (p === 'Mode') {
+                      return (
+                        <td key="Mode" style={{ ...S.td(true, rowIdx), fontWeight: 600 }}>
+                          {row._modeStr || '—'}
+                        </td>
+                      );
+                    }
                     const cell = row[p] || { fileValue: '—' };
                     const hasData = cell.fileValue !== '—' && cell.fileValue !== '' && cell.fileValue != null;
                     return (
