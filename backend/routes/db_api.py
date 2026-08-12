@@ -362,60 +362,133 @@ def validate_tx_summary_file():
     if df is None or df.empty:
         return error_response("파일에 데이터가 없습니다.", 400)
 
-    csv_probe_col = None
-    csv_sw_col = None
+    # 빈 헤더 제거
+    valid_idxs = [i for i, col in enumerate(df.columns) if str(col).strip()]
+    df = df.iloc[:, valid_idxs]
+
+    # DB 스키마 기반 컬럼 정규화 (upload와 동일 로직)
+    column_lookup = _get_column_lookup(selected_database, "Tx_summary")
+    col_map = {}
     for col in df.columns:
         norm = str(col).strip().lower()
-        if norm in {"probeid", "probe_id"} and csv_probe_col is None:
-            csv_probe_col = col
-        if norm in {"software_version", "softwareversion"} and csv_sw_col is None:
-            csv_sw_col = col
-    if csv_probe_col is None or csv_sw_col is None:
-        return error_response(
-            "CSV에 ProbeID, Software_version 컬럼이 필요합니다.", 400
-        )
+        if norm in column_lookup:
+            col_map[col] = column_lookup[norm]
+    df_norm = df.rename(columns=col_map)
 
-    file_probe_values = sorted(
-        {
-            _normalize_probe_id(v)
-            for v in df[csv_probe_col].dropna().tolist()
-            if _normalize_probe_id(v)
-        }
-    )
-    file_sw_values = sorted(
-        {str(v).strip() for v in df[csv_sw_col].dropna().tolist() if str(v).strip()}
-    )
+    # ProbeID / Software_version 컬럼 확인
+    if "ProbeID" not in df_norm.columns:
+        return error_response("파일에서 ProbeID 컬럼을 찾을 수 없습니다. 컬럼명을 확인하세요.", 400)
+    if "Software_version" not in df_norm.columns:
+        return error_response("파일에서 Software_version 컬럼을 찾을 수 없습니다. 컬럼명을 확인하세요.", 400)
 
     selected_probe_norm = _normalize_probe_id(selected_probe_id)
     selected_sw_norm = str(selected_sw_version).strip()
-    matches_selection = (
-        selected_probe_norm in file_probe_values and selected_sw_norm in file_sw_values
+
+    # 파일에서 선택한 probe+sw 필터
+    df_filtered = df_norm[
+        df_norm["ProbeID"].apply(lambda x: _normalize_probe_id(str(x)) == selected_probe_norm)
+        & df_norm["Software_version"].apply(lambda x: str(x).strip() == selected_sw_norm)
+    ]
+    matches_selection = not df_filtered.empty
+
+    file_probe_values = sorted(
+        {_normalize_probe_id(str(v)) for v in df_norm["ProbeID"].dropna().tolist() if _normalize_probe_id(str(v))}
+    )
+    file_sw_values = sorted(
+        {str(v).strip() for v in df_norm["Software_version"].dropna().tolist() if str(v).strip()}
     )
 
+    # DB에서 전체 컬럼 조회
     db_probe_param = selected_probe_norm
     try:
         db_probe_param = int(selected_probe_norm)
     except Exception:
         pass
     db_match_df = g.current_db.execute_query(
-        "SELECT TOP 200 ProbeID, ProbeName, Software_version, Mode, combined_mode, IsProcessed "
-        f"FROM [{selected_database}].[dbo].[Tx_summary] "
+        f"SELECT TOP 500 * FROM [{selected_database}].[dbo].[Tx_summary] "
         "WHERE ProbeID = ? "
         "  AND LTRIM(RTRIM(CAST(Software_version AS NVARCHAR(255)))) = LTRIM(RTRIM(CAST(? AS NVARCHAR(255))))",
         params=(db_probe_param, selected_sw_norm),
     )
     db_has_matching_rows = db_match_df is not None and not db_match_df.empty
-    matching_rows = (
+
+    # 파라미터별 비교 rows 생성 (파일 vs DB, Mode 기준 행 매칭)
+    comparison_rows = []
+    if matches_selection and db_has_matching_rows:
+        db_df = db_match_df.replace({np.nan: None})
+        # 비교 대상 컬럼: 파일에 있고 DB에도 있는 컬럼 (IsProcessed, combined_mode 제외)
+        skip_cols = {"IsProcessed", "combined_mode"}
+        compare_cols = [
+            c for c in df_filtered.columns
+            if c in db_df.columns and c not in skip_cols
+        ]
+
+        # Mode별 행 매핑
+        file_by_mode = {}
+        db_by_mode = {}
+        if "Mode" in df_filtered.columns:
+            for _, row in df_filtered.iterrows():
+                mode_key = str(row.get("Mode", "")).strip()
+                file_by_mode[mode_key] = row
+        if "Mode" in db_df.columns:
+            for _, row in db_df.iterrows():
+                mode_key = str(row.get("Mode", "")).strip()
+                db_by_mode[mode_key] = row
+
+        all_modes = sorted(set(file_by_mode.keys()) | set(db_by_mode.keys()))
+        # Mode 컬럼이 없을 경우 단일 비교
+        if not file_by_mode and not db_by_mode:
+            file_by_mode[""] = df_filtered.iloc[0] if not df_filtered.empty else None
+            db_by_mode[""] = db_df.iloc[0] if not db_df.empty else None
+            all_modes = [""]
+
+        row_no = 1
+        for mode in all_modes:
+            file_row = file_by_mode.get(mode)
+            db_row = db_by_mode.get(mode)
+            status = "FILE_ONLY" if db_row is None else ("DB_ONLY" if file_row is None else "BOTH")
+
+            for param in compare_cols:
+                if param == "Mode":
+                    continue
+                fv = str(file_row[param]) if file_row is not None and param in file_row.index else "—"
+                dv = str(db_row[param]) if db_row is not None and param in db_row.index else "—"
+                # "nan" 정리
+                if fv.lower() == "nan" or fv == "None":
+                    fv = "—"
+                if dv.lower() == "nan" or dv == "None":
+                    dv = "—"
+                # 숫자 비교 (부동소수점 오차 허용)
+                try:
+                    matched = abs(float(fv) - float(dv)) < 1e-6
+                except Exception:
+                    matched = fv.strip() == dv.strip()
+
+                comparison_rows.append({
+                    "No": row_no,
+                    "Mode": mode,
+                    "Parameter": param,
+                    "FileValue": fv,
+                    "DBValue": dv,
+                    "Match": "O" if matched else "X",
+                    "Status": status,
+                })
+                row_no += 1
+
+    matching_rows_simple = (
         db_match_df.replace({np.nan: None}).to_dict(orient="records")
         if db_has_matching_rows
         else []
     )
 
-    message = "파일 파라미터와 선택값이 일치합니다."
     if not matches_selection:
         message = "파일 파라미터(ProbeID/Software_version)가 선택값과 일치하지 않습니다."
     elif not db_has_matching_rows:
         message = "선택한 Probe/Software 버전이 Tx_summary 테이블에 없습니다."
+    else:
+        mismatch_cnt = sum(1 for r in comparison_rows if r.get("Match") == "X")
+        total_cnt = len(comparison_rows)
+        message = f"비교 완료: {total_cnt}개 파라미터 중 {mismatch_cnt}개 불일치" if total_cnt else "파일 파라미터와 선택값이 일치합니다."
 
     return jsonify(
         {
@@ -427,8 +500,9 @@ def validate_tx_summary_file():
                 "fileSoftwareVersions": file_sw_values,
                 "selectedProbeId": selected_probe_norm,
                 "selectedSoftwareVersion": selected_sw_norm,
-                "matchingCount": len(matching_rows),
-                "matchingRows": matching_rows,
+                "matchingCount": len(matching_rows_simple),
+                "matchingRows": matching_rows_simple,
+                "comparisonRows": comparison_rows,
                 "message": message,
             },
         }

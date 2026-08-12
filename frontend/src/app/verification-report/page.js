@@ -255,19 +255,21 @@ export default function VerificationReport() {
   }, [txDatabase, txProbe]);
 
   const openTxValidationWindow = (validation) => {
+    const comparisonRows = Array.isArray(validation.comparisonRows) && validation.comparisonRows.length > 0
+      ? validation.comparisonRows
+      : null;
+
     const summaryRows = [
-      { category: 'selection', item: 'Selected ProbeID', value: validation.selectedProbeId ?? '' },
-      { category: 'selection', item: 'Selected Software version', value: validation.selectedSoftwareVersion ?? '' },
-      { category: 'file', item: 'File ProbeIDs', value: (validation.fileProbeIds || []).join(', ') },
-      { category: 'file', item: 'File Software versions', value: (validation.fileSoftwareVersions || []).join(', ') },
-      { category: 'match', item: 'Selection Match', value: validation.matchesSelection ? 'YES' : 'NO' },
-      { category: 'match', item: 'Tx_summary Rows', value: String(validation.matchingCount ?? 0) },
-      { category: 'message', item: 'Result', value: validation.message || '' },
+      { Category: 'Selection', Item: 'Selected ProbeID', Value: validation.selectedProbeId ?? '' },
+      { Category: 'Selection', Item: 'Selected Software version', Value: validation.selectedSoftwareVersion ?? '' },
+      { Category: 'File', Item: 'File ProbeIDs', Value: (validation.fileProbeIds || []).join(', ') },
+      { Category: 'File', Item: 'File Software versions', Value: (validation.fileSoftwareVersions || []).join(', ') },
+      { Category: 'Result', Item: 'Selection Match', Value: validation.matchesSelection ? 'YES' : 'NO' },
+      { Category: 'Result', Item: 'Tx_summary Rows (DB)', Value: String(validation.matchingCount ?? 0) },
+      { Category: 'Result', Item: 'Message', Value: validation.message || '' },
     ];
-    const detailRows = Array.isArray(validation.matchingRows) ? validation.matchingRows : [];
-    const displayRows = detailRows.length > 0
-      ? detailRows.map((row, idx) => ({ rowNo: idx + 1, ...row }))
-      : summaryRows;
+
+    const displayRows = comparisonRows || summaryRows;
     const storageKey = `txValidation_${Date.now()}`;
     sessionStorage.setItem(storageKey, JSON.stringify(displayRows));
     sessionStorage.setItem(`${storageKey}_columns`, JSON.stringify(Object.keys(displayRows[0] || {})));
