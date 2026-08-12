@@ -6,11 +6,5 @@ export const metadata = {
 };
 
 export default function TxMatchingPopupLayout({ children }) {
-  return (
-    <html lang="ko">
-      <body style={{ margin: 0, background: 'var(--bg-primary, #f8f9fa)' }}>
-        {children}
-      </body>
-    </html>
-  );
+  return <>{children}</>;
 }
