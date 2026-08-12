@@ -459,3 +459,11 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - 파일 검증 API 응답에 `matchingCount`, `matchingRows` 추가
   - 파일 검증 완료 시 `verification-report/data-view-standalone` 팝업을 열어 매칭 결과 표시
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+
+## 2026-08-12 No database specified 오류 수정
+
+- 요청: Input file 선택 후 `No database specified` 에러 발생
+- 반영:
+  - 새 API에서 선택 database를 allowlist 검증 후 쿼리에 `[database].[dbo].[table]`로 명시
+  - 대상 API: `get_imaging_sw_versions`, `validate_tx_summary_file`
+- 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)

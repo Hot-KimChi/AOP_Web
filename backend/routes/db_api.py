@@ -16,6 +16,12 @@ db_api_bp = Blueprint("db_api", __name__, url_prefix="/api")
 _COLUMN_CACHE: dict = {}
 
 
+def _is_allowed_database(database_name: str) -> bool:
+    raw = os.environ.get("DATABASE_NAME", "")
+    allowed = {d.strip() for d in raw.split(",") if d.strip()}
+    return database_name in allowed
+
+
 def _get_column_lookup(database: str, table: str) -> dict:
     cache_key = (database, table)
     cached = _COLUMN_CACHE.get(cache_key)
@@ -232,6 +238,8 @@ def get_imaging_sw_versions():
     probe_id = request.args.get("probeId")
     if not selected_database or not probe_id:
         return error_response("database, probeId 파라미터가 필요합니다.", 400)
+    if not _is_allowed_database(selected_database):
+        return error_response("유효하지 않은 database 이름입니다.", 400)
     normalized_probe_id = _normalize_probe_id(probe_id)
     try:
         probe_id_param = int(normalized_probe_id)
@@ -239,7 +247,7 @@ def get_imaging_sw_versions():
         return error_response("probeId는 정수 값이어야 합니다.", 400)
     query = (
         "SELECT measSSId, imagingSwVersion "
-        "FROM [meas_station_setup] "
+        f"FROM [{selected_database}].[dbo].[meas_station_setup] "
         "WHERE probeId = ? "
         "  AND imagingSwVersion IS NOT NULL "
         "  AND LTRIM(RTRIM(CAST(imagingSwVersion AS NVARCHAR(255)))) <> '' "
@@ -286,6 +294,8 @@ def validate_tx_summary_file():
     selected_sw_version = request.form.get("softwareVersion")
     if not selected_probe_id or not selected_sw_version:
         return error_response("probeId, softwareVersion 파라미터가 필요합니다.", 400)
+    if not selected_database or not _is_allowed_database(selected_database):
+        return error_response("유효하지 않은 database 이름입니다.", 400)
     file = request.files["file"]
     if not file.filename.endswith(".csv"):
         return error_response("Only CSV files are allowed", 400)
@@ -339,7 +349,7 @@ def validate_tx_summary_file():
         pass
     db_match_df = g.current_db.execute_query(
         "SELECT TOP 200 ProbeID, ProbeName, Software_version, Mode, combined_mode, IsProcessed "
-        "FROM [Tx_summary] "
+        f"FROM [{selected_database}].[dbo].[Tx_summary] "
         "WHERE ProbeID = ? "
         "  AND LTRIM(RTRIM(CAST(Software_version AS NVARCHAR(255)))) = LTRIM(RTRIM(CAST(? AS NVARCHAR(255))))",
         params=(db_probe_param, selected_sw_norm),

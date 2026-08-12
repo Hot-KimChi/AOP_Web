@@ -1476,3 +1476,27 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 
 ### 결과
 - Input file 선택 후 검증이 수행되면, 사용자가 즉시 매칭 결과를 별도 창에서 확인 가능
+
+---
+
+## 2026-08-12 `No database specified` 오류 수정
+
+### 증상
+- Input file 선택/검증 시 `No database specified` 오류 발생
+
+### 원인
+- 신규 API에서 `database` 파라미터를 받았지만 실제 쿼리의 FROM 절에 선택 DB가 반영되지 않아
+  DB 컨텍스트가 비어 있는 환경에서 조회 실패
+
+### 조치
+1. `backend/routes/db_api.py`
+   - `_is_allowed_database()` 추가 (`DATABASE_NAME` allowlist 기준 검증)
+   - `get_imaging_sw_versions`:
+     - database 유효성 검증 추가
+     - 조회 대상을 `[{database}].[dbo].[meas_station_setup]`로 명시
+   - `validate_tx_summary_file`:
+     - database 유효성 검증 추가
+     - 매칭 조회 대상을 `[{database}].[dbo].[Tx_summary]`로 명시
+
+### 결과
+- 선택한 database 기준으로 쿼리가 실행되어 `No database specified` 오류 해소
