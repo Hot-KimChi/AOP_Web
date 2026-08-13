@@ -445,12 +445,14 @@ def validate_tx_summary_file():
     # ── DB 기준 파라미터별 비교 rows 생성 ──
     # db_has_matching_rows이면 DB값+파일값 비교, 아니면 파일값만 표시 (컬럼 구조는 db_schema_df 사용)
     comparison_rows = []
+    parameter_order = []
     schema_ref = db_schema_df if (db_schema_df is not None and not db_schema_df.empty) else None
 
     if schema_ref is not None:
         schema_cols = list(schema_ref.columns)
         skip_cols = {"IsProcessed", "combined_mode"}
         db_cols = [c for c in schema_cols if c not in skip_cols and c != "Mode"]
+        parameter_order = ["Mode", *db_cols]
 
         # DB Mode별 행 매핑 (ProbeID/SW 매칭 있을 때만)
         db_by_mode = {}
@@ -558,6 +560,7 @@ def validate_tx_summary_file():
                 "matchingCount": len(matching_rows_simple),
                 "matchingRows": matching_rows_simple,
                 "comparisonRows": comparison_rows,
+                "parameterOrder": parameter_order,
                 "columnMapLog": column_map_log,
                 "unmappedFileCols": unmapped_file_cols,
                 "message": message,

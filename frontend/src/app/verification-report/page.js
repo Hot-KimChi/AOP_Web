@@ -265,14 +265,17 @@ export default function VerificationReport() {
       // 피벗 구조 생성: 행=No(행번호), 열=Parameter
       const rowNos = [...new Set(comparisonRows.map(r => r.No))].sort((a, b) => a - b);
 
-      // SQL 컬럼 순서 보존: 첫 번째 No 행에서 Parameter 순서 추출
-      const firstNo = rowNos[0];
-      const paramNames = comparisonRows
-        .filter(r => r.No === firstNo)
+      // SQL 컬럼 순서 우선 사용. 없으면 첫 번째 No 기준으로 복원.
+      const fallbackFirstNo = rowNos[0];
+      const fallbackParamNames = comparisonRows
+        .filter(r => r.No === fallbackFirstNo)
         .map(r => r.Parameter);
-
-      // 헤더: Mode를 첫 컬럼으로 포함
-      const params = ['Mode', ...paramNames];
+      const serverOrder = Array.isArray(validation.parameterOrder) ? validation.parameterOrder : null;
+      const orderedParams = serverOrder && serverOrder.length > 0
+        ? serverOrder
+        : ['Mode', ...fallbackParamNames];
+      const paramNames = orderedParams.filter(p => p !== 'Mode');
+      const params = orderedParams;
 
       const pivotRows = rowNos.map(no => {
         const rowCells = comparisonRows.filter(r => r.No === no);
