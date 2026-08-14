@@ -65,6 +65,17 @@ const S = {
     color: '#64748b',
     lineHeight: 1.7,
   },
+  headerRow3: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 14,
+    borderTop: '1px dashed #e2e8f0',
+    marginTop: 8,
+    paddingTop: 8,
+    fontSize: 12,
+    color: '#64748b',
+  },
   metaLabel: { color: '#94a3b8', marginRight: 3 },
   metaVal:   { fontWeight: 600, color: '#1e293b', marginRight: 18 },
   msgText: (isWarn) => ({
@@ -128,11 +139,6 @@ const S = {
     fontSize: 12,
     whiteSpace: 'nowrap',
   }),
-  /* 범례 */
-  legend: {
-    marginTop: 8, fontSize: 11, color: '#94a3b8',
-    display: 'flex', gap: 16, flexWrap: 'wrap',
-  },
 };
 
 /* ─── 메인 컴포넌트 ─── */
@@ -260,6 +266,12 @@ function TxMatchingContent() {
               </>
             )}
           </div>
+          <div style={S.headerRow3}>
+            <span><span style={{ color: '#86efac', fontWeight: 700 }}>O</span> : 매칭률 포함 + txt 컬럼 매핑됨</span>
+            <span><span style={{ color: '#fecaca', fontWeight: 700 }}>X</span> : 매칭률 포함 + txt 컬럼 매핑 안됨</span>
+            <span><span style={{ color: '#cbd5e1', fontWeight: 700 }}>-</span> : 매칭률 제외(TxSummaryID/ProbeID/SW/ProbeName/IsProcessed/Combined_mode)</span>
+            <span><span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span> : 데이터 셀의 실제 값 없음</span>
+          </div>
         </div>
 
         {/* ── 테이블: 헤더=파라미터명, 행=실제 데이터 ── */}
@@ -311,13 +323,6 @@ function TxMatchingContent() {
           </table>
         </div>
 
-        {/* ── 범례 ── */}
-        <div style={S.legend}>
-          <span><span style={{ color: '#86efac', fontWeight: 700 }}>헤더 아래 O</span> = 매칭률 포함 + txt 컬럼 매핑됨</span>
-          <span><span style={{ color: '#fecaca', fontWeight: 700 }}>헤더 아래 X</span> = 매칭률 포함 + txt 컬럼 매핑 안됨</span>
-          <span><span style={{ color: '#cbd5e1', fontWeight: 700 }}>헤더 아래 -</span> = 매칭률 제외(TxSummaryID/ProbeID/SW/ProbeName/IsProcessed/Combined_mode)</span>
-          <span><span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span> = 데이터 셀의 실제 값 없음</span>
-        </div>
       </div>
     );
   }
