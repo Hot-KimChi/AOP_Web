@@ -188,8 +188,8 @@ function TxMatchingContent() {
     };
 
     /* 파라미터 수 및 매칭률 계산: Mode·TxSummaryID 제외 */
-    const SKIP = new Set(['TxSummaryID', 'Mode']);
-    const calcParams = params.filter(p => !SKIP.has(p));
+    const SKIP = new Set(['txsummaryid', 'mode']);
+    const calcParams = params.filter((p) => !SKIP.has(String(p).toLowerCase()));
     const paramCount = calcParams.length;
 
     let totalCells = 0, matchedCells = 0;
