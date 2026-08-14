@@ -204,7 +204,8 @@ function TxMatchingContent() {
     const paramMatchStatus = {};
     params.forEach((p) => {
       if (p === 'Mode') {
-        paramMatchStatus[p] = 'O';
+        const hasModeValue = rows.some((row) => String(row._modeStr || '').trim() !== '');
+        paramMatchStatus[p] = hasModeValue ? 'O' : 'X';
         return;
       }
       let mapped = false;
@@ -258,18 +259,16 @@ function TxMatchingContent() {
                   <th key={p} style={S.th}>
                     <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.15 }}>
                       <span>{p}</span>
-                      {p !== 'Mode' && (
-                        <span
-                          style={{
-                            color: paramMatchStatus[p] === 'O' ? '#86efac' : '#fecaca',
-                            fontWeight: 700,
-                            fontSize: 11,
-                            marginTop: 2,
-                          }}
-                        >
-                          {paramMatchStatus[p]}
-                        </span>
-                      )}
+                      <span
+                        style={{
+                          color: paramMatchStatus[p] === 'O' ? '#86efac' : '#fecaca',
+                          fontWeight: 700,
+                          fontSize: 11,
+                          marginTop: 2,
+                        }}
+                      >
+                        {paramMatchStatus[p]}
+                      </span>
                     </div>
                   </th>
                 ))}
