@@ -178,6 +178,14 @@ function TxMatchingContent() {
   /* ────────────── 피벗 테이블 뷰 ────────────── */
   if (pivot) {
     const { params, rows } = pivot;
+    const toDisplay = (raw) => {
+      const val = (raw !== null && typeof raw === 'object')
+        ? (raw.fileValue ?? 'UNMATCHED')
+        : (raw ?? 'UNMATCHED');
+      return (val === '—' || val === 'UNMATCHED') ? 'UNMATCHED'
+           : (val === 'NULL' || val === '') ? 'NULL'
+           : val;
+    };
 
     /* 파라미터 수 및 매칭률 계산: Mode·TxSummaryID 제외 */
     const SKIP = new Set(['TxSummaryID', 'Mode']);
@@ -188,12 +196,21 @@ function TxMatchingContent() {
     rows.forEach(row => {
       calcParams.forEach(p => {
         totalCells++;
-        const raw = row[p];
-        const val = (raw !== null && typeof raw === 'object') ? (raw.fileValue ?? 'UNMATCHED') : (raw ?? 'UNMATCHED');
+        const val = toDisplay(row[p]);
         if (val !== 'UNMATCHED' && val !== '—' && val !== 'NULL' && val !== '') matchedCells++;
       });
     });
     const matchRate = totalCells > 0 ? Math.round((matchedCells / totalCells) * 100) : 0;
+    const missingParams = new Set();
+    rows.forEach((row) => {
+      params.forEach((p) => {
+        if (p === 'Mode') return;
+        const val = toDisplay(row[p]);
+        if (val === 'UNMATCHED' || val === 'NULL') {
+          missingParams.add(p);
+        }
+      });
+    });
 
     return (
       <div style={S.page}>
@@ -232,7 +249,14 @@ function TxMatchingContent() {
             <thead>
               <tr>
                 {params.map(p => (
-                  <th key={p} style={S.th}>{p}</th>
+                  <th key={p} style={S.th}>
+                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.15 }}>
+                      <span>{p}</span>
+                      {p !== 'Mode' && missingParams.has(p) && (
+                        <span style={{ color: '#fecaca', fontWeight: 700, fontSize: 11, marginTop: 2 }}>X</span>
+                      )}
+                    </div>
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -247,23 +271,10 @@ function TxMatchingContent() {
                         </td>
                       );
                     }
-                    const raw = row[p];
-                    // 구버전 호환: {match, fileValue, dbValue} 객체 → fileValue 추출
-                    const val = (raw !== null && typeof raw === 'object')
-                      ? (raw.fileValue ?? 'UNMATCHED')
-                      : (raw ?? 'UNMATCHED');
-                    // 구버전 '—' → 새 'UNMATCHED'로 정규화
-                    const display = (val === '—' || val === 'UNMATCHED') ? 'UNMATCHED'
-                                  : (val === 'NULL' || val === '')        ? 'NULL'
-                                  : val;
+                    const display = toDisplay(row[p]);
                     return (
                       <td key={p} style={S.td(display, rowIdx)}>
-                        {(display === 'UNMATCHED' || display === 'NULL') ? (
-                          <div style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.2 }}>
-                            <span style={{ fontWeight: 700 }}>X</span>
-                            <span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span>
-                          </div>
-                        ) : display}
+                        {(display === 'UNMATCHED' || display === 'NULL') ? 'NULL' : display}
                       </td>
                     );
                   })}
@@ -275,7 +286,8 @@ function TxMatchingContent() {
 
         {/* ── 범례 ── */}
         <div style={S.legend}>
-          <span><span style={{ color: '#dc2626', fontWeight: 700 }}>X / NULL</span> = 파일에 데이터가 없거나 매핑 불가</span>
+          <span><span style={{ color: '#fecaca', fontWeight: 700 }}>헤더 아래 X</span> = 해당 파라미터에 결측 데이터 존재</span>
+          <span><span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span> = 데이터 셀의 실제 값 없음</span>
         </div>
       </div>
     );
