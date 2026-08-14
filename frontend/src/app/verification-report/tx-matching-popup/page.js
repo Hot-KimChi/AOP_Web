@@ -267,9 +267,9 @@ function TxMatchingContent() {
             )}
           </div>
           <div style={S.headerRow3}>
-            <span><span style={{ color: '#16a34a', fontWeight: 800 }}>O</span> : 매칭률 포함 + txt 컬럼 매핑됨</span>
-            <span><span style={{ color: '#dc2626', fontWeight: 800 }}>X</span> : 매칭률 포함 + txt 컬럼 매핑 안됨</span>
-            <span><span style={{ color: '#475569', fontWeight: 800 }}>-</span> : 매칭률 제외(TxSummaryID/ProbeID/SW/ProbeName/IsProcessed/Combined_mode)</span>
+            <span><span style={{ color: '#86efac', fontWeight: 700 }}>O</span> : 매칭률 포함 + txt 컬럼 매핑됨</span>
+            <span><span style={{ color: '#fecaca', fontWeight: 700 }}>X</span> : 매칭률 포함 + txt 컬럼 매핑 안됨</span>
+            <span><span style={{ color: '#cbd5e1', fontWeight: 700 }}>-</span> : 매칭률 제외(TxSummaryID/ProbeID/SW/ProbeName/IsProcessed/Combined_mode)</span>
             <span><span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span> : 데이터 셀의 실제 값 없음</span>
           </div>
         </div>
@@ -285,24 +285,15 @@ function TxMatchingContent() {
                       <span>{p}</span>
                       <span
                         style={{
-                          color: '#ffffff',
-                          background:
+                          color:
                             paramMatchStatus[p] === 'O'
-                              ? '#16a34a'
+                              ? '#86efac'
                               : paramMatchStatus[p] === '-'
-                                ? '#64748b'
-                                : '#dc2626',
+                                ? '#cbd5e1'
+                                : '#fecaca',
                           fontWeight: 700,
-                          fontSize: 12,
-                          marginTop: 3,
-                          minWidth: 18,
-                          height: 18,
-                          borderRadius: 9,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: '0 6px',
-                          boxShadow: '0 1px 2px rgba(0,0,0,.25)',
+                          fontSize: 11,
+                          marginTop: 2,
                         }}
                       >
                         {paramMatchStatus[p]}
