@@ -383,8 +383,8 @@ export default function VerificationReport() {
     const total = targetParams.length;
     const mappedCount = mappedParams.length;
     const rate = total > 0 ? Math.round((mappedCount / total) * 100) : 0;
-    const unmappedText = unmappedParams.length > 0 ? unmappedParams.join(', ') : '없음';
-    setTxValidationMessage(`매핑률 ${rate}% (${mappedCount}/${total}) | 미매핑 파라미터: ${unmappedText}`);
+    const mismatchingText = unmappedParams.length > 0 ? unmappedParams.join(', ') : '없음';
+    setTxValidationMessage(`매핑률 ${rate}% (${mappedCount}/${total}) | mismatching 파라미터: ${mismatchingText}`);
 
     openTxValidationWindow(validation);
     return ok;
