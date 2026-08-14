@@ -209,16 +209,17 @@ function TxMatchingContent() {
         paramMatchStatus[p] = '-';
         return;
       }
-      // 포함 컬럼은 "전체 행 매칭" 기준: 하나라도 결측/미매칭이면 X
-      let allMatched = true;
+      // 포함 컬럼은 "컬럼 매핑 여부" 기준:
+      // 하나라도 UNMATCHED가 아닌 값이 있으면 O, 전부 UNMATCHED면 X
+      let mapped = false;
       for (const row of rows) {
         const val = toDisplay(row[p]);
-        if (val === 'UNMATCHED' || val === 'NULL') {
-          allMatched = false;
+        if (val !== 'UNMATCHED') {
+          mapped = true;
           break;
         }
       }
-      paramMatchStatus[p] = allMatched ? 'O' : 'X';
+      paramMatchStatus[p] = mapped ? 'O' : 'X';
     });
 
     return (
@@ -298,8 +299,8 @@ function TxMatchingContent() {
 
         {/* ── 범례 ── */}
         <div style={S.legend}>
-          <span><span style={{ color: '#86efac', fontWeight: 700 }}>헤더 아래 O</span> = 매칭률 포함 + 매칭됨</span>
-          <span><span style={{ color: '#fecaca', fontWeight: 700 }}>헤더 아래 X</span> = 매칭률 포함 + 미매칭</span>
+          <span><span style={{ color: '#86efac', fontWeight: 700 }}>헤더 아래 O</span> = 매칭률 포함 + txt 컬럼 매핑됨</span>
+          <span><span style={{ color: '#fecaca', fontWeight: 700 }}>헤더 아래 X</span> = 매칭률 포함 + txt 컬럼 매핑 안됨</span>
           <span><span style={{ color: '#cbd5e1', fontWeight: 700 }}>헤더 아래 -</span> = 매칭률 제외(TxSummaryID/ProbeID/SW)</span>
           <span><span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span> = 데이터 셀의 실제 값 없음</span>
         </div>
