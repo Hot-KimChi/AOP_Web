@@ -347,6 +347,7 @@ def validate_tx_summary_file():
     )
     selected_probe_id = request.form.get("probeId")
     selected_sw_version = request.form.get("softwareVersion")
+    selected_probe_name = (request.form.get("probeName") or "").strip()
     if not selected_probe_id or not selected_sw_version:
         return error_response("probeId, softwareVersion 파라미터가 필요합니다.", 400)
     if not selected_database or not _is_allowed_database(selected_database):
@@ -431,13 +432,31 @@ def validate_tx_summary_file():
 
     if df_norm is not None and not df_norm.empty:
         if "ProbeID" in df_norm.columns and "Software_version" in df_norm.columns:
-            df_filtered = df_norm[
-                df_norm["ProbeID"].apply(lambda x: _normalize_probe_id(str(x)) == selected_probe_norm)
-                & df_norm["Software_version"].apply(lambda x: str(x).strip() == selected_sw_norm)
+            filtered = df_norm[
+                df_norm["ProbeID"].apply(
+                    lambda x: _normalize_probe_id(str(x)) == selected_probe_norm
+                )
+                & df_norm["Software_version"].apply(
+                    lambda x: str(x).strip() == selected_sw_norm
+                )
             ]
-            matches_selection = not df_filtered.empty
-            file_probe_values = sorted({_normalize_probe_id(str(v)) for v in df_norm["ProbeID"].dropna() if _normalize_probe_id(str(v))})
-            file_sw_values = sorted({str(v).strip() for v in df_norm["Software_version"].dropna() if str(v).strip()})
+            # 선택값 필터 결과가 비어도 파일 전체를 보여줘야 하므로 fallback 사용
+            df_filtered = filtered if not filtered.empty else df_norm
+            matches_selection = not filtered.empty
+            file_probe_values = sorted(
+                {
+                    _normalize_probe_id(str(v))
+                    for v in df_norm["ProbeID"].dropna()
+                    if _normalize_probe_id(str(v))
+                }
+            )
+            file_sw_values = sorted(
+                {
+                    str(v).strip()
+                    for v in df_norm["Software_version"].dropna()
+                    if str(v).strip()
+                }
+            )
         else:
             df_filtered = df_norm
             matches_selection = True
@@ -445,14 +464,33 @@ def validate_tx_summary_file():
     # ── DB 기준 파라미터별 비교 rows 생성 ──
     # db_has_matching_rows이면 DB값+파일값 비교, 아니면 파일값만 표시 (컬럼 구조는 db_schema_df 사용)
     comparison_rows = []
-    parameter_order = []
+    parameter_order = [
+        "TxSummaryID",
+        "ProbeName",
+        "ExamName",
+        "Mode",
+        "SubModeIndex",
+        "BeamStyleIndex",
+        "TxFreqIndex",
+        "ProbeNumElevAper",
+        "ProbeNumTxCycles",
+        "TxpgWaveformStyle",
+        "TxChannelModulationEn",
+        "CompoundingIndex",
+        "TxPulseRle",
+        "IsPresetCpaEn",
+        "IsProcessed",
+        "ProbeID",
+        "Software_version",
+        "Combined_mode",
+        "TxFrequency",
+    ]
     schema_ref = db_schema_df if (db_schema_df is not None and not db_schema_df.empty) else None
 
     if schema_ref is not None:
         schema_cols = list(schema_ref.columns)
-        skip_cols = {"IsProcessed", "combined_mode"}
-        db_cols = [c for c in schema_cols if c not in skip_cols and c != "Mode"]
-        parameter_order = ["Mode", *db_cols]
+        schema_col_map = {str(c).strip().lower(): c for c in schema_cols}
+        db_cols = [c for c in parameter_order if c != "Mode"]
 
         # DB Mode별 행 매핑 (ProbeID/SW 매칭 있을 때만)
         db_by_mode = {}
@@ -489,24 +527,78 @@ def validate_tx_summary_file():
                 status = "DB_ONLY" if file_row is None else ("BOTH" if db_row is not None else "FILE_ONLY")
 
                 for param in db_cols:
+                    actual_db_col = schema_col_map.get(param.lower(), param)
+
                     dv = "—"
-                    if db_row is not None and param in db_row.index:
-                        raw_dv = db_row[param]
-                        dv = "—" if (raw_dv is None or str(raw_dv).lower() in ("nan", "none", "")) else str(raw_dv)
+                    if (
+                        db_row is not None
+                        and hasattr(db_row, "index")
+                        and actual_db_col in db_row.index
+                    ):
+                        raw_dv = db_row[actual_db_col]
+                        dv = (
+                            "—"
+                            if raw_dv is None
+                            or str(raw_dv).lower() in ("nan", "none", "")
+                            else str(raw_dv)
+                        )
 
                     # fv 구분:
                     #   "UNMATCHED" → 파일에 파라미터 컬럼 자체가 없음 (매핑 불가)
                     #   "NULL"      → 파라미터 컬럼은 있으나 값이 null/비어있음
                     #   실제 문자열 → 정상 데이터
                     fv = "UNMATCHED"
-                    if file_row is not None:
-                        idx = file_row.index if hasattr(file_row, "index") else []
-                        if param in idx:
-                            raw_fv = file_row[param]
-                            if raw_fv is None or str(raw_fv).lower() in ("nan", "none", ""):
-                                fv = "NULL"
+
+                    if param == "ProbeID":
+                        fv = selected_probe_norm or "NULL"
+                    elif param == "Software_version":
+                        fv = selected_sw_norm or "NULL"
+                    elif param == "ProbeName":
+                        fv = selected_probe_name or "NULL"
+                    elif param == "Combined_mode":
+                        mode_len = len(str(mode or "").strip())
+                        fv = "0" if mode_len == 1 else ("1" if mode_len >= 2 else "NULL")
+                    elif param == "IsProcessed":
+                        fv = "1"
+                    else:
+                        if file_row is not None and hasattr(file_row, "index"):
+                            row_idx = file_row.index
+                            lookup = {str(c).strip().lower(): c for c in row_idx}
+
+                            candidate_cols = []
+                            if param == "ExamName":
+                                candidate_cols = [
+                                    "ExamName",
+                                    "Exam",
+                                    "exam",
+                                    "Exam_Name",
+                                ]
                             else:
-                                fv = str(raw_fv)
+                                candidate_cols = [
+                                    param,
+                                    actual_db_col,
+                                ]
+
+                            matched_col = None
+                            for cand in candidate_cols:
+                                if cand in row_idx:
+                                    matched_col = cand
+                                    break
+                                lower_cand = str(cand).strip().lower()
+                                if lower_cand in lookup:
+                                    matched_col = lookup[lower_cand]
+                                    break
+
+                            if matched_col is not None:
+                                raw_fv = file_row[matched_col]
+                                if raw_fv is None or str(raw_fv).lower() in (
+                                    "nan",
+                                    "none",
+                                    "",
+                                ):
+                                    fv = "NULL"
+                                else:
+                                    fv = str(raw_fv)
 
                     matched = fv not in ("UNMATCHED", "NULL")
 

@@ -104,15 +104,16 @@ const S = {
   td: (val, rowIdx) => {
     const isUnmatched = val === 'UNMATCHED';
     const isNull      = val === 'NULL';
+    const isMissing   = isUnmatched || isNull;
     return {
       padding: '7px 10px',
       textAlign: 'center',
       border: `1px solid ${BORDER}`,
-      background: isUnmatched
+      background: isMissing
         ? (rowIdx % 2 === 0 ? 'rgba(239,68,68,.07)' : 'rgba(239,68,68,.12)')
         : (rowIdx % 2 === 0 ? '#fff' : ROW_ODD),
-      color: isUnmatched ? '#dc2626' : isNull ? '#94a3b8' : '#1e293b',
-      fontWeight: isUnmatched ? 700 : 400,
+      color: isMissing ? '#dc2626' : '#1e293b',
+      fontWeight: isMissing ? 700 : 400,
       fontSize: 12,
       whiteSpace: 'nowrap',
     };
@@ -257,7 +258,12 @@ function TxMatchingContent() {
                                   : val;
                     return (
                       <td key={p} style={S.td(display, rowIdx)}>
-                        {display === 'UNMATCHED' ? 'X' : display === 'NULL' ? 'NULL' : display}
+                        {(display === 'UNMATCHED' || display === 'NULL') ? (
+                          <div style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                            <span style={{ fontWeight: 700 }}>X</span>
+                            <span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span>
+                          </div>
+                        ) : display}
                       </td>
                     );
                   })}
@@ -269,8 +275,7 @@ function TxMatchingContent() {
 
         {/* ── 범례 ── */}
         <div style={S.legend}>
-          <span><span style={{ color: '#dc2626', fontWeight: 700 }}>X</span> = 파일에 해당 파라미터 없음 (매핑 불가)</span>
-          <span><span style={{ color: '#94a3b8', fontWeight: 600 }}>NULL</span> = 파라미터는 있으나 값이 비어 있음</span>
+          <span><span style={{ color: '#dc2626', fontWeight: 700 }}>X / NULL</span> = 파일에 데이터가 없거나 매핑 불가</span>
         </div>
       </div>
     );

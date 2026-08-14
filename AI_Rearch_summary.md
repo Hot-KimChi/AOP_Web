@@ -16,6 +16,14 @@
 
 ---
 
+## 변경 이력 (v0.9.52 — 2026-08-14)
+
+| # | 요청 | 해결 | Detail |
+|---|------|------|--------|
+| 1 | Tx Summary 매칭 팝업 컬럼 순서 고정 + 파생값 규칙 반영 + 없는 데이터 X/NULL 표기 | 팝업 컬럼을 지정된 SQL 순서(`TxSummaryID ... TxFrequency`)로 고정. `ProbeID`/`Software_version`은 선택값 주입, `ProbeName`은 드롭다운 선택값 주입, `ExamName`은 txt의 `Exam` 컬럼 우선 매핑, `Combined_mode`는 `Mode` 길이(1→0, 2+→1), `IsProcessed`는 `1`로 채움. 파일에 없는 값은 셀에 `X`와 `NULL(빨간색)`을 함께 표시하도록 UI 수정 | [→ Detail](./AI_Rearch_detail.md#v0952--1-tx-summary-매칭-팝업-컬럼순서파생값-표시-규칙-정렬) |
+
+---
+
 ## 변경 이력 (v0.9.38 — 2026-05-12)
 
 | # | 요청 | 해결 | Detail |

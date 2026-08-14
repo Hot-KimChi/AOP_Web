@@ -314,7 +314,7 @@ export default function VerificationReport() {
     );
   };
 
-  const validateTxFile = async (file, database, probeId, softwareVersion) => {
+  const validateTxFile = async (file, database, probeId, softwareVersion, probeName) => {
     if (!file || !database || !probeId || !softwareVersion) {
       return;
     }
@@ -325,6 +325,7 @@ export default function VerificationReport() {
     formData.append('database', database);
     formData.append('probeId', probeId);
     formData.append('softwareVersion', softwareVersion);
+    formData.append('probeName', probeName || '');
     const response = await fetch(`${API_BASE_URL}/api/validate_tx_summary_file`, {
       method: 'POST',
       credentials: 'include',
@@ -367,7 +368,16 @@ export default function VerificationReport() {
     const runValidation = async () => {
       try {
         setTxLoading(true);
-        await validateTxFile(txFile, txDatabase, txProbe, txSoftwareVersion);
+        const selectedProbe = txProbeList.find(
+          (probe) => normalizeProbeId(probe.probeId) === normalizeProbeId(txProbe)
+        );
+        await validateTxFile(
+          txFile,
+          txDatabase,
+          txProbe,
+          txSoftwareVersion,
+          selectedProbe?.probeName || ''
+        );
       } catch (err) {
         setTxError(err.message || '파일 검증 실패');
       } finally {
@@ -375,7 +385,7 @@ export default function VerificationReport() {
       }
     };
     runValidation();
-  }, [txFile, txDatabase, txProbe, txSoftwareVersion]);
+  }, [txFile, txDatabase, txProbe, txSoftwareVersion, txProbeList]);
 
   const uploadTxSummary = async () => {
     if (!txDatabase || !txProbe || !txSoftwareVersion || !txFile) {

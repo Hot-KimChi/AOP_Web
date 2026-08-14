@@ -147,6 +147,49 @@ def _read_tx_dataframe(file_storage) -> pd.DataFrame:
 
 ---
 
+## 변경 이력 (v0.9.52 — 2026-08-14)
+
+### v0.9.52 — #1. Tx Summary 매칭 팝업 컬럼순서/파생값/표시 규칙 정렬
+
+**요청:**
+- 컬럼 순서를 아래 SQL 순서로 고정
+  `TxSummaryID, ProbeName, ExamName, Mode, SubModeIndex, BeamStyleIndex, TxFreqIndex, ProbeNumElevAper, ProbeNumTxCycles, TxpgWaveformStyle, TxChannelModulationEn, CompoundingIndex, TxPulseRle, IsPresetCpaEn, IsProcessed, ProbeID, Software_version, Combined_mode, TxFrequency`
+- 없는 데이터는 파라미터 아래 `X`, 실제값은 `NULL(빨간색)`으로 표시
+- `ProbeID`/`Software_version`/`ProbeName`/`ExamName`/`Combined_mode` 파생값 규칙 반영
+
+**대상 파일:**
+- `backend/routes/db_api.py`
+- `frontend/src/app/verification-report/page.js`
+- `frontend/src/app/verification-report/tx-matching-popup/page.js`
+
+**변경 내용:**
+1. **백엔드 컬럼 순서 고정**
+   - `validate_tx_summary_file`에서 `parameter_order`를 고정 배열로 반환
+   - 프론트는 이 순서를 그대로 사용해 표의 컬럼 순서가 매번 동일
+
+2. **파생값 규칙 반영**
+   - `ProbeID` = 선택한 ProbeID
+   - `Software_version` = 선택한 SW version
+   - `ProbeName` = 드롭다운 선택 ProbeName (프론트 formData로 `probeName` 전달)
+   - `ExamName` = txt 파일의 `Exam`/`ExamName` 계열 컬럼에서 추출
+   - `Combined_mode` = `Mode` 길이 기준 (`1글자 → 0`, `2글자 이상 → 1`)
+   - `IsProcessed` = `"1"`
+
+3. **선택값 필터 fallback**
+   - 파일에 `ProbeID`/`Software_version` 컬럼이 있어도 선택값 필터 결과가 비면 파일 전체(`df_norm`)를 fallback으로 사용해 데이터 소실 방지
+
+4. **팝업 셀 표시 규칙 변경**
+   - 값 없음/매핑불가(`UNMATCHED` 또는 `NULL`)는 셀에 `X` + `NULL`(빨간색) 2줄로 표시
+   - 정상값은 기존처럼 실제 값 출력
+
+**Before / After:**
+- Before: 컬럼 순서가 매번 변동 가능, 일부 파생값이 빈값/미매핑, 없는 데이터 표기가 일관되지 않음
+- After: SQL 기준 고정 컬럼 순서 + 파생값 자동 주입 + 누락 데이터 `X/NULL(빨간색)` 일관 표기
+
+📎 **[→ 변경 요약(Summary)](./AI_Rearch_summary.md)**
+
+---
+
 ## 변경 이력 (v0.9.38 — 2026-05-12)
 
 ### v0.9.38 — #1. 전체 프로젝트 코드 리뷰
