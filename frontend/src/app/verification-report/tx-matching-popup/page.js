@@ -96,7 +96,7 @@ const S = {
   table: {
     borderCollapse: 'collapse',
     width: '100%',
-    fontSize: 10,
+    fontSize: 11,
     tableLayout: 'fixed',
   },
   /* 헤더: 파라미터명 */
@@ -108,7 +108,7 @@ const S = {
     whiteSpace: 'nowrap',
     border: `1px solid rgba(255,255,255,.15)`,
     fontWeight: 600,
-    fontSize: 9,
+    fontSize: 10,
     minWidth: 0,
   },
   /* 데이터 셀 — 상태별 스타일 */
@@ -125,7 +125,7 @@ const S = {
         : (rowIdx % 2 === 0 ? '#fff' : ROW_ODD),
       color: isMissing ? '#dc2626' : '#1e293b',
       fontWeight: isMissing ? 700 : 400,
-      fontSize: 9,
+      fontSize: 10,
       whiteSpace: 'normal',
       wordBreak: 'break-word',
     };
