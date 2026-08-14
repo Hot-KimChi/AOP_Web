@@ -280,7 +280,7 @@ export default function VerificationReport() {
       const pivotRows = rowNos.map(no => {
         const rowCells = comparisonRows.filter(r => r.No === no);
         const modeVal = rowCells.length > 0 ? String(rowCells[0].Mode ?? '') : '';
-        const row = { _rowNo: no, _modeStr: modeVal };
+        const row = { _rowNo: no, _modeStr: modeVal, Mode: modeVal || 'NULL' };
         paramNames.forEach(param => {
           const found = rowCells.find(r => r.Parameter === param);
           // FileValue: "UNMATCHED"(매핑불가) | "NULL"(값없음) | 실제값

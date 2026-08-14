@@ -204,7 +204,10 @@ function TxMatchingContent() {
     const paramMatchStatus = {};
     params.forEach((p) => {
       if (p === 'Mode') {
-        const hasModeValue = rows.some((row) => String(row._modeStr || '').trim() !== '');
+        const hasModeValue = rows.some((row) => {
+          const v = toDisplay(row[p]);
+          return v !== 'UNMATCHED' && v !== 'NULL';
+        });
         paramMatchStatus[p] = hasModeValue ? 'O' : 'X';
         return;
       }
@@ -278,13 +281,6 @@ function TxMatchingContent() {
               {rows.map((row, rowIdx) => (
                 <tr key={row._rowNo ?? rowIdx}>
                   {params.map(p => {
-                    if (p === 'Mode') {
-                      return (
-                        <td key="Mode" style={S.tdMode(rowIdx)}>
-                          {row._modeStr || '—'}
-                        </td>
-                      );
-                    }
                     const display = toDisplay(row[p]);
                     return (
                       <td key={p} style={S.td(display, rowIdx)}>
