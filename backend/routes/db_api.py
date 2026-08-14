@@ -631,7 +631,14 @@ def validate_tx_summary_file():
     )
 
     # 메시지 결정
-    excluded_for_match = {"TxSummaryID", "ProbeID", "Software_version"}
+    excluded_for_match = {
+        "TxSummaryID",
+        "ProbeID",
+        "Software_version",
+        "ProbeName",
+        "IsProcessed",
+        "Combined_mode",
+    }
     effective_rows = [
         r
         for r in comparison_rows
@@ -647,7 +654,7 @@ def validate_tx_summary_file():
         message = (
             f"비교 완료: {total_params}개 파라미터 기준 "
             f"{mismatch_cnt}개 매핑 불가 "
-            f"(TxSummaryID/ProbeID/SW 제외)"
+            f"(TxSummaryID/ProbeID/SW/ProbeName/IsProcessed/Combined_mode 제외)"
         )
     else:
         mismatch_cnt = sum(1 for r in effective_rows if r.get("Match") == "X")
@@ -655,7 +662,7 @@ def validate_tx_summary_file():
         mapped_cnt = len(column_map_log) if column_map_log else 0
         message = (
             f"비교 완료: {total_cnt}개 기준 {mismatch_cnt}개 불일치 "
-            f"(TxSummaryID/ProbeID/SW 제외, 파일 컬럼 매핑: {mapped_cnt}개)"
+            f"(TxSummaryID/ProbeID/SW/ProbeName/IsProcessed/Combined_mode 제외, 파일 컬럼 매핑: {mapped_cnt}개)"
         )
 
     return jsonify(

@@ -187,8 +187,15 @@ function TxMatchingContent() {
            : val;
     };
 
-    /* 파라미터 수 및 매칭률 계산: Mode·TxSummaryID 제외 */
-    const SKIP = new Set(['txsummaryid', 'probeid', 'software_version']);
+    /* 파라미터 수 및 매칭률 계산 제외 */
+    const SKIP = new Set([
+      'txsummaryid',
+      'probeid',
+      'software_version',
+      'probename',
+      'isprocessed',
+      'combined_mode',
+    ]);
     const calcParams = params.filter((p) => !SKIP.has(String(p).toLowerCase()));
     const paramCount = calcParams.length;
 
@@ -201,7 +208,14 @@ function TxMatchingContent() {
       });
     });
     const matchRate = totalCells > 0 ? Math.round((matchedCells / totalCells) * 100) : 0;
-    const excludedForRate = new Set(['txsummaryid', 'probeid', 'software_version']);
+    const excludedForRate = new Set([
+      'txsummaryid',
+      'probeid',
+      'software_version',
+      'probename',
+      'isprocessed',
+      'combined_mode',
+    ]);
     const paramMatchStatus = {};
     params.forEach((p) => {
       const lower = String(p).toLowerCase();
@@ -301,7 +315,7 @@ function TxMatchingContent() {
         <div style={S.legend}>
           <span><span style={{ color: '#86efac', fontWeight: 700 }}>헤더 아래 O</span> = 매칭률 포함 + txt 컬럼 매핑됨</span>
           <span><span style={{ color: '#fecaca', fontWeight: 700 }}>헤더 아래 X</span> = 매칭률 포함 + txt 컬럼 매핑 안됨</span>
-          <span><span style={{ color: '#cbd5e1', fontWeight: 700 }}>헤더 아래 -</span> = 매칭률 제외(TxSummaryID/ProbeID/SW)</span>
+          <span><span style={{ color: '#cbd5e1', fontWeight: 700 }}>헤더 아래 -</span> = 매칭률 제외(TxSummaryID/ProbeID/SW/ProbeName/IsProcessed/Combined_mode)</span>
           <span><span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span> = 데이터 셀의 실제 값 없음</span>
         </div>
       </div>
