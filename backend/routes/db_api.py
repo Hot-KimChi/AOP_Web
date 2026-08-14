@@ -518,11 +518,15 @@ def validate_tx_summary_file():
                 for _, row in df_filtered.iterrows():
                     file_rows_by_mode.setdefault("", []).append(row)
 
-        # Mode 목록 결정: DB에 있으면 DB 기준, 없으면 파일 기준, 둘 다 없으면 [""]
-        if db_by_mode:
-            all_modes = sorted(db_by_mode.keys())
-        elif file_rows_by_mode:
+        # Mode 목록 결정: txt 파일 Mode를 우선 사용
+        if file_rows_by_mode:
             all_modes = sorted(file_rows_by_mode.keys())
+            if db_by_mode:
+                for db_mode in sorted(db_by_mode.keys()):
+                    if db_mode not in all_modes:
+                        all_modes.append(db_mode)
+        elif db_by_mode:
+            all_modes = sorted(db_by_mode.keys())
         else:
             all_modes = [""]
 
