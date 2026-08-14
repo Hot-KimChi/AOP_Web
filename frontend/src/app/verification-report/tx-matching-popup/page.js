@@ -253,6 +253,9 @@ function TxMatchingContent() {
                     {meta.message}
                   </span>
                 )}
+                <span style={S.msgText(false)}>
+                  매칭률 기준 제외: TxSummaryID, ProbeID, Software_version, Mode
+                </span>
               </>
             )}
           </div>

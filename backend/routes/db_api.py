@@ -631,24 +631,31 @@ def validate_tx_summary_file():
     )
 
     # 메시지 결정
+    excluded_for_match = {"TxSummaryID", "ProbeID", "Software_version", "Mode"}
+    effective_rows = [
+        r
+        for r in comparison_rows
+        if r.get("Parameter") not in excluded_for_match
+    ]
     if file_parse_warning:
         message = f"파일 파싱 경고: {file_parse_warning}"
     elif not db_has_matching_rows and not comparison_rows:
         message = "선택한 Probe/Software 버전이 Tx_summary 테이블에 없습니다."
     elif not db_has_matching_rows:
-        mismatch_cnt = sum(1 for r in comparison_rows if r.get("Match") == "X")
-        total_params = len(set(r["Parameter"] for r in comparison_rows))
+        mismatch_cnt = sum(1 for r in effective_rows if r.get("Match") == "X")
+        total_params = len(set(r["Parameter"] for r in effective_rows))
         message = (
-            f"DB에 ProbeID/SW 매칭 없음 — 파일 데이터 {total_params}개 파라미터 표시 "
-            f"({mismatch_cnt}개 매핑 불가)"
+            f"비교 완료: {total_params}개 파라미터 기준 "
+            f"{mismatch_cnt}개 매핑 불가 "
+            f"(TxSummaryID/ProbeID/SW/Mode 제외)"
         )
     else:
-        mismatch_cnt = sum(1 for r in comparison_rows if r.get("Match") == "X")
-        total_cnt = len(comparison_rows)
+        mismatch_cnt = sum(1 for r in effective_rows if r.get("Match") == "X")
+        total_cnt = len(effective_rows)
         mapped_cnt = len(column_map_log) if column_map_log else 0
         message = (
-            f"비교 완료: {total_cnt}개 파라미터 중 {mismatch_cnt}개 불일치 "
-            f"(파일 컬럼 매핑: {mapped_cnt}개)"
+            f"비교 완료: {total_cnt}개 기준 {mismatch_cnt}개 불일치 "
+            f"(TxSummaryID/ProbeID/SW/Mode 제외, 파일 컬럼 매핑: {mapped_cnt}개)"
         )
 
     return jsonify(
