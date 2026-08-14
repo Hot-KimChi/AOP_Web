@@ -103,13 +103,12 @@ const S = {
   th: {
     position: 'sticky', top: 0, zIndex: 10,
     background: HDR_BG, color: '#fff',
-    padding: '8px 10px',
+    padding: '6px 6px',
     textAlign: 'center',
-    whiteSpace: 'normal',
-    wordBreak: 'break-word',
+    whiteSpace: 'nowrap',
     border: `1px solid rgba(255,255,255,.15)`,
     fontWeight: 600,
-    fontSize: 10,
+    fontSize: 9,
     minWidth: 0,
   },
   /* 데이터 셀 — 상태별 스타일 */
@@ -118,7 +117,7 @@ const S = {
     const isNull      = val === 'NULL';
     const isMissing   = isUnmatched || isNull;
     return {
-      padding: '7px 10px',
+      padding: '6px 6px',
       textAlign: 'center',
       border: `1px solid ${BORDER}`,
       background: isMissing
@@ -126,7 +125,7 @@ const S = {
         : (rowIdx % 2 === 0 ? '#fff' : ROW_ODD),
       color: isMissing ? '#dc2626' : '#1e293b',
       fontWeight: isMissing ? 700 : 400,
-      fontSize: 10,
+      fontSize: 9,
       whiteSpace: 'normal',
       wordBreak: 'break-word',
     };
