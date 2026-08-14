@@ -194,26 +194,6 @@ function TxMatchingContent() {
     };
 
     /* 파라미터 수 및 매칭률 계산 제외 */
-    const SKIP = new Set([
-      'txsummaryid',
-      'probeid',
-      'software_version',
-      'probename',
-      'isprocessed',
-      'combined_mode',
-    ]);
-    const calcParams = params.filter((p) => !SKIP.has(String(p).toLowerCase()));
-    const paramCount = calcParams.length;
-
-    let totalCells = 0, matchedCells = 0;
-    rows.forEach(row => {
-      calcParams.forEach(p => {
-        totalCells++;
-        const val = toDisplay(row[p]);
-        if (val !== 'UNMATCHED' && val !== '—' && val !== 'NULL' && val !== '') matchedCells++;
-      });
-    });
-    const matchRate = totalCells > 0 ? Math.round((matchedCells / totalCells) * 100) : 0;
     const excludedForRate = new Set([
       'txsummaryid',
       'probeid',
@@ -222,6 +202,8 @@ function TxMatchingContent() {
       'isprocessed',
       'combined_mode',
     ]);
+    const calcParams = params.filter((p) => !excludedForRate.has(String(p).toLowerCase()));
+    const paramCount = calcParams.length;
     const paramMatchStatus = {};
     params.forEach((p) => {
       const lower = String(p).toLowerCase();
@@ -241,6 +223,8 @@ function TxMatchingContent() {
       }
       paramMatchStatus[p] = mapped ? 'O' : 'X';
     });
+    const matchedParams = calcParams.filter((p) => paramMatchStatus[p] === 'O').length;
+    const matchRate = paramCount > 0 ? Math.round((matchedParams / paramCount) * 100) : 0;
 
     return (
       <div style={S.page}>
