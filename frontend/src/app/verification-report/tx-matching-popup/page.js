@@ -201,15 +201,21 @@ function TxMatchingContent() {
       });
     });
     const matchRate = totalCells > 0 ? Math.round((matchedCells / totalCells) * 100) : 0;
-    const missingParams = new Set();
-    rows.forEach((row) => {
-      params.forEach((p) => {
-        if (p === 'Mode') return;
+    const paramMatchStatus = {};
+    params.forEach((p) => {
+      if (p === 'Mode') {
+        paramMatchStatus[p] = 'O';
+        return;
+      }
+      let mapped = false;
+      for (const row of rows) {
         const val = toDisplay(row[p]);
-        if (val === 'UNMATCHED' || val === 'NULL') {
-          missingParams.add(p);
+        if (val !== 'UNMATCHED') {
+          mapped = true;
+          break;
         }
-      });
+      }
+      paramMatchStatus[p] = mapped ? 'O' : 'X';
     });
 
     return (
@@ -252,8 +258,17 @@ function TxMatchingContent() {
                   <th key={p} style={S.th}>
                     <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.15 }}>
                       <span>{p}</span>
-                      {p !== 'Mode' && missingParams.has(p) && (
-                        <span style={{ color: '#fecaca', fontWeight: 700, fontSize: 11, marginTop: 2 }}>X</span>
+                      {p !== 'Mode' && (
+                        <span
+                          style={{
+                            color: paramMatchStatus[p] === 'O' ? '#86efac' : '#fecaca',
+                            fontWeight: 700,
+                            fontSize: 11,
+                            marginTop: 2,
+                          }}
+                        >
+                          {paramMatchStatus[p]}
+                        </span>
                       )}
                     </div>
                   </th>
@@ -286,7 +301,8 @@ function TxMatchingContent() {
 
         {/* ── 범례 ── */}
         <div style={S.legend}>
-          <span><span style={{ color: '#fecaca', fontWeight: 700 }}>헤더 아래 X</span> = 해당 파라미터에 결측 데이터 존재</span>
+          <span><span style={{ color: '#86efac', fontWeight: 700 }}>헤더 아래 O</span> = txt와 파라미터 매핑됨</span>
+          <span><span style={{ color: '#fecaca', fontWeight: 700 }}>헤더 아래 X</span> = txt와 파라미터 매핑 안됨</span>
           <span><span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span> = 데이터 셀의 실제 값 없음</span>
         </div>
       </div>
