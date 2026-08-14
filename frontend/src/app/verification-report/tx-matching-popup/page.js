@@ -201,30 +201,24 @@ function TxMatchingContent() {
       });
     });
     const matchRate = totalCells > 0 ? Math.round((matchedCells / totalCells) * 100) : 0;
+    const excludedForRate = new Set(['txsummaryid', 'probeid', 'software_version']);
     const paramMatchStatus = {};
     params.forEach((p) => {
       const lower = String(p).toLowerCase();
-      if (lower === 'probeid' || lower === 'software_version') {
+      if (excludedForRate.has(lower)) {
         paramMatchStatus[p] = '-';
         return;
       }
-      if (p === 'Mode') {
-        const hasModeValue = rows.some((row) => {
-          const v = toDisplay(row[p]);
-          return v !== 'UNMATCHED' && v !== 'NULL';
-        });
-        paramMatchStatus[p] = hasModeValue ? 'O' : 'X';
-        return;
-      }
-      let mapped = false;
+      // 포함 컬럼은 "전체 행 매칭" 기준: 하나라도 결측/미매칭이면 X
+      let allMatched = true;
       for (const row of rows) {
         const val = toDisplay(row[p]);
-        if (val !== 'UNMATCHED') {
-          mapped = true;
+        if (val === 'UNMATCHED' || val === 'NULL') {
+          allMatched = false;
           break;
         }
       }
-      paramMatchStatus[p] = mapped ? 'O' : 'X';
+      paramMatchStatus[p] = allMatched ? 'O' : 'X';
     });
 
     return (
@@ -301,9 +295,9 @@ function TxMatchingContent() {
 
         {/* ── 범례 ── */}
         <div style={S.legend}>
-          <span><span style={{ color: '#86efac', fontWeight: 700 }}>헤더 아래 O</span> = txt와 파라미터 매핑됨</span>
-          <span><span style={{ color: '#fecaca', fontWeight: 700 }}>헤더 아래 X</span> = txt와 파라미터 매핑 안됨</span>
-          <span><span style={{ color: '#cbd5e1', fontWeight: 700 }}>헤더 아래 -</span> = ProbeID/SW 매칭 제외</span>
+          <span><span style={{ color: '#86efac', fontWeight: 700 }}>헤더 아래 O</span> = 매칭률 포함 + 매칭됨</span>
+          <span><span style={{ color: '#fecaca', fontWeight: 700 }}>헤더 아래 X</span> = 매칭률 포함 + 미매칭</span>
+          <span><span style={{ color: '#cbd5e1', fontWeight: 700 }}>헤더 아래 -</span> = 매칭률 제외(TxSummaryID/ProbeID/SW)</span>
           <span><span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span> = 데이터 셀의 실제 값 없음</span>
         </div>
       </div>
