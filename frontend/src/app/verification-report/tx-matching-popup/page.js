@@ -254,7 +254,7 @@ function TxMatchingContent() {
             <span><span style={{ color: '#86efac', fontWeight: 700 }}>O</span> : 매칭률 포함 + txt 컬럼 매핑됨</span>
             <span><span style={{ color: '#fecaca', fontWeight: 700 }}>X</span> : 매칭률 포함 + txt 컬럼 매핑 안됨</span>
             <span><span style={{ color: '#cbd5e1', fontWeight: 700 }}>-</span> : 매칭률 제외(TxSummaryID/ProbeID/SW/ProbeName/IsProcessed/Combined_mode)</span>
-            <span><span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span> : 데이터 셀의 실제 값 없음</span>
+            <span><span style={{ color: '#dc2626', fontWeight: 700 }}>-1</span> : 데이터 셀의 실제 값 없음</span>
           </div>
         </div>
 
@@ -296,7 +296,7 @@ function TxMatchingContent() {
                     return (
                       <td key={p} style={S.td(display, rowIdx)}>
                         {(display === 'UNMATCHED' || display === 'NULL')
-                          ? (isTxSummaryId ? '' : 'NULL')
+                          ? (isTxSummaryId ? '' : '-1')
                           : display}
                       </td>
                     );
