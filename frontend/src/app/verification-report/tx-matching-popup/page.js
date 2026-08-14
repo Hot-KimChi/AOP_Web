@@ -292,10 +292,11 @@ function TxMatchingContent() {
                 <tr key={row._rowNo ?? rowIdx}>
                   {params.map(p => {
                     const display = toDisplay(row[p]);
+                    const isTxSummaryId = String(p).toLowerCase() === 'txsummaryid';
                     return (
                       <td key={p} style={S.td(display, rowIdx)}>
                         {(display === 'UNMATCHED' || display === 'NULL')
-                          ? 'null'
+                          ? (isTxSummaryId ? '' : 'null')
                           : display}
                       </td>
                     );
