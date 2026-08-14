@@ -188,7 +188,7 @@ function TxMatchingContent() {
     };
 
     /* 파라미터 수 및 매칭률 계산: Mode·TxSummaryID 제외 */
-    const SKIP = new Set(['txsummaryid', 'mode']);
+    const SKIP = new Set(['txsummaryid', 'mode', 'probeid', 'software_version']);
     const calcParams = params.filter((p) => !SKIP.has(String(p).toLowerCase()));
     const paramCount = calcParams.length;
 
@@ -203,6 +203,11 @@ function TxMatchingContent() {
     const matchRate = totalCells > 0 ? Math.round((matchedCells / totalCells) * 100) : 0;
     const paramMatchStatus = {};
     params.forEach((p) => {
+      const lower = String(p).toLowerCase();
+      if (lower === 'probeid' || lower === 'software_version') {
+        paramMatchStatus[p] = '-';
+        return;
+      }
       if (p === 'Mode') {
         const hasModeValue = rows.some((row) => {
           const v = toDisplay(row[p]);
@@ -264,7 +269,12 @@ function TxMatchingContent() {
                       <span>{p}</span>
                       <span
                         style={{
-                          color: paramMatchStatus[p] === 'O' ? '#86efac' : '#fecaca',
+                          color:
+                            paramMatchStatus[p] === 'O'
+                              ? '#86efac'
+                              : paramMatchStatus[p] === '-'
+                                ? '#cbd5e1'
+                                : '#fecaca',
                           fontWeight: 700,
                           fontSize: 11,
                           marginTop: 2,
@@ -298,6 +308,7 @@ function TxMatchingContent() {
         <div style={S.legend}>
           <span><span style={{ color: '#86efac', fontWeight: 700 }}>헤더 아래 O</span> = txt와 파라미터 매핑됨</span>
           <span><span style={{ color: '#fecaca', fontWeight: 700 }}>헤더 아래 X</span> = txt와 파라미터 매핑 안됨</span>
+          <span><span style={{ color: '#cbd5e1', fontWeight: 700 }}>헤더 아래 -</span> = ProbeID/SW 매칭 제외</span>
           <span><span style={{ color: '#dc2626', fontWeight: 700 }}>NULL</span> = 데이터 셀의 실제 값 없음</span>
         </div>
       </div>
