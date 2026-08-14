@@ -828,6 +828,7 @@ def upload_tx_summary():
         # 1. 빈 헤더 사전 제거 (trailing delimiter 때문에 빈 컬럼 생성 가능)
         valid_header_indexes = [i for i, col in enumerate(df.columns) if str(col).strip()]
         df = df.iloc[:, valid_header_indexes]
+        df = df.reset_index(drop=True)
         
         # 2. DB 스키마 조회 및 컬럼 매칭
         column_lookup = _get_column_lookup(selected_database, "Tx_summary")
@@ -851,6 +852,7 @@ def upload_tx_summary():
         
         if df_normalized.empty:
             return error_response("No valid columns after schema matching", 400)
+        df_normalized = df_normalized.reset_index(drop=True)
         
         # 4. 검증 팝업과 동일한 파생값 규칙 반영
         actual_probe_id_col = column_lookup.get("probeid", "ProbeID")
@@ -880,7 +882,10 @@ def upload_tx_summary():
                 exam_source_col = cand
                 break
         if exam_source_col is not None:
-            df_normalized[actual_exam_name_col] = df[exam_source_col]
+            exam_values = df[exam_source_col]
+            if isinstance(exam_values, pd.DataFrame):
+                exam_values = exam_values.iloc[:, 0]
+            df_normalized[actual_exam_name_col] = exam_values.reset_index(drop=True).values
 
         # IsProcessed는 1 고정
         df_normalized[actual_is_processed_col] = 1
