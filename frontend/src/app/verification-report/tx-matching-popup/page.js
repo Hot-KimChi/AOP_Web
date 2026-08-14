@@ -89,7 +89,7 @@ const S = {
     background: '#fff',
     borderRadius: 8,
     boxShadow: '0 1px 4px rgba(0,0,0,.1)',
-    overflowX: 'hidden',
+    overflowX: 'auto',
     overflowY: 'auto',
     maxHeight: 'calc(100vh - 110px)',
   },
@@ -97,7 +97,7 @@ const S = {
     borderCollapse: 'collapse',
     width: '100%',
     fontSize: 11,
-    tableLayout: 'fixed',
+    tableLayout: 'auto',
   },
   /* 헤더: 파라미터명 */
   th: {
@@ -126,8 +126,7 @@ const S = {
       color: isMissing ? '#dc2626' : '#1e293b',
       fontWeight: isMissing ? 700 : 400,
       fontSize: 10,
-      whiteSpace: 'normal',
-      wordBreak: 'break-word',
+      whiteSpace: 'nowrap',
     };
   },
   tdMode: (rowIdx) => ({
