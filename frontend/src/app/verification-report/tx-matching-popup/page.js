@@ -248,14 +248,6 @@ function TxMatchingContent() {
                 <span style={S.metaVal}>{meta.selectedProbeId || '—'}</span>
                 <span style={S.metaLabel}>선택한 SW version</span>
                 <span style={S.metaVal}>{meta.selectedSoftwareVersion || '—'}</span>
-                {meta.message && (
-                  <span style={S.msgText(meta.message.includes('경고') || meta.message.includes('없음'))}>
-                    {meta.message}
-                  </span>
-                )}
-                <span style={S.msgText(false)}>
-                  매칭률 기준 제외: TxSummaryID, ProbeID, Software_version
-                </span>
               </>
             )}
           </div>
