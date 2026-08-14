@@ -344,7 +344,48 @@ export default function VerificationReport() {
     const validation = data.validation || {};
     const ok = Boolean(validation.matchesSelection && validation.dbHasMatchingRows);
     setTxValidationOk(ok);
-    setTxValidationMessage(validation.message || '');
+
+    // 카드 메시지: 매핑률 + 미매핑 파라미터명 표시
+    const comparisonRows = Array.isArray(validation.comparisonRows) ? validation.comparisonRows : [];
+    const excluded = new Set([
+      'txsummaryid',
+      'probeid',
+      'software_version',
+      'probename',
+      'isprocessed',
+      'combined_mode',
+    ]);
+    const order = Array.isArray(validation.parameterOrder) && validation.parameterOrder.length > 0
+      ? validation.parameterOrder
+      : [...new Set(comparisonRows.map((r) => r.Parameter))];
+    const targetParams = order.filter((p) => !excluded.has(String(p).toLowerCase()));
+
+    const mappedParams = [];
+    const unmappedParams = [];
+    targetParams.forEach((param) => {
+      let mapped = false;
+      if (String(param).toLowerCase() === 'mode') {
+        mapped = comparisonRows.some((r) => String(r.Mode ?? '').trim() !== '');
+      } else {
+        const paramRows = comparisonRows.filter((r) => r.Parameter === param);
+        mapped = paramRows.some((r) => {
+          const fv = String(r.FileValue ?? '').trim().toUpperCase();
+          return fv !== '' && fv !== 'UNMATCHED';
+        });
+      }
+      if (mapped) {
+        mappedParams.push(param);
+      } else {
+        unmappedParams.push(param);
+      }
+    });
+
+    const total = targetParams.length;
+    const mappedCount = mappedParams.length;
+    const rate = total > 0 ? Math.round((mappedCount / total) * 100) : 0;
+    const unmappedText = unmappedParams.length > 0 ? unmappedParams.join(', ') : '없음';
+    setTxValidationMessage(`매핑률 ${rate}% (${mappedCount}/${total}) | 미매핑 파라미터: ${unmappedText}`);
+
     openTxValidationWindow(validation);
     return ok;
   };
