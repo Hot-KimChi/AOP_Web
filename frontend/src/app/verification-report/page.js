@@ -342,8 +342,6 @@ export default function VerificationReport() {
       throw new Error(data.message || '파일 파라미터 검증 실패');
     }
     const validation = data.validation || {};
-    const ok = Boolean(validation.matchesSelection && validation.dbHasMatchingRows);
-    setTxValidationOk(ok);
 
     // 카드 메시지: 매핑률 + 미매핑 파라미터명 표시
     const comparisonRows = Array.isArray(validation.comparisonRows) ? validation.comparisonRows : [];
@@ -385,6 +383,8 @@ export default function VerificationReport() {
     const rate = total > 0 ? Math.round((mappedCount / total) * 100) : 0;
     const mismatchingText = unmappedParams.length > 0 ? unmappedParams.join(', ') : '없음';
     setTxValidationMessage(`매핑률 ${rate}% (${mappedCount}/${total}) | mismatching 파라미터: ${mismatchingText}`);
+    const ok = total > 0;
+    setTxValidationOk(ok);
 
     openTxValidationWindow(validation);
     return ok;
@@ -445,6 +445,10 @@ export default function VerificationReport() {
       formData.append('database', txDatabase);
       formData.append('probeId', txProbe);
       formData.append('softwareVersion', txSoftwareVersion);
+      const selectedProbe = txProbeList.find(
+        (probe) => normalizeProbeId(probe.probeId) === normalizeProbeId(txProbe)
+      );
+      formData.append('probeName', selectedProbe?.probeName || '');
       const response = await fetch(`${API_BASE_URL}/api/upload_tx_summary`, {
         method: 'POST',
         credentials: 'include',

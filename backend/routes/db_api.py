@@ -814,6 +814,9 @@ def upload_tx_summary():
         return error_response("CSV 또는 TXT 파일만 업로드할 수 있습니다.", 400)
     
     selected_database = request.form.get("database", os.environ.get("SERVER_NAME_DB", "AOP_DB"))
+    selected_probe_id = request.form.get("probeId")
+    selected_sw_version = request.form.get("softwareVersion")
+    selected_probe_name = (request.form.get("probeName") or "").strip()
     
     try:
         # 입력 파일 읽기 (TXT는 구분자 자동 감지)
@@ -849,17 +852,47 @@ def upload_tx_summary():
         if df_normalized.empty:
             return error_response("No valid columns after schema matching", 400)
         
-        # 4. IsProcessed를 1로 강제 설정
-        for idx in range(len(df_normalized)):
-            row = df_normalized.iloc[idx].to_dict()
-            row["IsProcessed"] = 1
-            df_normalized.iloc[idx] = pd.Series(row)
+        # 4. 검증 팝업과 동일한 파생값 규칙 반영
+        actual_probe_id_col = column_lookup.get("probeid", "ProbeID")
+        actual_sw_col = column_lookup.get("software_version", "Software_version")
+        actual_probe_name_col = column_lookup.get("probename", "ProbeName")
+        actual_exam_name_col = column_lookup.get("examname", "ExamName")
+        actual_mode_col = column_lookup.get("mode", "Mode")
+        actual_combined_mode_col = (
+            column_lookup.get("combined_mode")
+            or column_lookup.get("combinedmode")
+            or "Combined_mode"
+        )
+        actual_is_processed_col = column_lookup.get("isprocessed", "IsProcessed")
+
+        # ProbeID / Software_version / ProbeName 강제 주입
+        if selected_probe_id:
+            df_normalized[actual_probe_id_col] = _normalize_probe_id(selected_probe_id)
+        if selected_sw_version:
+            df_normalized[actual_sw_col] = str(selected_sw_version).strip()
+        if selected_probe_name:
+            df_normalized[actual_probe_name_col] = selected_probe_name
+
+        # ExamName은 txt 파일의 Exam/ExamName 컬럼 우선 사용
+        exam_source_col = None
+        for cand in ["ExamName", "Exam", "exam", "Exam_Name"]:
+            if cand in df.columns:
+                exam_source_col = cand
+                break
+        if exam_source_col is not None:
+            df_normalized[actual_exam_name_col] = df[exam_source_col]
+
+        # IsProcessed는 1 고정
+        df_normalized[actual_is_processed_col] = 1
+
+        # Mode 길이에 따라 Combined_mode 계산(1글자=0, 2글자 이상=1)
+        if actual_mode_col in df_normalized.columns:
+            def _to_combined_mode(v):
+                mode_len = len(str(v).strip()) if v is not None else 0
+                return 0 if mode_len == 1 else (1 if mode_len >= 2 else None)
+            df_normalized[actual_combined_mode_col] = df_normalized[actual_mode_col].apply(_to_combined_mode)
         
-        # 5. Mode에 따라 combined_mode 자동 계산
-        if "Mode" in df_normalized.columns:
-            df_normalized["combined_mode"] = df_normalized["Mode"].apply(compute_combined_mode)
-        
-        # 6. numpy 타입 변환 후 DB에 삽입
+        # 5. numpy 타입 변환 후 DB에 삽입
         for col in df_normalized.columns:
             df_normalized[col] = df_normalized[col].apply(
                 lambda x: x.item() if isinstance(x, (np.integer, np.floating)) else x
