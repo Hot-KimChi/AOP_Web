@@ -12,7 +12,7 @@ const S = {
     fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
     background: '#f0f4f8',
     minHeight: '100vh',
-    padding: '12px 16px',
+    padding: '10px 10px',
     boxSizing: 'border-box',
   },
   /* ─ 상단 카드 ─ */
@@ -89,15 +89,15 @@ const S = {
     background: '#fff',
     borderRadius: 8,
     boxShadow: '0 1px 4px rgba(0,0,0,.1)',
-    overflowX: 'auto',
+    overflowX: 'hidden',
     overflowY: 'auto',
     maxHeight: 'calc(100vh - 110px)',
   },
   table: {
     borderCollapse: 'collapse',
     width: '100%',
-    fontSize: 12,
-    tableLayout: 'auto',
+    fontSize: 10,
+    tableLayout: 'fixed',
   },
   /* 헤더: 파라미터명 */
   th: {
@@ -105,11 +105,12 @@ const S = {
     background: HDR_BG, color: '#fff',
     padding: '8px 10px',
     textAlign: 'center',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
     border: `1px solid rgba(255,255,255,.15)`,
     fontWeight: 600,
-    fontSize: 12,
-    minWidth: 90,
+    fontSize: 10,
+    minWidth: 0,
   },
   /* 데이터 셀 — 상태별 스타일 */
   td: (val, rowIdx) => {
@@ -125,8 +126,9 @@ const S = {
         : (rowIdx % 2 === 0 ? '#fff' : ROW_ODD),
       color: isMissing ? '#dc2626' : '#1e293b',
       fontWeight: isMissing ? 700 : 400,
-      fontSize: 12,
-      whiteSpace: 'nowrap',
+      fontSize: 10,
+      whiteSpace: 'normal',
+      wordBreak: 'break-word',
     };
   },
   tdMode: (rowIdx) => ({
