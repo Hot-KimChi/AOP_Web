@@ -63,10 +63,15 @@ def _read_tx_dataframe(file_storage) -> pd.DataFrame:
     filename = (file_storage.filename or "").strip().lower()
     if filename.endswith(".txt"):
         try:
-            return pd.read_csv(StringIO(content), sep=None, engine="python")
+            return pd.read_csv(
+                StringIO(content),
+                sep=None,
+                engine="python",
+                keep_default_na=False,
+            )
         except Exception:
-            return pd.read_csv(StringIO(content), sep="\t")
-    return pd.read_csv(StringIO(content))
+            return pd.read_csv(StringIO(content), sep="\t", keep_default_na=False)
+    return pd.read_csv(StringIO(content), keep_default_na=False)
 
 
 def compute_combined_mode(mode: str) -> int:
@@ -895,7 +900,7 @@ def upload_tx_summary():
         if actual_tx_pulse_rle_col in df_normalized.columns:
             df_normalized[actual_tx_pulse_rle_col] = df_normalized[actual_tx_pulse_rle_col].apply(
                 lambda v: 0
-                if v is None or str(v).strip().lower() in ("", "nan", "none", "null")
+                if v is None or str(v).strip().lower() in ("", "nan", "none")
                 else v
             )
         else:
