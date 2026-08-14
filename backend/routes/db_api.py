@@ -860,6 +860,7 @@ def upload_tx_summary():
         actual_probe_name_col = column_lookup.get("probename", "ProbeName")
         actual_exam_name_col = column_lookup.get("examname", "ExamName")
         actual_mode_col = column_lookup.get("mode", "Mode")
+        actual_tx_pulse_rle_col = column_lookup.get("txpulserle", "TxPulseRle")
         actual_combined_mode_col = (
             column_lookup.get("combined_mode")
             or column_lookup.get("combinedmode")
@@ -889,6 +890,16 @@ def upload_tx_summary():
 
         # IsProcessed는 1 고정
         df_normalized[actual_is_processed_col] = 1
+
+        # TxPulseRle은 DB NOT NULL 제약 대응: 결측은 0으로 강제
+        if actual_tx_pulse_rle_col in df_normalized.columns:
+            df_normalized[actual_tx_pulse_rle_col] = df_normalized[actual_tx_pulse_rle_col].apply(
+                lambda v: 0
+                if v is None or str(v).strip().lower() in ("", "nan", "none", "null")
+                else v
+            )
+        else:
+            df_normalized[actual_tx_pulse_rle_col] = 0
 
         # Mode 길이에 따라 Combined_mode 계산(1글자=0, 2글자 이상=1)
         if actual_mode_col in df_normalized.columns:
