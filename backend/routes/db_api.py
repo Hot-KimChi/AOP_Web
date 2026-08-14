@@ -501,9 +501,17 @@ def validate_tx_summary_file():
         # 파일 Mode별 행 목록 매핑 (같은 Mode 여러 행 모두 저장)
         file_rows_by_mode: dict = {}
         if df_filtered is not None and not df_filtered.empty:
-            if "Mode" in df_filtered.columns:
+            mode_col = next(
+                (
+                    c
+                    for c in df_filtered.columns
+                    if str(c).strip().lower() == "mode"
+                ),
+                None,
+            )
+            if mode_col is not None:
                 for _, row in df_filtered.iterrows():
-                    mode_key = str(row.get("Mode", "")).strip()
+                    mode_key = str(row.get(mode_col, "")).strip()
                     file_rows_by_mode.setdefault(mode_key, []).append(row)
             else:
                 # Mode 컬럼 없으면 전체 행을 빈 모드로
