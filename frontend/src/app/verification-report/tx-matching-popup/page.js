@@ -188,7 +188,7 @@ function TxMatchingContent() {
     };
 
     /* 파라미터 수 및 매칭률 계산: Mode·TxSummaryID 제외 */
-    const SKIP = new Set(['txsummaryid', 'mode', 'probeid', 'software_version']);
+    const SKIP = new Set(['txsummaryid', 'probeid', 'software_version']);
     const calcParams = params.filter((p) => !SKIP.has(String(p).toLowerCase()));
     const paramCount = calcParams.length;
 
@@ -254,7 +254,7 @@ function TxMatchingContent() {
                   </span>
                 )}
                 <span style={S.msgText(false)}>
-                  매칭률 기준 제외: TxSummaryID, ProbeID, Software_version, Mode
+                  매칭률 기준 제외: TxSummaryID, ProbeID, Software_version
                 </span>
               </>
             )}
