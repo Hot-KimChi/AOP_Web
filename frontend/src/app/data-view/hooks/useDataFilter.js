@@ -13,23 +13,38 @@
 
 import { useState, useCallback, useMemo } from 'react';
 
+const normalizeFilterValue = (value) => String(value ?? '').toLowerCase().trim();
+
 export const useDataFilter = (csvData, setDisplayData) => {
   const [filters, setFilters] = useState({});
+
+  const normalizedFilterSets = useMemo(() => {
+    const sets = {};
+    Object.entries(filters).forEach(([column, values]) => {
+      if (!values || values.length === 0) return;
+      sets[column] = new Set(values.map(normalizeFilterValue));
+    });
+    return sets;
+  }, [filters]);
 
   /**
    * 필터 적용 (컬럼 내 OR, 컬럼 간 AND)
    */
   const applyFilters = useCallback((newFilters) => {
+    const normalizedNewFilters = {};
+    Object.entries(newFilters).forEach(([column, values]) => {
+      if (!values || values.length === 0) return;
+      normalizedNewFilters[column] = new Set(values.map(normalizeFilterValue));
+    });
+
     let filteredData = [...csvData];
 
-    Object.entries(newFilters).forEach(([column, filterValues]) => {
-      if (!filterValues || filterValues.length === 0) return;
+    Object.entries(normalizedNewFilters).forEach(([column, filterValues]) => {
+      if (!filterValues || filterValues.size === 0) return;
       filteredData = filteredData.filter(row => {
-        const cellValue = String(row[column] ?? '').toLowerCase();
+        const cellValue = normalizeFilterValue(row[column]);
         // 컬럼 내 OR: 선택된 값 중 하나라도 일치하면 통과
-        return filterValues.some(
-          filter => cellValue === filter.toLowerCase().trim()
-        );
+        return filterValues.has(cellValue);
       });
     });
 
@@ -51,11 +66,11 @@ export const useDataFilter = (csvData, setDisplayData) => {
     columns.forEach(targetCol => {
       // targetCol을 제외한 나머지 필터만 적용
       let data = csvData;
-      Object.entries(filters).forEach(([col, vals]) => {
-        if (col === targetCol || !vals || vals.length === 0) return;
+      Object.entries(normalizedFilterSets).forEach(([col, valSet]) => {
+        if (col === targetCol || !valSet || valSet.size === 0) return;
         data = data.filter(row => {
-          const v = String(row[col] ?? '').toLowerCase();
-          return vals.some(f => v === f.toLowerCase().trim());
+          const v = normalizeFilterValue(row[col]);
+          return valSet.has(v);
         });
       });
 
@@ -72,7 +87,7 @@ export const useDataFilter = (csvData, setDisplayData) => {
     });
 
     return result;
-  }, [csvData, filters]);
+  }, [csvData, filters, normalizedFilterSets]);
 
   /**
    * 필터 값 변경 핸들러 (멀티 선택)

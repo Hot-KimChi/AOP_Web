@@ -3,6 +3,12 @@ import { useState, useMemo, useCallback } from 'react';
 import { ArrowUpDown, FileSpreadsheet } from 'lucide-react';
 import { MultiSelectDropdown } from '../app/data-view/components/MultiSelectDropdown';
 
+const FLOAT2_PATTERN = /^(XP_Value_\d+|reportValue_\d+|Difference_\d+|Ambient_Temp_\d+|MaxReportValue)$/;
+
+function normalizeFilterValue(value) {
+  return String(value ?? '').toLowerCase().trim();
+}
+
 export default function DataViewer({
   data = [],
   columns = [],
@@ -21,6 +27,15 @@ export default function DataViewer({
     [columns, data],
   );
 
+  const normalizedFilterSets = useMemo(() => {
+    const sets = {};
+    Object.entries(filters).forEach(([col, vals]) => {
+      if (!vals || vals.length === 0) return;
+      sets[col] = new Set(vals.map(normalizeFilterValue));
+    });
+    return sets;
+  }, [filters]);
+
   // ── 연쇄 필터 옵션 (cascaded) ─────────────────────────────
   // 각 컬럼에 대해 "해당 컬럼을 제외한 나머지 필터를 적용한 결과"에서 고유값을 추출합니다.
   const cascadedOptions = useMemo(() => {
@@ -28,11 +43,11 @@ export default function DataViewer({
     const result = {};
     columnList.forEach(targetCol => {
       let subset = data;
-      Object.entries(filters).forEach(([col, vals]) => {
-        if (col === targetCol || !vals || vals.length === 0) return;
+      Object.entries(normalizedFilterSets).forEach(([col, valSet]) => {
+        if (col === targetCol || !valSet || valSet.size === 0) return;
         subset = subset.filter(row => {
-          const v = String(row[col] ?? '').toLowerCase();
-          return vals.some(f => v === f.toLowerCase().trim());
+          const v = normalizeFilterValue(row[col]);
+          return valSet.has(v);
         });
       });
       const optionSet = new Set(subset.map(row => String(row[targetCol] ?? '')));
@@ -43,20 +58,20 @@ export default function DataViewer({
       );
     });
     return result;
-  }, [data, filters, columnList]);
+  }, [data, filters, columnList, normalizedFilterSets]);
 
   // ── 필터 적용 (컬럼 내 OR, 컬럼 간 AND) ─────────────────
   const filteredData = useMemo(() => {
     let result = data;
-    Object.entries(filters).forEach(([col, vals]) => {
-      if (!vals || vals.length === 0) return;
+    Object.entries(normalizedFilterSets).forEach(([col, valSet]) => {
+      if (!valSet || valSet.size === 0) return;
       result = result.filter(row => {
-        const v = String(row[col] ?? '').toLowerCase();
-        return vals.some(f => v === f.toLowerCase().trim());
+        const v = normalizeFilterValue(row[col]);
+        return valSet.has(v);
       });
     });
     return result;
-  }, [data, filters]);
+  }, [data, normalizedFilterSets]);
 
   // ── 정렬 적용 ────────────────────────────────────────────
   const displayData = useMemo(() => {
@@ -128,9 +143,8 @@ export default function DataViewer({
 
   // ── 유틸 ─────────────────────────────────────────────────
   function formatNumber(value, key) {
-    const float2Pattern = /^(XP_Value_\d+|reportValue_\d+|Difference_\d+|Ambient_Temp_\d+|MaxReportValue)$/;
     if (typeof value === 'number') {
-      if (key && float2Pattern.test(key)) return value.toFixed(2);
+      if (key && FLOAT2_PATTERN.test(key)) return value.toFixed(2);
       return value % 1 === 0 ? value : parseFloat(value.toFixed(4));
     }
     return value?.toString() || '';
@@ -158,7 +172,7 @@ export default function DataViewer({
         )}
       </div>
 
-      <table className={`w-full min-w-[${minWidth}px] border-collapse`}>
+      <table className="w-full border-collapse" style={{ minWidth: `${minWidth}px` }}>
         <thead>
           {/* 헤더 행 */}
           <tr className="sticky-header">

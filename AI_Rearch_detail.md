@@ -1735,3 +1735,60 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 
 ### 결과
 - 파일 선택 후 검증과 결과 팝업 출력 동작이 과거 구현 방식대로 복원됨
+
+---
+
+## 2026-08-15 전역 병목 개선 (속도 + 정확도)
+
+### 요청
+- 전체 프로젝트에서 기능 삭제 없이 병목 지점을 전반적으로 개선하고 정확도를 높이기
+
+### 조치
+1. **프론트 필터 병목 최적화**
+   - 파일:
+     - `frontend/src/components/DataViewer.js`
+     - `frontend/src/app/data-view/hooks/useDataFilter.js`
+   - 변경:
+     - 필터 값 정규화(`toLowerCase().trim()`)를 행 반복마다 수행하던 구조를 사전 계산으로 이동
+     - `vals.some(...)` 선형 비교를 `Set.has(...)` O(1) 조회로 전환
+     - 연쇄 필터(cascaded) 계산에서도 동일한 정규화/Set 캐시를 재사용
+   - 효과:
+     - 데이터가 클수록 필터 반응 지연이 줄고, 필터 기준 대소문자/공백 일관성이 강화됨
+
+2. **소프트웨어 버전 조회 경로 최적화**
+   - 파일: `backend/routes/db_api.py` (`get_imaging_sw_versions`)
+   - 변경:
+     - 기존: `meas_station_setup` 전체 후보를 가져와 Python `iterrows`로 중복 제거
+     - 변경: SQL에서 `GROUP BY + MAX(measSSId)`로 최신순 고유 버전을 먼저 계산
+   - 효과:
+     - DB가 더 효율적으로 집계 수행, 애플리케이션 레벨 순회 비용 감소
+
+3. **TX 파일 검증 필터 벡터화**
+   - 파일: `backend/routes/db_api.py` (`validate_tx_summary_file`)
+   - 변경:
+     - 기존: `ProbeID`, `Software_version` 비교를 `Series.apply(lambda)`로 행 단위 처리
+     - 변경: 정규화 Series를 생성한 뒤 불리언 마스크로 벡터화 필터 처리
+   - 효과:
+     - 대용량 파일에서 검증 응답시간 단축, 동일 규칙의 반복 계산 감소
+
+4. **컬럼 스키마 조회 정확도 개선**
+   - 파일: `backend/routes/db_api.py` (`_get_column_lookup`)
+   - 변경:
+     - `INFORMATION_SCHEMA.COLUMNS` 조회를 선택된 DB(`[database].INFORMATION_SCHEMA...`)로 명시
+     - 캐시 키를 소문자 정규화해 캐시 히트 안정성 개선
+   - 효과:
+     - 다중 DB 환경에서 스키마 참조 정확도 향상
+
+5. **DB 연결 안정성 개선**
+   - 파일: `backend/pkg_SQL/database.py`
+   - 변경:
+     - SQLAlchemy 엔진 생성 시 `pool_pre_ping=True`, `pool_recycle=1800` 적용
+     - `params` 분기 조건을 `is not None`으로 정밀화해 파라미터 처리 일관성 강화
+   - 효과:
+     - 유휴 연결 재사용 시 끊어진 커넥션으로 인한 오동작/재시도 비용 완화
+
+### 결과
+- 기능 동작은 유지하면서, 필터/검증/버전조회 경로의 불필요 반복 연산을 제거해 체감 성능을 개선했다.
+- 다중 DB 참조 및 연결 재사용 구간의 안정성을 높여 정확도 저하 가능성을 줄였다.
+
+📎 **[→ Summary](./AI_Rearch_summary.md)**

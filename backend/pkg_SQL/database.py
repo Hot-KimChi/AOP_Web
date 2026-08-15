@@ -19,7 +19,11 @@ class SQL:
         self.connection_string = self.create_connection_string()
 
         # SQLAlchemy 엔진을 초기화 시점에 한 번만 생성
-        self.engine = create_engine(self.connection_string)
+        self.engine = create_engine(
+            self.connection_string,
+            pool_pre_ping=True,
+            pool_recycle=1800,
+        )
 
     def create_connection_string(self):
         """연결 문자열을 생성합니다."""
@@ -120,7 +124,7 @@ class SQL:
     def execute_query(self, query, params=None, return_type=None):
         """SQL 쿼리를 실행하고 결과를 pandas DataFrame으로 반환합니다."""
         try:
-            if params:
+            if params is not None:
                 logger.info(f"With params: {self._sanitize_params_for_log(params)}")
 
             with self.connect() as connection:
@@ -128,13 +132,17 @@ class SQL:
                 is_select = query_upper.startswith("SELECT") or query_upper.startswith("WITH")
 
                 if is_select:
-                    return pd.read_sql(query, connection, params=params) if params else pd.read_sql(query, connection)
+                    return (
+                        pd.read_sql(query, connection, params=params)
+                        if params is not None
+                        else pd.read_sql(query, connection)
+                    )
 
                 # INSERT/UPDATE/DELETE 쿼리
                 raw_conn = connection.connection
                 cursor = raw_conn.cursor()
 
-                if params:
+                if params is not None:
                     converted_params = self._convert_params(params)
 
                     insert_id = None
@@ -168,7 +176,7 @@ class SQL:
         except Exception as e:
             logger.error(f"Query execution error: {str(e)}")
             logger.error(f"Query was: {query}")
-            if params:
+            if params is not None:
                 logger.error(f"Params were: {self._sanitize_params_for_log(params)}")
             raise
 

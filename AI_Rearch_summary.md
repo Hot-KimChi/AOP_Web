@@ -504,3 +504,14 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - 업로드 버튼에 `txValidationOk` 게이트 복원
   - 검증 결과 팝업(`Tx Summary Parameter Matching`) 출력 흐름 복원
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+
+## 2026-08-15 전역 병목 개선 (속도 + 정확도)
+
+- 요청: 전체 프로젝트에서 기능 유지한 채 병목을 완화하고 정확도를 개선
+- 반영:
+  - 프론트 `DataViewer`/`useDataFilter`의 연쇄 필터 계산에서 반복 소문자 변환+`some` 탐색을 `Set` 기반 O(1) 조회로 변경
+  - 백엔드 `get_imaging_sw_versions`를 SQL 집계(`GROUP BY + MAX`) 기반으로 변경해 Python `iterrows` 중복 제거
+  - 백엔드 `validate_tx_summary_file`의 `ProbeID/Software_version` 필터를 `apply(lambda)`에서 벡터화 연산으로 전환
+  - 백엔드 컬럼 스키마 조회를 선택 DB의 `INFORMATION_SCHEMA`로 명시해 잘못된 DB 참조 가능성 제거
+  - SQL 엔진에 `pool_pre_ping`, `pool_recycle`을 적용해 장시간 세션의 연결 정확도/안정성 개선
+- 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)

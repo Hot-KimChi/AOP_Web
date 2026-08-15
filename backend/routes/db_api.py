@@ -23,12 +23,15 @@ def _is_allowed_database(database_name: str) -> bool:
 
 
 def _get_column_lookup(database: str, table: str) -> dict:
-    cache_key = (database, table)
+    cache_key = (str(database).strip().lower(), str(table).strip().lower())
     cached = _COLUMN_CACHE.get(cache_key)
     if cached is not None:
         return cached
+    if not _is_allowed_database(database):
+        return {}
     schema_df = g.current_db.execute_query(
-        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?",
+        f"SELECT COLUMN_NAME FROM [{database}].INFORMATION_SCHEMA.COLUMNS "
+        "WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = ?",
         params=(table,),
     )
     actual_columns = (
@@ -278,25 +281,27 @@ def get_imaging_sw_versions():
     except Exception:
         return error_response("probeId는 정수 값이어야 합니다.", 400)
     query = (
-        "SELECT measSSId, imagingSwVersion "
-        f"FROM [{selected_database}].[dbo].[meas_station_setup] "
-        "WHERE probeId = ? "
-        "  AND imagingSwVersion IS NOT NULL "
-        "  AND LTRIM(RTRIM(CAST(imagingSwVersion AS NVARCHAR(255)))) <> '' "
-        "ORDER BY measSSId DESC"
+        "SELECT softwareVersion FROM ("
+        "  SELECT "
+        "    LTRIM(RTRIM(CAST(imagingSwVersion AS NVARCHAR(255)))) AS softwareVersion, "
+        "    MAX(measSSId) AS latestMeasSSId "
+        f"  FROM [{selected_database}].[dbo].[meas_station_setup] "
+        "  WHERE probeId = ? "
+        "    AND imagingSwVersion IS NOT NULL "
+        "    AND LTRIM(RTRIM(CAST(imagingSwVersion AS NVARCHAR(255)))) <> '' "
+        "  GROUP BY LTRIM(RTRIM(CAST(imagingSwVersion AS NVARCHAR(255))))"
+        ") versions "
+        "ORDER BY latestMeasSSId DESC"
     )
     df = g.current_db.execute_query(query, params=(probe_id_param,))
     if df is None or df.empty:
         return jsonify({"status": "success", "softwareVersions": []})
-    seen = set()
-    software_versions = []
-    for idx, row in df.iterrows():
-        raw_version = row.get("imagingSwVersion")
-        version = str(raw_version).strip() if raw_version is not None else ""
-        if not version or version in seen:
-            continue
-        seen.add(version)
-        software_versions.append({"softwareVersion": version, "_id": f"imaging_sw_{idx}"})
+    software_values = df["softwareVersion"].astype(str).tolist()
+    software_versions = [
+        {"softwareVersion": version, "_id": f"imaging_sw_{idx}"}
+        for idx, version in enumerate(software_values)
+        if version
+    ]
     return jsonify({"status": "success", "softwareVersions": software_versions})
 
 
@@ -437,30 +442,20 @@ def validate_tx_summary_file():
 
     if df_norm is not None and not df_norm.empty:
         if "ProbeID" in df_norm.columns and "Software_version" in df_norm.columns:
+            normalized_probe_series = df_norm["ProbeID"].map(_normalize_probe_id)
+            normalized_sw_series = df_norm["Software_version"].astype(str).str.strip()
             filtered = df_norm[
-                df_norm["ProbeID"].apply(
-                    lambda x: _normalize_probe_id(str(x)) == selected_probe_norm
-                )
-                & df_norm["Software_version"].apply(
-                    lambda x: str(x).strip() == selected_sw_norm
-                )
+                (normalized_probe_series == selected_probe_norm)
+                & (normalized_sw_series == selected_sw_norm)
             ]
             # 선택값 필터 결과가 비어도 파일 전체를 보여줘야 하므로 fallback 사용
             df_filtered = filtered if not filtered.empty else df_norm
             matches_selection = not filtered.empty
             file_probe_values = sorted(
-                {
-                    _normalize_probe_id(str(v))
-                    for v in df_norm["ProbeID"].dropna()
-                    if _normalize_probe_id(str(v))
-                }
+                {v for v in normalized_probe_series.dropna().tolist() if str(v).strip()}
             )
             file_sw_values = sorted(
-                {
-                    str(v).strip()
-                    for v in df_norm["Software_version"].dropna()
-                    if str(v).strip()
-                }
+                {v for v in normalized_sw_series.dropna().tolist() if str(v).strip()}
             )
         else:
             df_filtered = df_norm
