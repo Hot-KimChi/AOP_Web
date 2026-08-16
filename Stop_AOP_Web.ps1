@@ -48,56 +48,41 @@ function Stop-ServiceOnPort {
     
     Write-Log "Checking $ServiceName on port $Port..." "INFO"
     
-    $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
-    if ($connections) {
-        # PID 0 = TIME_WAIT 상태 (커널 소유) — 실제 프로세스가 아니므로 제외
-        $processIds = $connections |
-            Where-Object { $_.OwningProcess -ne 0 } |
-            Select-Object -ExpandProperty OwningProcess -Unique
-
-        if (-not $processIds) {
-            Write-Log "Port $Port has only TIME_WAIT connections (PID 0) — no process to stop" "INFO"
-            Write-Host "  No active process on port $Port (TIME_WAIT only)" -ForegroundColor Gray
-            return $false
-        }
-        
-        Write-Host "`nFound $ServiceName processes:" -ForegroundColor Yellow
-        foreach ($processId in $processIds) {
-            try {
-                $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-                if ($process) {
-                    Write-Host "  - $($process.ProcessName) (PID: $processId)" -ForegroundColor Cyan
-                    Write-Log "Found process: $($process.ProcessName) (PID: $processId)" "INFO"
-                }
-            } catch { }
-        }
-        
-        if (-not $Force) {
-            $choice = Read-Host "`nStop these processes? (Y/N)"
-            if ($choice -ne 'Y' -and $choice -ne 'y') {
-                Write-Log "User cancelled shutdown of $ServiceName" "INFO"
-                return $false
-            }
-        }
-        
-        foreach ($processId in $processIds) {
-            try {
-                Stop-Process -Id $processId -Force -ErrorAction Stop
-                Write-Log "Stopped process PID: $processId" "INFO"
-                Write-Host "  [OK] Stopped PID: $processId" -ForegroundColor Green
-            } catch {
-                Write-Log "Failed to stop PID: $processId - $($_.Exception.Message)" "ERROR"
-                Write-Host "  [FAIL] Could not stop PID: $processId" -ForegroundColor Red
-            }
-        }
-        
-        Start-Sleep -Milliseconds 500
-        return $true
-    } else {
+    # 포트-프로세스 탐지 로직은 AOP_Web_Common.ps1 의 Get-ProcessesOnPort 로 공통화됨
+    # (Start_AOP_Web.ps1 과 중복 제거 + Get-Process 재조회 방지)
+    $portProcesses = Get-ProcessesOnPort -Port $Port
+    if ($portProcesses.Count -eq 0) {
         Write-Log "No process found on port $Port" "INFO"
         Write-Host "  No process found on port $Port" -ForegroundColor Gray
         return $false
     }
+
+    Write-Host "`nFound $ServiceName processes:" -ForegroundColor Yellow
+    foreach ($p in $portProcesses) {
+        Write-Host "  - $($p.ProcessName) (PID: $($p.ProcessId))" -ForegroundColor Cyan
+    }
+
+    if (-not $Force) {
+        $choice = Read-Host "`nStop these processes? (Y/N)"
+        if ($choice -ne 'Y' -and $choice -ne 'y') {
+            Write-Log "User cancelled shutdown of $ServiceName" "INFO"
+            return $false
+        }
+    }
+
+    foreach ($p in $portProcesses) {
+        try {
+            Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop
+            Write-Log "Stopped process PID: $($p.ProcessId)" "INFO"
+            Write-Host "  [OK] Stopped PID: $($p.ProcessId)" -ForegroundColor Green
+        } catch {
+            Write-Log "Failed to stop PID: $($p.ProcessId) - $($_.Exception.Message)" "ERROR"
+            Write-Host "  [FAIL] Could not stop PID: $($p.ProcessId)" -ForegroundColor Red
+        }
+    }
+
+    Start-Sleep -Milliseconds 500
+    return $true
 }
 #endregion
 

@@ -6,6 +6,14 @@
 
 ---
 
+## 변경 이력 (v0.9.53 — 2026-08-16)
+
+| # | 요청 | 해결 | Detail |
+|---|------|------|--------|
+| 1 | `Start_AOP_Web_Auto.bat`(서버 기동) 관련 속도·정확도 개선, 중복/병목 제거 | ① 포트 확인을 `Get-NetTCPConnection`(CIM, 실측 2.5~4.5초/호출)에서 `netstat` 파싱(실측 70~120ms)으로 전환해 30배 이상 고속화. ② 백엔드 검증의 고정 `Start-Sleep 5초` + 별도 포트 폴링 루프를 즉시 폴링(`Wait-ForPortListening`)으로 통합해 평균 대기시간 단축. ③ 프론트엔드도 무검증 고정 대기 대신 포트 리스닝 폴링으로 검증 추가(실패해도 비차단). ④ Start/Stop 스크립트에 중복돼 있던 "포트→PID→프로세스명" 탐지 로직을 `AOP_Web_Common.ps1`의 `Get-ProcessesOnPort`로 통합하고 LISTENING 상태만 필터링(오탐 방지, 정확도 개선). ⑤ `Clean-OldLogs`의 로그 디렉터리 2회 스캔을 1회로 통합 | [→ Detail](./AI_Rearch_detail.md#v0953--1-server-start-script-성능-개선) |
+
+---
+
 ## 변경 이력 (v0.9.51 — 2026-08-12)
 
 | # | 요청 | 해결 | Detail |

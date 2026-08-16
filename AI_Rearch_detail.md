@@ -6,6 +6,54 @@
 
 ---
 
+## 변경 이력 (v0.9.53 — 2026-08-16)
+
+### v0.9.53 — #1. Server Start Script 성능 개선
+
+**요청:**
+- `Start_AOP_Web_Auto.bat`(서버 기동 스크립트) 관련 속도/정확도 리뷰 및 개선
+- 기능 삭제 금지, 중복·병목 발견 시 업데이트
+
+**대상 파일:** `AOP_Web_Common.ps1`, `Start_AOP_Web.ps1`, `Stop_AOP_Web.ps1`
+
+**변경 내용:**
+
+1. **포트 확인 방식 전환 (핵심 병목 제거)**
+   - Before: `Get-NetTCPConnection`(CIM 기반) — 실측 호출당 **2.5~4.5초**
+   - After: `netstat -ano -p tcp` 파싱 — 실측 호출당 **70~120ms** (약 30배 이상 고속화)
+   - 신규 공통 함수 `Get-ProcessesOnPort`(포트→PID→프로세스명), `Test-PortListening`(단발 확인), `Wait-ForPortListening`(폴링 대기)을 `AOP_Web_Common.ps1`에 추가
+
+2. **백엔드 기동 검증 로직 개선**
+   - Before: 무조건 `Start-Sleep -Seconds 5` 후 프로세스 확인 → 별도로 최대 10초(20회×0.5초) 포트 폴링 루프 → 총 대기 상한 15초, 정상 기동 시에도 최소 5초 낭비
+   - After: 프로세스 최소 초기화 대기(0.5초) 후 즉시 `Wait-ForPortListening`(0.3초 간격, 최대 15초) 폴링 → 정상 기동 시 대기시간이 실제 준비 시간에 수렴
+
+3. **프론트엔드 기동 검증 추가** (기능 확장, 삭제 없음)
+   - Before: 무검증 고정 대기(`Start-Sleep -Seconds 2/5`) 후 그대로 진행
+   - After: 포트 3000 리스닝 여부를 폴링으로 확인해 로그에 성공/경고 기록. 실패해도 치명적 오류로 처리하지 않음(첫 컴파일 등으로 지연 가능)
+
+4. **프로덕션 헬스체크 루프 개선**
+   - Before: `Test-NetConnection`(DNS 조회·ICMP 관련 오버헤드 포함, 실측 4.5초) 매 분 2회 호출
+   - After: 신규 `Test-PortListening` 사용 (netstat 기반, 실측 <100ms)
+
+5. **Start/Stop 스크립트 간 중복 코드 제거**
+   - `Start_AOP_Web.ps1`의 `Stop-ProcessOnPort`와 `Stop_AOP_Web.ps1`의 `Stop-ServiceOnPort`가 거의 동일한 "포트→PID→프로세스" 탐지 로직을 각자 보유하고 있었음 → 공통 함수 `Get-ProcessesOnPort`로 통합, 두 스크립트는 결과만 소비
+   - 부가 효과: 기존에는 PID당 `Get-Process`를 로깅용/표시용으로 두 번 조회했으나, 헬퍼가 반환하는 객체(`ProcessId`, `ProcessName`)를 재사용해 중복 조회 제거
+
+6. **정확도 개선: LISTENING 상태만 필터링**
+   - Before: `Get-NetTCPConnection -LocalPort $Port`(상태 무관)로 조회 후 PID 0만 제외 → TIME_WAIT/ESTABLISHED 상태의 무관한 클라이언트 프로세스(예: 해당 포트에 접속 중인 브라우저 탭)의 PID가 섞여 들어와 있으면 오탐 가능성 존재
+   - After: `Get-ProcessesOnPort`가 `LISTENING` 상태 항목만 파싱 → 실제로 포트를 점유(바인딩)한 서버 프로세스만 정확히 식별
+
+7. **`Clean-OldLogs` 중복 디스크 스캔 제거**
+   - Before: `Get-ChildItem -Recurse`를 오래된 로그 조회용/전체 용량 계산용으로 **2회** 수행
+   - After: 1회 스캔한 결과를 메모리 상에서 필터링해 재사용 (로그가 많을수록 효과 큼)
+
+**검증:**
+- 3개 스크립트 모두 PowerShell 파서로 문법 검증(오류 없음)
+- `Start_AOP_Web.ps1 -Diagnose` 정상 동작 확인
+- 신규 공통 함수(`Get-ProcessesOnPort`, `Test-PortListening`, `Wait-ForPortListening`)를 실제 `python -m http.server` 임시 프로세스로 통합 테스트: 기동 감지 315ms, PID/프로세스명 정확 탐지, 프로세스 종료 후 미탐지까지 확인
+
+---
+
 ## 변경 이력 (v0.9.51 — 2026-08-12)
 
 ### v0.9.51 — #1. 자동 커밋 정책 신설

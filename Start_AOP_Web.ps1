@@ -38,55 +38,40 @@ if (!(Test-Path $commonScript)) {
 
 function Stop-ProcessOnPort {
     param([int]$Port, [string]$ServiceName)
-    
-    $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
-    if ($connections) {
-        # PID 0 = Windows System Idle Process (TCP TIME_WAIT state owned by kernel).
-        # These transient connections do NOT block new server bindings — skip them.
-        $realProcessIds = $connections |
-            Where-Object { $_.OwningProcess -ne 0 } |
-            Select-Object -ExpandProperty OwningProcess -Unique
 
-        if (-not $realProcessIds) {
-            Write-Log "Port $Port has only TIME_WAIT connections (PID 0) — no real process to stop" "INFO"
-            return
-        }
+    # 포트-프로세스 탐지 로직은 AOP_Web_Common.ps1 의 Get-ProcessesOnPort 로 공통화됨
+    # (Stop_AOP_Web.ps1 과 중복 제거 + Get-Process 재조회 방지)
+    $portProcesses = Get-ProcessesOnPort -Port $Port
+    if ($portProcesses.Count -eq 0) { return }
 
-        foreach ($processId in $realProcessIds) {
+    foreach ($p in $portProcesses) {
+        Write-Host "  Process: $($p.ProcessName) (PID: $($p.ProcessId))" -ForegroundColor Yellow
+    }
+
+    Write-Host "`n$ServiceName (Port $Port) is already in use." -ForegroundColor Yellow
+
+    # In production mode, automatically stop the process
+    if ($Production) {
+        Write-Host "Stopping process automatically in Production mode..." -ForegroundColor Yellow
+        $choice = 'Y'
+    } else {
+        $choice = Read-Host "Stop existing process and continue? (Y/N)"
+    }
+
+    if ($choice -eq 'Y' -or $choice -eq 'y') {
+        foreach ($p in $portProcesses) {
             try {
-                $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-                if ($process) {
-                    Write-Log "Found process using port $Port : $($process.ProcessName) (PID: $processId)" "WARN"
-                    Write-Host "  Process: $($process.ProcessName) (PID: $processId)" -ForegroundColor Yellow
-                }
-            } catch { }
-        }
-        
-        Write-Host "`n$ServiceName (Port $Port) is already in use." -ForegroundColor Yellow
-        
-        # In production mode, automatically stop the process
-        if ($Production) {
-            Write-Host "Stopping process automatically in Production mode..." -ForegroundColor Yellow
-            $choice = 'Y'
-        } else {
-            $choice = Read-Host "Stop existing process and continue? (Y/N)"
-        }
-        
-        if ($choice -eq 'Y' -or $choice -eq 'y') {
-            foreach ($processId in $realProcessIds) {
-                try {
-                    Stop-Process -Id $processId -Force -ErrorAction Stop
-                    Write-Log "Stopped process PID: $processId on port $Port" "INFO"
-                    Start-Sleep -Milliseconds 500
-                } catch {
-                    Write-Log "Failed to stop process PID: $processId - $($_.Exception.Message)" "ERROR"
-                    throw "Failed to stop process on port $Port"
-                }
+                Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop
+                Write-Log "Stopped process PID: $($p.ProcessId) on port $Port" "INFO"
+                Start-Sleep -Milliseconds 500
+            } catch {
+                Write-Log "Failed to stop process PID: $($p.ProcessId) - $($_.Exception.Message)" "ERROR"
+                throw "Failed to stop process on port $Port"
             }
-            Write-Log "Port $Port is now available" "INFO"
-        } else {
-            throw "User cancelled - Port $Port is in use"
         }
+        Write-Log "Port $Port is now available" "INFO"
+    } else {
+        throw "User cancelled - Port $Port is in use"
     }
 }
 #endregion
@@ -242,32 +227,26 @@ try {
     }
     
     # Verify backend started successfully
+    # 고정 5초 대기 후 검사하던 방식을 제거하고, 프로세스 최소 초기화 시간(500ms)만 대기한 뒤
+    # 즉시 포트 폴링을 시작 — 정상 기동 시 평균 대기시간이 크게 단축됨
     Write-Log "Verifying backend startup..." "INFO"
-    Start-Sleep -Seconds 5
-    
+    Start-Sleep -Milliseconds 500
+
     # Check if process is still running
     $backendRunning = Get-Process -Id $backendProcess.Id -ErrorAction SilentlyContinue
     if (-not $backendRunning) {
         throw "Backend process terminated unexpectedly. Check logs for errors."
     }
-    
-    # Check if port 5000 is listening
-    $portListening = $false
-    for ($i = 0; $i -lt 20; $i++) {
-        $connection = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue
-        if ($connection) {
-            $portListening = $true
-            Write-Log "Backend is listening on port 5000" "INFO"
-            break
-        }
-        Start-Sleep -Milliseconds 500
-    }
-    
-    if (-not $portListening) {
+
+    # Check if port 5000 is listening (즉시 폴링, 최대 15초)
+    $portListening = Wait-ForPortListening -Port 5000 -TimeoutSeconds 15 -IntervalMilliseconds 300
+    if ($portListening) {
+        Write-Log "Backend is listening on port 5000" "INFO"
+    } else {
         Stop-Process -Id $backendProcess.Id -Force -ErrorAction SilentlyContinue
         throw "Backend failed to listen on port 5000. Check app.py for errors."
     }
-    
+
     Write-Log "Backend started successfully" "INFO"
     #endregion
     
@@ -314,12 +293,12 @@ try {
         # Start npm directly in hidden window
         $frontendProcess = Start-Process -FilePath "npm" -ArgumentList "start" -WorkingDirectory $frontendPath -WindowStyle Hidden -PassThru
         Set-Location $projectPath
-        $waitTime = 5
+        $waitTime = 10
     } else {
         # Development mode: Interactive window
         $frontendCmd = "Set-Location '$frontendPath'; npm run dev"
         $frontendProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd -PassThru
-        $waitTime = 2
+        $waitTime = 10
     }
     Write-Log "Frontend PID: $($frontendProcess.Id)" "INFO" @{
         service = "frontend"
@@ -328,7 +307,14 @@ try {
         mode = $mode
     }
     
-    Start-Sleep -Seconds $waitTime
+    # 고정 대기(waitTime) 대신 포트 리스닝을 즉시 폴링 — 준비되는 즉시 다음 단계로 진행
+    # (실패해도 치명적 오류로 취급하지 않음: 최초 컴파일 등으로 더 걸릴 수 있음)
+    $frontendListening = Wait-ForPortListening -Port 3000 -TimeoutSeconds $waitTime -IntervalMilliseconds 300
+    if ($frontendListening) {
+        Write-Log "Frontend is listening on port 3000" "INFO"
+    } else {
+        Write-Log "Frontend port 3000 not detected within ${waitTime}s yet (may still be starting/compiling)" "WARN"
+    }
     #endregion
     
     Write-Log "=== Startup Complete ===" "INFO"
@@ -349,8 +335,9 @@ try {
             while ($true) {
                 Start-Sleep -Seconds 60
                 # Optional: Health check every minute
-                $backendAlive = Test-NetConnection -ComputerName localhost -Port 5000 -InformationLevel Quiet -WarningAction SilentlyContinue
-                $frontendAlive = Test-NetConnection -ComputerName localhost -Port 3000 -InformationLevel Quiet -WarningAction SilentlyContinue
+                # netstat 기반 Test-PortListening 사용 (Get-NetTCPConnection/Test-NetConnection 대비 대폭 빠름)
+                $backendAlive = Test-PortListening -Port 5000
+                $frontendAlive = Test-PortListening -Port 3000
                 
                 if (-not $backendAlive) {
                     Write-Log "Backend health check failed on port 5000" "WARN"
