@@ -487,6 +487,8 @@ def validate_tx_summary_file():
     ]
     schema_ref = db_schema_df if (db_schema_df is not None and not db_schema_df.empty) else None
 
+    db_match_records = []
+
     if schema_ref is not None:
         schema_cols = list(schema_ref.columns)
         schema_col_map = {str(c).strip().lower(): c for c in schema_cols}
@@ -495,12 +497,16 @@ def validate_tx_summary_file():
         # DB Mode별 행 매핑 (ProbeID/SW 매칭 있을 때만)
         db_by_mode = {}
         if db_has_matching_rows and "Mode" in db_match_df.columns:
-            for _, row in db_match_df.replace({np.nan: None}).iterrows():
+            db_match_records = db_match_df.replace({np.nan: None}).to_dict(
+                orient="records"
+            )
+            for row in db_match_records:
                 db_by_mode[str(row.get("Mode", "")).strip()] = row
 
         # 파일 Mode별 행 목록 매핑 (같은 Mode 여러 행 모두 저장)
         file_rows_by_mode: dict = {}
         if df_filtered is not None and not df_filtered.empty:
+            file_records = df_filtered.replace({np.nan: None}).to_dict(orient="records")
             mode_col = next(
                 (
                     c
@@ -510,12 +516,12 @@ def validate_tx_summary_file():
                 None,
             )
             if mode_col is not None:
-                for _, row in df_filtered.iterrows():
+                for row in file_records:
                     mode_key = str(row.get(mode_col, "")).strip()
                     file_rows_by_mode.setdefault(mode_key, []).append(row)
             else:
                 # Mode 컬럼 없으면 전체 행을 빈 모드로
-                for _, row in df_filtered.iterrows():
+                for row in file_records:
                     file_rows_by_mode.setdefault("", []).append(row)
 
         # Mode 목록 결정: txt 파일 Mode를 우선 사용
@@ -542,12 +548,8 @@ def validate_tx_summary_file():
                     actual_db_col = schema_col_map.get(param.lower(), param)
 
                     dv = "—"
-                    if (
-                        db_row is not None
-                        and hasattr(db_row, "index")
-                        and actual_db_col in db_row.index
-                    ):
-                        raw_dv = db_row[actual_db_col]
+                    if db_row is not None and actual_db_col in db_row:
+                        raw_dv = db_row.get(actual_db_col)
                         dv = (
                             "—"
                             if raw_dv is None
@@ -573,9 +575,8 @@ def validate_tx_summary_file():
                     elif param == "IsProcessed":
                         fv = "1"
                     else:
-                        if file_row is not None and hasattr(file_row, "index"):
-                            row_idx = file_row.index
-                            lookup = {str(c).strip().lower(): c for c in row_idx}
+                        if file_row is not None:
+                            lookup = {str(c).strip().lower(): c for c in file_row}
 
                             candidate_cols = []
                             if param == "ExamName":
@@ -593,7 +594,7 @@ def validate_tx_summary_file():
 
                             matched_col = None
                             for cand in candidate_cols:
-                                if cand in row_idx:
+                                if cand in file_row:
                                     matched_col = cand
                                     break
                                 lower_cand = str(cand).strip().lower()
@@ -626,7 +627,7 @@ def validate_tx_summary_file():
                 row_no += 1
 
     matching_rows_simple = (
-        db_match_df.replace({np.nan: None}).to_dict(orient="records")
+        db_match_records
         if db_has_matching_rows else []
     )
 

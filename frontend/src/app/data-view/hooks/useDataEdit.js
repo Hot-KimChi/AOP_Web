@@ -9,6 +9,7 @@ import { useState, useCallback } from 'react';
 import { MESSAGES } from '../constants/messages';
 import { validateCellData as validateCell } from '../utils/dataValidation';
 import { deepCopy } from '../utils/dataFormatters';
+import { buildNormalizedFilterSets, isRowMatchingFilters } from '../utils/filterHelpers';
 
 export const useDataEdit = (
   csvData,
@@ -106,13 +107,10 @@ export const useDataEdit = (
 
     // 삭제된 행이 있으면 필터링된 데이터도 업데이트
     if (deletedRows.length > 0) {
-      const filteredData = updatedCsvData.filter(row => {
-        return Object.entries(filters).every(([column, filterValues]) => {
-          if (!filterValues || filterValues.length === 0) return true;
-          const cellValue = (row[column]?.toString() || '').toLowerCase();
-          return filterValues.some(filter => cellValue === filter.toLowerCase().trim());
-        });
-      });
+      const normalizedFilterSets = buildNormalizedFilterSets(filters);
+      const filteredData = updatedCsvData.filter(row =>
+        isRowMatchingFilters(row, normalizedFilterSets)
+      );
       setDisplayData(filteredData);
     }
 

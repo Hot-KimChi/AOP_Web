@@ -12,41 +12,27 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-
-const normalizeFilterValue = (value) => String(value ?? '').toLowerCase().trim();
+import {
+  buildNormalizedFilterSets,
+  isRowMatchingFilters,
+  normalizeFilterValue
+} from '../utils/filterHelpers';
 
 export const useDataFilter = (csvData, setDisplayData) => {
   const [filters, setFilters] = useState({});
 
-  const normalizedFilterSets = useMemo(() => {
-    const sets = {};
-    Object.entries(filters).forEach(([column, values]) => {
-      if (!values || values.length === 0) return;
-      sets[column] = new Set(values.map(normalizeFilterValue));
-    });
-    return sets;
-  }, [filters]);
+  const normalizedFilterSets = useMemo(
+    () => buildNormalizedFilterSets(filters),
+    [filters]
+  );
 
   /**
    * 필터 적용 (컬럼 내 OR, 컬럼 간 AND)
    */
   const applyFilters = useCallback((newFilters) => {
-    const normalizedNewFilters = {};
-    Object.entries(newFilters).forEach(([column, values]) => {
-      if (!values || values.length === 0) return;
-      normalizedNewFilters[column] = new Set(values.map(normalizeFilterValue));
-    });
-
+    const normalizedNewFilters = buildNormalizedFilterSets(newFilters);
     let filteredData = [...csvData];
-
-    Object.entries(normalizedNewFilters).forEach(([column, filterValues]) => {
-      if (!filterValues || filterValues.size === 0) return;
-      filteredData = filteredData.filter(row => {
-        const cellValue = normalizeFilterValue(row[column]);
-        // 컬럼 내 OR: 선택된 값 중 하나라도 일치하면 통과
-        return filterValues.has(cellValue);
-      });
-    });
+    filteredData = filteredData.filter(row => isRowMatchingFilters(row, normalizedNewFilters));
 
     setDisplayData(filteredData);
   }, [csvData, setDisplayData]);

@@ -21,6 +21,7 @@ class SQL:
         # SQLAlchemy 엔진을 초기화 시점에 한 번만 생성
         self.engine = create_engine(
             self.connection_string,
+            fast_executemany=True,
             pool_pre_ping=True,
             pool_recycle=1800,
         )
@@ -237,7 +238,14 @@ class SQL:
         """MS-SQL 테이블에 데이터를 삽입합니다."""
         try:
             with self.connect() as connection:
-                data.to_sql(table_name, connection, if_exists="append", index=False)
+                data.to_sql(
+                    table_name,
+                    connection,
+                    if_exists="append",
+                    index=False,
+                    chunksize=1000,
+                    method="multi",
+                )
                 logger.info(f"Data inserted into [{table_name}] table")
         except Exception as e:
             logger.error(f"Data insertion error: {str(e)}")

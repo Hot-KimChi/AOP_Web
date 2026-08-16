@@ -457,6 +457,57 @@ def _read_tx_dataframe(file_storage) -> pd.DataFrame:
 
 ---
 
+## 2026-08-16 전역 병목 2차 개선 (기능 동일)
+
+### 요청
+- 기능은 그대로 유지하면서 전역 병목 구간을 2차로 추가 개선
+
+### 조치
+1. **필터 공통 로직 통합 + Set 기반 재사용**
+   - 파일:
+     - `frontend/src/app/data-view/utils/filterHelpers.js` (신규)
+     - `frontend/src/app/data-view/hooks/useDataFilter.js`
+     - `frontend/src/app/data-view/hooks/useDataEdit.js`
+     - `frontend/src/app/data-view/hooks/useRowOperations.js`
+   - 변경:
+     - `normalizeFilterValue`, `buildNormalizedFilterSets`, `isRowMatchingFilters` 공통화
+     - 저장/복원 시 필터 재적용 경로를 동일한 Set 기반 판정으로 통일
+   - 효과:
+     - 대규모 데이터에서 필터 재계산 시 문자열 정규화 및 선형 탐색 반복 감소
+     - 훅 간 필터 동작 일관성 강화(정확도 개선)
+
+2. **TableBody 렌더 경로 최적화**
+   - 파일: `frontend/src/app/data-view/components/DataTable/TableBody.jsx`
+   - 변경:
+     - `editableKeys.includes`를 셀 단위 반복 호출하지 않고 `Set`으로 1회 구성 후 조회
+     - 각 셀에서 `Object.entries(row)` 대신 `headers` 기준 순회로 키 탐색 비용 절감
+     - `formatNumber` 결과를 title/content에서 재사용해 중복 포맷 연산 제거
+   - 효과:
+     - 행/열이 많은 화면에서 셀 렌더링 비용 감소
+
+3. **TX 검증 비교 루프 최적화**
+   - 파일: `backend/routes/db_api.py` (`validate_tx_summary_file`)
+   - 변경:
+     - `iterrows()` 기반 순회를 `to_dict('records')` 기반으로 전환
+     - 파일 행별 컬럼 소문자 lookup을 파라미터마다 재생성하지 않고 행당 1회 생성 후 재사용
+   - 효과:
+     - 비교 파라미터가 많은 경우 CPU 사용량과 처리시간 감소
+
+4. **대량 삽입 처리량 최적화**
+   - 파일: `backend/pkg_SQL/database.py`
+   - 변경:
+     - `create_engine(..., fast_executemany=True)` 적용
+     - `insert_data`에서 `to_sql(..., chunksize=1000, method='multi')` 적용
+   - 효과:
+     - `upload_tx_summary` 등 대량 INSERT 경로의 처리량 개선
+
+### 결과
+- 기능 동작/응답 형식은 유지하면서, 데이터뷰 렌더·필터·검증·대량 삽입의 고비용 루프를 줄여 체감 성능을 추가 개선했다.
+
+📎 **[→ Summary](./AI_Rearch_summary.md)**
+
+---
+
 ## 변경 이력 (v0.9.33 — 2026-04-17)
 
 ### Detailed Change Description

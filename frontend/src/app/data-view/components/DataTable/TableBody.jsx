@@ -2,7 +2,7 @@
  * 테이블 바디 컴포넌트
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { RowActions } from '../RowActions';
 import { EditableCell } from '../EditableCell';
 import { formatNumber, truncateText } from '../../utils/dataFormatters';
@@ -17,8 +17,13 @@ export const TableBody = React.memo(({
   onCellChange,
   onDeleteRow
 }) => {
-  const renderCellContent = (value, rowIndex, columnName) => {
-    const isEditable = editableKeys && editableKeys.includes(columnName);
+  const editableKeySet = useMemo(() => new Set(editableKeys || []), [editableKeys]);
+  const headers = useMemo(
+    () => (displayData.length > 0 ? Object.keys(displayData[0] || {}) : []),
+    [displayData]
+  );
+
+  const renderCellContent = (value, rowIndex, columnName, isEditable, formattedValue) => {
     const cellKey = `${rowIndex}-${columnName}`;
     const hasError = validationErrors[cellKey];
     const isChanged = editedData[cellKey] !== undefined;
@@ -42,7 +47,6 @@ export const TableBody = React.memo(({
       return '';
     }
 
-    const formattedValue = formatNumber(value);
     return formattedValue === 0 ? '0' : truncateText(formattedValue);
   };
 
@@ -68,11 +72,14 @@ export const TableBody = React.memo(({
             rowIndex={rowIndex}
             onDelete={onDeleteRow}
           />
-          {Object.entries(row).map(([columnName, value], colIndex) => {
+          {headers.map((columnName, colIndex) => {
+            const value = row[columnName];
             const cellKey = `${rowIndex}-${columnName}`;
             const isChanged = editedData[cellKey] !== undefined;
             const showHighlight = showChanges && isChanged;
-            const isEditable = editableKeys && editableKeys.includes(columnName);
+            const isEditable = editableKeySet.has(columnName);
+            const formattedValue = formatNumber(value);
+            const title = formattedValue === 0 ? '0' : String(formattedValue ?? '');
 
             return (
               <td
@@ -85,9 +92,9 @@ export const TableBody = React.memo(({
                   maxWidth: isEditable ? '120px' : 'auto',
                   minWidth: isEditable ? '80px' : 'auto'
                 }}
-                title={formatNumber(value)}
+                title={title}
               >
-                {renderCellContent(value, rowIndex, columnName)}
+                {renderCellContent(value, rowIndex, columnName, isEditable, formattedValue)}
               </td>
             );
           })}

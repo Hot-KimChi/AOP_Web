@@ -515,3 +515,14 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - 백엔드 컬럼 스키마 조회를 선택 DB의 `INFORMATION_SCHEMA`로 명시해 잘못된 DB 참조 가능성 제거
   - SQL 엔진에 `pool_pre_ping`, `pool_recycle`을 적용해 장시간 세션의 연결 정확도/안정성 개선
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+
+## 2026-08-16 전역 병목 2차 개선 (기능 동일)
+
+- 요청: 기능 유지 조건에서 전역 병목을 한 번 더 줄여 속도 개선
+- 반영:
+  - 데이터뷰 공통 필터 유틸(`filterHelpers`)을 추가해 정규화/Set 필터 매칭 로직을 훅 간 중복 없이 재사용
+  - `useDataEdit`, `useRowOperations`의 필터 재계산 경로를 `some` 반복 비교에서 Set 기반 필터로 통일
+  - `TableBody`에서 `editableKeys.includes` 반복 탐색을 `Set` 조회로 전환하고 헤더 순회/포맷 재사용으로 셀 렌더 비용 절감
+  - `validate_tx_summary_file` 비교 루프에서 `iterrows`/컬럼 lookup 재생성을 제거하고 record 기반 단일 lookup으로 전환
+  - SQL 엔진 `fast_executemany` + `to_sql(chunksize, multi)`로 대량 업로드 삽입 경로 처리량 개선
+- 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)

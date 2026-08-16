@@ -7,6 +7,7 @@
 
 import { useState, useCallback } from 'react';
 import { MESSAGES } from '../constants/messages';
+import { buildNormalizedFilterSets, isRowMatchingFilters } from '../utils/filterHelpers';
 
 export const useRowOperations = (
   csvData,
@@ -60,13 +61,10 @@ export const useRowOperations = (
     if (deletedRows.length === 0) return;
 
     if (confirm(MESSAGES.RESTORE_CONFIRM)) {
-      const filteredData = csvData.filter(row => {
-        return Object.entries(filters).every(([column, filterValues]) => {
-          if (!filterValues || filterValues.length === 0) return true;
-          const cellValue = (row[column]?.toString() || '').toLowerCase();
-          return filterValues.some(filter => cellValue === filter.toLowerCase().trim());
-        });
-      });
+      const normalizedFilterSets = buildNormalizedFilterSets(filters);
+      const filteredData = csvData.filter(row =>
+        isRowMatchingFilters(row, normalizedFilterSets)
+      );
 
       setDisplayData(filteredData);
       setDeletedRows([]);
