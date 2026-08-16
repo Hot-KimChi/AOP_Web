@@ -6,6 +6,39 @@
 
 ---
 
+## 변경 이력 (v0.9.54 — 2026-08-16)
+
+### v0.9.54 — #1. Backend 개발모드 자동 재시작(Reloader) 도입
+
+**요청:**
+- Backend/Frontend 코드 수정 시 서버를 매번 종료 후 재시작해야 하는지 확인
+- 가능하면 개발 모드에서는 자동 반영되도록 개선
+
+**대상 파일:** `backend/app.py`, `Start_AOP_Web.ps1`
+
+**Before:**
+- `app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)` — 운영/개발 구분 없이 `use_reloader=False` 고정
+- Frontend(`npm run dev`)는 Next.js Fast Refresh로 이미 자동 반영되고 있었으나, Backend는 코드 수정 후 반드시 `Stop_AOP_Web.ps1` → `Start_AOP_Web.ps1` 재실행이 필요했음
+
+**After:**
+- `app.py`: `AOP_ENV` 환경변수(`development`/`production`, 미설정 시 `development`로 간주)를 읽어 `is_dev` 계산 → `debug=is_dev, use_reloader=is_dev`
+  - 개발 모드: Werkzeug reloader 활성화 → `.py` 파일 저장 시 자동 감지·재시작 (`* Detected change in '...', reloading` 로그로 확인)
+  - 운영 모드: 기존과 동일하게 `debug=False, use_reloader=False` 유지 (보안: Werkzeug 디버거 노출 방지, 안정성: reloader의 자식 프로세스 분기 방지)
+- `Start_AOP_Web.ps1`: 백엔드 프로세스 시작 직전 `$env:AOP_ENV = if ($Production) {"production"} else {"development"}` 설정. `Start-Process`로 띄우는 자식 프로세스는 현재 세션의 환경변수를 상속받으므로 별도 인자 전달 없이 자동 반영
+
+**검증:**
+- 개발 모드로 `app.py` 직접 기동 후 로그에서 `* Restarting with stat` 확인
+- `config.py`의 mtime을 갱신해 실제 파일 변경을 시뮬레이션 → `* Detected change in '...\config.py', reloading` → `* Restarting with stat` 로 자동 재시작 확인
+- 신규 바인딩이 이전 프로세스 종료 후에도 정상적으로 이루어짐을 확인 (포트 점유 잔존 이슈 없음)
+
+**참고 (Frontend):**
+- `npm run dev`는 이미 Fast Refresh(HMR)가 기본 활성화되어 있어 대부분의 컴포넌트/CSS 수정은 별도 조치 없이 자동 반영됨. `next.config.js`/`.env*`/`package.json` 변경 시에만 재시작 필요 (기존 동작 유지, 변경 없음)
+
+**참고 (전체 개발 모드 기동):**
+- `Start_AOP_Web_Auto.bat`은 이미 기본적으로 `-Production` 없이 `Start_AOP_Web.ps1`을 호출하도록 되어 있어(운영 모드 라인은 주석 처리) Backend/Frontend 모두 개발 모드로 시작됨. 별도 수정 없이 현재 상태가 "전부 개발 모드로 시작"에 해당
+
+---
+
 ## 변경 이력 (v0.9.53 — 2026-08-16)
 
 ### v0.9.53 — #1. Server Start Script 성능 개선

@@ -210,6 +210,11 @@ try {
     # Start backend
     Write-Log "Starting backend server (Port 5000)..." "INFO"
     
+    # AOP_ENV: 자식 프로세스(Start-Process)는 현재 세션의 환경변수를 상속받음.
+    # app.py 가 이 값을 읽어 개발 모드에서만 debug/reloader 를 활성화한다.
+    $env:AOP_ENV = if ($Production) { "production" } else { "development" }
+    Write-Log "AOP_ENV set to: $($env:AOP_ENV)" "INFO"
+    
     if ($Production) {
         # Production mode: Start Python directly in hidden window
         $backendProcess = Start-Process -FilePath $pythonExe -ArgumentList "app.py" -WorkingDirectory $backendPath -WindowStyle Hidden -PassThru
