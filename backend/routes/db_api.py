@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, g, Response
-import os, io, json
+import os, io, json, re
 from io import StringIO
 from pathlib import Path
 from docx import Document
@@ -210,7 +210,7 @@ def get_table_data():
     if selected_table == "Tx_summary":
         query = f"SELECT DISTINCT ProbeID AS probeId, ProbeName AS probeName, Software_version AS software_version FROM [{selected_table}] ORDER BY software_version DESC"
     elif selected_table == "WCS":
-        query = f"SELECT DISTINCT probeId, myVersion FROM [{selected_table}] ORDER BY myVersion DESC"
+        query = f"SELECT DISTINCT probeId, LTRIM(RTRIM(CAST(myVersion AS NVARCHAR(255)))) AS myVersion FROM [{selected_table}] ORDER BY myVersion DESC"
     else:
         query = f"SELECT DISTINCT probeId, probeName FROM [{selected_table}]"
     df = g.current_db.execute_query(query)
@@ -224,7 +224,7 @@ def get_table_data():
     }
     if selected_table == "WCS":
         df["probeId"] = df["probeId"].astype(str)
-        df["myVersion"] = df["myVersion"].astype(str)
+        df["myVersion"] = df["myVersion"].astype(str).str.replace(r'\s+', '', regex=True)
         df = df.drop_duplicates(subset=["probeId", "myVersion"]).reset_index(drop=True)
         df["_id"] = "wcs_" + df.index.astype(str)
         response_data["wcsVersions"] = df[["probeId", "myVersion", "_id"]].to_dict("records")
@@ -713,8 +713,8 @@ def run_tx_compare():
             400,
         )
     probeid = int(float(data.get("probeId")))
-    tx_sw = data.get("TxSumSoftware")
-    wcs_sw = data.get("wcsSoftware")
+    tx_sw = re.sub(r'\s+', '', str(data.get("TxSumSoftware") or ""))
+    wcs_sw = re.sub(r'\s+', '', str(data.get("wcsSoftware") or ""))
     ssid_temp = None if ssid_temp == "" or ssid_temp is None else ssid_temp
     ssid_mi = None if ssid_mi == "" or ssid_mi is None else ssid_mi
     ssid_ispta3 = None if ssid_ispta3 == "" or ssid_ispta3 is None else ssid_ispta3

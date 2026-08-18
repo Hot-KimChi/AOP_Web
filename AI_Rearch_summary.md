@@ -542,3 +542,14 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - `validate_tx_summary_file` 비교 루프에서 `iterrows`/컬럼 lookup 재생성을 제거하고 record 기반 단일 lookup으로 전환
   - SQL 엔진 `fast_executemany` + `to_sql(chunksize, multi)`로 대량 업로드 삽입 경로 처리량 개선
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+
+## 2026-08-18 WCS Software version 공백 불일치 수정
+
+- 요청: `WCS.myVersion`에 공백 포함 시 (`a b` vs `ab`) 다른 버전으로 인식되는 문제 보완
+- 반영:
+  - `get_table_data()` WCS 조회 SQL에 `LTRIM(RTRIM(CAST(...)))` 추가 → DB에서 앞뒤 공백 제거된 값 반환
+  - Python에서 `str.replace(r'\s+', '', regex=True)` 적용 → 내부 공백까지 제거 후 중복 제거
+  - `run_tx_compare()` 프로시저 호출 전 `re.sub(r'\s+', '', ...)` 적용 → `tx_sw`, `wcs_sw` 모두 정규화
+  - SQL 프로시저(`TxCompare`) JOIN/WHERE 조건에 `REPLACE(LTRIM(RTRIM(...)), ' ', '')` 추가 권장 (DB 직접 수정 필요)
+- 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+

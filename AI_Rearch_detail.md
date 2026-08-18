@@ -1924,3 +1924,56 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 - 다중 DB 참조 및 연결 재사용 구간의 안정성을 높여 정확도 저하 가능성을 줄였다.
 
 📎 **[→ Summary](./AI_Rearch_summary.md)**
+
+---
+
+## 2026-08-18 WCS Software version 공백 불일치 수정
+
+### 요청
+- `WCS.myVersion` 값에 공백이 있을 경우 (`a b` vs `ab`) 다른 버전으로 인식되는 문제 보완 요청
+
+### 원인
+- DB에 저장된 `myVersion` 값과 사용자가 UI에서 선택·전달하는 값 사이에 앞뒤 또는 내부 공백 차이가 발생
+- `TxCompare` 프로시저 JOIN 조건 `wcs.myVersion = @WCS_SW`가 공백을 포함한 정확한 문자열 비교만 수행
+
+### 조치
+
+**파일: `backend/routes/db_api.py`**
+
+1. `get_table_data()` — WCS 목록 조회 SQL 수정 (L213)
+   - Before: `SELECT DISTINCT probeId, myVersion FROM [{table}]`
+   - After: `SELECT DISTINCT probeId, LTRIM(RTRIM(CAST(myVersion AS NVARCHAR(255)))) AS myVersion FROM [{table}]`
+   - 효과: DB에서 앞뒤 공백이 제거된 버전 반환
+
+2. `get_table_data()` — Python 레벨 내부 공백 제거 추가 (L227)
+   - Before: `df["myVersion"] = df["myVersion"].astype(str)`
+   - After: `df["myVersion"] = df["myVersion"].astype(str).str.replace(r'\s+', '', regex=True)`
+   - 효과: DB LTRIM/RTRIM으로 제거 안 된 내부 공백(`a b` → `ab`)까지 정규화
+
+3. `run_tx_compare()` — 프로시저 전달 전 공백 제거 (L716~717)
+   - Before: `tx_sw = data.get("TxSumSoftware")` / `wcs_sw = data.get("wcsSoftware")`
+   - After: `tx_sw = re.sub(r'\s+', '', str(...))` / `wcs_sw = re.sub(r'\s+', '', str(...))`
+   - 효과: 프론트에서 전달된 값의 공백을 최종 정규화 후 프로시저에 전달
+
+4. `import re` 추가 (L2)
+
+**SQL 프로시저 `TxCompare` (DB 직접 수정 권장)**
+
+```sql
+-- 프로시저 BEGIN 직후 정규화 변수 선언
+DECLARE @WCS_SW_N varchar(20) = REPLACE(LTRIM(RTRIM(@WCS_SW)), ' ', '');
+DECLARE @Tx_SW_N  varchar(20) = REPLACE(LTRIM(RTRIM(@Tx_SW)),  ' ', '');
+
+-- JOIN 조건: @WCS_SW → @WCS_SW_N 으로 교체
+AND REPLACE(LTRIM(RTRIM(wcs.myVersion)), ' ', '') = @WCS_SW_N
+
+-- WHERE 조건: @Tx_SW → @Tx_SW_N 으로 교체
+AND REPLACE(LTRIM(RTRIM(m.Software_version)), ' ', '') = @Tx_SW_N
+```
+
+### 결과
+- UI 드롭다운에 표시되는 WCS 버전이 공백 정규화되어 일관된 값 선택 가능
+- 프로시저 호출 파라미터 공백 제거로 `a b` / `ab` 형태 불일치 방지
+
+📎 **[→ Summary](./AI_Rearch_summary.md)**
+
