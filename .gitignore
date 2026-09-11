@@ -2,6 +2,8 @@
 logs/
 1_uploads/
 0_Docs/machine_learning_검증파일/
+.playwright-mcp/
+screenshots/
 
 # ===== OS 파일 =====
 *.lnk

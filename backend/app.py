@@ -53,7 +53,7 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
 
-    # AOP_ENV: Start_AOP_Web.ps1 이 -Production 여부에 따라 설정 (미설정 시 개발 모드로 간주)
+    # AOP_ENV: scripts/AOP_Web.ps1 이 -Production 여부에 따라 설정 (미설정 시 개발 모드로 간주)
     # 개발 모드: debug+reloader 활성화 → 코드 저장 시 자동 재시작 (서버 재기동 불필요)
     # 운영 모드: 보안/안정성을 위해 debug/reloader 비활성화
     is_dev = os.environ.get("AOP_ENV", "development").lower() != "production"

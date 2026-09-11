@@ -39,7 +39,7 @@
 |-----------|---------------|
 | `backend/**` | `backend/AGENTS.md` |
 | `frontend/**` | `frontend/AGENTS.md` |
-| 프로젝트 구동/배포/실행 | `README.md`, `AOP_Web.ps1` |
+| 프로젝트 구동/배포/실행 | `README.md`, `scripts/AOP_Web.ps1` |
 | 디버깅/오류 분석 | `.github/instructions/verification.instructions.md` |
 | 서브에이전트/병렬 작업 | `.github/instructions/agent-orchestration.instructions.md` |
 
@@ -70,8 +70,8 @@
 
 코드/동작 변경 시 최종 단계에서 기록:
 
-- **`AI_Rearch_summary.md`** — 요청 한 줄 + 해결 사항 간략. Detail 링크 포함
-- **`AI_Rearch_detail.md`** — 변경 상세 (무엇을, 왜, Before/After). Summary 링크 포함
+- **`docs/AI_Rearch_summary.md`** — 요청 한 줄 + 해결 사항 간략. Detail 링크 포함
+- **`docs/AI_Rearch_detail.md`** — 변경 상세 (무엇을, 왜, Before/After). Summary 링크 포함
 
 ---
 
@@ -82,7 +82,7 @@
 ### 커밋 시점
 - 하나의 논리적 변경(기능 추가/버그 수정/리팩터링/문서 갱신)이 완료되고 검증(빌드·tsc·테스트 등)까지 끝나면 **즉시 커밋**
 - 논리적 변경 1건 = 커밋 1건. 서로 무관한 변경을 한 커밋에 섞지 않는다
-- Change Log(`AI_Rearch_*.md`) 갱신을 포함해 같은 커밋에 담는다
+- Change Log(`docs/AI_Rearch_*.md`) 갱신을 포함해 같은 커밋에 담는다
 
 ### 스테이징 규칙 (안전)
 - **내가 이번에 변경한 파일만 명시적으로 `git add`** — `git add .` / `git add -A` 금지

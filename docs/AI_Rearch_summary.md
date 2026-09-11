@@ -6,6 +6,14 @@
 
 ---
 
+## 변경 이력 (v0.9.58 — 2026-09-11)
+
+| # | 요청 | 해결 | Detail |
+|---|------|------|--------|
+| 1 | 루트 폴더 파일 과다·가독성 저하 해소 (start/stop/AOP_Web.ps1 혼재) | 하위 호환 래퍼 4종(`Start_AOP_Web.ps1`, `Start_AOP_Web_Auto.bat`, `Stop_AOP_Web.ps1`, `Stop_AOP_Web_Auto.bat`)과 미사용 `AOP_Web_Common.ps1` 삭제. 실행 로직은 `scripts/`, 변경이력 문서는 `docs/`로 이동하고 진입점을 `AOP_Web.bat` 하나로 단일화(루트 추적 파일 14 → 6개). 정리 중 발견한 실제 버그 3건 수정 — ① 단일 프로세스 서비스 미탐지(배열 언롤링으로 `.Count`가 `$null`) → `stop`이 프론트엔드를 종료하지 못하던 문제, ② 종료된 PID의 잔존 소켓을 RUNNING으로 오탐, ③ 배치가 항상 `exit /b 0`으로 실패를 은폐 | [→ Detail](./AI_Rearch_detail.md#v0958--1-루트-폴더-구조-단순화-및-진입점-단일화) |
+
+---
+
 ## 변경 이력 (v0.9.57 — 2026-09-11)
 
 | # | 요청 | 해결 | Detail |

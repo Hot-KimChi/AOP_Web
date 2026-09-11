@@ -3,7 +3,7 @@
 #  AOP Web Application - Unified Management Script
 #
 #  Purpose  : Start, Stop, Restart, Status 통합 관리 스크립트
-#  Usage    : .\AOP_Web.ps1 [-Action Start|Stop|Restart|Status] [-Production] [-Force] [-Debug] [-Diagnose] [-Help]
+#  Usage    : .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status] [-Production] [-Force] [-Diagnose] [-Help]
 #  Created  : 2026-09-11
 # ============================================================
 
@@ -12,14 +12,14 @@ param(
     [string]$Action = "Start",
     [switch]$Production,
     [switch]$Force,
-    [switch]$Debug,
     [switch]$Diagnose,
     [switch]$Help
 )
 
 #region Environment & Logging Setup
+# 이 스크립트는 scripts/ 하위에 위치하므로 프로젝트 루트는 한 단계 상위 디렉터리다.
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-$projectPath = $scriptPath
+$projectPath = Split-Path -Parent $scriptPath
 $logDir = Join-Path $projectPath "logs"
 $logTimestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $actionLower = $Action.ToLower()
@@ -113,6 +113,9 @@ function Clean-OldLogs {
 }
 
 function Get-ProcessesOnPort {
+    # 반환값은 반드시 호출부에서 @() 로 감싸야 한다.
+    # 결과가 1건이면 PowerShell 이 배열을 스칼라로 언롤링해 .Count 가 $null 이 되고,
+    # Count 기반 분기가 전부 오작동한다(프로세스 1개짜리 서비스가 미탐지됨).
     param([int]$Port)
     $lines = netstat -ano -p tcp 2>$null | Select-String -Pattern ":$Port\s+.*LISTENING"
     if (-not $lines) { return @() }
@@ -130,9 +133,11 @@ function Get-ProcessesOnPort {
 
     $result = @()
     foreach ($processId in $processIds) {
+        # 프로세스 종료 직후에도 netstat 에 LISTENING 소켓이 잠시 잔존한다.
+        # Get-Process 로 실제 생존 여부를 확인해 죽은 PID 는 제외한다(오탐/불필요한 Stop-Process 방지).
         $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-        $processName = if ($process) { $process.ProcessName } else { "Unknown" }
-        $result += [PSCustomObject]@{ ProcessId = $processId; ProcessName = $processName }
+        if (-not $process) { continue }
+        $result += [PSCustomObject]@{ ProcessId = $processId; ProcessName = $process.ProcessName }
     }
     return $result
 }
@@ -163,7 +168,7 @@ if ($Help) {
     Write-Host "AOP Web Application Unified Management Script" -ForegroundColor Green
     Write-Host "===============================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Usage: .\AOP_Web.ps1 [-Action Start|Stop|Restart|Status] [-Production] [-Force] [-Debug] [-Diagnose]" -ForegroundColor Yellow
+    Write-Host "Usage: .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status] [-Production] [-Force] [-Diagnose]" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Actions:" -ForegroundColor Yellow
     Write-Host "  Start      Start Frontend & Backend servers (Default)"
@@ -174,7 +179,6 @@ if ($Help) {
     Write-Host "Parameters:" -ForegroundColor Yellow
     Write-Host "  -Production    Production mode (build + background)"
     Write-Host "  -Force         Non-interactive mode (force stop existing processes)"
-    Write-Host "  -Debug         Enable debug logging"
     Write-Host "  -Diagnose      Run environment diagnosis only"
     Write-Host ""
     Exit 0
@@ -226,7 +230,7 @@ function Show-Status {
     Write-Host "  AOP Web Application Status Check"           -ForegroundColor Green
     Write-Host "=============================================" -ForegroundColor Green
 
-    $backendProcs = Get-ProcessesOnPort -Port 5000
+    $backendProcs = @(Get-ProcessesOnPort -Port 5000)
     Write-Host "`n[Backend Server - Port 5000]" -ForegroundColor Cyan
     if ($backendProcs.Count -gt 0) {
         foreach ($p in $backendProcs) {
@@ -236,7 +240,7 @@ function Show-Status {
         Write-Host "  Status: STOPPED (Port 5000 is free)" -ForegroundColor Yellow
     }
 
-    $frontendProcs = Get-ProcessesOnPort -Port 3000
+    $frontendProcs = @(Get-ProcessesOnPort -Port 3000)
     Write-Host "`n[Frontend Server - Port 3000]" -ForegroundColor Cyan
     if ($frontendProcs.Count -gt 0) {
         foreach ($p in $frontendProcs) {
@@ -255,7 +259,7 @@ function Stop-Services {
     
     $stoppedCount = 0
     foreach ($svc in @(@{Port=3000; Name="Frontend"}, @{Port=5000; Name="Backend"})) {
-        $procs = Get-ProcessesOnPort -Port $svc.Port
+        $procs = @(Get-ProcessesOnPort -Port $svc.Port)
         if ($procs.Count -eq 0) {
             Write-Log "No running process found on port $($svc.Port) ($($svc.Name))" "INFO"
             continue
@@ -319,7 +323,7 @@ function Start-Services {
     if (-not $pythonExe) { throw "Python executable not found." }
 
     # Clear Port 5000 if occupied
-    $existingBackend = Get-ProcessesOnPort -Port 5000
+    $existingBackend = @(Get-ProcessesOnPort -Port 5000)
     if ($existingBackend.Count -gt 0) {
         Write-Log "Port 5000 is in use. Stopping existing process automatically..." "WARN"
         foreach ($p in $existingBackend) {
@@ -363,7 +367,7 @@ function Start-Services {
     }
 
     # Clear Port 3000 if occupied
-    $existingFrontend = Get-ProcessesOnPort -Port 3000
+    $existingFrontend = @(Get-ProcessesOnPort -Port 3000)
     if ($existingFrontend.Count -gt 0) {
         Write-Log "Port 3000 is in use. Stopping existing process automatically..." "WARN"
         foreach ($p in $existingFrontend) {

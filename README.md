@@ -25,37 +25,37 @@ AOP Web Application은 Flask 기반 백엔드 API와 Next.js 15 (App Router) 기
 
 ## 3. 빠른 시작 및 구동 가이드 (Quick Start)
 
-통합 구동 스크립트(`AOP_Web_Auto.bat` 및 `AOP_Web.ps1`)를 사용하여 애플리케이션 시작, 종료, 재시작, 상태 점검을 한 번에 수행할 수 있습니다.
+통합 구동 스크립트(`AOP_Web.bat`)를 사용하여 애플리케이션 시작, 종료, 재시작, 상태 점검을 한 번에 수행할 수 있습니다.
 
-### 3.1 배치 파일 명령어 (`AOP_Web_Auto.bat`)
+### 3.1 배치 파일 명령어 (`AOP_Web.bat`)
 
-프로젝트 루트 디렉토리에서 `AOP_Web_Auto.bat`를 실행하거나 명령 프롬프트(CMD)에서 아래 명령어들을 수행합니다.
+프로젝트 루트 디렉토리에서 `AOP_Web.bat`를 실행하거나 명령 프롬프트(CMD)에서 아래 명령어들을 수행합니다.
 
 | 명령어 | 설명 |
 |--------|------|
-| `AOP_Web_Auto.bat` | 개발 모드로 애플리케이션 시작 (기본값) |
-| `AOP_Web_Auto.bat start` | 서버 시작 (개발 모드) |
-| `AOP_Web_Auto.bat stop` | 실행 중인 백엔드(5000) 및 프론트엔드(3000) 종료 |
-| `AOP_Web_Auto.bat restart` | 서버 재시작 |
-| `AOP_Web_Auto.bat status` | 현재 백엔드/프론트엔드 포트 리스닝 및 프로세스 상태 확인 |
-| `AOP_Web_Auto.bat prod` | 운영 모드(Production)로 빌드 및 백그라운드 구동 |
+| `AOP_Web.bat` | 개발 모드로 애플리케이션 시작 (기본값) |
+| `AOP_Web.bat start` | 서버 시작 (개발 모드) |
+| `AOP_Web.bat stop` | 실행 중인 백엔드(5000) 및 프론트엔드(3000) 종료 |
+| `AOP_Web.bat restart` | 서버 재시작 |
+| `AOP_Web.bat status` | 현재 백엔드/프론트엔드 포트 리스닝 및 프로세스 상태 확인 |
+| `AOP_Web.bat prod` | 운영 모드(Production)로 빌드 및 백그라운드 구동 |
 
-### 3.2 PowerShell 직접 실행 (`AOP_Web.ps1`)
+### 3.2 PowerShell 직접 실행 (`scripts\AOP_Web.ps1`)
 
 PowerShell 환경에서 직접 세부 옵션과 함께 제어할 수도 있습니다.
 
 ```powershell
 # 개발 모드 시작
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\AOP_Web.ps1 -Action Start
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\AOP_Web.ps1 -Action Start
 
 # 운영 모드 시작
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\AOP_Web.ps1 -Action Start -Production
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\AOP_Web.ps1 -Action Start -Production
 
 # 강제 종료
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\AOP_Web.ps1 -Action Stop -Force
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\AOP_Web.ps1 -Action Stop -Force
 
 # 환경 상태 진단
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\AOP_Web.ps1 -Diagnose
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\AOP_Web.ps1 -Diagnose
 ```
 
 ---
@@ -67,14 +67,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\AOP_Web.ps1 -Diagnose
 ### 방법 1: Windows 시작프로그램 폴더(`shell:startup`) 이용
 1. `Win + R` 키를 눌러 실행 창을 엽니다.
 2. `shell:startup` 을 입력하여 시작프로그램 폴더를 엽니다.
-3. `AOP_Web_Auto.bat` 파일의 바로 가기(Shortcut)를 해당 폴더 안에 만듭니다.
+3. `AOP_Web.bat` 파일의 바로 가기(Shortcut)를 해당 폴더 안에 만듭니다.
 4. 서버 재부팅 시 백그라운드/독립 프로세스로 무인 자동 실행됩니다.
 
 ### 방법 2: Windows 작업 스케줄러(Task Scheduler) 이용
 1. 작업 스케줄러 실행 후 **[기본 작업 만들기]** 선택.
 2. 트리거: **[컴퓨터 시작 시]** 또는 **[로그온할 때]** 선택.
 3. 동작: **[프로그램 시작]** 선택.
-4. 프로그램/스크립트: `D:\GitHub\AOP_Web\AOP_Web_Auto.bat` 지정.
+4. 프로그램/스크립트: `D:\GitHub\AOP_Web\AOP_Web.bat` 지정.
 5. 시작 위치: `D:\GitHub\AOP_Web\` 지정.
 
 ---
@@ -103,11 +103,15 @@ npm run dev
 
 ```
 AOP_Web/
-├── AOP_Web_Auto.bat        # 통합 구동/종료 배치 스크립트 (메인 컨트롤러)
-├── AOP_Web.ps1             # 통합 PowerShell 구동 제어 모듈
-├── AOP_Web_Common.ps1      # 공통 유틸리티 (포트 조작, 로깅, 로그 정리)
-├── Implementation_list.md  # 작업 수행 내역 및 요구사항 관리 파일
+├── AOP_Web.bat             # ★ 단일 진입점 (start/stop/restart/status/prod)
 ├── README.md               # 프로젝트 설치 및 구동 설명 문서
+├── Implementation_list.md  # 작업 수행 내역 및 요구사항 관리 파일
+├── AOP_Web.code-workspace  # VS Code 워크스페이스 설정
+├── scripts/                # 실행 로직
+│   └── AOP_Web.ps1         # 통합 PowerShell 구동 제어 모듈 (로깅·포트 제어 포함)
+├── docs/                   # 변경 이력 문서
+│   ├── AI_Rearch_summary.md
+│   └── AI_Rearch_detail.md
 ├── backend/                # Flask 백엔드 서비스
 │   ├── app.py              # Flask 메인 엔트리포인트
 │   ├── routes/             # API 라우터
@@ -115,7 +119,7 @@ AOP_Web/
 ├── frontend/               # Next.js 프론트엔드 앱
 │   ├── src/                # Next.js App Router 페이지 및 컴포넌트
 │   └── package.json
-└── logs/                   # 구동/종료 로그 파일 보관 디렉토리
+└── logs/                   # 구동/종료 로그 파일 보관 디렉토리 (자동 생성)
 ```
 
 ---
@@ -124,5 +128,5 @@ AOP_Web/
 
 - **로그 저장 경로**: `logs/` 디렉토리에 텍스트(`.log`) 및 JSON(`.json`) 형태로 날짜별 자동 보관됩니다.
 - **로그 자동 정리**: 30일이 지나거나 로그 용량이 500MB를 초과할 경우 자동으로 오래된 로그가 정돈됩니다.
-- **포트 충돌 해결**: `AOP_Web_Auto.bat start` 실행 시 5000/3000 포트가 이미 사용 중이면 기존 프로세스를 자동으로 탐지하고 정리 후 새로 기동합니다.
+- **포트 충돌 해결**: `AOP_Web.bat start` 실행 시 5000/3000 포트가 이미 사용 중이면 기존 프로세스를 자동으로 탐지하고 정리 후 새로 기동합니다.
 - **환경 진단**: 실행에 문제가 있을 경우 `-Diagnose` 명령을 통해 Python, Node.js, 가상환경, 필수 디렉토리 상태를 점검할 수 있습니다.

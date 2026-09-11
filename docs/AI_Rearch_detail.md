@@ -6,6 +6,61 @@
 
 ---
 
+## 변경 이력 (v0.9.58 — 2026-09-11)
+
+### v0.9.58 — #1. 루트 폴더 구조 단순화 및 진입점 단일화
+
+**요청:**
+- 최상위 폴더에 파일이 너무 많고, `Start_AOP_Web`·`Stop_AOP_Web`·`AOP_Web.ps1`이 혼재해 가독성이 떨어짐
+- 불필요한 파일 삭제 및 구조 최적화
+
+**대상 파일:** `AOP_Web.bat`(신규 진입점), `scripts/AOP_Web.ps1`, `docs/AI_Rearch_*.md`, `README.md`, `.github/copilot-instructions.md`, `.gitignore`, `backend/app.py`
+
+**Before (루트 추적 파일 14개):**
+- 동일 기능에 대해 진입점이 5개 공존 — `AOP_Web_Auto.bat`, `Start_AOP_Web_Auto.bat`, `Stop_AOP_Web_Auto.bat`, `Start_AOP_Web.ps1`, `Stop_AOP_Web.ps1`
+- `Start_AOP_Web.ps1`은 v0.9.56 래퍼화 과정에서 **구 파일의 잔여 코드가 그대로 남아 문법적으로 깨진 상태**였음 (래퍼 9줄 뒤에 이전 구현의 `catch` 블록 잔재가 이어짐)
+- `AOP_Web_Common.ps1`은 `AOP_Web.ps1`이 모든 함수를 자체 보유하게 되면서 **아무도 참조하지 않는 죽은 코드**가 됨
+- 변경이력 문서 2개(약 140KB)가 루트에 노출
+- `AOP_Web.ps1`의 `-Debug` 파라미터는 선언만 되고 사용처 없음
+- `.playwright-mcp/`, `screenshots/` 산출물이 `.gitignore` 미등록
+
+**After (루트 추적 파일 6개):**
+- 진입점 단일화: `AOP_Web.bat` 하나만 유지 (`start`/`stop`/`restart`/`status`/`prod`)
+- 실행 로직 이동: `AOP_Web.ps1` → `scripts/AOP_Web.ps1`
+- 변경이력 이동: `AI_Rearch_summary.md`, `AI_Rearch_detail.md` → `docs/`
+- 삭제: 래퍼 4종 + 죽은 코드 `AOP_Web_Common.ps1`
+- **경로 기준 보정(중요)**: 스크립트가 `scripts/` 하위로 내려가면서 `$projectPath = $scriptPath`가 `scripts/`를 가리켜 `logs/`·`backend/`·`frontend/` 해석이 모두 깨질 수 있었음 → `$projectPath = Split-Path -Parent $scriptPath`로 수정
+- 미사용 `-Debug` 파라미터 및 Help 항목 제거
+- 참조 갱신: `README.md`(명령어·디렉터리 구조), `.github/copilot-instructions.md`(라우팅·Change Log 경로), `backend/app.py`(AOP_ENV 주석)
+- `.gitignore`에 `.playwright-mcp/`, `screenshots/` 추가
+
+**정리 과정에서 발견·수정한 실제 버그 3건:**
+
+1. **단일 프로세스 서비스 미탐지 (영향 큼)**
+   - 증상: 프론트엔드가 실제로 기동(HTTP 200)되어 있는데 `status`는 `STOPPED`로 표시. 더 심각하게는 `stop`이 프론트엔드를 **종료하지 못하고 조용히 건너뜀**
+   - 원인: `Get-ProcessesOnPort`가 결과 1건일 때 PowerShell이 배열을 스칼라로 언롤링 → 호출부의 `$procs.Count`가 `$null`이 되어 `-gt 0` / `-eq 0` 분기가 모두 오작동. 백엔드는 reloader 때문에 프로세스가 2개라 우연히 정상 동작해 그동안 드러나지 않았음
+   - 조치: 5개 호출부를 모두 `@(Get-ProcessesOnPort ...)`로 배열 고정하고, 함수에 호출 규약 주석 명시. `Show-Status`·`Stop-Services`·`Start-Services`(포트 선점 정리)가 함께 교정됨
+2. **종료된 PID를 RUNNING으로 오탐**
+   - 증상: `stop` 직후 `status`가 `Process: Unknown`으로 RUNNING 표시. `start` 시 이미 죽은 PID에 `Stop-Process` 시도
+   - 원인: 프로세스 종료 후에도 netstat에 LISTENING 소켓이 잠시 잔존하는데, 기존 코드는 `Get-Process` 실패 시 `"Unknown"` 이름으로 **레코드를 그대로 생성**
+   - 조치: `Get-Process`로 생존 확인 후 죽은 PID는 결과에서 제외
+3. **배치가 실패를 은폐**
+   - 증상: PowerShell이 오류로 종료해도 `AOP_Web_Auto.bat`이 항상 `exit /b 0` 반환 → 작업 스케줄러가 실패를 감지 불가
+   - 조치: `ERRORLEVEL`을 그대로 전파하고, 알 수 없는 인자에 대해 사용법 출력 후 `exit /b 1`
+
+**검증:**
+- `scripts\AOP_Web.ps1 -Diagnose` → Python 3.12.9 / Node v20.15.0 / backend·frontend 경로 모두 `OK` (경로 기준 보정 확인)
+- 로그가 `scripts/logs`가 아닌 루트 `logs/`에 생성되는 것 확인
+- `.\AOP_Web.bat start` → 백엔드·프론트엔드 정상 기동 (약 2초), exit code 0
+- `.\AOP_Web.bat status` → 수정 전 프론트엔드 `STOPPED` 오탐 → 수정 후 `RUNNING | node | PID` 정상 표시
+- `.\AOP_Web.bat stop` → 프론트엔드 포함 3개 프로세스 정상 종료 (수정 전에는 프론트엔드 미종료)
+- 종료 직후 `status` → 잔존 소켓에도 불구하고 양쪽 `STOPPED` 정상 판정
+- `.\AOP_Web.bat restart` → 종료 후 재기동까지 정상, HTTP 확인(프론트엔드 200, 백엔드 404 응답 = 앱 정상 응답)
+- `.\AOP_Web.bat bogus` → 사용법 출력 후 exit code 1 반환
+- 검증 후 세션 시작 시점과 동일하게 서비스는 정지 상태로 복원
+
+---
+
 ## 변경 이력 (v0.9.57 — 2026-09-11)
 
 ### v0.9.57 — #1. README 작성 및 구동 컨텍스트 보완
