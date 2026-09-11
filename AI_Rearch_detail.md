@@ -24,7 +24,7 @@
 - 배치 파일의 PowerShell 실행 구정에 `-NoProfile` 옵션 추가 (`powershell.exe -NoProfile -ExecutionPolicy Bypass ...`)
 - 배치 종료 대기시간을 1초(`timeout /t 1`)로 단축
 - `Start_AOP_Web.ps1` 자식 창 기동 파라미터에 `-NoProfile` 추가
-- `Implementation_list.md`에 수행 일자(2026-09-11)와 2줄 요약 형태의 개선 사항 기록
+- `Implementation_list.md`에 수행 일자(2026-09-11)와 버전(v0.9.55)을 명시하고 2줄 요약 형태의 개선 사항 기록
 
 ---
 

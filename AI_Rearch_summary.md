@@ -10,7 +10,7 @@
 
 | # | 요청 | 해결 | Detail |
 |---|------|------|--------|
-| 1 | `Start_AOP_Web_auto.bat` 실행 시 병목 및 속도 최적화, 수행 내역 기록 | PowerShell 호출 시 `-NoProfile` 옵션 추가로 프로필 로딩에 따른 초기 1~3초 지연 제거, 배치 종료 고정 대기시간(`timeout /t 3` -> `timeout /t 1`) 단축, `Start_AOP_Web.ps1` 자식 창 기동에도 `-NoProfile` 옵션 적용, `Implementation_list.md`에 수행 내역 기록 | [→ Detail](./AI_Rearch_detail.md#v0955--1-start_aop_web_auto-구동-속도-및-병목-최적화) |
+| 1 | `Start_AOP_Web_auto.bat` 실행 시 병목 및 속도 최적화, 수행 내역 기록 | PowerShell 호출 시 `-NoProfile` 옵션 추가로 프로필 로딩에 따른 초기 1~3초 지연 제거, 배치 종료 고정 대기시간(`timeout /t 3` -> `timeout /t 1`) 단축, `Start_AOP_Web.ps1` 자식 창 기동에도 `-NoProfile` 옵션 적용, `Implementation_list.md`에 버전(v0.9.55) 포함 2줄 요약 수행 내역 기록 | [→ Detail](./AI_Rearch_detail.md#v0955--1-start_aop_web_auto-구동-속도-및-병목-최적화) |
 
 ---
 
