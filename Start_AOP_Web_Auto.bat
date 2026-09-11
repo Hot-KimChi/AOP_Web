@@ -20,17 +20,17 @@ if not exist "AOP_Web_Common.ps1" (
     exit /b 1
 )
 
-REM Execute PowerShell script with bypass policy
+REM Execute PowerShell script with bypass policy (-NoProfile for fast launch)
 REM Default: Development mode
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0Start_AOP_Web.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start_AOP_Web.ps1"
 
 REM Alternative: Production mode (uncomment the line below and comment the line above)
-REM powershell.exe -ExecutionPolicy Bypass -File "%~dp0Start_AOP_Web.ps1" -Production
+REM powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start_AOP_Web.ps1" -Production
 
 echo AOP Web Application startup initiated.
 
-REM Wait a moment to see any immediate errors
-timeout /t 3 /nobreak >nul
+REM Wait a short moment to display startup completion
+timeout /t 1 /nobreak >nul
 
 REM Exit silently
 exit /b 0

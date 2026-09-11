@@ -6,6 +6,28 @@
 
 ---
 
+## 변경 이력 (v0.9.55 — 2026-09-11)
+
+### v0.9.55 — #1. Start_AOP_Web_Auto 구동 속도 및 병목 최적화
+
+**요청:**
+- `Implementation_list.md` 기반으로 `Start_AOP_Web_auto.bat` 실행 시 병목 및 최적화 진행, 속도 개선 후 수행 내역 기록
+
+**대상 파일:** `Start_AOP_Web_Auto.bat`, `Stop_AOP_Web_Auto.bat`, `Start_AOP_Web.ps1`, `Implementation_list.md`
+
+**Before:**
+- `Start_AOP_Web_Auto.bat` 및 `Stop_AOP_Web_Auto.bat`에서 `powershell.exe`를 호출할 때 `-NoProfile` 옵션 미지정으로 사용자 프로필 로딩에 의한 초기 1~3초 추가 지연 발생
+- 배치 파일 종료 전 고정 `timeout /t 3` 대기로 불필요한 대기 병목 존재
+- `Start_AOP_Web.ps1` 내부 Backend/Frontend 창 띄울 때도 `-NoProfile` 미지정으로 창 기동 지연
+
+**After:**
+- 배치 파일의 PowerShell 실행 구정에 `-NoProfile` 옵션 추가 (`powershell.exe -NoProfile -ExecutionPolicy Bypass ...`)
+- 배치 종료 대기시간을 1초(`timeout /t 1`)로 단축
+- `Start_AOP_Web.ps1` 자식 창 기동 파라미터에 `-NoProfile` 추가
+- `Implementation_list.md`에 수행 일자(2026-09-11)와 2줄 요약 형태의 개선 사항 기록
+
+---
+
 ## 변경 이력 (v0.9.54 — 2026-08-16)
 
 ### v0.9.54 — #1. Backend 개발모드 자동 재시작(Reloader) 도입

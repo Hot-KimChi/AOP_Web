@@ -219,9 +219,9 @@ try {
         # Production mode: Start Python directly in hidden window
         $backendProcess = Start-Process -FilePath $pythonExe -ArgumentList "app.py" -WorkingDirectory $backendPath -WindowStyle Hidden -PassThru
     } else {
-        # Development mode: Interactive window with PowerShell
+        # Development mode: Interactive window with PowerShell (-NoProfile for speed)
         $backendCmd = "Set-Location '$backendPath'; & '$pythonExe' app.py"
-        $backendProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -PassThru
+        $backendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $backendCmd -PassThru
     }
     
     Write-Log "Backend PID: $($backendProcess.Id)" "INFO" @{ 
@@ -300,9 +300,9 @@ try {
         Set-Location $projectPath
         $waitTime = 10
     } else {
-        # Development mode: Interactive window
+        # Development mode: Interactive window (-NoProfile for speed)
         $frontendCmd = "Set-Location '$frontendPath'; npm run dev"
-        $frontendProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd -PassThru
+        $frontendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $frontendCmd -PassThru
         $waitTime = 10
     }
     Write-Log "Frontend PID: $($frontendProcess.Id)" "INFO" @{

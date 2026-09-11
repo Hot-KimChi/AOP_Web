@@ -28,11 +28,11 @@ if not exist "AOP_Web_Common.ps1" (
     exit /b 1
 )
 
-REM -- PowerShell 스크립트 실행 (ExecutionPolicy Bypass) --
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0Stop_AOP_Web.ps1" -Force
+REM -- PowerShell 스크립트 실행 (ExecutionPolicy Bypass, -NoProfile for fast launch) --
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Stop_AOP_Web.ps1" -Force
 
 echo.
 echo AOP Web Application stop process completed.
 
 REM -- 결과 확인을 위해 잠시 대기 --
-timeout /t 3 /nobreak >nul
+timeout /t 1 /nobreak >nul
