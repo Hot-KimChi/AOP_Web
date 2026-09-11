@@ -6,6 +6,27 @@
 
 ---
 
+## 변경 이력 (v0.9.57 — 2026-09-11)
+
+### v0.9.57 — #1. README 작성 및 구동 컨텍스트 보완
+
+**요청:**
+- Readme 파일을 생성하여 애플리케이션 구동 방법 설명
+- AI 에이전트가 이를 잘 수행할 수 있도록 컨텍스트를 보완한 뒤 설계/구현/검증 진행
+
+**대상 파일:** `README.md`, `.github/copilot-instructions.md`, `Implementation_list.md`
+
+**Before:**
+- 프로젝트 루트에 구동 가이드라인을 담은 `README.md` 문서가 존재하지 않았음
+- `.github/copilot-instructions.md` 라우팅 테이블에 프로젝트 실행/구동에 관한 파일 참조가 없었음
+
+**After:**
+- `.github/copilot-instructions.md` 라우터에 `README.md`, `AOP_Web.ps1` 라우팅 경로를 추가하여 AI 에이전트의 컨텍스트 참조 효율을 향상시킴
+- `README.md` 작성: 기술 스택, 사전 요구사항, `AOP_Web_Auto.bat` 통합 제어 명령어, PowerShell 세부 옵션, Windows 시작프로그램 자동 실행 등록 방법, 수동 개별 실행 방법, 디렉토리 구조 및 트러블슈팅 안내 체계화
+- `Implementation_list.md`에 수행 일자(2026-09-11)와 버전(v0.9.57)을 명시한 2줄 요약 기록
+
+---
+
 ## 변경 이력 (v0.9.56 — 2026-09-11)
 
 ### v0.9.56 — #1. 루트 파일 정리 및 단일 통합 스크립트 구축

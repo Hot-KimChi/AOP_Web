@@ -39,6 +39,7 @@
 |-----------|---------------|
 | `backend/**` | `backend/AGENTS.md` |
 | `frontend/**` | `frontend/AGENTS.md` |
+| 프로젝트 구동/배포/실행 | `README.md`, `AOP_Web.ps1` |
 | 디버깅/오류 분석 | `.github/instructions/verification.instructions.md` |
 | 서브에이전트/병렬 작업 | `.github/instructions/agent-orchestration.instructions.md` |
 
