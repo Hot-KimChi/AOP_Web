@@ -6,6 +6,30 @@
 
 ---
 
+## 변경 이력 (v0.9.56 — 2026-09-11)
+
+### v0.9.56 — #1. 루트 파일 정리 및 단일 통합 스크립트 구축
+
+**요청:**
+- 프로젝트 root 디렉토리 파일 정리 (중복 제거 및 흩어진 파일 정리)
+- 하나의 파일에서 start/stop/restart/status가 모두 가능하도록 통합
+- 서버 시작프로그램 등록 자동 기동에 최적화되도록 `.bat` 및 스크립트 구조 검증 및 개선
+
+**대상 파일:** `AOP_Web_Auto.bat`, `AOP_Web.ps1`, `Start_AOP_Web_Auto.bat`, `Stop_AOP_Web_Auto.bat`, `Start_AOP_Web.ps1`, `Stop_AOP_Web.ps1`, `Implementation_list.md`
+
+**Before:**
+- Start/Stop 스크립트가 파편화되어 중복 코드가 존재했고, 단일 파일에서 다목적 관리가 불가능했음
+- 루트 디렉토리에 불필요한 고정 바로가기(`Start_AOP_Web_Auto.bat - 바로 가기.lnk`) 존재
+- 서버 시작프로그램 등록 시 비대화형 실행 옵션 미흡으로 대기 병목 가능성 존재
+
+**After:**
+- `AOP_Web.ps1` 및 `AOP_Web_Auto.bat` 단일 통합 스크립트 작성: Start/Stop/Restart/Status를 인자 하나로 완벽 제어
+- 매개변수 없이 실행 시 서버 시작프로그램 자동 실행에 맞춰 dev 모드 Start가 비차단(-NonInteractive)으로 즉시 진행되도록 최적화
+- 불필요한 `.lnk` 파일 제거 및 기존 스크립트(`Start_AOP_Web_Auto.bat` 등)는 1줄 래퍼로 단순화해 하위 호환성 유지
+- `Implementation_list.md`에 수행 일자(2026-09-11)와 버전(v0.9.56)을 명시하고 2줄 요약 기록
+
+---
+
 ## 변경 이력 (v0.9.55 — 2026-09-11)
 
 ### v0.9.55 — #1. Start_AOP_Web_Auto 구동 속도 및 병목 최적화
