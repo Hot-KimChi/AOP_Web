@@ -6,6 +6,14 @@
 
 ---
 
+## 변경 이력 (v0.9.59 — 2026-09-12)
+
+| # | 요청 | 해결 | Detail |
+|---|------|------|--------|
+| 1 | Agent 성능 최대화를 위한 스텝별 모델 분담 설정 (design·구현=Claude Opus 최신, 검증=GPT 최신, 문제 시 iteration으로 상호보완) 및 하네스·스킬 최신화 | `.github/instructions/model-routing.instructions.md`를 신설해 3스텝 파이프라인(Design/Implement=Claude Opus 최신 직접 수행, Verify=GPT 최신 위임)을 규정. 같은 모델의 자기 검증은 구현 시 추론 오류를 그대로 재현하므로 **계열이 바뀌는 지점을 Verify 하나로 두는 것**이 설계 핵심. 승격 기준을 파일 수가 아닌 **위험도**(인증·SQL·데이터 손실·구동 스크립트·확신 없는 변경)로 설계하고 `필수 > 생략` 우선순위를 명문화. iteration 프로토콜(Blocker/Major/Minor, finding ID 추적, `write_agent` 멀티턴 재검증, 라운드 상한 3회, 완료 조건 `Blocker 0 AND Major 0`, **증거 우선(Evidence Wins)** 이견 해소), Verify 프롬프트 9블록 규격, 검증자 실패 모드 대응을 정의. 라우터·오케스트레이션·검증 문서 3종을 갱신. **이 변경 자체를 새 파이프라인으로 검증해 Blocker 1·Major 8을 발견·수정**하고 완료 조건을 충족시킴 | [→ Detail](./AI_Rearch_detail.md#v0959--1-스텝별-모델-분담-파이프라인-도입) |
+
+---
+
 ## 변경 이력 (v0.9.58 — 2026-09-11)
 
 | # | 요청 | 해결 | Detail |

@@ -42,6 +42,7 @@
 | 프로젝트 구동/배포/실행 | `README.md`, `scripts/AOP_Web.ps1` |
 | 디버깅/오류 분석 | `.github/instructions/verification.instructions.md` |
 | 서브에이전트/병렬 작업 | `.github/instructions/agent-orchestration.instructions.md` |
+| **동작 변경을 수반하는 모든 작업** | `.github/instructions/model-routing.instructions.md` |
 
 ### 컨텍스트 윈도우 관리
 
@@ -52,17 +53,22 @@
 
 ---
 
-## 4. Workflow: Plan → Implement → Verify
+## 4. Workflow: Design → Implement → Verify
 
-1. **Plan** — 요구사항 명확화, 범위 확정. 비자명 작업은 `rubber-duck` 에이전트로 검증
-2. **Implement** — 가장 단순한 정확한 해결책
-3. **Verify** — `.github/instructions/verification.instructions.md` 체크리스트 수행. 문제 시 1로 복귀
+> **Design·Implement는 Claude Opus 최신, Verify는 GPT 최신 서브에이전트에 위임한다.**
+> 계열이 바뀌는 지점은 Verify 하나뿐이며, 그 이유는 **자기 검증의 맹점 제거**다.
+> 모델 ID·승격 기준·iteration 규칙: **`.github/instructions/model-routing.instructions.md`**
+
+- **승격된 Verify는 GPT 서브에이전트가 수행한다** — 구현자와 같은 모델이 검증하면 같은 추론 오류를 그대로 통과시킨다. (예외: 해당 계열 모델이 없을 때)
+- 교차 검증은 **위험도로 승격**한다(인증·SQL·데이터 손실·구동 스크립트·확신 없는 변경). 파일 수로 판단하지 않는다. **필수 조건은 생략 조건보다 우선**한다.
+- 완료 조건은 **`Blocker 0 AND Major 0`**. 미해결 시 커밋하지 않고 보고한다.
 
 ---
 
 ## 5. Agent & Tool Orchestration
 
-> 상세: `.github/instructions/agent-orchestration.instructions.md`
+> 에이전트·도구 운용: `.github/instructions/agent-orchestration.instructions.md`
+> 모델 배정·iteration: `.github/instructions/model-routing.instructions.md`
 
 ---
 

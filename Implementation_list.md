@@ -32,3 +32,9 @@
 - **진행 내역 요약**:
   1. 래퍼 4종과 미사용 `AOP_Web_Common.ps1`을 삭제하고 실행 로직은 `scripts/`, 변경이력은 `docs/`로 이동해 루트 파일을 14개에서 6개로 축소하고 진입점을 `AOP_Web.bat` 하나로 단일화했습니다.
   2. 정리 중 발견한 실제 버그 3건(단일 프로세스 미탐지로 `stop` 실패, 죽은 PID RUNNING 오탐, 배치의 실패 코드 은폐)을 수정하고 start/stop/restart/status 전 구간을 실행 검증했습니다.
+
+#### 5. Agent 성능 최대화를 위해 md 지시문에 스텝별 모델 분담을 설정해죠. ① design: Claude Opus 최신 모델 ② 구현: Claude Opus 최신 모델 ③ 검증: GPT 최신 모델. 각 스텝에서 문제가 있으면 iteration을 진행하여 상호보완한다. 하네스·스킬 등 최신 테크닉을 기반으로 업데이트해죠.
+- **수행 일자**: 2026-09-12 (v0.9.59)
+- **진행 내역 요약**:
+  1. `.github/instructions/model-routing.instructions.md`를 신설해 Design·Implement는 Claude Opus 최신이 직접 수행하고 Verify만 GPT 최신 서브에이전트에 위임하는 교차 검증 파이프라인과 iteration 프로토콜(심각도 분류, finding ID 추적, 라운드 상한 3회, 완료 조건 `Blocker 0 AND Major 0`, 증거 우선 이견 해소)을 규정했습니다.
+  2. 이 변경 자체를 새 파이프라인으로 4라운드 검증해 Blocker 1·Major 8(필수↔생략 기준 충돌, 라우터 중복, 완료 조건 불일치, 과잉 위임 등)을 발견·수정했고, 라우터·오케스트레이션·검증 문서 3종도 함께 갱신했습니다.
