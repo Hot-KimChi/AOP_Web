@@ -29,6 +29,16 @@ def _is_production() -> bool:
     return os.environ.get("AOP_ENV", "development").lower() == "production"
 
 
+def _parse_allowed_users(raw: str):
+    """로그인을 허용할 사용자(selxxxxx) 목록을 파싱한다.
+
+    비어 있으면 None 을 돌려주고, 이는 "제한 없음"(기존 동작)을 뜻한다.
+    SQL Server 로그인명은 대소문자를 구분하지 않으므로 소문자로 정규화한다.
+    """
+    users = {u.strip().lower() for u in raw.split(",") if u.strip()}
+    return users or None
+
+
 # 업로드/생성 파일의 단일 기준 루트(절대 경로).
 # 상대 경로를 쓰면 Flask 프로세스의 작업 디렉터리에 따라 저장 위치와 조회 위치가
 # 어긋나므로(생성은 성공하지만 다운로드는 400), 저장소 루트 기준으로 고정한다.
@@ -48,6 +58,20 @@ class Config:
     ALLOWED_ORIGINS = _parse_origins(os.environ.get("ALLOWED_ORIGINS", ""))
     # 쿠키 Secure 플래그 (운영=true, 개발=false)
     COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
+    # 로그인 허용 사용자 목록 (미지정 시 제한 없음)
+    ALLOWED_USERS = _parse_allowed_users(os.environ.get("AUTH_ALLOWED_USERS", ""))
+
+    @staticmethod
+    def is_login_allowed(username: str) -> bool:
+        """해당 사용자가 로그인 가능한지 판단한다. 목록 미지정이면 전원 허용."""
+        if not Config.ALLOWED_USERS:
+            return True
+        if not username:
+            return False
+        # 목록이 코드로 직접 주입되어 정규화를 거치지 않았을 수도 있으므로
+        # 비교 시점에도 양쪽을 소문자로 맞춘다.
+        target = username.strip().lower()
+        return any(target == str(u).strip().lower() for u in Config.ALLOWED_USERS)
 
     @staticmethod
     def _validate_production():
@@ -112,5 +136,6 @@ class Config:
         Config.FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", DEFAULT_FLASK_SECRET)
         Config.COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
         Config.ALLOWED_ORIGINS = _parse_origins(os.environ.get("ALLOWED_ORIGINS", ""))
+        Config.ALLOWED_USERS = _parse_allowed_users(os.environ.get("AUTH_ALLOWED_USERS", ""))
 
         Config._validate_production()

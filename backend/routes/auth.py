@@ -67,6 +67,17 @@ def login():
         with DatabaseManager.create_explicit_connection(username, password, "master") as sql:
             user_info = sql.get_user_info(username=username)
             if user_info and sql.authenticate_user(username=username, user_info=user_info):
+                # 자격증명이 유효하더라도 허용 목록이 지정돼 있으면 그 안에 있어야 한다.
+                # 검증을 자격증명 확인 "뒤"에 두어, 비밀번호를 모르는 사람이 특정
+                # 계정의 권한 여부를 떠보지 못하게 한다.
+                if not Config.is_login_allowed(user_info["username"]):
+                    logger.warning(
+                        f"Login denied for user '{user_info['username']}': not in AUTH_ALLOWED_USERS"
+                    )
+                    return error_response(
+                        "This account is not allowed to use AOP Web. Please contact the administrator.",
+                        403,
+                    )
                 payload = {
                     "username": user_info["username"],
                     "id": str(user_info["sid"]),
@@ -127,6 +138,20 @@ def auth_status():
         )
     try:
         decoded_token = jwt.decode(token, Config.SECRET_KEY, algorithms=["HS256"])
+        # 허용 목록에서 빠진 계정의 기존 토큰은 즉시 무효로 본다.
+        # (토큰은 발급 후 EXPIRE_TIME 동안 살아 있으므로 여기서 확인하지 않으면
+        #  권한을 회수해도 기존 세션이 그대로 유지된다)
+        if not Config.is_login_allowed(decoded_token.get("username")):
+            response = jsonify({"authenticated": False, "message": "Access revoked"})
+            response.set_cookie(
+                "auth_token",
+                "",
+                expires=0,
+                httponly=True,
+                samesite="Lax",
+                secure=Config.COOKIE_SECURE,
+            )
+            return response, 200
         # 세션에 DB 자격증명이 있는지도 확인 (JWT 유효하지만 세션 만료 시 422 방지)
         has_credentials = has_session_credentials()
         return (

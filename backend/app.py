@@ -7,6 +7,7 @@ from routes.auth import auth_bp
 from routes.measset_gen import measset_gen_bp
 from routes.db_api import db_api_bp
 from routes.ml import ml_bp
+from routes.todo import todo_bp
 
 
 def create_app():
@@ -40,6 +41,7 @@ def create_app():
     app.register_blueprint(measset_gen_bp)
     app.register_blueprint(db_api_bp)
     app.register_blueprint(ml_bp)
+    app.register_blueprint(todo_bp)
 
     @app.before_request
     def purge_legacy_session_secrets():

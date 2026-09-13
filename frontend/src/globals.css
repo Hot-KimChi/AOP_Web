@@ -684,3 +684,123 @@ button.navbar-mobile-link {
 [data-theme="dark"] .dp-type-intensity .dp-type-header { background: #172554; color: #60a5fa; }
 [data-theme="dark"] .dp-type-unknown  .dp-type-header { background: var(--border); color: var(--text-sec); }
 [data-theme="dark"] .dp-ai-value { color: #818cf8; }
+
+/* ─────────────────────────────────────────────
+   내 할 일(Todo) 패널 — 로그인 사용자 개인 목록
+   ───────────────────────────────────────────── */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.home-split {
+  display: flex;
+  gap: 0.75rem;
+  height: 100%;
+  align-items: stretch;
+}
+.home-split > .home-split-main { flex: 1 1 auto; min-width: 0; }
+.home-split > .todo-panel      { flex: 0 0 320px; }
+
+@media (max-width: 900px) {
+  .home-split { flex-direction: column; height: auto; }
+  .home-split > .todo-panel { flex: 0 0 auto; }
+}
+
+.todo-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  min-height: 0;
+}
+
+.todo-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.todo-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.todo-panel-meta { font-size: 0.75rem; color: var(--text-sec); }
+
+.todo-add { display: flex; gap: 0.4rem; margin-bottom: 0.6rem; }
+.todo-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.todo-input:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+.todo-input::placeholder { color: var(--text-muted); }
+
+.todo-error {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  color: var(--status-error-text);
+}
+.todo-empty {
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
+  color: var(--text-sec);
+}
+
+.todo-list {
+  list-style: none;
+  margin: 0;
+  /* 우측 하단 고정 버전 배지와 마지막 항목이 겹치지 않도록 여백을 둔다 */
+  padding: 0 0 1.75rem;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.todo-item:last-child { border-bottom: none; }
+
+.todo-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.todo-check input { margin-top: 0.2rem; accent-color: var(--brand); }
+.todo-text {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text);
+  word-break: break-word;
+}
+.todo-item-done .todo-text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}

@@ -41,11 +41,27 @@ def require_auth(f):
         if not token:
             return error_response("Authentication required", 401)
         try:
-            jwt.decode(token, Config.SECRET_KEY, algorithms=["HS256"])
+            payload = jwt.decode(token, Config.SECRET_KEY, algorithms=["HS256"])
         except jwt.ExpiredSignatureError:
             return error_response("Token expired", 401)
         except jwt.InvalidTokenError:
             return error_response("Invalid token", 403)
+        # 접속자 식별자(selxxxxx)를 요청 컨텍스트에 실어 둔다. 사용자별 기능은
+        # 반드시 이 값만 신뢰해야 하며, 클라이언트가 보낸 사용자명은 믿지 않는다.
+        g.current_user = payload.get("username")
+        if not g.current_user:
+            return error_response("Invalid token", 403)
+        # 허용 목록은 로그인 시점뿐 아니라 매 요청마다 확인한다. 토큰은 발급 후
+        # 만료까지 살아 있으므로, 여기서 막지 않으면 권한을 회수해도 기존 세션이
+        # 그대로 통과한다.
+        if not Config.is_login_allowed(g.current_user):
+            logger.warning(
+                f"Access denied for user '{g.current_user}': not in AUTH_ALLOWED_USERS"
+            )
+            return error_response(
+                "This account is not allowed to use AOP Web. Please contact the administrator.",
+                403,
+            )
         return f(*args, **kwargs)
 
     return decorated_function

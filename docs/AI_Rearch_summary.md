@@ -6,6 +6,14 @@
 
 ---
 
+## 변경 이력 (v0.9.66 — 2026-09-13)
+
+| # | 요청 | 해결 | Detail |
+|---|------|------|--------|
+| 1 | 접속자의 `selxxxxx` 를 확인해 로그인 권한을 따로 줄 수 있는가? 윈도우 로그인 권한과 동일한 인증으로 로그인 가능한가? 가능하다면 유저별 todo list 출력 (Agent 재작성 명세 선작성 후 진행) | **추측 대신 인프라를 실측해 답을 확정**. **① 접속자 식별은 이미 되고 있었다** — 로그인 시 입력하는 DB 계정명이 곧 `selxxxxx` 이고 JWT 에 담겨 매 요청 검증되나, 라우트에서 꺼내 쓸 수 없어 사용자별 기능을 만들지 못하던 상태였다. `require_auth` 가 `g.current_user` 에 username 을 넣도록 변경. **② Windows SSO 는 불가** — `dsregcmd /status` 실측 결과 `DomainJoined : NO` / `AzureAdJoined : YES`(순수 Entra ID 조인), IIS 미설치. 서버가 접속자의 Windows 자격증명을 *검증*하려면 AD 도메인 가입 + Kerberos(SPN)/NTLM 패스스루가 필요하다. MS-SQL Windows 인증이 되는 것은 서버가 *클라이언트로서* 자기 자격증명을 제시하는 **반대 방향**이라 근거가 되지 않는다. 또한 DB 접속을 Windows 인증으로 바꾸면 모든 사용자가 서버 프로세스 계정(sysadmin)으로 붙어 **사용자별 DB 권한이 사라지므로** 현행 SQL 인증을 유지. **③ 로그인 권한 분리** — `AUTH_ALLOWED_USERS` 허용 목록 신설(자격증명 검증 *후* 판정해 비밀번호를 모르는 사람이 권한 여부를 떠보지 못하게 함, 미지정 시 기존과 동일한 전체 허용). **④ 사용자별 todo list 구현** — 서버 로컬 SQLite 에 소유자 소문자 정규화 저장, 모든 쿼리에 `owner = ?` 강제, 타인 항목은 **404**(존재 여부 비노출). 홈 우측에 "내 할 일" 패널 추가. | [→ Detail](./AI_Rearch_detail.md#v0966--1-접속자별-로그인-권한과-사용자별-todo) |
+
+---
+
 ## 변경 이력 (v0.9.65 — 2026-09-13)
 
 | # | 요청 | 해결 | Detail |
@@ -629,3 +637,4 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - `validate_tx_summary_file` 비교 루프에서 `iterrows`/컬럼 lookup 재생성을 제거하고 record 기반 단일 lookup으로 전환
   - SQL 엔진 `fast_executemany` + `to_sql(chunksize, multi)`로 대량 업로드 삽입 경로 처리량 개선
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
+

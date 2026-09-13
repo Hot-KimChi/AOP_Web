@@ -6,7 +6,7 @@ AOP Web Application은 Flask 기반 백엔드 API와 Next.js 15 (App Router) 기
 
 | 메뉴 | 경로 | 설명 |
 |------|------|------|
-| **홈** | `/` | 로그인 후 팀 주간 일정(SharePoint Excel) 임베드 표시. 비로그인 시 로그인 안내 카드 노출 |
+| **홈** | `/` | 로그인 후 팀 주간 일정(SharePoint Excel) 임베드와 **접속 계정별 개인 "내 할 일" 패널**을 나란히 표시. 비로그인 시 로그인 안내 카드 노출 |
 | **MeasSet Generation** | `/measset-generation` | 측정 설정(MeasSet) 파라미터 자동 생성 및 결과 CSV 산출 |
 | **Viewer** | `/viewer` | 데이터베이스 테이블 조회 및 데이터 확인 |
 | **Verification Report** | `/verification-report` | 검증 리포트 생성 및 Tx 매칭 확인 |
@@ -118,6 +118,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\AOP_Web.ps1 -D
 | `AUTH_SECRET_KEY` | 개발용 기본값 | JWT 서명 키. **운영 모드에서 미지정 시 부팅 중단** |
 | `FLASK_SECRET_KEY` | 개발용 기본값 | Flask 세션 서명 키. **운영 모드에서 미지정 시 부팅 중단** |
 | `AUTH_EXPIRE_TIME` | `7200` | 인증 토큰 및 서버 측 자격증명 보관 TTL(초) |
+| `AUTH_ALLOWED_USERS` | (비어 있음) | 쉼표로 구분한 **로그인 허용 계정 목록**(`selxxxxx` 형식, 대소문자 무관). 지정 시 목록에 없는 계정은 자격증명이 맞아도 403 으로 차단되며, **이미 발급된 토큰도 즉시 무효화**됩니다. 비워 두면 기존과 동일하게 DB 계정이 있는 전원 허용 |
 | `ALLOWED_ORIGINS` | (비어 있음) | 쉼표로 구분한 CORS 허용 Origin. 운영 모드에서는 **반드시 명시** |
 | `COOKIE_SECURE` | `false` | 세션 쿠키의 `Secure` 플래그. HTTPS 운영 시 `true` |
 

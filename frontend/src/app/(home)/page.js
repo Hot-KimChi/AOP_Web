@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../../lib/apiBase';
+import TodoPanel from '../../components/TodoPanel';
 
 const WEEKLY_SCHEDULE_URL = 'https://healthineersapc.sharepoint.com/:x:/r/teams/SUSKOUE/Shared%20Documents/AOP/Z_UE_AOP%20weekly/AOP%20weekly%20schedule.xlsx?d=wdfdc89b1439d4600b6af66d46b91b13b&csf=1&web=1&e=2FAyYg';
 const WEEKLY_SCHEDULE_EMBED_URL = 'https://healthineersapc.sharepoint.com/teams/SUSKOUE/_layouts/15/Doc.aspx?sourcedoc=%7Bdfdc89b1-439d-4600-b6af-66d46b91b13b%7D&file=AOP%20weekly%20schedule.xlsx&action=embedview&mobileredirect=true';
@@ -90,19 +91,20 @@ export default function HomePage() {
 
   return (
     <div className="page-wrapper" style={{ padding: '0.5rem', height: 'calc(100vh - 1rem)' }}>
-      <div style={{ width: '100%', height: '100%' }}>
-        <div
-          style={{
-            background: 'var(--surface)',
-            color: 'var(--text)',
-            border: '1px solid var(--border)',
-            borderRadius: '12px',
-            padding: '1rem',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
+      <div className="home-split">
+        <div className="home-split-main">
+          <div
+            style={{
+              background: 'var(--surface)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '1rem',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
           <div
             style={{
               display: 'flex',
@@ -147,7 +149,9 @@ export default function HomePage() {
             }}
             allowFullScreen
           />
+          </div>
         </div>
+        <TodoPanel />
       </div>
     </div>
   );

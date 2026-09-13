@@ -8,6 +8,75 @@
 
 ## 변경 이력 (v0.9.65 — 2026-09-13)
 
+### v0.9.66 — #1. 접속자별 로그인 권한과 사용자별 Todo
+
+**요청**: 서버에 접속한 사람의 `selxxxxx` 를 확인해 로그인 권한을 따로 줄 수 있는가? 혹은 Windows 로그인 권한과 동일한 인증으로 로그인할 수 있는가? MS-SQL 은 Windows 인증으로 접속하니 같은 방식이면 유저별 todo list 출력도 가능할 것 같다.
+
+#### 1) 인프라 실측 (추측 금지)
+
+| 항목 | 실측값 | 확인 방법 |
+|---|---|---|
+| 서버 PC 도메인 가입 | **`DomainJoined : NO`** (Domain = `AAD005`, `PartOfDomain = False`) | `dsregcmd /status`, `Get-CimInstance Win32_ComputerSystem` |
+| Entra ID 조인 | `AzureAdJoined : YES`, `AzureAdPrt : YES` | `dsregcmd /status` |
+| 서버 PC Windows 계정 | `AD005\sel04327` — **selxxxxx 형식이 맞음** | `whoami`, `$env:USERNAME` |
+| IIS | **미설치** | 기능 조회 |
+| MS-SQL Windows 인증 접속 | **성공** (`SUSER_NAME() = AD005\sel04327`, sysadmin=1) | pyodbc `Trusted_Connection=yes` 실접속 |
+| 현재 AOP 의 DB 접속 방식 | **SQL 인증** (`UID`/`PWD`) | `pkg_SQL/database.py:create_connection_string()` |
+| 현재 로그인 사용자명 | `sel02776` 등 — **이미 selxxxxx 그 자체** | 로그인 폼 입력값 = DB 계정명 |
+
+#### 2) 질문별 답
+
+1. **"접속한 사람의 selxxxxx 를 확인할 수 있는가?"** → **이미 확인하고 있다.** 로그인 시 입력하는 DB 계정명이 곧 `selxxxxx` 이고 JWT 에 담겨 매 요청 검증된다. 다만 라우트에서 그 값을 꺼내 쓸 수 없어 사용자별 기능을 만들지 못하던 상태였다.
+2. **"Windows 로그인 권한과 동일한 인증이 가능한가?"** → **현 구성에서는 불가.** 서버가 접속자의 Windows 신원을 *검증*하려면 AD 도메인 가입 + Kerberos(SPN)/NTLM 패스스루가 필요한데 이 서버는 `DomainJoined : NO` 이고 IIS 도 없다.
+3. **"MS-SQL 이 Windows 인증으로 되는데 왜 웹은 안 되는가?"** → **방향이 반대다.** MS-SQL 접속은 서버가 *클라이언트로서* 자기 자격증명을 제시하는 것이고, 웹 SSO 는 서버가 *검증자로서* 남의 자격증명을 판정해야 한다. 또한 DB 접속을 Windows 인증으로 바꾸면 **모든 사용자가 서버 프로세스 계정(sysadmin) 권한으로 DB 에 붙어 사용자별 DB 권한이 사라진다** — 현행 SQL 인증이 더 안전하므로 유지했다.
+   - 실현 경로(이번 범위 밖, IT 승인 필요): ① AD 도메인 가입 + IIS Windows 인증 리버스 프록시, ② Entra ID OIDC 앱 등록(`AzureAdPrt : YES` 라 브라우저는 이미 Entra SSO 상태)
+4. **"유저별 todo list 출력이 가능한가?"** → **가능하며 구현했다.** 식별 기준은 AOP Web 로그인 계정 = `selxxxxx` 로, Windows 계정과 동일한 ID 체계다.
+
+#### 3) 변경 내역
+
+| 파일 | 변경 |
+|---|---|
+| `backend/utils/decorators.py` | `require_auth` 가 JWT 를 디코드해 **`g.current_user`** 에 username 저장(없으면 403). **매 요청 허용목록 검사** 후 미허용 시 403 |
+| `backend/config.py` | `_parse_allowed_users()`, `Config.ALLOWED_USERS`(env `AUTH_ALLOWED_USERS`, 쉼표 구분·소문자 정규화·빈 값이면 무제한), `Config.is_login_allowed()`. `load_config()` 에서 재적용 |
+| `backend/routes/auth.py` | `login()` 이 **자격증명 검증 후** 허용목록 판정 → 403. `auth_status()` 도 허용목록 확인 → `authenticated:false` + 쿠키 만료 |
+| `backend/utils/todo_store.py` *(신규)* | SQLite(`backend/data/user_data.db`) 저장소. 모든 쿼리에 `owner = ?` 강제, owner 소문자 정규화, 제목 200자·사용자당 500건 상한, id 범위 검증 |
+| `backend/routes/todo.py` *(신규)* | `GET/POST /api/todos`, `PATCH/DELETE /api/todos/<id>`. 소유자는 `g.current_user` 만 사용(클라이언트 입력 불신), 타인 항목은 **404** |
+| `backend/app.py` | `todo_bp` 등록 |
+| `frontend/src/components/TodoPanel.js` *(신규)* | 목록·추가·토글·삭제. `credentials: 'include'`, 낙관적 업데이트 + 실패 롤백, `pendingIds` 로 항목별 중복 요청 차단 |
+| `frontend/src/app/(home)/page.js` | 로그인 뷰를 `.home-split` 2단(좌: 주간 일정, 우: 내 할 일)으로 변경. **비로그인 뷰는 미변경** |
+| `frontend/src/globals.css` | `.home-split`, `.todo-*`, `.visually-hidden` 추가. CSS 변수만 사용, 900px 이하 세로 스택 |
+| `.gitignore` | `backend/data/` 추가(사용자 데이터 비커밋) |
+
+#### 4) 설계 결정과 이유
+
+- **Todo 저장을 운영 MS-SQL 이 아닌 서버 로컬 SQLite 로** — 운영 측정 DB 에 앱 테이블을 만들면 DB 권한·백업·스키마 관리에 얽히고 되돌리기 어렵다.
+- **타인 항목은 403 이 아니라 404** — 403 은 "그 id 는 존재한다"를 알려주는 정보 노출이다.
+- **허용목록 판정은 자격증명 검증 *후*** — 먼저 판정하면 비밀번호를 모르는 사람이 계정의 권한 여부를 떠볼 수 있다.
+- **owner 소문자 정규화** — SQL Server 로그인은 대소문자를 구분하지 않으므로, 정규화하지 않으면 `SEL02776` 과 `sel02776` 이 다른 사람이 된다.
+
+#### 5) 검증
+
+| 항목 | 결과 |
+|---|---|
+| 비로그인 `GET /api/todos` | 401 |
+| 사용자 A·B 목록 격리 | OK (서로 보이지 않음) |
+| B 가 A 항목 PATCH / DELETE | 404 / 404 |
+| A 가 자기 항목 PATCH | 200 |
+| `SEL02776` vs `sel02776` | 동일인 처리 |
+| 빈 제목 / 200자 초과 / `done:"yes"` | 400 / 400 / 400 |
+| 허용목록 미설정 / 비허용 / 대소문자 다른 허용 | 200 / 403 / 200 |
+| 브라우저 UI(추가·토글·삭제·새로고침 유지·다크모드) | 정상 |
+| `npm test` / `npm run build` | 15/15 / 성공 |
+
+**GPT 교차 검증 (Blocker 0 / Major 1 · Minor 2 → 전건 수정 후 재실측 통과)**
+
+| 지적 | 내용 | 수정 | 재실측 |
+|---|---|---|---|
+| MAJOR | 허용목록을 `login()` 에서만 검사해, **이미 발급된 JWT 는 목록에서 제외돼도 계속 통과** | `require_auth` 가 매 요청 검사 + `auth_status()` 가 쿠키 만료 | 제외 후 `GET`·`PATCH` **403**, `auth_status` → `authenticated:false` + 쿠키 만료 |
+| MINOR | 64비트 초과 todo id → `OverflowError` → **500** | `_is_valid_id()` 범위 검사 후 없음 처리 | 100자리 id·`2**63` DELETE/PATCH 모두 **404** |
+| MINOR | 같은 항목 연속 토글 시 응답 순서 역전으로 UI 가 서버 상태와 어긋남 | `pendingIds` 로 항목별 중복 요청 차단(입력 `disabled`) | 토글·삭제 진행 중 재클릭 불가 |
+
+---
 ### v0.9.65 — #1. 로그인 실패: API 주소 자동 산출과 실패 원인 분류
 
 **요청**: 로그인에 실패하였다. 원인 및 해결. 단 agent 재작성 명세를 먼저 남기고 진행.
@@ -2766,3 +2835,4 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 📎 **[→ Summary](./AI_Rearch_summary.md)**
 
 ---
+
