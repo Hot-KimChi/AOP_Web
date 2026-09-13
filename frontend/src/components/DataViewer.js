@@ -4,10 +4,11 @@ import { ArrowUpDown, FileSpreadsheet } from 'lucide-react';
 import { MultiSelectDropdown } from '../app/data-view/components/MultiSelectDropdown';
 import { formatNumber, truncateText } from '../app/data-view/utils/dataFormatters';
 import { escapeCSVValue } from '../app/data-view/utils/csvExport';
-
-function normalizeFilterValue(value) {
-  return String(value ?? '').toLowerCase().trim();
-}
+import {
+  buildNormalizedFilterSets,
+  buildCascadedOptions,
+  normalizeFilterValue,
+} from '../app/data-view/utils/filterHelpers';
 
 export default function DataViewer({
   data = [],
@@ -27,38 +28,17 @@ export default function DataViewer({
     [columns, data],
   );
 
-  const normalizedFilterSets = useMemo(() => {
-    const sets = {};
-    Object.entries(filters).forEach(([col, vals]) => {
-      if (!vals || vals.length === 0) return;
-      sets[col] = new Set(vals.map(normalizeFilterValue));
-    });
-    return sets;
-  }, [filters]);
+  const normalizedFilterSets = useMemo(
+    () => buildNormalizedFilterSets(filters),
+    [filters],
+  );
 
   // ── 연쇄 필터 옵션 (cascaded) ─────────────────────────────
   // 각 컬럼에 대해 "해당 컬럼을 제외한 나머지 필터를 적용한 결과"에서 고유값을 추출합니다.
-  const cascadedOptions = useMemo(() => {
-    if (!data.length) return {};
-    const result = {};
-    columnList.forEach(targetCol => {
-      let subset = data;
-      Object.entries(normalizedFilterSets).forEach(([col, valSet]) => {
-        if (col === targetCol || !valSet || valSet.size === 0) return;
-        subset = subset.filter(row => {
-          const v = normalizeFilterValue(row[col]);
-          return valSet.has(v);
-        });
-      });
-      const optionSet = new Set(subset.map(row => String(row[targetCol] ?? '')));
-      // 현재 선택된 값은 목록에서 사라지지 않도록 유지
-      (filters[targetCol] || []).forEach(v => optionSet.add(v));
-      result[targetCol] = [...optionSet].sort((a, b) =>
-        a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }),
-      );
-    });
-    return result;
-  }, [data, filters, columnList, normalizedFilterSets]);
+  const cascadedOptions = useMemo(
+    () => buildCascadedOptions(data, columnList, filters, normalizedFilterSets),
+    [data, filters, columnList, normalizedFilterSets],
+  );
 
   // ── 필터 적용 (컬럼 내 OR, 컬럼 간 AND) ─────────────────
   const filteredData = useMemo(() => {

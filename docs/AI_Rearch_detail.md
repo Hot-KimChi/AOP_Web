@@ -6,6 +6,134 @@
 
 ---
 
+## 변경 이력 (v0.9.63 — 2026-09-13)
+
+### v0.9.63 — #1. 런타임 성능 실측 기반 개선
+
+**요청**: 전체 프로젝트의 속도를 개선하되, 먼저 agent 재작성 명세를 작성한 뒤 진행.
+
+#### 0) 원칙 — 추측 금지
+
+명세에 다음을 못 박고 시작했다.
+
+- 개선 항목마다 **개선 전/후 벤치마크**(동일 입력·동일 기준)
+- 최적화 전후 출력이 같음을 데이터로 대조(**mismatch 0**)
+- 표시 데이터·정렬·필터·편집 결과가 변경 전과 **완전히 동일**할 것
+- 이미 최적인 계층(DB 엔진 전역 캐시 + 풀 + 안전한 `close`, v0.9.60 의 ML 벡터화)은 **재작업 금지**
+
+그 결과 **채택 2건 / 기각 3건**이 나왔다. 기각한 것도 수치와 함께 남긴다.
+
+#### 1) 채택 — 연쇄필터 옵션 계산 (13.52배)
+
+각 컬럼의 드롭다운 옵션은 "자기 자신의 필터만 빼고" 나머지 필터를 적용한 결과에서 뽑는다.
+기존 구현은 **컬럼마다** 전체 행을 다시 훑었다. 컬럼이 40개면 40번 훑는다.
+
+```js
+// Before — 컬럼 수만큼 전체 데이터 재순회 + 매번 localeCompare
+columns.forEach((column) => {
+  const others = activeFilters.filter((f) => f !== column);
+  const subset = data.filter((row) => others.every((f) => match(row, f)));
+  options[column] = [...new Set(subset.map(...))].sort((a, b) => a.localeCompare(b, ...));
+});
+```
+
+활성 필터 컬럼 수를 k 라 하면, 실제로 필요한 부분집합은 **(k+1)개**뿐이다.
+"모든 필터 적용" 1개 + "필터 컬럼 i 만 제외" k 개. 나머지 컬럼은 전부 첫 번째를 공유한다.
+
+```js
+// After — 부분집합 (k+1)개만 만들어 공유, Collator 는 모듈 레벨에서 1회 생성
+const optionCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+export const buildCascadedOptions = (data, columns, filters, normalizedFilterSets) => { ... };
+```
+
+| 조건 | Before | After | 결과 |
+|------|--------|-------|------|
+| 1000행 × 40컬럼, 필터 2개 | 1.78 ms | **0.13 ms** | **13.52배**, mismatch 0 |
+
+같은 로직이 `data-view/hooks/useDataFilter.js` 와 `components/DataViewer.js` 에 **중복 구현**돼 있었다.
+둘 다 `filterHelpers.buildCascadedOptions` 호출로 교체해 구현을 하나로 합쳤다.
+
+#### 2) 채택 — 편집 시 리렌더 범위 (1000행 → 변경된 행만)
+
+셀 하나를 고칠 때마다 `editedData` 와 `validationErrors` 가 **새 객체**로 교체된다.
+이 평면 맵을 모든 행에 그대로 내려주면 `TableBody` 의 메모가 무효화되어
+표 전체(행 × 컬럼)가 타이핑 한 번마다 재조정됐다. 1000행 × 40컬럼이면 4만 셀이다.
+
+편집 항목이 자기 자신의 `rowId`·`columnName` 을 들고 있다는 점을 이용해,
+부모에서 **행별 버킷**으로 나눈 뒤 메모된 `TableRow` 에 그 버킷만 내려준다.
+편집되지 않은 행은 항상 `undefined` 가 전달되므로 참조가 그대로고, 얕은 비교로 렌더를 건너뛴다.
+
+```js
+// After — 비용은 "편집한 셀 수"에 비례하며 행 수와 무관
+const editedByRow = useMemo(() => {
+  const grouped = new Map();
+  Object.values(editedData || {}).forEach((entry) => {
+    if (!entry || entry.rowId === undefined) return;
+    let bucket = grouped.get(entry.rowId);
+    if (!bucket) { bucket = Object.create(null); grouped.set(entry.rowId, bucket); }
+    bucket[entry.columnName] = entry;
+  });
+  return grouped;
+}, [editedData]);
+```
+
+| 조건 (1000행 × 40컬럼, 편집 20셀) | Before | After |
+|---|---|---|
+| 타이핑 1회당 편집 상태 분배 비용 | 3.58 ms | **0.008 ms** (463배) |
+| 타이핑 1회당 다시 그리는 행 수 | 1000 | **20** |
+
+첫 시도는 메모 비교 함수에서 행마다 셀 키를 조합해 비교하는 방식이었으나,
+문자열 연결 4만 회 때문에 **15.5 ms** 가 들어 오히려 비쌌다. 측정했기에 버릴 수 있었다.
+
+함께 `DataTable/index.jsx` 의 `headers` useMemo 가 `displayData` 에 의존해
+편집마다 **내용이 같은 새 배열**을 반환하던 문제도 고쳤다. 이것을 놔두면 위 최적화가 통째로 무효가 된다.
+
+```js
+// After — 컬럼 구성이 같으면 이전 배열 참조를 그대로 반환
+if (prev.length === next.length && prev.every((name, i) => name === next[i])) return prev;
+```
+
+- `validationErrors` 는 값이 메시지 문자열뿐이라 행 정보가 없어, 오류가 있을 때만 행 접두사로 나눈다(대부분의 경우 즉시 빈 Map 반환).
+- 버킷은 `Object.create(null)` 로 만든다. `{}` 를 쓰면 `constructor`·`toString` 같은 이름의 컬럼에서 `Object.prototype` 속성이 잡혀 변경 표시가 오탐된다(교차 검증 지적 수용).
+
+#### 3) 기각 — 측정 결과 이득이 없거나 위험이 큰 것
+
+| 후보 | 측정 결과 | 판단 |
+|------|-----------|------|
+| 전체 배열 딥클론 → 얕은 행 복사 | JSON 딥클론 **5.12 ms** vs 얕은 행 복사 **8.60 ms** | **기각** — 오히려 0.60배로 느려짐 |
+| `content-visibility: auto` 로 화면 밖 행 렌더 생략 | 4만 셀 159.8 ms → **136.2 ms** | **기각** — 1.17배로 미미, 스크롤 시 레이아웃 리스크만 추가 |
+| `get_probes` 의 `SELECT DISTINCT` 푸시다운 | 전송량은 감소하나 MS-SQL DISTINCT 는 **collation** 을 따름 | **되돌림** — 대소문자만 다르거나 뒤에 공백이 붙은 `probeName` 을 병합해, pandas `drop_duplicates` 의 정확일치와 결과가 달라질 수 있음. 수 ms 이득보다 표시 동일성이 우선 |
+| `pool_pre_ping=True` 제거 | 이득 수 ms | **보류** — 끊긴 연결 방치 위험이 더 큼 |
+| DB 연결 계층 재작업 | 요청 단위 연결 캐시 + 엔진 전역 LRU + 풀이 **이미 적용돼 있음** | **재작업 금지** (서브에이전트의 "요청마다 재연결" 지적은 사실이 아님을 코드로 확인) |
+
+#### 4) dev vs prod 구동 모드 — 측정 및 문서화
+
+명세의 "무인 기동 동작을 임의로 바꾸지 않는다"를 지키기 위해, 바꾸지 않고 수치만 남긴다.
+
+| 라우트 | dev (`npm run dev`) | prod (`npm run build && npm start`) |
+|--------|---------------------|--------------------------------------|
+| `/` | 49~51 ms | **8 ms** |
+| `/data-view` | — | **5~13 ms** |
+| `/machine-learning` | 47 ms | **5~12 ms** |
+| `/verification-report` | 60 ms | **5~10 ms** |
+| `/measset-generation` | 46 ms | **6~14 ms** |
+| `/SSR_DocOut` | 72 ms | **7~14 ms** |
+
+- 라우트 응답 기준 **약 7~10배** prod 가 빠르다.
+- 대신 기동할 때마다 `npm run build` **69초**가 추가되어 **시작 속도는 악화**된다.
+- 상시 띄워두고 쓰는 운용이라면 prod 가 유리하고, 껐다 켜는 운용이라면 dev 가 유리하다. 선택지만 제시하고 기본 동작(`AOP_Web.bat` 인자 없는 실행 = development)은 유지했다.
+
+#### 5) 검증
+
+- `npm test` **15/15 통과**
+- `npm run build` 성공 (69초, 14개 라우트 정적 프리렌더)
+- 동등성: 연쇄필터 옵션 40컬럼 전수 대조 **mismatch 0**
+- **GPT 교차 검증 2라운드**
+  - 라운드1: `Major 1`(SQL DISTINCT 의 collation 의존) · `Minor 1`(버킷의 프로토타입 속성 오탐) → 둘 다 수용·수정
+  - 라운드2: **0건**
+
+---
+
 ## 변경 이력 (v0.9.62 — 2026-09-13)
 
 ### v0.9.62 — #1. 작업 등급(Tier) 도입과 지연 예산 규칙 적용

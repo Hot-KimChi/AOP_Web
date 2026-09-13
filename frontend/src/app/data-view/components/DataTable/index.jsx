@@ -2,7 +2,7 @@
  * 데이터 테이블 메인 컴포넌트
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { TableHeader } from './TableHeader';
 import { FilterRow } from './FilterRow';
 import { TableBody } from './TableBody';
@@ -25,12 +25,23 @@ export const DataTable = React.memo(({
 }) => {
   // 필터 결과가 0건이어도 헤더·필터 UI 가 사라지지 않도록
   // 전체 데이터(allData)의 스키마를 우선 사용한다.
+  //
+  // 셀을 한 번 고칠 때마다 displayData 가 새 배열이 되므로, 그대로 두면
+  // 컬럼 구성이 똑같아도 headers 가 매번 새 배열이 되어 하위 행 메모이제이션이
+  // 전부 무효화된다. 내용이 같으면 이전 배열 참조를 그대로 돌려준다.
+  const headersRef = useRef([]);
   const headers = useMemo(() => {
     const schemaSource =
       (allData && allData.length > 0 && allData[0]) ||
       (displayData.length > 0 && displayData[0]) ||
       null;
-    return schemaSource ? Object.keys(schemaSource) : [];
+    const next = schemaSource ? Object.keys(schemaSource) : [];
+    const prev = headersRef.current;
+    if (prev.length === next.length && prev.every((name, i) => name === next[i])) {
+      return prev;
+    }
+    headersRef.current = next;
+    return next;
   }, [allData, displayData]);
 
   return (

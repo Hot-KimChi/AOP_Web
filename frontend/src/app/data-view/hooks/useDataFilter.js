@@ -15,7 +15,7 @@ import { useState, useCallback, useMemo } from 'react';
 import {
   buildNormalizedFilterSets,
   isRowMatchingFilters,
-  normalizeFilterValue
+  buildCascadedOptions
 } from '../utils/filterHelpers';
 
 export const useDataFilter = (csvData, setDisplayData) => {
@@ -47,32 +47,7 @@ export const useDataFilter = (csvData, setDisplayData) => {
   const cascadedOptions = useMemo(() => {
     if (!csvData || csvData.length === 0) return {};
     const columns = Object.keys(csvData[0] || {});
-    const result = {};
-
-    columns.forEach(targetCol => {
-      // targetCol을 제외한 나머지 필터만 적용
-      let data = csvData;
-      Object.entries(normalizedFilterSets).forEach(([col, valSet]) => {
-        if (col === targetCol || !valSet || valSet.size === 0) return;
-        data = data.filter(row => {
-          const v = normalizeFilterValue(row[col]);
-          return valSet.has(v);
-        });
-      });
-
-      // 필터링 결과에서 고유값 추출
-      const optionSet = new Set(data.map(row => String(row[targetCol] ?? '')));
-
-      // 현재 선택된 값은 사라지지 않도록 보장
-      (filters[targetCol] || []).forEach(v => optionSet.add(v));
-
-      // 숫자 인식 정렬
-      result[targetCol] = [...optionSet].sort((a, b) =>
-        a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
-      );
-    });
-
-    return result;
+    return buildCascadedOptions(csvData, columns, filters, normalizedFilterSets);
   }, [csvData, filters, normalizedFilterSets]);
 
   /**

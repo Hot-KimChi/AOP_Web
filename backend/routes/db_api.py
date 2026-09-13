@@ -179,6 +179,11 @@ def get_probes():
             jsonify({"status": "error", "message": "유효하지 않은 테이블 이름입니다"}),
             400,
         )
+    # 참고: 여기서 `SELECT DISTINCT` 로 중복 제거를 SQL 에 밀어 넣으면 전송량은 줄지만,
+    # MS-SQL 의 DISTINCT 는 데이터베이스 collation 을 따르므로 대소문자만 다르거나
+    # 뒤에 공백이 붙은 probeName 을 같은 값으로 합쳐 버릴 수 있다. 아래 pandas
+    # `drop_duplicates` 는 문자열을 정확히 일치시키므로 결과가 달라진다.
+    # 표시 결과의 동일성이 수 ms 의 이득보다 중요하므로 중복 제거는 파이썬에 남긴다.
     query = f"SELECT probeId, probeName FROM [{selected_table}]"
     df = g.current_db.execute_query(query)
     df["probeId"] = df["probeId"].fillna("Empty")
