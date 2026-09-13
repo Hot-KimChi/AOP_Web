@@ -6,6 +6,139 @@
 
 ---
 
+## 변경 이력 (v0.9.60 — 2026-09-12)
+
+### v0.9.60 — #1. 전체 프로젝트 전수 리뷰 및 결함·성능 개선
+
+**요청:**
+- 전체 프로젝트를 리뷰하고 병목현상·에러·성능개선을 전체적으로 진행. "완벽하게 그리고 모든 아이템을 리뷰"
+
+**접근 (v0.9.59 모델 분담 파이프라인 적용):**
+- **Design·Implement** = Claude Opus 최신(메인 직접 수행) / **Verify** = GPT 최신(서브에이전트 위임)
+- 1단계로 4축(백엔드 보안·백엔드 로직/성능·프론트엔드·구성/스크립트) 병렬 서브에이전트가 소스 96개(15,121 LOC)를 전수 분석 → **Blocker 15 / Major 34 / Minor 14** 식별
+- 2단계로 메인이 6개 Phase로 나눠 직접 수정, 각 Phase마다 실행 증거 확보
+
+---
+
+#### Phase 1 — 백엔드 보안
+
+| 항목 | Before | After |
+|------|--------|-------|
+| DB 비밀번호 보관 | `session["password"] = 평문` — Flask 세션 쿠키는 **서명만 될 뿐 암호화되지 않아** base64 디코딩만으로 읽힘 | 신규 `backend/utils/credential_store.py` — 쿠키에는 `secrets.token_urlsafe(32)` 불투명 토큰만, 실제 자격증명은 서버 메모리에 TTL(슬라이딩 갱신) 보관 |
+| CORS | 개발 기본값 `origins="*"` + `supports_credentials=True` — 임의 사이트가 인증 쿠키를 실은 요청 가능(CSRF·데이터 탈취) | `DEV_ORIGIN_PATTERN` 정규식(localhost/사설망 대역, 앵커·이스케이프 적용)으로 제한 |
+| 시크릿 | `AOP_config.cfg` 에 SECRET_KEY 하드코딩 | 파일에서 제거, 환경변수 우선. `Config._validate_production()` 이 운영 모드에서 기본 시크릿 사용 시 **부팅 중단** |
+| 예외 | `str(e)` 를 클라이언트에 그대로 반환(스택·SQL·경로 노출) | 서버 로그에만 상세 기록, 응답은 일반화 메시지 |
+| 엔진 | 요청마다 SQLAlchemy 엔진 신규 생성 | `_ENGINE_CACHE`(LRU 32) + `reuse_engine` / `close()` |
+
+#### Phase 2 — 백엔드 정확성
+
+- `data_preprocessing.py`: **항상 False 로 평가되던 전처리 분기**를 `get_preprocessing_steps()` 로 재작성 → 스케일러·다항식 변환이 실제로 적용됨
+- `machine_learning.py`: sklearn `Pipeline` 구성 — 전처리를 split 이전 전체 데이터에 fit 하던 **데이터 누수** 제거. 일부 모델 실패 시 `partial_success` 반환
+- `training_evaluation.py`: 표본 수가 적을 때 CV fold 수를 적응적으로 축소. `modelSave()` 에 논리명+타임스탬프 부여
+- `create_groupidx.py`: 예외 삼킴 제거 + `pd.isna()` 체크
+- `predictML.py`: `_get_probe_geo()` 캐시, `_align_features()` 로 학습/추론 피처 순서 정렬, 모델 부재 시 명시적 RuntimeError
+- `data_inout.py`: 타임스탬프를 초 단위로(같은 probe 를 1분 내 두 번 생성 시 **결과 파일이 조용히 덮어써지던 문제**), 절대경로화, case 1 경로 버그 수정
+
+#### Phase 3 — 백엔드 성능 (동등성 실측)
+
+원본을 `git show HEAD:<path>` 로 추출해 같은 패키지에 임시 로드한 뒤 신·구 결과를 키별로 대조했다.
+
+| 대상 | Before | After | 결과 |
+|------|--------|-------|------|
+| `Temp_Prr_predict.find_prr_for_temprise_batch()` | 행마다 그리드 평가 + 이분탐색을 각각 단건 추론 | 그리드 1회 + 보간 1회 + **이분탐색 스텝별 1회**(스텝 동기 배치) + mtime 기반 아티팩트 캐시 | 200행 **22.30s → 0.17s (128배)**, mismatch **0** |
+| `param_gen` 전 메서드 | `apply(lambda)` / 행 루프 | numpy·pandas 벡터화 | 4000행 **0.063s → 0.010s (6.1배)**, mismatch **0** |
+| `mlflow_integration` | 요청마다 모델 재로딩, 행 단위 INSERT | 체크섬 기반 `_MODEL_CACHE`(락 보호), `_bulk_insert()` 다중 VALUES(파라미터 2100 제한 내) | 반복 예측 I/O 제거 |
+
+> **중대 발견**: `param_gen.py` 에는 `import numpy` / `import pandas` 가 **아예 없었다**. 기존 코드는 우연히 해당 심볼을 쓰지 않아 통과했으나, 벡터화 시점에 런타임 `NameError` 가 되는 상태였다.
+
+#### Phase 4 — 프론트엔드 정확성
+
+- **행 편집/삭제 데이터 오염(Blocker)**: 편집·삭제 대상을 **화면 인덱스**로 지목하고 있어 정렬·필터가 걸린 상태에서는 전혀 다른 원본 행이 수정·삭제됨
+  - 신규 `data-view/utils/rowIdentity.js` — `ROW_ID` Symbol 기반 안정 식별자(`Object.keys`/`JSON.stringify` 에 노출되지 않아 헤더·저장 값을 오염시키지 않음)
+  - `useDataEdit` / `useRowOperations` / `EditableCell` / `RowActions` 를 rowId 기준으로 전환
+- `useDataManagement`: `activeStorageKeyRef` 로 실제 로드한 키를 기억 → 저장 후 재오픈 시 **수정 이전 데이터가 되살아나던 문제** 해결
+- `useWindowSync`: 미저장 변경이 있을 때 REFRESH_DATA 확인 창
+- `useDataSort` + `DataViewer`: 문자열 비교에 의한 숫자 정렬 오류 수정(`numeric: true`)
+- `DataTable`: 필터 결과가 0행이어도 헤더 스키마가 유지되도록 `allData` prop 추가, `colSpan` 을 `headers.length + 1` 로 수정
+- `csvExport.js`: RFC 4180 `escapeCSVValue()` — 쉼표·따옴표·개행 포함 값이 열을 밀어내던 문제 수정
+- `verification-report`: 순차 fetch → `Promise.all`, 팝업 차단 감지
+
+#### Phase 5 — 프론트엔드 성능·테마·설정
+
+- `auth/layout.js` 에 inline theme script 추가 → 로그인 화면 다크모드 FOUC 제거
+- `globals.css` 에 `--accent-success/-info/-warning`, `--tx-header-bg`, `--tx-legend-*` 토큰을 **light·dark 양쪽**에 정의하고, 하드코딩 색상을 CSS 변수로 치환(`tx-matching-popup` 34곳 포함)
+- `.env.development` 의 고정 사설 IP → `localhost:5000`
+- `backend/requirements.txt` UTF-16LE → UTF-8(BOM 없음)
+- `package.json` 에 `"test": "playwright test"` 추가, 버전 배지 v0.9.60 + E2E 는 정규식 검증으로 완화
+
+---
+
+### 교차 검증(GPT 최신) — 3라운드 iteration
+
+같은 모델의 자기 검증은 구현 시의 추론 오류를 그대로 재현하므로, 계열이 다른 모델에 위임했다.
+
+**라운드 1 — Blocker 1 · Major 3**
+
+| # | 심각도 | 위치 | 내용 | 조치 |
+|---|--------|------|------|------|
+| 1 | BLOCKER | `utils/credential_store.py` `bind_to_session()` | `FLASK_SECRET_KEY` 를 유지한 채 배포하면 **구버전 쿠키의 평문 비밀번호가 그대로 살아남아** 로그인 후에도 계속 왕복. 토큰만 교체하고 `session["password"]` 를 지우지 않았음 | `session.clear()` 후 토큰 저장 + `app.py` 에 `@before_request` 훅으로 레거시 키 상시 제거 |
+| 2 | MAJOR | `pkg_MeasSetGen/data_inout.py` ↔ `routes/db_api.py` | 생성 파일은 **저장소 루트**의 `1_uploads` 로 옮겼는데, `/api/csv-data` 는 `os.getcwd()`(= `backend/`) 하위만 허용. 생성은 성공하는데 조회는 400 | `Config.UPLOADS_ROOT` 단일 기준 루트를 도입해 **쓰는 쪽과 읽는 쪽이 같은 절대 경로**를 공유 |
+| 3 | MAJOR | `hooks/useDataEdit.js` | 편집이 `displayData` 에만 반영되고 `csvData` 는 그대로여서, 필터를 적용/해제하면 `csvData` 로부터 화면이 재계산되며 **편집 이전 값이 되살아나고 CSV 내보내기도 옛 값**을 씀 | 편집·삭제를 canonical `csvData` 에 **즉시 반영**하도록 전환. 삭제 행은 `{rowId, row, index}` 로 보관해 원래 위치로 복원 |
+| 4 | MAJOR | `pkg_MeasSetGen/param_gen.py` | 범위 검증은 추가했으나 `astype(int)` 가 소수 인덱스를 **조용히 버림** → `3.5` 가 인덱스 `3` 의 주파수로 둔갑(원본은 `TypeError` 로 거부했음) | `freq_index % 1 != 0` 을 invalid 마스크에 추가 |
+
+**라운드 2 — Major 2 · Minor 1 (라운드 1 수정이 새로 만든 결함)**
+
+| # | 심각도 | 위치 | 내용 | 조치 |
+|---|--------|------|------|------|
+| 5 | MAJOR | `hooks/useDataEdit.js` | `handleCellChange` 의 의존성이 줄면서 **오래된 `validateCellData` 클로저**를 붙잡게 됨 → 다른 셀을 정상 값으로 고치면 기존 오류가 통째로 지워지고 **잘못된 데이터가 저장 가능**해짐 | `validateCellData` 를 앞에 정의하고 `validationErrors` 의존 제거 + 함수형 업데이트로 전환, `handleCellChange` 의존성에 포함 |
+| 6 | MAJOR | `hooks/useRowOperations.js` | 편집된 행을 삭제하면 그 행의 편집·검증 기록이 **버려지고**, 복원 시에도 되살아나지 않음 → 데이터는 저장 스냅샷과 다른데 "변경 없음"으로 표시되어 저장 버튼이 숨고 창 닫을 때 동기화도 안 됨 | 삭제 항목에 `edits`/`errors` 를 함께 보관하고 복원 시 병합 |
+| 7 | MINOR | `hooks/useRowOperations.js` | 보관한 index 는 각기 **다른 중간 배열** 기준이라, 오름차순 삽입은 원래 순서를 복구하지 못함(`[A,B,C,D]` 에서 B→C 삭제 후 복원하면 `A,C,B,D`) | 삭제의 **역순**으로 splice |
+
+**라운드 3 — Blocker 0 · Major 0 · Minor 0 → 완료 조건 충족**
+
+**재현 검증 결과**
+
+```
+[PASS] legacy password purged -> ['cred_token', 'username']
+[PASS] generated path inside uploads root -> D:\GitHub\AOP_Web\1_uploads\...
+[PASS] path traversal still blocked -> D:\GitHub\AOP_Web\backend\config.py
+[PASS] fractional freq index rejected -> ValueError
+[PASS] integer freq index ok -> [1333300, 1000000]
+
+[PASS] edit visible immediately -> 50
+[PASS] edit survives filter re-apply -> 50
+[PASS] export source has edited value -> 50
+[PASS] deleted row stays deleted after filter clear -> true
+[PASS] restore puts row back at original index -> 50,80,70
+
+[PASS] error recorded on invalid cell -> 1
+[PASS] other cell edit does not erase existing error -> ["r1-voltage"]
+[PASS] restored row keeps edited value -> 50
+[PASS] dirty state preserved after restore -> true
+[PASS] multi-delete restore keeps original order -> A,B,C,D
+```
+
+`npm run build` ✓ Compiled successfully (14개 라우트 전부 생성), `create_app()` import ✓
+
+---
+
+### 의도적으로 보류한 항목 (사유 기록)
+
+| 항목 | 보류 사유 |
+|------|-----------|
+| `training_evaluation` / `model_selection` 의 `n_jobs=-1` 중첩 | CPU 과구독이지만, 튜닝 값 변경이 학습 시간·결과 재현성에 미치는 영향이 커 실측 없이 건드리지 않음 |
+| `fetch_selectFeature` 의 `LIKE '%Beamstyle%'`, `ORDER BY 1` | 학습 데이터의 **행 순서 재현성**에 영향 가능. 모델 재학습 검증 없이 변경 불가 |
+| Tailwind 클래스 잔재(`bg-red-100` 등) | `tailwindcss` 의존성이 없어 무시되는 클래스지만 주 프레임워크가 Bootstrap이고 대부분 장식용. 전면 정리는 회귀 위험 대비 이득이 낮음 |
+| `frontend/package.json` 의 미사용 `process`/`typescript`/`@types/*` | 제거 시 재설치·재빌드 비용 대비 이득이 낮음 |
+| 10°C 정책의 역탐색 미적용, GroupIndex 원자적 예약 | 도메인 의사결정이 필요한 사안 |
+
+**검증:**
+- 백엔드: `create_app()` import, 전처리 분기 동작(`['poly','scaler']` / `[]`), 성능 리팩터 신·구 결과 대조(mismatch 0), 보안 수정 재현 테스트 5건
+- 프론트엔드: `npm run build` 통과(14개 라우트), 데이터뷰 편집·삭제·복원 시나리오 재현 5건
+- 교차 검증: GPT 최신 모델 3라운드 iteration(Blocker 1·Major 3 → Major 2·Minor 1 → **0건**), 완료 조건 `Blocker 0 AND Major 0` 충족
+
+---
+
 ## 변경 이력 (v0.9.59 — 2026-09-12)
 
 ### v0.9.59 — #1. 스텝별 모델 분담 파이프라인 도입
