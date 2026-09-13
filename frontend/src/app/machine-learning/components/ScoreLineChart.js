@@ -13,6 +13,7 @@
 'use client';
 
 import { Line } from 'react-chartjs-2';
+import { TrendingUp, Lightbulb } from 'lucide-react';
 
 // ── ScoreLineChart ────────────────────────────────────────────
 export default function ScoreLineChart({ versionsData, versionsLoading, chartData, chartOptions }) {
@@ -23,7 +24,7 @@ export default function ScoreLineChart({ versionsData, versionsLoading, chartDat
       {/* 카드 헤더 */}
       <div className="card-header">
         <div className="card-title-row">
-          <span style={{ fontSize: '0.875rem' }}>📈</span>
+          <TrendingUp size={16} className="card-title-icon" />
           <h6>Model Test Score (R²) Trend</h6>
         </div>
       </div>
@@ -46,7 +47,7 @@ export default function ScoreLineChart({ versionsData, versionsLoading, chartDat
       {/* 카드 푸터 */}
       <div className="card-footer py-2" style={{ minHeight: '52px' }}>
         <p className="mb-0 small text-muted" style={{ fontSize: '0.775rem' }}>
-          💡 <strong>Click</strong> a point to show that version alone &nbsp;|&nbsp;
+          <Lightbulb size={13} style={{ verticalAlign: '-2px', marginRight: '4px', color: 'var(--text-muted)' }} /><strong>Click</strong> a point to show that version alone &nbsp;|&nbsp;
           <strong>Ctrl+Click</strong> to add/remove from scatter plot
         </p>
       </div>

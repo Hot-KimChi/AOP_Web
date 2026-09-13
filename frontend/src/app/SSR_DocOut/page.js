@@ -103,7 +103,7 @@ export default function SSR_DocOut() {
           <div className="card-header">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div className="card-title-row">
-                <FileText size={16} color="var(--brand)" />
+                <FileText size={16} color="var(--brand-text)" />
                 <h5>SSR DocOut</h5>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '400' }}>meas_station_setup</span>
               </div>
@@ -121,14 +121,7 @@ export default function SSR_DocOut() {
                 <button
                   onClick={handleExportWord}
                   disabled={!selectedDatabase || selectedRowIdxs.length === 0}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.375rem',
-                    padding: '0.375rem 0.875rem', borderRadius: '6px',
-                    background: selectedDatabase && selectedRowIdxs.length > 0 ? 'var(--status-success-text)' : 'var(--border)',
-                    color: 'white', border: 'none', fontWeight: '500', fontSize: '0.8125rem',
-                    cursor: selectedDatabase && selectedRowIdxs.length > 0 ? 'pointer' : 'not-allowed',
-                    whiteSpace: 'nowrap',
-                  }}
+                  className="btn-app btn-app-primary btn-app-sm"
                 >
                   <Download size={13} />
                   Export Word{selectedRowIdxs.length > 0 ? ` (${selectedRowIdxs.length})` : ''}

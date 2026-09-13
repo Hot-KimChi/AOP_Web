@@ -72,7 +72,7 @@ export default function Viewer() {
           {/* Header */}
           <div className="card-header">
             <div className="card-title-row">
-              <Database size={16} color="var(--brand)" />
+              <Database size={16} color="var(--brand-text)" />
               <h5>Database Viewer</h5>
             </div>
           </div>
@@ -109,10 +109,9 @@ export default function Viewer() {
 
               <div className="col-md-2">
                 <button
-                  className="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2"
+                  className="btn-app btn-app-primary btn-app-block"
                   onClick={handleViewData}
                   disabled={!selectedDatabase || !selectedTable}
-                  style={{ background: 'var(--brand)', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                 >
                   <Eye size={14} />
                   View

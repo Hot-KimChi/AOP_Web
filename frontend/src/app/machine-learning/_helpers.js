@@ -132,7 +132,8 @@ export function buildScatterChartData(scatterData, isDark = false) {
   // 모델별 scatter dataset
   const datasets = scatterData.map((model, idx) => {
     const color     = MODEL_COLORS[idx % MODEL_COLORS.length];
-    const stageMark = model.stage === 'Production' ? ' ⭐' : '';
+    // Chart.js 범례는 문자열만 받으므로 아이콘 대신 텍스트로 표기한다.
+    const stageMark = model.stage === 'Production' ? ' (Production)' : '';
 
     return {
       label:           `${model.model_name.replace('_AOP_Intensity', '')} v${model.version_number}${stageMark}`,

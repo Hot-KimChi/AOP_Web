@@ -79,15 +79,7 @@ export default function HomePage() {
           </p>
           <button
             onClick={handleLogin}
-            style={{
-              width: '100%',
-              border: '1px solid var(--brand)',
-              background: 'var(--brand)',
-              color: 'white',
-              borderRadius: '8px',
-              padding: '0.55rem 0.75rem',
-              fontWeight: '600',
-            }}
+            className="btn-app btn-app-primary btn-app-block"
           >
             로그인
           </button>

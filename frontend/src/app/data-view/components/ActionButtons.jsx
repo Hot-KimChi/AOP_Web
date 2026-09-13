@@ -17,8 +17,8 @@ export const ActionButtons = React.memo(({
   onClose
 }) => {
   return (
-    <div className="flex gap-2">
-      <div className="form-check">
+    <div className="action-bar">
+      <div className="form-check mb-0 me-2">
         <input
           type="checkbox"
           id="showChanges"
@@ -32,34 +32,34 @@ export const ActionButtons = React.memo(({
       {hasChanges && (
         <>
           <button
-            className="btn btn-success"
+            className="btn-app btn-app-primary"
             onClick={onSave}
             disabled={hasErrors}
           >
-            <Save size={16} className="mr-1" />
+            <Save size={15} />
             변경사항 저장
           </button>
           <button
-            className="btn btn-secondary"
+            className="btn-app btn-app-secondary"
             onClick={onRevert}
           >
-            <X size={16} className="mr-1" />
+            <X size={15} />
             변경취소
           </button>
         </>
       )}
 
       <button
-        className="btn btn-primary"
+        className="btn-app btn-app-secondary"
         onClick={onDownload}
         disabled={!hasData}
       >
-        <FileSpreadsheet size={16} className="mr-1" />
+        <FileSpreadsheet size={15} />
         CSV 다운로드
       </button>
 
       <button
-        className="btn btn-secondary"
+        className="btn-app btn-app-ghost action-bar-end"
         onClick={onClose}
       >
         창 닫기

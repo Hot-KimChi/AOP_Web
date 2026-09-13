@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Thermometer, Scale, Droplet, HelpCircle, Network, X } from 'lucide-react';
 
 /**
  * GroupIndex별 데이터 관계도(Temperature / Power / Intensity)를 보여주는 모달.
@@ -106,11 +107,11 @@ export default function DataPreviewModal({ isOpen, onClose, data }) {
 
   // 타입별 표시 설정
   const typeConfig = {
-    temperature:    { icon: '🌡️', label: 'Temperature',    cls: 'dp-type-temp' },
-    temperature_sa: { icon: '🌡️', label: 'Temperature SA', cls: 'dp-type-tempsa' },
-    power:          { icon: '⚖️',  label: 'Power',          cls: 'dp-type-power' },
-    intensity:      { icon: '💧', label: 'Intensity',      cls: 'dp-type-intensity' },
-    unknown:        { icon: '❓', label: 'Unknown',        cls: 'dp-type-unknown' },
+    temperature:    { Icon: Thermometer, label: 'Temperature',    cls: 'dp-type-temp' },
+    temperature_sa: { Icon: Thermometer, label: 'Temperature SA', cls: 'dp-type-tempsa' },
+    power:          { Icon: Scale,       label: 'Power',          cls: 'dp-type-power' },
+    intensity:      { Icon: Droplet,     label: 'Intensity',      cls: 'dp-type-intensity' },
+    unknown:        { Icon: HelpCircle,  label: 'Unknown',        cls: 'dp-type-unknown' },
   };
 
   const renderMiniTable = (rows, type) => {
@@ -120,7 +121,7 @@ export default function DataPreviewModal({ isOpen, onClose, data }) {
     return (
       <div className={`dp-type-section ${cfg.cls}`} key={type}>
         <div className="dp-type-header">
-          {cfg.icon} {cfg.label}
+          <cfg.Icon size={13} className="dp-type-icon" />{cfg.label}
           <span className="dp-type-count">{rows.length}</span>
         </div>
         <div className="dp-table-wrap">
@@ -158,22 +159,22 @@ export default function DataPreviewModal({ isOpen, onClose, data }) {
       <div className="dp-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="dp-header">
-          <h5 className="dp-title">📊 Data Preview — 데이터 관계도</h5>
-          <button className="dp-close-btn" onClick={onClose} aria-label="닫기">✕</button>
+          <h5 className="dp-title"><Network size={16} className="card-title-icon" />Data Preview — 데이터 관계도</h5>
+          <button className="dp-close-btn" onClick={onClose} aria-label="닫기"><X size={16} /></button>
         </div>
 
         {/* Summary Bar */}
         <div className="dp-summary">
           <span className="dp-summary-chip">전체 <strong>{summary.totalRows}</strong> rows</span>
           <span className="dp-summary-chip">그룹 <strong>{summary.totalGroups}</strong></span>
-          <span className="dp-summary-chip dp-chip-intensity">💧 Intensity <strong>{summary.intensity}</strong></span>
-          <span className="dp-summary-chip dp-chip-power">⚖️ Power <strong>{summary.power}</strong></span>
-          <span className="dp-summary-chip dp-chip-temp">🌡️ Temp <strong>{summary.temperature}</strong></span>
+          <span className="dp-summary-chip dp-chip-intensity"><Droplet size={12} /> Intensity <strong>{summary.intensity}</strong></span>
+          <span className="dp-summary-chip dp-chip-power"><Scale size={12} /> Power <strong>{summary.power}</strong></span>
+          <span className="dp-summary-chip dp-chip-temp"><Thermometer size={12} /> Temp <strong>{summary.temperature}</strong></span>
           {summary.temperature_sa > 0 && (
-            <span className="dp-summary-chip dp-chip-tempsa">🌡️ SA <strong>{summary.temperature_sa}</strong></span>
+            <span className="dp-summary-chip dp-chip-tempsa"><Thermometer size={12} /> SA <strong>{summary.temperature_sa}</strong></span>
           )}
           {summary.unknown > 0 && (
-            <span className="dp-summary-chip dp-chip-unknown">❓ Unknown <strong>{summary.unknown}</strong></span>
+            <span className="dp-summary-chip dp-chip-unknown"><HelpCircle size={12} /> Unknown <strong>{summary.unknown}</strong></span>
           )}
           <button className="dp-toggle-all-btn" onClick={handleToggleAll}>
             {expandAll ? '▲ 모두 접기' : '▼ 모두 펼치기'}
@@ -220,11 +221,11 @@ export default function DataPreviewModal({ isOpen, onClose, data }) {
                     );
                   })()}
                   <span className="dp-group-badges">
-                    <span className={`dp-badge dp-badge-temp${g.temperature.length === 0 ? ' dp-badge-empty' : ''}`}>🌡️ {g.temperature.length}</span>
-                    <span className={`dp-badge dp-badge-tempsa${g.temperature_sa.length === 0 ? ' dp-badge-empty' : ''}`}>🌡️SA {g.temperature_sa.length}</span>
-                    <span className={`dp-badge dp-badge-power${g.power.length === 0 ? ' dp-badge-empty' : ''}`}>⚖️ {g.power.length}</span>
-                    <span className={`dp-badge dp-badge-intensity${g.intensity.length === 0 ? ' dp-badge-empty' : ''}`}>💧 {g.intensity.length}</span>
-                    {g.unknown.length > 0 && <span className="dp-badge dp-badge-unknown">❓ {g.unknown.length}</span>}
+                    <span className={`dp-badge dp-badge-temp${g.temperature.length === 0 ? ' dp-badge-empty' : ''}`}><Thermometer size={11} /> {g.temperature.length}</span>
+                    <span className={`dp-badge dp-badge-tempsa${g.temperature_sa.length === 0 ? ' dp-badge-empty' : ''}`}><Thermometer size={11} /> SA {g.temperature_sa.length}</span>
+                    <span className={`dp-badge dp-badge-power${g.power.length === 0 ? ' dp-badge-empty' : ''}`}><Scale size={11} /> {g.power.length}</span>
+                    <span className={`dp-badge dp-badge-intensity${g.intensity.length === 0 ? ' dp-badge-empty' : ''}`}><Droplet size={11} /> {g.intensity.length}</span>
+                    {g.unknown.length > 0 && <span className="dp-badge dp-badge-unknown"><HelpCircle size={11} /> {g.unknown.length}</span>}
                   </span>
                   <span className="dp-group-total">{total} rows</span>
                 </div>

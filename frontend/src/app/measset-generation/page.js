@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { Play, ExternalLink, Database, Table2, RotateCw, Settings2 } from 'lucide-react';
 import DataPreviewModal from '../../components/DataPreviewModal';
 
 export default function MeasSetGen() {
@@ -726,7 +727,7 @@ export default function MeasSetGen() {
         {/* Header */}
         <div className="card-header">
           <div className="card-title-row">
-            <span style={{ fontSize: '1rem' }}>⚙️</span>
+            <Settings2 size={16} className="card-title-icon" />
             <h5>MeasSet Generation</h5>
           </div>
         </div>
@@ -792,84 +793,72 @@ export default function MeasSetGen() {
               />
             </div>
 
-            {/* Generate & View */}
-            <div className="col-md-3">
-              <button
-                className="btn w-100"
-                style={{ background: 'var(--brand)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
-                onClick={() => { handleFileUpload().then((parsedData) => { if (parsedData) openDataInNewWindow(parsedData); }); }}
-                disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
-              >
-                {isLoading ? 'Processing…' : '⚡ Generate & View CSV'}
-              </button>
-            </div>
-
-            {/* Open in new window */}
-            <div className="col-md-3">
-              <button
-                className="btn w-100"
-                style={{ background: 'var(--accent-success)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
-                onClick={() => openDataInNewWindow()}
-                disabled={!filterCsvData || filterCsvData.length === 0}
-              >
-                {isLoading ? 'Processing…' : '🔍 Open Data in New Window'}
-              </button>
-            </div>
-
-            {/* Save to SQL */}
-            <div className="col-md-3">
-              <button
-                className="btn w-100"
-                style={{ background: 'var(--accent-info)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
-                onClick={parseDatabase}
-                disabled={!selectedDatabase || !selectedProbe || (!fullCsvData && !file) || isLoading}
-              >
-                {isLoading ? 'Processing…' : '💾 Save to SQL Database'}
-              </button>
-            </div>
-
-            {/* Data Preview */}
-            <div className="col-md-3">
-              <button
-                className="btn w-100"
-                style={{ background: 'var(--accent-warning)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
-                onClick={() => {
-                  // 팝업 창이 열려 있으면 최신 데이터 동기화
-                  if (dataWindowReference && !dataWindowReference.closed) {
-                    try {
-                      dataWindowReference.postMessage({ type: 'REQUEST_LATEST_DATA' }, '*');
-                    } catch (err) {
-                      console.error('팝업 데이터 동기화 오류:', err);
-                    }
-                  }
-                  // 세션 스토리지에서 최신 전체 데이터 로드
-                  const stored = sessionStorage.getItem('fullCsvData');
-                  if (stored) {
-                    try {
-                      const parsed = JSON.parse(stored);
-                      setFullCsvData(parsed);
-                    } catch (e) { /* 파싱 실패 시 현재 state 사용 */ }
-                  }
-                  setShowPreviewModal(true);
-                }}
-                disabled={!fullCsvData || fullCsvData.length === 0}
-              >
-                📊 Data Preview
-              </button>
-            </div>
-
-            {/* Refresh data */}
-            {dataModified && (
-              <div className="col-md-12">
+            {/* 실행 버튼은 한 줄로 묶는다. 주 액션만 채움(primary)이고
+                나머지는 테두리(secondary)로 위계를 준다. */}
+            <div className="col-12">
+              <div className="action-bar">
                 <button
-                  className="btn btn-sm"
-                  style={{ background: 'transparent', border: '1px solid var(--brand)', color: 'var(--brand)', borderRadius: '6px', fontWeight: '500', fontSize: '0.8125rem' }}
-                  onClick={refreshData}
+                  className="btn-app btn-app-primary"
+                  onClick={() => { handleFileUpload().then((parsedData) => { if (parsedData) openDataInNewWindow(parsedData); }); }}
+                  disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
                 >
-                  ↻ Refresh Data
+                  <Play size={15} />
+                  {isLoading ? 'Processing…' : 'Generate & View CSV'}
                 </button>
+
+                <button
+                  className="btn-app btn-app-secondary"
+                  onClick={() => openDataInNewWindow()}
+                  disabled={!filterCsvData || filterCsvData.length === 0}
+                >
+                  <ExternalLink size={15} />
+                  Open Data in New Window
+                </button>
+
+                <button
+                  className="btn-app btn-app-secondary"
+                  onClick={parseDatabase}
+                  disabled={!selectedDatabase || !selectedProbe || (!fullCsvData && !file) || isLoading}
+                >
+                  <Database size={15} />
+                  Save to SQL Database
+                </button>
+
+                <button
+                  className="btn-app btn-app-secondary"
+                  onClick={() => {
+                    // 팝업 창이 열려 있으면 최신 데이터 동기화
+                    if (dataWindowReference && !dataWindowReference.closed) {
+                      try {
+                        dataWindowReference.postMessage({ type: 'REQUEST_LATEST_DATA' }, '*');
+                      } catch (err) {
+                        console.error('팝업 데이터 동기화 오류:', err);
+                      }
+                    }
+                    // 세션 스토리지에서 최신 전체 데이터 로드
+                    const stored = sessionStorage.getItem('fullCsvData');
+                    if (stored) {
+                      try {
+                        const parsed = JSON.parse(stored);
+                        setFullCsvData(parsed);
+                      } catch (e) { /* 파싱 실패 시 현재 state 사용 */ }
+                    }
+                    setShowPreviewModal(true);
+                  }}
+                  disabled={!fullCsvData || fullCsvData.length === 0}
+                >
+                  <Table2 size={15} />
+                  Data Preview
+                </button>
+
+                {dataModified && (
+                  <button className="btn-app btn-app-ghost btn-app-sm" onClick={refreshData}>
+                    <RotateCw size={14} />
+                    Refresh Data
+                  </button>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           {renderModifiedMessage()}

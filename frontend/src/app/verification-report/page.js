@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { FileInput, ClipboardList, Upload, Table2 } from 'lucide-react';
 import Layout from '../../components/Layout';
 
 export default function VerificationReport() {
@@ -583,7 +584,7 @@ export default function VerificationReport() {
         <div className="card mb-3">
           <div className="card-header">
             <div className="card-title-row">
-              <span style={{ fontSize: '1rem' }}>📑</span>
+              <FileInput size={16} className="card-title-icon" />
               <h5>Tx Summary Input</h5>
             </div>
           </div>
@@ -662,14 +663,16 @@ export default function VerificationReport() {
                 />
               </div>
               <div className="col-md-12">
-                <button
-                  className="btn w-100"
-                  style={{ background: 'var(--brand)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
-                  onClick={uploadTxSummary}
-                  disabled={!txDatabase || !txProbe || !txSoftwareVersion || !txFile || txLoading || !txValidationOk}
-                >
-                  {txLoading ? 'Processing…' : '📥 Upload TX Summary to DB'}
-                </button>
+                <div className="action-bar">
+                  <button
+                    className="btn-app btn-app-primary"
+                    onClick={uploadTxSummary}
+                    disabled={!txDatabase || !txProbe || !txSoftwareVersion || !txFile || txLoading || !txValidationOk}
+                  >
+                    <Upload size={15} />
+                    {txLoading ? 'Processing…' : 'Upload TX Summary to DB'}
+                  </button>
+                </div>
               </div>
               {txValidationMessage && (
                 <div className={`col-md-12 alert ${txValidationOk ? 'alert-success' : 'alert-warning'}`} style={{ marginBottom: 0 }}>
@@ -684,7 +687,7 @@ export default function VerificationReport() {
         <div className="card mb-3">
           <div className="card-header">
             <div className="card-title-row">
-              <span style={{ fontSize: '1rem' }}>📋</span>
+              <ClipboardList size={16} className="card-title-icon" />
               <h5>Verification Report</h5>
             </div>
           </div>
@@ -790,14 +793,16 @@ export default function VerificationReport() {
                 />
               </div>
               <div className="col-md-12">
-                <button
-                  className="btn w-100"
-                  style={{ background: 'var(--accent-success)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
-                  onClick={extractReportData}
-                  disabled={!reportDatabase || !reportProbe || !reportWcsSoftware || !reportSoftwareVersion || reportLoading}
-                >
-                  {reportLoading ? 'Processing…' : '📊 Extract Report Table'}
-                </button>
+                <div className="action-bar">
+                  <button
+                    className="btn-app btn-app-primary"
+                    onClick={extractReportData}
+                    disabled={!reportDatabase || !reportProbe || !reportWcsSoftware || !reportSoftwareVersion || reportLoading}
+                  >
+                    <Table2 size={15} />
+                    {reportLoading ? 'Processing…' : 'Extract Report Table'}
+                  </button>
+                </div>
               </div>
               {reportError && <div className="col-md-12 alert alert-danger" style={{ marginBottom: 0 }}>{reportError}</div>}
             </div>
@@ -809,7 +814,7 @@ export default function VerificationReport() {
             <div className="card-header">
               <div className="card-title-row">
                 <h5>Summary Table Preview</h5>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>showing first 5 rows</span>
+                <span className="card-title-sub">showing first 5 rows</span>
               </div>
             </div>
             <div className="card-body" style={{ padding: '1rem 1.25rem' }}>
@@ -838,7 +843,7 @@ export default function VerificationReport() {
             <div className="card-header">
               <div className="card-title-row">
                 <h5>Report Data Preview</h5>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>showing first 5 rows</span>
+                <span className="card-title-sub">showing first 5 rows</span>
               </div>
             </div>
             <div className="card-body" style={{ padding: '1rem 1.25rem' }}>

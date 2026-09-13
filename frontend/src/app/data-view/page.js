@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, Suspense, useCallback } from 'react';
+import { Table2 } from 'lucide-react';
 import { downloadCSV as downloadCSVFile } from './utils/csvExport';
 import { MESSAGES } from './constants/messages';
 
@@ -146,18 +147,20 @@ function DataViewContent() {
   const hasData = displayData && displayData.length > 0;
 
   return (
-    <div className="min-vh-100 p-4 bg-light">
+    <div className="min-vh-100 p-4" style={{ background: 'var(--bg)' }}>
       <div className="container-fluid">
-        <div className="bg-white rounded-4 shadow-lg border">
+        <div className="rounded-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)' }}>
           {/* Header */}
-          <div className="px-4 py-3 bg-white border-bottom">
-            <h4 className="text-dark fw-semibold mb-0">
-              📊 CSV 데이터 표시 <span className="text-muted fs-6 ms-2">(measSetComments, maxTxVoltageVolt, ceilTxVoltageVolt, numTxCycles 수정 가능)</span>
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
+            <h4 className="fw-semibold mb-0 d-flex align-items-center gap-2" style={{ color: 'var(--text)', fontSize: '1.0625rem' }}>
+              <Table2 size={18} className="card-title-icon" />
+              CSV 데이터 표시
+              <span className="card-title-sub">(measSetComments, maxTxVoltageVolt, ceilTxVoltageVolt, numTxCycles 수정 가능)</span>
             </h4>
           </div>
 
           {/* Action Bar */}
-          <div className="px-4 py-3 bg-light border-bottom">
+          <div className="px-4 py-3" style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
             <ActionButtons
               showChanges={showChanges}
               onToggleChanges={() => setShowChanges(!showChanges)}

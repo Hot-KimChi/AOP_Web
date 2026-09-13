@@ -16,6 +16,8 @@
 
 'use client';
 
+import { Cpu, AlertTriangle, CheckCircle2, Check } from 'lucide-react';
+
 // ── ModelTrainingCard ─────────────────────────────────────────
 export default function ModelTrainingCard({
   models,
@@ -35,7 +37,7 @@ export default function ModelTrainingCard({
       {/* 카드 헤더 */}
       <div className="card-header">
         <div className="card-title-row">
-          <span style={{ fontSize: '0.875rem' }}>🤖</span>
+          <Cpu size={16} className="card-title-icon" />
           <h6>Model Training</h6>
         </div>
       </div>
@@ -58,27 +60,21 @@ export default function ModelTrainingCard({
           </select>
         </div>
 
-        {/* Training 버튼 */}
-        <div className="d-grid">
-          <button
-            type="button"
-            className="btn btn-lg"
-            onClick={onTrain}
-            disabled={!selectedModel || loading || trainingLoading}
-            style={{
-              background: !selectedModel || loading || trainingLoading ? 'var(--brand-light)' : 'var(--brand)',
-              color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600',
-              transition: 'background 0.15s',
-            }}
-          >
-            {trainingLoading ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
-                Training…
-              </>
-            ) : 'Start Training'}
-          </button>
-        </div>
+        {/* Training 버튼 — 비활성일 때 배경색을 흐리게 바꾸면 흰 글씨가 읽히지
+            않으므로, 색 대신 투명도로만 비활성을 표현한다. */}
+        <button
+          type="button"
+          className="btn-app btn-app-primary btn-app-block"
+          onClick={onTrain}
+          disabled={!selectedModel || loading || trainingLoading}
+        >
+          {trainingLoading ? (
+            <>
+              <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+              Training…
+            </>
+          ) : 'Start Training'}
+        </button>
 
         {/* 상태 메시지 — 로딩 / 에러 / 완료 / 선택 확인 순서로 표시 */}
         <StatusMessages
@@ -113,7 +109,7 @@ function StatusMessages({ loading, error, trainingResult, selectedModel }) {
     return (
       <div className="mt-3 p-3 rounded" style={{ background: 'var(--status-error-bg)', border: '1px solid var(--status-error-border)' }}>
         <div className="d-flex align-items-center gap-2">
-          <span style={{ color: 'var(--status-error-text)', fontSize: '1rem' }}>⚠️</span>
+          <AlertTriangle size={16} style={{ color: 'var(--status-error-text)', flexShrink: 0 }} />
           <span style={{ color: 'var(--status-error-text)', fontSize: '0.8125rem' }}>{error}</span>
         </div>
       </div>
@@ -124,7 +120,7 @@ function StatusMessages({ loading, error, trainingResult, selectedModel }) {
     return (
       <div className="mt-3 p-3 rounded" style={{ background: 'var(--status-success-bg)', border: '1px solid var(--status-success-border)' }}>
         <div className="d-flex align-items-center gap-2">
-          <span style={{ fontSize: '1rem' }}>✅</span>
+          <CheckCircle2 size={16} style={{ color: 'var(--status-success-text)', flexShrink: 0 }} />
           <span style={{ color: 'var(--status-success-text)', fontSize: '0.8125rem', fontWeight: '600' }}>{trainingResult}</span>
         </div>
       </div>
@@ -134,7 +130,9 @@ function StatusMessages({ loading, error, trainingResult, selectedModel }) {
   if (selectedModel) {
     return (
       <div className="mt-3 p-3 rounded" style={{ background: 'var(--brand-light)', border: '1px solid var(--border-focus)' }}>
-        <p style={{ margin: '0 0 4px', fontSize: '0.75rem', fontWeight: '600', color: 'var(--brand)' }}>✓ Selected model</p>
+        <p style={{ margin: '0 0 4px', fontSize: '0.75rem', fontWeight: '600', color: 'var(--brand-text)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Check size={13} /> Selected model
+        </p>
         <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text)' }}>{selectedModel}</p>
       </div>
     );

@@ -160,7 +160,7 @@ export const TableBody = React.memo(({
     return (
       <tbody>
         <tr>
-          <td colSpan={colCount} className="text-center py-3 text-gray-500">
+          <td colSpan={colCount} className="text-center py-3" style={{ color: 'var(--text-muted)' }}>
             {MESSAGES.INFO_NO_MATCHING_DATA}
           </td>
         </tr>

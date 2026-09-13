@@ -148,16 +148,16 @@ export default function DataViewer({
   // ── 렌더 ─────────────────────────────────────────────────
   return (
     <div className="table-container" style={style}>
-      <div className="flex justify-between items-center mb-3">
+      <div className="d-flex justify-content-between align-items-center mb-3">
         <h4 className="mb-0">{title}</h4>
         {showExport && (
-          <button className="btn btn-primary" onClick={exportToExcel}>
+          <button className="btn-app btn-app-secondary btn-app-sm" onClick={exportToExcel}>
             <FileSpreadsheet size={13} /> Export Excel
           </button>
         )}
       </div>
 
-      <table className="w-full border-collapse" style={{ minWidth: `${minWidth}px` }}>
+      <table className="border-collapse" style={{ width: '100%', minWidth: `${minWidth}px` }}>
         <thead>
           {/* 헤더 행 */}
           <tr className="sticky-header">
@@ -171,14 +171,13 @@ export default function DataViewer({
                     {truncateText(header)}
                   </span>
                   <button
-                    style={{ padding: '1px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    className="hover:bg-gray-200 rounded transition-colors"
+                    style={{ padding: '1px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderRadius: '4px' }}
                     onClick={() => handleSort(header)}
                     title={`Sort ${sortConfig.key === header && sortConfig.direction === 'asc' ? 'Descending' : 'Ascending'}`}
                   >
                     <ArrowUpDown
                       size={9}
-                      className={sortConfig.key === header ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'}
+                      color={sortConfig.key === header ? 'var(--brand-text)' : 'var(--text-muted)'}
                     />
                   </button>
                 </div>
@@ -220,7 +219,7 @@ export default function DataViewer({
             ))
           ) : (
             <tr>
-              <td colSpan={columnList.length} className="text-center py-3 text-gray-500">
+              <td colSpan={columnList.length} className="text-center py-3" style={{ color: 'var(--text-muted)' }}>
                 No data to display. Please adjust your filters.
               </td>
             </tr>

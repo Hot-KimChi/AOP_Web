@@ -14,6 +14,7 @@
 'use client';
 
 import React from 'react';
+import { BarChart3, Info } from 'lucide-react';
 import { getScoreClass, getStageBadge } from '../_helpers';
 
 // ── ModelVersionsTable ────────────────────────────────────────
@@ -35,7 +36,7 @@ export default function ModelVersionsTable({
       {/* 카드 헤더 */}
       <div className="card-header">
         <div className="card-title-row">
-          <span style={{ fontSize: '0.875rem' }}>📊</span>
+          <BarChart3 size={16} className="card-title-icon" />
           <h6>Model Version Performance (R² Score)</h6>
         </div>
       </div>
@@ -188,14 +189,14 @@ function ModelRows({ model, displayVersions, isExpanded, onToggle }) {
 
 function ScoreGuide() {
   return (
-    <div className="mt-4 p-3 rounded" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderLeft: '3px solid var(--brand)' }}>
+    <div className="mt-4 p-3 rounded" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderLeft: '3px solid var(--brand-text)' }}>
       <div className="d-flex align-items-start gap-3">
-        <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: '2px' }}>ℹ️</span>
+        <Info size={16} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--brand-text)' }} />
         <div>
           <p className="mb-2 fw-semibold" style={{ color: 'var(--text)', fontSize: '0.875rem' }}>Performance Guide</p>
           <p className="mb-2 small" style={{ color: 'var(--text-sec)', fontSize: '0.8rem' }}>
             • Higher Test Score (R²) indicates better prediction accuracy.<br />
-            • <span className="badge" style={{ background: 'var(--status-warning-bg)', color: 'var(--status-warning-text)' }}>⭐ Gold star</span>{' '}
+            • <span className="badge" style={{ background: 'var(--status-warning-bg)', color: 'var(--status-warning-text)' }}>Gold star</span>{' '}
             marks the best-performing version across all models.
           </p>
           <p className="mb-0 small" style={{ fontSize: '0.8rem' }}>

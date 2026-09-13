@@ -200,7 +200,7 @@ export const MultiSelectDropdown = React.memo(({
                 style={{
                   ...ST.optionRow,
                   background: isChecked ? 'var(--brand-light)' : 'var(--surface)',
-                  color:      isChecked ? 'var(--brand)' : 'var(--text)',
+                  color:      isChecked ? 'var(--brand-text)' : 'var(--text)',
                 }}
                 onMouseEnter={e => {
                   if (!isChecked) e.currentTarget.style.background = 'var(--bg)';
@@ -284,9 +284,9 @@ MultiSelectDropdown.displayName = 'MultiSelectDropdown';
 // ── 스타일 상수 (인라인 스타일 재사용) ──────────────────────
 const ST = {
   labelMuted:  { fontSize: 11, color: 'var(--text-muted)' },
-  labelAll:    { fontSize: 11, fontWeight: 600, color: 'var(--brand)' },
-  labelSingle: { fontSize: 11, fontWeight: 500, color: 'var(--brand)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  labelCount:  { fontSize: 11, fontWeight: 500, color: 'var(--brand)' },
+  labelAll:    { fontSize: 11, fontWeight: 600, color: 'var(--brand-text)' },
+  labelSingle: { fontSize: 11, fontWeight: 500, color: 'var(--brand-text)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  labelCount:  { fontSize: 11, fontWeight: 500, color: 'var(--brand-text)' },
 
   searchWrap:  { padding: '6px 8px', borderBottom: '1px solid var(--border)', flexShrink: 0 },
   searchBox:   { display: 'flex', alignItems: 'center', gap: 4, padding: '2px 6px', border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg)' },
@@ -294,7 +294,7 @@ const ST = {
   iconBtn:     { display: 'flex', alignItems: 'center', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' },
 
   toolbar:     { display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', flexShrink: 0 },
-  btnBlue:     { fontSize: 11, color: 'var(--brand)', border: 'none', background: 'none', cursor: 'pointer', padding: 0 },
+  btnBlue:     { fontSize: 11, color: 'var(--brand-text)', border: 'none', background: 'none', cursor: 'pointer', padding: 0 },
   btnGray:     { fontSize: 11, color: 'var(--text-sec)', border: 'none', background: 'none', cursor: 'pointer', padding: 0 },
 
   empty:       { padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' },

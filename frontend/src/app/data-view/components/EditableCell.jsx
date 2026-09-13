@@ -25,7 +25,7 @@ const STYLE_VARIANTS = {
 };
 
 // 포커스 시 보더 색상
-const FOCUS_COLORS = { error: 'var(--status-error-border)', changed: 'var(--status-warning-border)', normal: 'var(--brand)' };
+const FOCUS_COLORS = { error: 'var(--status-error-border)', changed: 'var(--status-warning-border)', normal: 'var(--brand-text)' };
 
 // 아이콘 위치 스타일
 const ICON_POSITION_STYLE = {
@@ -61,12 +61,12 @@ export const EditableCell = React.memo(({
       />
       {hasError && (
         <div style={ICON_POSITION_STYLE}>
-          <AlertCircle size={10} className="text-red-500" title={errorMessage} />
+          <AlertCircle size={10} color="var(--status-error-text)" title={errorMessage} />
         </div>
       )}
       {isChanged && !hasError && (
         <div style={ICON_POSITION_STYLE}>
-          <CheckCircle size={10} className="text-green-500" title="값이 수정되었습니다" />
+          <CheckCircle size={10} color="var(--status-success-text)" title="값이 수정되었습니다" />
         </div>
       )}
     </div>

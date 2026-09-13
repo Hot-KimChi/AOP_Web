@@ -113,16 +113,7 @@ const LoginPage = () => {
         <button
           onClick={handleLogin}
           disabled={isLoading || !username || !password}
-          style={{
-            width: '100%', padding: '0.625rem',
-            borderRadius: '8px', border: 'none',
-            background: isLoading || !username || !password ? 'var(--brand-light)' : 'var(--brand)',
-            color: 'white', fontWeight: '600', fontSize: '0.9375rem',
-            cursor: isLoading || !username || !password ? 'not-allowed' : 'pointer',
-            transition: 'background 0.15s',
-          }}
-          onMouseEnter={(e) => { if (!isLoading && username && password) e.currentTarget.style.background = 'var(--brand-dark)'; }}
-          onMouseLeave={(e) => { if (!isLoading && username && password) e.currentTarget.style.background = 'var(--brand)'; }}
+          className="btn-app btn-app-primary btn-app-block"
         >
           {isLoading ? 'Signing in…' : 'Sign In'}
         </button>

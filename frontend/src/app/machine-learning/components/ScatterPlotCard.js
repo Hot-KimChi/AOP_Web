@@ -16,6 +16,7 @@
 'use client';
 
 import { Scatter } from 'react-chartjs-2';
+import { Crosshair, RotateCcw } from 'lucide-react';
 
 // ── ScatterPlotCard ───────────────────────────────────────────
 export default function ScatterPlotCard({
@@ -38,9 +39,9 @@ export default function ScatterPlotCard({
         style={{ flexWrap: 'wrap', gap: '4px' }}
       >
         <div className="card-title-row">
-          <span style={{ fontSize: '0.875rem' }}>🎯</span>
+          <Crosshair size={16} className="card-title-icon" />
           <h6>Target vs Estimation
-            <span style={{ fontWeight: '400', color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '6px' }}>(Test Set)</span>
+            <span className="card-title-sub" style={{ marginLeft: '6px' }}>(Test Set)</span>
           </h6>
         </div>
 
@@ -72,12 +73,12 @@ export default function ScatterPlotCard({
           {/* best model 초기화 버튼 */}
           {selectedVersionsMeta.length > 0 && (
             <button
-              className="btn btn-sm"
+              className="btn-app btn-app-secondary btn-app-sm"
               onClick={() => onReset()}
               title="Reset to best score model"
-              style={{ fontSize: '11px', padding: '0 8px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-sec)', borderRadius: '4px' }}
             >
-              ↺ Reset
+              <RotateCcw size={12} />
+              Reset
             </button>
           )}
         </div>

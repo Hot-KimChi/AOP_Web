@@ -1,18 +1,24 @@
-/* ─── Design Tokens ─────────────────────────────────────────── */
+/* ─── Design Tokens ─────────────────────────────────────────────
+ * 색은 WCAG AA(본문 4.5:1)를 기준으로 고른다. 값을 바꿀 때는
+ * 눈대중이 아니라 대비비를 계산해 확인할 것.
+ * --brand      : 채워진 버튼 "배경"용 (그 위에는 항상 흰 글씨)
+ * --brand-text : 브랜드색 "글자/아이콘"용 (배경 위에 얹히는 색)
+ * ------------------------------------------------------------- */
 :root {
-  --brand:        #6366f1;
-  --brand-dark:   #4f46e5;
+  --brand:        #4f46e5;
+  --brand-dark:   #4338ca;
   --brand-light:  #eef2ff;
+  --brand-text:   #4f46e5;
 
   --bg:           #f8fafc;
   --surface:      #ffffff;
   --border:       #e2e8f0;
-  --border-focus: #6366f1;
+  --border-focus: #4f46e5;
 
   --text:         #0f172a;
   --text-sec:     #475569;
-  --text-muted:   #94a3b8;
-  --disabled-text: #cbd5e1;
+  --text-muted:   #5f6d80;
+  --disabled-text: #5f6d80;
 
   --table-hover:  #f1f5f9;
 
@@ -29,20 +35,22 @@
   /* ─ Semantic Status Colors ─ */
   --status-error-bg:      #fef2f2;
   --status-error-border:  #fca5a5;
-  --status-error-text:    #dc2626;
+  --status-error-text:    #b91c1c;
 
   --status-success-bg:    #f0fdf4;
   --status-success-border:#86efac;
-  --status-success-text:  #16a34a;
+  --status-success-text:  #166534;
 
   --status-warning-bg:    #fffbeb;
   --status-warning-border:#fde68a;
   --status-warning-text:  #92400e;
 
-  /* ─ Action Accents (버튼 등 강조색) ─ */
-  --accent-success: #10b981;
-  --accent-info:    #0ea5e9;
-  --accent-warning: #f59e0b;
+  /* ─ Action Accents ─
+   * 상태(성공/정보/경고)를 나타낼 때만 쓴다. 실행 버튼 배경으로 쓰면
+   * 화면마다 주 액션 색이 달라져 위계가 무너진다. */
+  --accent-success: #047857;
+  --accent-info:    #0369a1;
+  --accent-warning: #b45309;
 
   /* ─ Tx 매칭 팝업 전용 ─ */
   --tx-header-bg:    #1e3a5f;
@@ -57,12 +65,13 @@
   --surface:      #1e293b;
   --border:       #334155;
   --border-focus: #818cf8;
-  --brand-light:  #1e1b4b;
+  --brand-light:  #312e81;
+  --brand-text:   #a5b4fc;
 
   --text:         #f1f5f9;
-  --text-sec:     #94a3b8;
-  --text-muted:   #475569;
-  --disabled-text: #475569;
+  --text-sec:     #cbd5e1;
+  --text-muted:   #94a3b8;
+  --disabled-text: #94a3b8;
 
   --table-hover:  #263347;
 
@@ -107,13 +116,11 @@
 [data-theme="dark"] .navbar-divider     { background: var(--border); }
 [data-theme="dark"] .navbar-link        { color: var(--text-sec); }
 [data-theme="dark"] .navbar-link:hover  { background: var(--border); color: var(--text); }
-[data-theme="dark"] .navbar-link.active { background: var(--brand-light); color: var(--border-focus); }
 [data-theme="dark"] .navbar-link.disabled { color: var(--disabled-text); }
 [data-theme="dark"] .navbar-mobile-menu { background: var(--surface); border-color: var(--border); }
 [data-theme="dark"] .navbar-username    { color: var(--text-sec); }
 [data-theme="dark"] .navbar-mobile-link { color: var(--text-sec); }
 [data-theme="dark"] .navbar-mobile-link:hover  { background: var(--border); color: var(--text); }
-[data-theme="dark"] .navbar-mobile-link.active { background: var(--brand-light); color: var(--border-focus); font-weight: 600; }
 
 /* ─── Dark Mode: Bootstrap Cards ────────────────────────────── */
 [data-theme="dark"] .card         { background: var(--surface) !important; border-color: var(--border) !important; }
@@ -240,7 +247,7 @@
   cursor: pointer; flex-shrink: 0;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.theme-toggle:hover { background: var(--brand-light); color: var(--brand); border-color: var(--brand); }
+.theme-toggle:hover { background: var(--brand-light); color: var(--brand-text); border-color: var(--brand-text); }
 
 /* ─── Base Reset ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
@@ -271,7 +278,7 @@ body {
 
 .navbar-logo-icon {
   width: 32px; height: 32px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--brand) 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, #7c3aed 100%);
   display: flex; align-items: center; justify-content: center;
   color: white; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;
 }
@@ -297,7 +304,7 @@ body {
   flex-shrink: 0;
 }
 .navbar-link:hover  { background: var(--bg); color: var(--text); }
-.navbar-link.active { background: var(--brand-light); color: var(--brand); font-weight: 600; }
+.navbar-link.active { background: var(--brand-light); color: var(--brand-text); font-weight: 600; }
 .navbar-link.disabled { color: var(--disabled-text); cursor: not-allowed; pointer-events: none; }
 
 .navbar-auth { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; padding-left: 1rem; flex-shrink: 0; }
@@ -346,7 +353,7 @@ body {
   color: var(--text-sec); transition: background 0.15s, color 0.15s;
 }
 .navbar-mobile-link:hover  { background: var(--bg); color: var(--text); }
-.navbar-mobile-link.active { background: var(--brand-light); color: var(--brand); font-weight: 600; }
+.navbar-mobile-link.active { background: var(--brand-light); color: var(--brand-text); font-weight: 600; }
 .navbar-mobile-link.disabled { color: var(--disabled-text); pointer-events: none; }
 
 button.navbar-mobile-link {
@@ -360,7 +367,7 @@ button.navbar-mobile-link {
   padding: 0.625rem 0.75rem; font-size: 0.875rem; color: var(--text-sec);
 }
 
-.navbar-mobile-login { color: var(--brand) !important; font-weight: 600 !important; }
+.navbar-mobile-login { color: var(--brand-text) !important; font-weight: 600 !important; }
 .navbar-mobile-logout { color: var(--status-error-text) !important; }
 
 /* ─── Responsive Breakpoints ─────────────────────────────────── */
@@ -393,6 +400,49 @@ button.navbar-mobile-link {
   }
 }
 
+/* ─── Action Buttons ──────────────────────────────────────────
+ * 실행 버튼은 색으로 종류를 구분하지 않는다. 화면마다 주 액션 색이
+ * 달라지면 "무엇이 주 액션인지" 읽을 수 없기 때문이다.
+ * 위계는 primary(채움 1개) > secondary(테두리) > ghost(배경 없음) 로만 준다.
+ * ------------------------------------------------------------- */
+.btn-app {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.95rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem; font-weight: 600; line-height: 1.2;
+  font-family: inherit; white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn-app:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-app:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+.btn-app-primary { background: var(--brand); color: #fff; }
+.btn-app-primary:hover:not(:disabled) { background: var(--brand-dark); }
+
+.btn-app-secondary { background: var(--surface); color: var(--text-sec); border-color: var(--border); }
+.btn-app-secondary:hover:not(:disabled) { background: var(--bg); color: var(--text); border-color: var(--text-muted); }
+
+.btn-app-ghost { background: transparent; color: var(--brand-text); }
+.btn-app-ghost:hover:not(:disabled) { background: var(--brand-light); }
+
+.btn-app-danger { background: transparent; color: var(--status-error-text); border-color: var(--status-error-border); }
+.btn-app-danger:hover:not(:disabled) { background: var(--status-error-bg); }
+
+.btn-app-sm { padding: 0.35rem 0.7rem; font-size: 0.75rem; }
+.btn-app-block { width: 100%; }
+
+/* 표 안의 아이콘 전용 버튼 — 라벨이 없으므로 좌우 여백을 줄인다. */
+.btn-app-icon-danger { padding: 0.2rem 0.35rem; color: var(--text-muted); }
+.btn-app-icon-danger:hover:not(:disabled) { background: var(--status-error-bg); color: var(--status-error-text); }
+
+/* 여러 실행 버튼은 한 줄로 묶는다. 각 버튼을 전폭으로 늘리면
+ * 업무 화면에서 과장돼 보이고 위계도 사라진다. */
+.action-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.action-bar-end { margin-left: auto; }
+
 /* ─── Bootstrap Card Overrides ───────────────────────────────── */
 .card        { border: 1px solid var(--border) !important; border-radius: var(--radius-lg) !important; box-shadow: var(--shadow-sm) !important; background: var(--surface) !important; }
 .card-header { background: var(--surface) !important; border-bottom: 1px solid var(--border) !important; border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important; padding: 0.875rem 1.25rem !important; }
@@ -407,7 +457,7 @@ button.navbar-mobile-link {
 }
 .form-control:focus, .form-select:focus {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+  box-shadow: 0 0 0 3px rgba(79,70,229,0.15);
   outline: none;
 }
 .form-label { font-size: 0.8125rem; font-weight: 500; color: var(--text-sec); margin-bottom: 0.375rem; }
@@ -418,10 +468,10 @@ button.navbar-mobile-link {
 .login-brand { display: flex; flex-direction: column; align-items: center; margin-bottom: 2rem; }
 .login-brand-icon {
   width: 52px; height: 52px; border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--brand) 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, #7c3aed 100%);
   display: flex; align-items: center; justify-content: center;
   color: white; font-weight: 700; font-size: 1.25rem; margin-bottom: 0.75rem;
-  box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+  box-shadow: 0 4px 12px rgba(79,70,229,0.28);
 }
 .login-brand-title    { font-weight: 700; font-size: 1.125rem; color: var(--text); }
 .login-brand-subtitle { font-size: 0.8125rem; color: var(--text-muted); margin-top: 0.25rem; }
@@ -433,6 +483,9 @@ button.navbar-mobile-link {
 /* ─── Card Section Header ────────────────────────────────────── */
 .card-title-row { display: flex; align-items: center; gap: 0.5rem; }
 .card-title-row h5, .card-title-row h6 { margin: 0; font-weight: 600; color: var(--text); font-size: 0.9375rem; }
+/* 제목 아이콘은 장식이므로 브랜드색으로 낮게 깔고 크기를 고정한다. */
+.card-title-icon { color: var(--brand-text); flex-shrink: 0; }
+.card-title-sub { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; }
 
 /* ─── Version Badge ──────────────────────────────────────────── */
 .version-badge {
@@ -473,9 +526,10 @@ button.navbar-mobile-link {
   padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.dp-title { margin: 0; font-size: 1rem; font-weight: 600; color: var(--text); }
+.dp-title { margin: 0; font-size: 1rem; font-weight: 600; color: var(--text); display: inline-flex; align-items: center; gap: 0.4rem; }
 .dp-close-btn {
-  border: none; background: transparent; font-size: 1.25rem;
+  border: none; background: transparent;
+  display: inline-flex; align-items: center; justify-content: center;
   cursor: pointer; color: var(--text-muted); line-height: 1;
   padding: 0.25rem; border-radius: var(--radius-sm);
   transition: background 0.15s, color 0.15s;
@@ -492,13 +546,16 @@ button.navbar-mobile-link {
   font-size: 0.75rem; padding: 0.25rem 0.625rem;
   border-radius: 999px; background: var(--surface);
   border: 1px solid var(--border); color: var(--text-sec);
+  display: inline-flex; align-items: center; gap: 0.25rem;
 }
 .dp-summary-chip strong { color: var(--text); margin-left: 0.2em; }
-.dp-chip-intensity { border-color: #3b82f6; color: #3b82f6; }
-.dp-chip-power     { border-color: #ef4444; color: #ef4444; }
+/* 칩 글자색은 흰 배경에서 4.5:1 이상이 되도록 어둡게 잡는다.
+ * 테두리는 색 식별용이므로 원래의 밝은 색을 유지한다. */
+.dp-chip-intensity { border-color: #3b82f6; color: #1d4ed8; }
+.dp-chip-power     { border-color: #ef4444; color: #b91c1c; }
 .dp-chip-temp      { border-color: #f59e0b; color: #92400e; }
-.dp-chip-tempsa    { border-color: #8b5cf6; color: #8b5cf6; }
-.dp-chip-unknown   { border-color: #94a3b8; color: #64748b; }
+.dp-chip-tempsa    { border-color: #8b5cf6; color: #6d28d9; }
+.dp-chip-unknown   { border-color: #94a3b8; color: #475569; }
 
 .dp-toggle-all-btn {
   margin-left: auto; border: 1px solid var(--border); background: var(--surface);
@@ -551,14 +608,15 @@ button.navbar-mobile-link {
 .dp-badge {
   font-size: 0.625rem; padding: 0.125rem 0.5rem;
   border-radius: 999px; font-weight: 600; white-space: nowrap;
-  min-width: 3rem; text-align: center;
+  min-width: 3rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.2rem;
 }
 .dp-badge-empty { opacity: 0.3; }
 .dp-badge-temp    { background: #fef3c7; color: #92400e; }
 .dp-badge-tempsa  { background: #ede9fe; color: #6d28d9; }
 .dp-badge-power   { background: #fee2e2; color: #b91c1c; }
 .dp-badge-intensity { background: #dbeafe; color: #1d4ed8; }
-.dp-badge-unknown { background: #f1f5f9; color: #64748b; }
+.dp-badge-unknown { background: #f1f5f9; color: #475569; }
 
 /* Group body */
 .dp-group-body { padding: 0.5rem 0.875rem 0.75rem; }
@@ -573,6 +631,7 @@ button.navbar-mobile-link {
   display: flex; align-items: center; gap: 0.375rem;
   padding: 0.375rem 0.625rem; font-size: 0.75rem; font-weight: 600;
 }
+.dp-type-icon { flex-shrink: 0; }
 .dp-type-count {
   margin-left: auto; font-size: 0.625rem; font-weight: 500;
   background: var(--surface); border: 1px solid var(--border);
@@ -583,7 +642,7 @@ button.navbar-mobile-link {
 .dp-type-tempsa   .dp-type-header { background: #ede9fe; color: #6d28d9; }
 .dp-type-power    .dp-type-header { background: #fee2e2; color: #b91c1c; }
 .dp-type-intensity .dp-type-header { background: #dbeafe; color: #1d4ed8; }
-.dp-type-unknown  .dp-type-header { background: #f1f5f9; color: #64748b; }
+.dp-type-unknown  .dp-type-header { background: #f1f5f9; color: #475569; }
 
 /* Mini table */
 .dp-table-wrap { overflow-x: auto; }
@@ -611,6 +670,7 @@ button.navbar-mobile-link {
 [data-theme="dark"] .dp-chip-power     { color: #f87171; border-color: #ef4444; }
 [data-theme="dark"] .dp-chip-temp      { color: #fbbf24; border-color: #f59e0b; }
 [data-theme="dark"] .dp-chip-tempsa    { color: #a78bfa; border-color: #8b5cf6; }
+[data-theme="dark"] .dp-chip-unknown   { color: var(--text-sec); border-color: var(--text-muted); }
 
 [data-theme="dark"] .dp-badge-temp    { background: #451a03; color: #fbbf24; }
 [data-theme="dark"] .dp-badge-tempsa  { background: #2e1065; color: #a78bfa; }
