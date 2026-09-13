@@ -3,8 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import DataViewer from '../../../components/DataViewer';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+import { API_BASE_URL } from '../../../lib/apiBase';
 
 function DataViewContent() {
   const [data, setData] = useState([]);

@@ -65,7 +65,8 @@ Do not reorder. Inline script must execute before React hydration.
 ## API Communication
 
 ```javascript
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+import { API_BASE_URL } from '<relative>/lib/apiBase';
+
 const res = await fetch(`${API_BASE_URL}/api/endpoint`, {
   credentials: 'include',  // MANDATORY for authenticated requests
   headers: { 'Content-Type': 'application/json' },
@@ -73,6 +74,12 @@ const res = await fetch(`${API_BASE_URL}/api/endpoint`, {
 });
 ```
 
+- **Never redeclare the base URL.** Always import it from `src/lib/apiBase.js`.
+  Hardcoding `'http://localhost:5000'` breaks every visitor except the server's own
+  browser (`localhost` points at the *visitor's* PC), which previously made login
+  fail for all remote users.
+- `apiBase.js` derives the address from `window.location` (host that the browser
+  actually opened) and honors `NEXT_PUBLIC_API_BASE_URL` only when it is explicitly set.
 - `NEXT_PUBLIC_` prefix required for browser env vars
 - Handle loading/error states; parse `response.json()` before showing errors
 

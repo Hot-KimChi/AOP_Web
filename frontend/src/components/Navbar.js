@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Settings, Eye, ClipboardCheck, FileOutput, Brain, User, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
 import '../globals.css';
+import { API_BASE_URL } from '../lib/apiBase';
 
 const menuItems = [
   { href: '/measset-generation',  icon: Settings,       text: 'MeasSet Generation' },
@@ -21,8 +22,6 @@ const Navbar = () => {
   const [username,        setUsername]        = useState('');
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [isDark,          setIsDark]          = useState(false);
-
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
   // ThemeInit에서 이미 data-theme을 설정하므로, DOM 상태만 읽어서 동기화
   useEffect(() => {

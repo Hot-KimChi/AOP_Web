@@ -6,6 +6,13 @@
 
 ---
 
+## 변경 이력 (v0.9.65 — 2026-09-13)
+
+| # | 요청 | 해결 | Detail |
+|---|------|------|--------|
+| 1 | 로그인에 실패하였다. 원인 및 해결 (agent 재작성 명세 선작성 후 진행) | 추측하지 않고 **재현 → 원인 특정 → 재발 방지** 순으로 처리. **① 원인은 인증 로직이 아니라 API 주소**: 백엔드 `/api/auth/login` 은 실계정으로 200 성공하고 서버 PC 브라우저에서는 로그인 6/6 성공했으나, `npm run dev` 로 구동되어 적용되던 `.env.development` 의 `NEXT_PUBLIC_API_BASE_URL=http://localhost:5000` 이 **브라우저 번들에 그대로 박혀** 나갔다. `localhost` 는 서버가 아니라 **접속한 사용자의 PC** 이므로, 다른 PC 에서 `http://<서버IP>:3000` 으로 열면 자기 PC 의 5000 번 포트로 요청이 가 항상 "Unable to connect to the server." 로 실패(서버 IP 접속 + localhost:5000 차단으로 재현 성공). 올바른 주소는 `.env.production` 에만 있었고 그마저 **IP 하드코딩**(`10.82.218.49`)이라 서버 IP 가 바뀌면 재발하는 구조였다. **② 해결 — 접속 호스트 기준 자동 산출**: `frontend/src/lib/apiBase.js` 신설, `window.location` 의 프로토콜·호스트에 백엔드 포트를 붙여 산출(localhost 로 열면 localhost:5000, 서버 IP 로 열면 그 IP:5000). `NEXT_PUBLIC_API_BASE_URL` 이 **명시된 경우에만** 그 값이 우선(백엔드가 다른 호스트인 배포 대비). **9개 파일에 복사**돼 있던 동일 선언을 이 모듈 하나로 통합하고 `.env` 두 곳의 하드코딩을 제거. **③ 조사를 어렵게 만든 부수 결함 동시 해결**: `routes/auth.py` 가 비밀번호 오류(28000)·DB 서버 다운(08001)·ODBC 드라이버 없음(IM002)을 **모두 같은 401 "Invalid username or password"** 로 반환하고 예외를 `pass` 로 삼켜 **서버 로그에도 원인이 없던 것**을, SQLSTATE 기반 분류(인프라 계열 → **503** + `logger.error`, 그 외 → 401 유지 + SQLSTATE 기록)로 변경. 로그 문자열은 길이 제한 + **비밀번호 마스킹**. 연결은 됐으나 계정 메타데이터를 못 찾는 경로도 별도 로그로 구분. **검증**: 서버 IP 접속 + localhost:5000 차단 상태에서 **로그인 성공**(이전엔 실패)·API 전량이 서버 IP 로 전송·**CORS 통과**·쿠키 정상 발급, localhost 접속 회귀 없음, 실패 3종 + SQLAlchemy 래핑까지 분류 실측(누출 0), Flask test_client 로 401 응답 본문 불변 + 로그에 `SQLSTATE=28000` 기록 확인, `npm test` 15/15, `npm run build` 성공, GPT 교차 검증 **0건** | [→ Detail](./AI_Rearch_detail.md#v0965--1-로그인-실패-api-주소-자동-산출과-실패-원인-분류) |
+
+---
 ## 변경 이력 (v0.9.64 — 2026-09-13)
 
 | # | 요청 | 해결 | Detail |

@@ -24,9 +24,9 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { findBestVersion, buildLineChartData, buildScatterChartData } from './_helpers';
 import { makeLineChartOptions, makeScatterChartOptions } from './_constants';
+import { API_BASE_URL } from '../../lib/apiBase';
 
 export function useMLPageData() {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // [상태 정의]

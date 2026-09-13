@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { FileText, Download } from 'lucide-react';
+import { API_BASE_URL } from '../../lib/apiBase';
 
 export default function SSR_DocOut() {
   const [DBList, setDBList] = useState([]);
@@ -13,8 +14,6 @@ export default function SSR_DocOut() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedRowIdxs, setSelectedRowIdxs] = useState([]);
-
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
   useEffect(() => {
     const fetchDatabases = async () => {

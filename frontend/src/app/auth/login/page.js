@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import "../../../globals.css";
+import { API_BASE_URL } from '../../../lib/apiBase';
 
 const LoginPage = () => {
   const router = useRouter();
@@ -10,8 +11,6 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
   const handleLogin = useCallback(async () => {
     if (!username || !password) {
@@ -27,8 +26,8 @@ const LoginPage = () => {
         credentials: 'include',
       });
       if (!response.ok) {
-        const data = await response.json();
-        setError(data?.message || 'Login failed');
+        const data = await response.json().catch(() => null);
+        setError(data?.message || `Login failed (HTTP ${response.status})`);
         return;
       }
       // 팝업으로 열린 경우: 부모 창 새로고침 후 팝업 닫기
@@ -39,11 +38,13 @@ const LoginPage = () => {
         router.push('/');
       }
     } catch {
-      setError('Unable to connect to the server.');
+      // 어느 주소로 요청했는지 함께 보여준다. 주소가 잘못되어 연결이 안 되는
+      // 경우(예: 다른 PC 에서 접속) 원인을 바로 알 수 있다.
+      setError(`Unable to connect to the server (${API_BASE_URL}).`);
     } finally {
       setIsLoading(false);
     }
-  }, [username, password, router, API_BASE_URL]);
+  }, [username, password, router]);
 
   useEffect(() => {
     if (error) {

@@ -143,12 +143,21 @@ $env:COOKIE_SECURE = "true"
 
 ### 5.3 프론트엔드 환경 변수
 
+프론트엔드는 **API 주소를 자동으로 결정합니다.** `frontend\src\lib\apiBase.js` 가 브라우저가 실제로 접속한 호스트를 그대로 사용합니다.
+
+| 접속 주소 | 자동 산출되는 백엔드 주소 |
+|-----------|---------------------------|
+| `http://localhost:3000` | `http://localhost:5000` |
+| `http://<서버IP>:3000` | `http://<서버IP>:5000` |
+
 | 파일 | 변수 | 용도 |
 |------|------|------|
-| `frontend\.env.development` | `NEXT_PUBLIC_API_BASE_URL` | 개발 모드 백엔드 주소 (기본 `http://localhost:5000`) |
-| `frontend\.env.production` | `NEXT_PUBLIC_API_BASE_URL` | 운영 빌드 백엔드 주소 |
+| `frontend\.env.development` | `NEXT_PUBLIC_API_BASE_URL` | (기본 미지정) 지정 시 자동 산출을 덮어씀 |
+| `frontend\.env.production` | `NEXT_PUBLIC_API_BASE_URL` | (기본 미지정) 지정 시 자동 산출을 덮어씀 |
 
-> 다른 PC 의 백엔드에 접속하려면 `.env.development` 의 값을 해당 호스트로 바꾸고, 백엔드 쪽 `ALLOWED_ORIGINS` 에 프론트엔드 Origin 을 추가해야 합니다.
+> **주의**: 여기에 `http://localhost:5000` 을 지정하면 안 됩니다. `localhost` 는 서버가 아니라 **접속한 사용자의 PC** 를 가리키므로, 다른 PC 에서 서버 IP 로 접속한 사용자는 로그인부터 실패합니다.
+>
+> 백엔드가 프론트엔드와 **다른 호스트/포트**에 있는 경우에만 위 변수를 명시하고, 백엔드 쪽 `ALLOWED_ORIGINS` 에 프론트엔드 Origin 을 추가하세요.
 
 ### 5.4 생성 파일 저장 위치
 

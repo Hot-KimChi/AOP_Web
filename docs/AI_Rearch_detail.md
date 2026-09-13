@@ -6,6 +6,141 @@
 
 ---
 
+## 변경 이력 (v0.9.65 — 2026-09-13)
+
+### v0.9.65 — #1. 로그인 실패: API 주소 자동 산출과 실패 원인 분류
+
+**요청**: 로그인에 실패하였다. 원인 및 해결. 단 agent 재작성 명세를 먼저 남기고 진행.
+
+#### 0) 원칙 — 추측하지 않고 재현부터 한다
+
+"로그인이 안 된다"는 증상만으로는 비밀번호·DB·네트워크·프론트엔드 어디든 원인이 될 수 있다. 그래서 **재현 → 원인 특정 → 재발 방지** 순서를 고정하고, 각 단계를 측정값으로만 넘어갔다.
+
+#### 1) 측정 — 어디까지 정상인가
+
+| 확인 항목 | 결과 |
+|-----------|------|
+| DB 서버 도달성 | 정상 (0.5초 내 응답) |
+| 백엔드 `/api/auth/login` 직접 호출 (실계정) | **200 성공**, `auth_token`·`session` 쿠키 발급 |
+| 서버 PC 브라우저(`http://localhost:3000`) 로그인 | **6/6 성공** (평균 약 1.3초) |
+| CORS 헤더 | 정상 (`allow-credentials=true`) |
+
+즉 **인증 로직 자체는 멀쩡했다.** 실패는 "누가 어디서 접속하는가"에 달려 있었다.
+
+#### 2) 원인 — `localhost` 는 서버가 아니라 접속자의 PC다
+
+서버 IP 로 접속(`http://172.30.1.69:3000`)한 뒤, 접속자 PC 의 `localhost:5000` 을 차단해 **다른 PC 상황을 재현**했다. 결과는 로그인 카드에 `Unable to connect to the server.` 이고, 브라우저가 실제로 호출한 주소는 다음과 같았다.
+
+```
+http://localhost:5000/api/auth/status
+http://localhost:5000/api/auth/login
+```
+
+원인은 프론트엔드 환경 변수였다.
+
+| 파일 | 변경 전 값 | 실제 적용 여부 |
+|------|-----------|----------------|
+| `frontend/.env.development` | `NEXT_PUBLIC_API_BASE_URL=http://localhost:5000` | **적용됨** (무인 자동 기동이 `npm run dev` 이므로) |
+| `frontend/.env.production` | `NEXT_PUBLIC_API_BASE_URL=http://10.82.218.49:5000` | 적용 안 됨 (production 으로 구동하지 않음) |
+
+`NEXT_PUBLIC_` 변수는 **브라우저 번들에 그대로 박혀** 나간다. 그리고 `localhost` 는 서버가 아니라 **그 페이지를 연 사용자의 PC** 를 가리킨다. 따라서 다른 PC 사용자는 자기 컴퓨터의 5000 번 포트로 로그인 요청을 보내게 되고, 거기엔 아무것도 없으므로 **100% 실패**한다. 서버 PC 본인만 성공하던 이유가 이것이다.
+
+`.env.production` 에 올바른 주소가 있긴 했지만 **IP 하드코딩**이라, 설령 production 으로 구동하더라도 서버 IP 가 바뀌는 순간 같은 방식으로 다시 깨진다. 게다가 같은 선언이 **9개 파일에 복사**돼 있어 한 곳을 고쳐도 전체가 따라오지 않는 구조였다.
+
+#### 3) 해결 — 접속한 호스트에서 주소를 만든다
+
+주소를 어딘가에 "적어두는" 방식은 적어둔 값이 틀리는 순간 전부 깨진다. 그래서 **브라우저가 실제로 접속한 호스트**에서 매번 산출하도록 바꿨다.
+
+**신설 `frontend/src/lib/apiBase.js`**
+
+```javascript
+export function getApiBaseUrl() {
+  const explicit = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (explicit) return explicit.replace(/\/+$/, '');
+  if (typeof window === 'undefined') return `http://localhost:${DEFAULT_BACKEND_PORT}`;
+  return `${window.location.protocol}//${window.location.hostname}:${DEFAULT_BACKEND_PORT}`;
+}
+```
+
+| 접속 주소 | 산출되는 API 주소 |
+|-----------|-------------------|
+| `http://localhost:3000` | `http://localhost:5000` |
+| `http://172.30.1.69:3000` | `http://172.30.1.69:5000` |
+
+명시 지정(`NEXT_PUBLIC_API_BASE_URL`)이 있으면 항상 그 값이 우선하므로, 백엔드가 프론트와 다른 호스트에 있는 배포도 그대로 지원된다.
+
+**Before / After (9개 파일 공통)**
+
+```javascript
+// Before — 파일마다 복사된 선언
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+
+// After — 단일 모듈에서 가져다 쓴다
+import { API_BASE_URL } from '../../lib/apiBase';
+```
+
+대상: `app/(home)/page.js`, `app/auth/login/page.js`, `app/machine-learning/_hooks.js`, `app/measset-generation/page.js`, `app/SSR_DocOut/page.js`, `app/verification-report/page.js`, `app/viewer/page.js`, `app/viewer/data-view-standalone/page.js`, `components/Navbar.js`
+
+`.env.development` / `.env.production` 은 값을 지우고, **왜 여기에 `localhost:5000` 을 적으면 안 되는지**를 주석으로 남겼다. 같은 내용을 `frontend/AGENTS.md` 의 API 규약과 `README.md` 5.3 절에도 반영해, 이후 작업에서 다시 하드코딩되지 않도록 했다.
+
+#### 4) 부수 결함 — 원인 규명이 오래 걸린 진짜 이유
+
+`backend/routes/auth.py` 의 `login()` 은 연결 예외를 전부 삼키고 있었다.
+
+```python
+# Before
+except (sqlalchemy.exc.InterfaceError, sqlalchemy.exc.OperationalError,
+        pyodbc.InterfaceError, pyodbc.OperationalError):
+    pass  # 인증 실패 — 아래 공통 응답으로 처리
+
+logger.warning(f"Failed login attempt for user: {username}")
+return error_response("Invalid username or password", 401)
+```
+
+실측해 보니 **세 가지 전혀 다른 상황이 모두 같은 401 "Invalid username or password"** 로 나왔다.
+
+| 실제 상황 | SQLSTATE | 변경 전 응답 | 변경 전 로그 |
+|-----------|----------|--------------|--------------|
+| 비밀번호 오류 | 28000 | 401 | 원인 없음 |
+| DB 서버 다운 | 08001 | 401 | 원인 없음 |
+| ODBC 드라이버 없음 | IM002 | 401 | 원인 없음 |
+
+관리자는 로그를 봐도 원인을 알 수 없고, 사용자는 멀쩡한 비밀번호를 계속 다시 입력하게 된다. SQLSTATE 기준으로 분류하도록 바꿨다.
+
+```python
+# After (요지)
+sqlstate = _extract_sqlstate(exc)
+detail = _safe_error_text(exc, password)   # 길이 제한 + 비밀번호 마스킹
+if sqlstate in _INFRA_SQLSTATES:           # 08001 08S01 08004 HYT00 HYT01 IM002 IM003
+    logger.error(f"... database connection failed (SQLSTATE={sqlstate}) - {detail}")
+    return error_response("Cannot reach the authentication server. ...", 503)
+logger.warning(f"... (SQLSTATE={sqlstate or 'unknown'}): {detail}")
+return error_response("Invalid username or password", 401)
+```
+
+| 실제 상황 | 변경 후 응답 | 변경 후 로그 |
+|-----------|--------------|--------------|
+| 비밀번호 오류 | 401 (**문구 그대로 유지**) | `WARNING ... (SQLSTATE=28000)` + 사유 |
+| DB 서버 다운 | **503** | `ERROR ... (SQLSTATE=08001)` + 사유 |
+| ODBC 드라이버 없음 | **503** | `ERROR ... (SQLSTATE=IM002)` + 사유 |
+
+자격증명 오류 시 사용자에게 보이는 문구는 **일부러 그대로 두었다.** 계정 존재 여부를 흘리지 않기 위해서다. 연결은 됐는데 `sys.sql_logins` 에서 계정 메타데이터를 찾지 못하는 경로도 별도 경고 로그로 구분했다.
+
+로그인 화면도 함께 손봤다. 응답 본문이 JSON 이 아닐 때 엉뚱하게 "연결 실패" 로 표시되던 것을 HTTP 상태 표기로 바꾸고, 연결 실패 메시지에 **실제로 호출한 API 주소를 함께 표시**하도록 했다. 이번 같은 주소 문제를 다음엔 화면만 보고 알 수 있다.
+
+#### 5) 검증
+
+| 항목 | 결과 |
+|------|------|
+| 서버 IP 접속 + localhost:5000 차단(= 다른 PC 재현) | **로그인 성공** (이전엔 실패). 차단된 localhost 요청 **0건**, API 전량 `http://172.30.1.69:5000` 으로 전송, 쿠키 발급, **CORS 통과** |
+| localhost 접속 회귀 | 성공 (API 전량 `http://localhost:5000`) |
+| 실패 분류 실측 | 28000 → 401, 08001 → 503, IM002 → 503, SQLAlchemy 래핑 08001 → 503, **비밀번호 누출 0** |
+| Flask test_client | 401 응답 본문 불변, 로그에 `SQLSTATE=28000` 기록 확인 |
+| Playwright E2E | **15/15 통과** |
+| `npm run build` | 성공 |
+| GPT 교차 검증 | **BLOCKER 0 / MAJOR 0 / MINOR 0** |
+
+---
 ## 변경 이력 (v0.9.64 — 2026-09-13)
 
 ### v0.9.64 — #1. 프론트엔드 디자인 토큰·버튼 체계 개편

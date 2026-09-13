@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, session
 from datetime import datetime, timedelta, timezone
+import re
 import jwt
 import sqlalchemy.exc
 import pyodbc
@@ -15,6 +16,39 @@ from utils.error_handler import error_response
 from utils.logger import logger
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
+
+# 로그인 실패를 "자격증명 문제"와 "인프라 문제"로 나누기 위한 SQLSTATE 목록.
+# 예전에는 세 경우(비밀번호 오류 / DB 서버 다운 / ODBC 드라이버 없음)가 모두 같은
+# 401 "Invalid username or password" 로 반환되고 예외도 삼켜져서, 서버 로그만으로는
+# 원인을 전혀 알 수 없었다.
+_INFRA_SQLSTATES = frozenset({
+    "08001",  # 서버에 연결할 수 없음
+    "08S01",  # 통신 링크 실패
+    "08004",  # 서버가 연결을 거부함
+    "HYT00",  # 쿼리 타임아웃
+    "HYT01",  # 연결 타임아웃
+    "IM002",  # 데이터 원본 이름을 찾을 수 없음(ODBC 드라이버 미설치)
+    "IM003",  # 드라이버 로드 실패
+})
+
+
+def _extract_sqlstate(exc):
+    """예외에서 ODBC SQLSTATE(5자리)를 뽑아낸다. 찾지 못하면 빈 문자열."""
+    orig = getattr(exc, "orig", exc)
+    args = getattr(orig, "args", ())
+    if args and isinstance(args[0], str) and len(args[0]) == 5:
+        return args[0]
+    match = re.search(r"\[(\w{5})\]", str(orig))
+    return match.group(1) if match else ""
+
+
+def _safe_error_text(exc, password):
+    """예외 메시지를 로그용으로 정리한다. 연결 문자열이 섞여 나올 수 있으므로
+    비밀번호가 포함돼 있으면 반드시 가린다."""
+    text = " ".join(str(exc).split())[:500]
+    if password:
+        text = text.replace(password, "***")
+    return text
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -52,9 +86,31 @@ def login():
                     secure=Config.COOKIE_SECURE,
                 )
                 return response
+            # 연결은 성공했으나 계정 메타데이터를 찾지 못한 경우
+            logger.warning(
+                f"Login rejected for user '{username}': "
+                f"connected to SQL Server but user metadata was not found in sys.sql_logins"
+            )
     except (sqlalchemy.exc.InterfaceError, sqlalchemy.exc.OperationalError,
-            pyodbc.InterfaceError, pyodbc.OperationalError):
-        pass  # 인증 실패 — 아래 공통 응답으로 처리
+            pyodbc.InterfaceError, pyodbc.OperationalError) as exc:
+        sqlstate = _extract_sqlstate(exc)
+        detail = _safe_error_text(exc, password)
+        if sqlstate in _INFRA_SQLSTATES:
+            # 자격증명 문제가 아니라 서버/드라이버 문제다. 401 로 뭉개면 사용자는
+            # 비밀번호만 반복해서 다시 입력하게 된다.
+            logger.error(
+                f"Login unavailable for user '{username}': "
+                f"database connection failed (SQLSTATE={sqlstate}) - {detail}"
+            )
+            return error_response(
+                "Cannot reach the authentication server. Please contact the administrator.",
+                503,
+            )
+        logger.warning(
+            f"Failed login attempt for user '{username}' "
+            f"(SQLSTATE={sqlstate or 'unknown'}): {detail}"
+        )
+        return error_response("Invalid username or password", 401)
 
     logger.warning(f"Failed login attempt for user: {username}")
     return error_response("Invalid username or password", 401)

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Play, ExternalLink, Database, Table2, RotateCw, Settings2 } from 'lucide-react';
 import DataPreviewModal from '../../components/DataPreviewModal';
+import { API_BASE_URL } from '../../lib/apiBase';
 
 export default function MeasSetGen() {
   // 기본 상태 변수 선언
@@ -19,8 +20,6 @@ export default function MeasSetGen() {
   const [dataWindowReference, setDataWindowReference] = useState(null); // 데이터 창 참조
   const [updatedCount, setUpdatedCount] = useState(0);           // 업데이트된 데이터 수
   const [showPreviewModal, setShowPreviewModal] = useState(false); // Data Preview 모달
-
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
   // CSV 데이터 파싱 함수
   const parseCSV = (text) => {

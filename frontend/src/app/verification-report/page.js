@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { FileInput, ClipboardList, Upload, Table2 } from 'lucide-react';
 import Layout from '../../components/Layout';
+import { API_BASE_URL } from '../../lib/apiBase';
 
 export default function VerificationReport() {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
   const normalizeProbeId = (value) => {
     const raw = String(value ?? '').trim();

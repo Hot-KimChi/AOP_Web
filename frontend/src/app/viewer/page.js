@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { Database, Eye } from 'lucide-react';
+import { API_BASE_URL } from '../../lib/apiBase';
 
 export default function Viewer() {
   const [DBList, setDBList] = useState([]);
@@ -12,8 +13,6 @@ export default function Viewer() {
   const [selectedTable, setSelectedTable] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
   useEffect(() => {
     const fetchDatabases = async () => {
