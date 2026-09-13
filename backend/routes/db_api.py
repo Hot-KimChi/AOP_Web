@@ -6,6 +6,7 @@ from docx import Document
 from utils.decorators import handle_exceptions, require_auth, with_db_connection
 from utils.error_handler import error_response
 from utils.logger import logger
+from config import Config
 import pandas as pd
 import numpy as np
 
@@ -115,7 +116,7 @@ def insert_sql_measset():
         )
     except Exception as e:
         logger.error(f"Data insertion failed: {str(e)}", exc_info=True)
-        return error_response(str(e), 500)
+        return error_response("데이터 저장에 실패했습니다.", 500)
 
 
 @db_api_bp.route("/csv-data", methods=["GET"])
@@ -126,11 +127,13 @@ def get_csv_data():
     if not csv_key:
         return error_response("csv_key is required", 400)
 
-    # 경로 탐색 공격 방지: 절대 경로로 변환 후 프로젝트 루트 내에 있는지 검증
+    # 경로 탐색 공격 방지: 절대 경로로 변환 후 업로드 루트 내에 있는지 검증.
+    # 기준을 os.getcwd() 로 두면 Flask 를 backend/ 에서 띄웠을 때 저장소 루트의
+    # 1_uploads 가 범위 밖이 되어 정상 생성 파일까지 400 이 된다.
     try:
         file_path = Path(csv_key).resolve()
-        project_root = Path(os.getcwd()).resolve()
-        file_path.relative_to(project_root)
+        uploads_root = Path(Config.UPLOADS_ROOT).resolve()
+        file_path.relative_to(uploads_root)
     except ValueError:
         logger.warning(f"Path traversal attempt blocked: {csv_key!r}")
         return error_response("Invalid file path", 400)
@@ -920,7 +923,7 @@ def upload_tx_summary():
         
     except Exception as e:
         logger.error(f"TX Summary upload error: {str(e)}", exc_info=True)
-        return error_response(f"TX Summary 업로드 실패: {str(e)}", 500)
+        return error_response("TX Summary 업로드에 실패했습니다.", 500)
 
 
 @db_api_bp.route("/get_viewer_data", methods=["GET"])

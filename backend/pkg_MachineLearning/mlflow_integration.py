@@ -3,10 +3,18 @@ import json
 import datetime
 import logging
 import sys
+import threading
 import sklearn
 from flask import session
 from pkg_SQL.database import SQL
+from utils.credential_store import get_session_credentials
 from utils.database_manager import get_mlflow_db
+
+# 예측 요청마다 수 MB 모델 바이너리를 재전송·역직렬화하지 않도록
+# (prediction_type, stage) 별로 마지막 모델을 프로세스 캐시에 보관한다.
+# checksum 이 바뀌면 자동으로 폐기되므로 모델 갱신은 즉시 반영된다.
+_MODEL_CACHE: dict = {}
+_MODEL_CACHE_LOCK = threading.Lock()
 
 
 class AOP_MLflowTracker:
@@ -16,8 +24,7 @@ class AOP_MLflowTracker:
     """
 
     def __init__(self):
-        self.username = session.get("username")
-        self.password = session.get("password")
+        self.username, self.password = get_session_credentials()
 
         if not self.username or not self.password:
             raise ValueError("사용자 인증 정보가 없습니다.")
@@ -88,7 +95,7 @@ class AOP_MLflowTracker:
             return self.current_run_uuid
 
         except Exception as e:
-            self.logger.error(f"Failed to start training run: {e}")
+            self.logger.error(f"Failed to start training run: {e}", exc_info=True)
             return None
 
     def _ensure_experiment_exists(self, experiment_name):
@@ -147,7 +154,7 @@ class AOP_MLflowTracker:
                 return None
 
         except Exception as e:
-            self.logger.error(f"Failed to ensure experiment exists: {e}")
+            self.logger.error(f"Failed to ensure experiment exists: {e}", exc_info=True)
             return None
 
     def _update_experiment_activity(self, experiment_name):
@@ -164,6 +171,24 @@ class AOP_MLflowTracker:
         except Exception as e:
             # 업데이트 실패해도 전체 프로세스는 계속 진행
             self.logger.warning(f"Failed to update experiment activity: {e}")
+
+    def _bulk_insert(self, table, columns, rows):
+        """여러 행을 단일 INSERT 문으로 저장한다.
+
+        항목마다 execute_query 를 호출하면 연결 획득과 네트워크 왕복이 행 수만큼
+        반복된다. 다중 VALUES 절로 묶어 왕복을 1회로 줄인다(파라미터화 유지).
+        """
+        rows = [r for r in rows if r is not None]
+        if not rows:
+            return
+
+        placeholder = "(" + ", ".join(["?"] * len(columns)) + ")"
+        query = (
+            f"INSERT INTO {table} ({', '.join(columns)}) VALUES "
+            + ", ".join([placeholder] * len(rows))
+        )
+        params = tuple(value for row in rows for value in row)
+        self.db.execute_query(query, params)
 
     def log_data_info(self, feature_data, target_data):
         """데이터 정보 로깅"""
@@ -192,15 +217,14 @@ class AOP_MLflowTracker:
                 ),
             ]
 
-            for param_key, param_value, param_type in params:
-                query = """
-                    INSERT INTO ml_params (run_uuid, param_key, param_value, param_type)
-                    VALUES (?, ?, ?, ?)
-                """
-                self.db.execute_query(
-                    query,
-                    (self.current_run_uuid, param_key, param_value, param_type),
-                )
+            self._bulk_insert(
+                "ml_params",
+                ("run_uuid", "param_key", "param_value", "param_type"),
+                [
+                    (self.current_run_uuid, param_key, param_value, param_type)
+                    for param_key, param_value, param_type in params
+                ],
+            )
 
             # 실행 정보 업데이트
             update_query = "UPDATE ml_runs SET data_shape_info = ? WHERE run_uuid = ?"
@@ -212,7 +236,7 @@ class AOP_MLflowTracker:
             self.logger.info(f"Data info logged: {data_shape_info}")
 
         except Exception as e:
-            self.logger.error(f"Failed to log data info: {e}")
+            self.logger.error(f"Failed to log data info: {e}", exc_info=True)
 
     def log_preprocessing_info(self, model_type, preprocessing_steps=None):
         """전처리 정보 로깅"""
@@ -238,20 +262,19 @@ class AOP_MLflowTracker:
                     )
                 )
 
-            for param_key, param_value, param_type in params:
-                query = """
-                    INSERT INTO ml_params (run_uuid, param_key, param_value, param_type)
-                    VALUES (?, ?, ?, ?)
-                """
-                self.db.execute_query(
-                    query,
-                    (self.current_run_uuid, param_key, param_value, param_type),
-                )
+            self._bulk_insert(
+                "ml_params",
+                ("run_uuid", "param_key", "param_value", "param_type"),
+                [
+                    (self.current_run_uuid, param_key, param_value, param_type)
+                    for param_key, param_value, param_type in params
+                ],
+            )
 
             self.logger.info(f"Preprocessing info logged for model type: {model_type}")
 
         except Exception as e:
-            self.logger.error(f"Failed to log preprocessing info: {e}")
+            self.logger.error(f"Failed to log preprocessing info: {e}", exc_info=True)
 
     def log_model_params(self, model):
         """모델 하이퍼파라미터 로깅"""
@@ -262,25 +285,24 @@ class AOP_MLflowTracker:
             if hasattr(model, "get_params"):
                 params = model.get_params()
 
-                for param_key, param_value in params.items():
-                    query = """
-                        INSERT INTO ml_params (run_uuid, param_key, param_value, param_type)
-                        VALUES (?, ?, ?, ?)
-                    """
-                    self.db.execute_query(
-                        query,
+                self._bulk_insert(
+                    "ml_params",
+                    ("run_uuid", "param_key", "param_value", "param_type"),
+                    [
                         (
                             self.current_run_uuid,
                             param_key,
                             str(param_value)[:1000],
                             "model",
-                        ),
-                    )
+                        )
+                        for param_key, param_value in params.items()
+                    ],
+                )
 
                 self.logger.info(f"Model parameters logged: {len(params)} params")
 
         except Exception as e:
-            self.logger.error(f"Failed to log model params: {e}")
+            self.logger.error(f"Failed to log model params: {e}", exc_info=True)
 
     def log_training_result(self, training_result):
         """machine_learning.py의 training_result 로깅"""
@@ -304,28 +326,27 @@ class AOP_MLflowTracker:
                 ("cv_folds", training_result.get("cv_folds", 5), "data_quality"),
             ]
 
-            for metric_key, metric_value, metric_type in metrics:
-                if metric_value is not None:
-                    query = """
-                        INSERT INTO ml_metrics (run_uuid, metric_key, value, metric_type)
-                        VALUES (?, ?, ?, ?)
-                    """
-                    self.db.execute_query(
-                        query,
-                        (
-                            self.current_run_uuid,
-                            metric_key,
-                            float(metric_value),
-                            metric_type,
-                        ),
+            self._bulk_insert(
+                "ml_metrics",
+                ("run_uuid", "metric_key", "value", "metric_type"),
+                [
+                    (
+                        self.current_run_uuid,
+                        metric_key,
+                        float(metric_value),
+                        metric_type,
                     )
+                    for metric_key, metric_value, metric_type in metrics
+                    if metric_value is not None
+                ],
+            )
 
             self.logger.info(
                 f"Training result logged successfully: {self.current_run_uuid[:8]}..."
             )
 
         except Exception as e:
-            self.logger.error(f"Failed to log training result: {e}")
+            self.logger.error(f"Failed to log training result: {e}", exc_info=True)
 
     def end_run(self, status="FINISHED", error_message=None):
         """실행 종료"""
@@ -366,7 +387,7 @@ class AOP_MLflowTracker:
             self.current_run_uuid = None
 
         except Exception as e:
-            self.logger.error(f"Failed to end run: {e}")
+            self.logger.error(f"Failed to end run: {e}", exc_info=True)
 
     def _normalize_model_name(self, model_name, prediction_type="intensity"):
         """
@@ -426,7 +447,7 @@ class AOP_MLflowTracker:
             return compressed_binary, "gzip", checksum, original_size
 
         except Exception as e:
-            self.logger.error(f"Model serialization failed: {e}")
+            self.logger.error(f"Model serialization failed: {e}", exc_info=True)
             return None, None, None, None
 
     def _deserialize_model(self, binary_data, compression_type="gzip"):
@@ -456,7 +477,7 @@ class AOP_MLflowTracker:
             return model_object
 
         except Exception as e:
-            self.logger.error(f"Model deserialization failed: {e}")
+            self.logger.error(f"Model deserialization failed: {e}", exc_info=True)
             return None
 
     def _extract_model_metadata(self, model_object, model_name):
@@ -611,7 +632,7 @@ class AOP_MLflowTracker:
                 return None
 
         except Exception as e:
-            self.logger.error(f"Error ensuring model exists: {e}")
+            self.logger.error(f"Error ensuring model exists: {e}", exc_info=True)
             return None
 
     def _get_next_version_number(self, registered_model_id):
@@ -638,7 +659,7 @@ class AOP_MLflowTracker:
                 return 1
 
         except Exception as e:
-            self.logger.error(f"Error getting next version number: {e}")
+            self.logger.error(f"Error getting next version number: {e}", exc_info=True)
             return 1
 
     def _create_model_version(
@@ -739,7 +760,7 @@ class AOP_MLflowTracker:
                 return None
 
         except Exception as e:
-            self.logger.error(f"Error creating model version: {e}")
+            self.logger.error(f"Error creating model version: {e}", exc_info=True)
             return None
 
     def register_model(
@@ -821,7 +842,7 @@ class AOP_MLflowTracker:
                 return None
 
         except Exception as e:
-            self.logger.error(f"Failed to register model: {e}")
+            self.logger.error(f"Failed to register model: {e}", exc_info=True)
             return None
 
     def _log_model_performance(self, version_id, training_result):
@@ -854,7 +875,7 @@ class AOP_MLflowTracker:
             self.logger.info(f"Performance metrics logged for version_id: {version_id}")
 
         except Exception as e:
-            self.logger.error(f"Failed to log model performance: {e}")
+            self.logger.error(f"Failed to log model performance: {e}", exc_info=True)
 
     def log_prediction_points(
         self, version_id, target_values, estimation_values, dataset_type="test"
@@ -918,7 +939,7 @@ class AOP_MLflowTracker:
             )
 
         except Exception as e:
-            self.logger.error(f"Failed to log prediction points: {e}")
+            self.logger.error(f"Failed to log prediction points: {e}", exc_info=True)
 
     def _auto_promote_best_model(self, model_id, new_version_id, new_test_score):
         """
@@ -972,7 +993,7 @@ class AOP_MLflowTracker:
                 )
 
         except Exception as e:
-            self.logger.error(f"Failed to auto-promote model: {e}")
+            self.logger.error(f"Failed to auto-promote model: {e}", exc_info=True)
 
     def log_prediction(
         self,
@@ -1040,7 +1061,7 @@ class AOP_MLflowTracker:
             return True
 
         except Exception as e:
-            self.logger.error(f"Failed to log prediction: {e}")
+            self.logger.error(f"Failed to log prediction: {e}", exc_info=True)
             return None
 
     @classmethod
@@ -1084,8 +1105,7 @@ class AOP_MLflowTracker:
     def get_model_by_name(cls, model_name, stage="Production"):
         """모델명으로 특정 스테이지의 모델 정보 조회"""
         try:
-            username = session.get("username")
-            password = session.get("password")
+            username, password = get_session_credentials()
 
             if not username or not password:
                 return None
@@ -1181,8 +1201,7 @@ class AOP_MLflowTracker:
     def get_recent_predictions(cls, model_name=None, limit=10):
         """최근 예측 결과 조회"""
         try:
-            username = session.get("username")
-            password = session.get("password")
+            username, password = get_session_credentials()
 
             if not username or not password:
                 return None
@@ -1301,7 +1320,7 @@ class AOP_MLflowTracker:
             return model_object
 
         except Exception as e:
-            self.logger.error(f"Failed to load model from database: {e}")
+            self.logger.error(f"Failed to load model from database: {e}", exc_info=True)
             return None
 
     def load_best_model(self, prediction_type="intensity", stage="Production"):
@@ -1316,7 +1335,40 @@ class AOP_MLflowTracker:
             object: 로드된 최고 성능 모델 객체, 실패 시 None
         """
         try:
-            # 1. 해당 예측 타입의 베스트 모델 조회
+            # 0. 경량 메타데이터 조회로 캐시 유효성 먼저 확인한다.
+            #    모델 바이너리는 수 MB 단위라 요청마다 전송·gzip 해제·역직렬화하면
+            #    예측 자체보다 로딩 비용이 커진다. checksum 이 같으면 재사용한다.
+            meta_query = """
+                SELECT TOP 1 
+                    rm.model_name,
+                    mv.version_number,
+                    mv.version_id,
+                    mv.checksum,
+                    mp.metric_value as test_score
+                FROM ml_registered_models rm
+                JOIN ml_model_versions mv ON rm.model_id = mv.model_id
+                JOIN ml_model_performance mp ON mv.version_id = mp.model_version_id
+                WHERE mv.prediction_type = ? 
+                    AND mv.stage = ?
+                    AND mp.metric_name = 'test_score'
+                ORDER BY mp.metric_value DESC
+            """
+            meta = self.db.execute_query(meta_query, (prediction_type, stage))
+
+            if meta.empty:
+                self.logger.warning(
+                    f"No model found for prediction_type: {prediction_type}, stage: {stage}"
+                )
+                return None
+
+            meta_row = meta.iloc[0]
+            cache_key = (prediction_type, stage)
+            with _MODEL_CACHE_LOCK:
+                cached = _MODEL_CACHE.get(cache_key)
+            if cached is not None and cached["checksum"] == meta_row["checksum"]:
+                return dict(cached["payload"])
+
+            # 1. 캐시 미스일 때만 바이너리를 포함해 재조회
             query = """
                 SELECT TOP 1 
                     rm.model_name,
@@ -1370,7 +1422,7 @@ class AOP_MLflowTracker:
                 )
 
                 # 모델 정보와 함께 반환 (튜플 형태)
-                return {
+                payload = {
                     "model": model_object,
                     "model_name": model_name,
                     "version_number": version_number,
@@ -1378,11 +1430,17 @@ class AOP_MLflowTracker:
                     "test_score": test_score,
                     "prediction_type": prediction_type,
                 }
+                with _MODEL_CACHE_LOCK:
+                    _MODEL_CACHE[cache_key] = {
+                        "checksum": checksum,
+                        "payload": payload,
+                    }
+                return dict(payload)
 
             return None
 
         except Exception as e:
-            self.logger.error(f"Failed to load best model: {e}")
+            self.logger.error(f"Failed to load best model: {e}", exc_info=True)
             return None
 
     def _verify_checksum(self, binary_data, expected_checksum):
@@ -1402,7 +1460,7 @@ class AOP_MLflowTracker:
             actual_checksum = hashlib.md5(binary_data).hexdigest()
             return actual_checksum == expected_checksum
         except Exception as e:
-            self.logger.error(f"Checksum verification error: {e}")
+            self.logger.error(f"Checksum verification error: {e}", exc_info=True)
             return False
 
     def list_available_models(self, prediction_type=None):
@@ -1450,5 +1508,5 @@ class AOP_MLflowTracker:
             return result
 
         except Exception as e:
-            self.logger.error(f"Failed to list available models: {e}")
+            self.logger.error(f"Failed to list available models: {e}", exc_info=True)
             return None

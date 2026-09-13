@@ -1,6 +1,5 @@
 import logging
 import pandas as pd
-from flask import session
 from utils.database_manager import get_db_connection
 
 # Pandas 다운캐스팅 옵션 설정
@@ -18,23 +17,30 @@ class GroupIdx:
         self.probeId = probeId
         self.database = database
 
-    def getGroupIdx(self):
-        ## 데이터베이스에서 마지막 groupIndex 값 load
-        try:
-            connect = get_db_connection(self.database)
-            query = """
-                SELECT MAX(groupIndex) AS maxGroupIndex from meas_setting
-                where probeid = ?
-            """
-            maxGroupIdx_df = connect.execute_query(query, (self.probeId,))
-            maxGroupIdx = maxGroupIdx_df["maxGroupIndex"].iloc[0]
+    def getGroupIdx(self) -> int:
+        """해당 probe 의 마지막 groupIndex 를 조회한다.
 
-            return maxGroupIdx if maxGroupIdx is not None else 0
+        조회에 실패하면 예외를 그대로 전파한다. 과거 구현은 실패 시 0 을 반환해
+        이미 존재하는 그룹과 1번부터 충돌하는 데이터를 생성했다.
+        """
+        connect = get_db_connection(self.database)
+        query = """
+            SELECT MAX(groupIndex) AS maxGroupIndex from meas_setting
+            where probeid = ?
+        """
+        maxGroupIdx_df = connect.execute_query(query, (self.probeId,))
 
-        except Exception as e:
-            # 오류 발생 시 0을 반환하여 1부터 시작하도록 함
-            logger.warning(f"getGroupIdx 오류 발생, 기본값 0 반환: {e}")
+        if maxGroupIdx_df is None or maxGroupIdx_df.empty:
             return 0
+
+        maxGroupIdx = maxGroupIdx_df["maxGroupIndex"].iloc[0]
+
+        # 해당 probe 의 기존 데이터가 없으면 SQL NULL 이 NaN 으로 들어온다.
+        # `is not None` 검사만으로는 NaN 을 걸러내지 못해 GroupIndex 전체가 NaN 이 된다.
+        if maxGroupIdx is None or pd.isna(maxGroupIdx):
+            return 0
+
+        return int(maxGroupIdx)
 
     def createGroupIdx(self, df):
         # GroupIndex 열 생성 — 벡터화 방식 (for 루프 대비 10x+ 빠름)

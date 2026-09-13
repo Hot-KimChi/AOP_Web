@@ -1,17 +1,18 @@
 import logging
 import os
 import pandas as pd
+from datetime import datetime
 from pkg_SQL.database import SQL
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from flask import session, g
+from flask import g
+from utils.credential_store import get_session_credentials
 from utils.database_manager import get_db_connection
 
 
 def fetchData():
     # 데이터베이스에서 데이터를 가져오는 함수 (병렬 처리)
-    # session에서 인증 정보 가져오기 (메인 스레드에서 미리 추출)
-    username = session.get("username")
-    password = session.get("password")
+    # 자격증명은 서버 메모리(credential_store)에서 가져온다 (메인 스레드에서 미리 추출)
+    username, password = get_session_credentials()
 
     if not username or not password:
         raise ValueError("세션에 사용자 인증 정보가 없습니다.")
@@ -116,17 +117,22 @@ def merge_selectionFeature():
     AOP_data = AOP_data.drop(AOP_data[AOP_data["beamstyleIndex"] == 12].index)
     AOP_data = AOP_data.dropna()
 
-    # CSV 파일을 pkg_MachineLearning/SQL_get_Data 하위에 저장
-    import os
-    from datetime import datetime
+    # 필터·결측 제거 후 학습 가능한 표본이 남았는지 확인한다.
+    # (빈 DataFrame 이 그대로 내려가면 train_test_split 에서 런타임 실패한다)
+    MIN_TRAINING_ROWS = 10
+    if len(AOP_data) < MIN_TRAINING_ROWS:
+        raise ValueError(
+            f"학습 가능한 데이터가 부족합니다(유효 {len(AOP_data)}행, 최소 "
+            f"{MIN_TRAINING_ROWS}행 필요). 조회 조건 또는 결측치를 확인하세요."
+        )
 
-    output_dir = os.path.join(os.path.dirname(__file__), "SQL_get_Data")
-    if not os.path.exists(output_dir):
+    # 수집 데이터 스냅샷 CSV 저장 (AOP_SAVE_TRAINING_CSV=false 로 끌 수 있음)
+    if os.environ.get("AOP_SAVE_TRAINING_CSV", "true").lower() != "false":
+        output_dir = os.path.join(os.path.dirname(__file__), "SQL_get_Data")
         os.makedirs(output_dir, exist_ok=True)
-    now = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_filename = f"{now}_Intensity_SQL_Get_Data.csv"
-    output_path = os.path.join(output_dir, output_filename)
-    AOP_data.to_csv(output_path, index=False)
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = os.path.join(output_dir, f"{now}_Intensity_SQL_Get_Data.csv")
+        AOP_data.to_csv(output_path, index=False)
 
     feature_list = [
         "txFrequencyHz",

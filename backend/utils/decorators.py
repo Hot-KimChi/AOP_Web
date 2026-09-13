@@ -8,6 +8,10 @@ from .error_handler import error_response, CredentialsRequired
 from .logger import logger
 
 
+def _is_production() -> bool:
+    return os.environ.get("AOP_ENV", "development").lower() == "production"
+
+
 def handle_exceptions(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -17,8 +21,15 @@ def handle_exceptions(f):
             logger.warning(f"Credentials required: {str(e)}")
             return error_response("Username and password are required", 422)
         except Exception as e:
+            # 상세 원인은 로그에만 남긴다. 드라이버 예외 문자열에는 서버명·스키마·
+            # SQL 구문이 포함될 수 있어 클라이언트에 그대로 노출하면 정보 유출이 된다.
             logger.error(f"Error occurred: {str(e)}", exc_info=True)
-            return error_response(str(e), 500)
+            message = (
+                "서버 내부 오류가 발생했습니다. 관리자에게 문의해 주세요."
+                if _is_production()
+                else f"서버 내부 오류: {type(e).__name__}"
+            )
+            return error_response(message, 500)
 
     return decorated_function
 

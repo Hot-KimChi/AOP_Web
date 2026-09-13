@@ -1,9 +1,10 @@
 from sklearn.model_selection import cross_validate
 import numpy as np
-import os, sys
+import os, re, sys
 import joblib
 import sklearn
 import logging
+from datetime import datetime
 
 logger = logging.getLogger("ModelEvaluator")
 
@@ -23,6 +24,14 @@ class ModelEvaluator:
         self.prediction = None
 
     def evaluate_model(self):
+        # 표본 수가 fold 수보다 적으면 cross_validate 가 런타임 실패한다.
+        n_samples = len(self.train_target)
+        if n_samples < 2:
+            raise ValueError(
+                f"학습 표본이 부족합니다(train={n_samples}). 최소 2개 이상 필요합니다."
+            )
+        n_splits = max(2, min(5, n_samples))
+
         # Cross validation 수행
         scores = cross_validate(
             self.model,
@@ -30,7 +39,7 @@ class ModelEvaluator:
             self.train_target,
             return_train_score=True,
             n_jobs=-1,
-            cv=5,  # 명시적으로 fold 수 지정
+            cv=n_splits,
         )
 
         # CV 결과 출력
@@ -71,7 +80,14 @@ class ModelEvaluator:
 
         return test_score_rounded, test_predictions
 
-    def modelSave(self):
+    def modelSave(self, logical_name: str = None):
+        """학습된 모델을 ML_Models 디렉터리에 저장한다.
+
+        Args:
+            logical_name: 설정상의 논리 모델명(예: PolynomialFeatures_with_linear_regression).
+                생략하면 클래스명을 사용한다. 클래스명만 쓰면 서로 다른 논리 모델이
+                같은 파일명을 공유해 이전 아티팩트를 덮어쓴다.
+        """
         # 상대 경로 대신 절대 경로 사용
         current_dir = os.path.dirname(os.path.abspath(__file__))
         model_dir = os.path.join(current_dir, "..", "ML_Models")
@@ -81,11 +97,13 @@ class ModelEvaluator:
 
         python_version = f"{sys.version_info.major}{sys.version_info.minor}"
         sklearn_version = sklearn.__version__
-        model_name = self.model.__class__.__name__
+        base_name = logical_name or self.model.__class__.__name__
+        safe_name = re.sub(r"[^0-9A-Za-z._-]+", "_", base_name).strip("_")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # 파일명 생성
+        # 파일명 생성 (논리 모델명 + 타임스탬프로 덮어쓰기 방지)
         filename = (
-            f"{model_name}_v1_python{python_version}_sklearn{sklearn_version}.pkl"
+            f"{safe_name}_{timestamp}_python{python_version}_sklearn{sklearn_version}.pkl"
         )
         filepath = os.path.join(model_dir, filename)
 

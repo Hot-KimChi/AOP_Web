@@ -6,9 +6,10 @@
 import os
 import logging
 from contextlib import contextmanager
-from flask import session, g
+from flask import g
 from pkg_SQL.database import SQL
 from typing import Optional
+from utils.credential_store import get_session_credentials
 from utils.error_handler import CredentialsRequired
 
 
@@ -39,16 +40,20 @@ class DatabaseManager:
             password: DB 비밀번호
             database: 대상 데이터베이스명
         """
-        connection = SQL(username=username, password=password, database=database)
+        connection = SQL(
+            username=username,
+            password=password,
+            database=database,
+            reuse_engine=False,
+        )
         try:
             yield connection
         finally:
-            if hasattr(connection, "close"):
-                connection.close()
+            connection.close()
 
     def get_connection(self, database: Optional[str] = None) -> SQL:
         """
-        로그인 세션의 username/password 로 데이터베이스 연결을 반환합니다.
+        로그인 세션의 자격증명으로 데이터베이스 연결을 반환합니다.
 
         Args:
             database (str, optional): 데이터베이스명. None이면 환경변수 기본값 사용
@@ -59,9 +64,8 @@ class DatabaseManager:
         Raises:
             CredentialsRequired: 세션에 로그인 정보가 없을 때 (422 로 변환됨)
         """
-        # 로그인 세션에서 인증 정보 가져오기
-        username = session.get("username")
-        password = session.get("password")
+        # 자격증명은 세션 쿠키가 아니라 서버 메모리에 보관된다(credential_store 참조)
+        username, password = get_session_credentials()
 
         if not username or not password:
             raise CredentialsRequired(

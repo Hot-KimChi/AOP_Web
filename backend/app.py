@@ -41,6 +41,19 @@ def create_app():
     app.register_blueprint(db_api_bp)
     app.register_blueprint(ml_bp)
 
+    @app.before_request
+    def purge_legacy_session_secrets():
+        """구버전 세션 쿠키에 남아 있을 수 있는 평문 자격증명을 즉시 제거한다.
+
+        Flask 세션 쿠키는 서명만 될 뿐 암호화되지 않으므로, 과거 버전이 남긴
+        `password` 키는 SECRET_KEY 가 유지된 채 배포되면 계속 왕복하게 된다.
+        """
+        from flask import session
+
+        for legacy_key in ("password", "user_password"):
+            if legacy_key in session:
+                session.pop(legacy_key, None)
+
     @app.teardown_appcontext
     def teardown_db(exception):
         from utils.database_manager import DatabaseManager

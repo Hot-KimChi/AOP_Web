@@ -35,6 +35,9 @@ MIN_ALLOWED_PRR: float = float(
 
 
 # ==== 학습 모델 아티팩트 (Booster, feature_columns 등) 불러오기 ====
+_ARTIFACT_CACHE: Dict[str, Any] = {}
+
+
 def load_artifacts():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     art_path = os.path.join(
@@ -45,8 +48,22 @@ def load_artifacts():
         raise FileNotFoundError(
             "모델 아티팩트가 없습니다. 먼저 train_pipeline()을 실행하세요."
         )
+
+    # 요청마다 joblib.load 를 반복하면 모델 크기만큼 디스크 IO·역직렬화 비용이
+    # 매번 발생한다. 파일 수정 시각을 키로 프로세스 캐시에 보관한다.
+    mtime = os.path.getmtime(art_path)
+    cached = _ARTIFACT_CACHE.get(art_path)
+    if cached is not None and cached["mtime"] == mtime:
+        return cached["booster"], cached["feature_columns"]
+
     art = joblib.load(art_path)
-    return art["booster"], art["feature_columns"]
+    booster, feature_columns = art["booster"], art["feature_columns"]
+    _ARTIFACT_CACHE[art_path] = {
+        "mtime": mtime,
+        "booster": booster,
+        "feature_columns": feature_columns,
+    }
+    return booster, feature_columns
 
 
 # ===== 유틸리티 ======
@@ -373,7 +390,7 @@ def _add_physics_features(df: pd.DataFrame) -> pd.DataFrame:
     #    SR = pd.to_numeric(out.get("scanRange", pd.Series([0]*len(out))), errors="coerce").fillna(0)
     #    SR = pd.to_numeric(out.get("scanRange", 0), errors="coerce").fillna(0).clip(lower=1.0)
     SR = pd.to_numeric(
-        out.get("scanRange", pd.Series([0] * len(out)) if len(out) > 1 else 0),
+        out["scanRange"] if "scanRange" in out.columns else pd.Series(0, index=out.index),
         errors="coerce",
     ).fillna(0)
 
@@ -403,6 +420,47 @@ def _add_physics_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ===== 배치 처리를 위한 함수 =====
+def _predict_temprise_many(
+    user_inputs: list, booster, feature_columns
+) -> np.ndarray:
+    """여러 입력의 TempRise 를 한 번의 추론으로 계산한다.
+
+    `_predict_temprise_one` 을 행마다 호출하면 입력 1건당 DataFrame 생성·원-핫
+    인코딩·DMatrix 생성이 반복된다. XGBoost 추론은 행 단위로 독립이므로 동일한
+    전처리를 프레임 단위로 수행해도 결과는 완전히 같다.
+    """
+    if not user_inputs:
+        return np.empty(0, dtype=float)
+
+    rows = pd.DataFrame(list(user_inputs))
+
+    for c in ["isTxAperModulationEn", "txpgWaveformStyle", "elevAperIndex", "VTxindex"]:
+        source = rows[c] if c in rows.columns else 0
+        rows[c] = pd.to_numeric(source, errors="coerce").fillna(0).astype(int)
+
+    V = pd.to_numeric(rows.get("pulseVoltage", 0), errors="coerce").fillna(0.0)
+    cycles = pd.to_numeric(rows.get("numTxCycles", 0), errors="coerce").fillna(0.0)
+
+    features = _add_physics_features(rows)
+    features = apply_one_hot_encoding(
+        features, ["isTxAperModulationEn", "txpgWaveformStyle", "elevAperIndex"]
+    )
+
+    # 훈련 시 컬럼과 동일한 집합·순서 보장
+    X_df = features.reindex(columns=list(feature_columns), fill_value=0)
+
+    dmatrix = xgb.DMatrix(X_df, feature_names=list(feature_columns))
+    g_hat = np.asarray(booster.predict(dmatrix), dtype=float)
+
+    V_arr = V.to_numpy(dtype=float)
+    preds = (V_arr**2) * g_hat
+
+    # 물리 가드: 전압/사이클 중 하나라도 0 이하면 발열 없음
+    invalid = (V_arr <= 0) | (cycles.to_numpy(dtype=float) <= 0)
+    preds[invalid] = 0.0
+    return preds
+
+
 def find_prr_for_temprise_batch(
     user_inputs: list[Dict[str, Any]],
     target_tr: float,
@@ -414,61 +472,74 @@ def find_prr_for_temprise_batch(
     """
     여러 user_input을 배치로 처리하여 성능 개선.
     하이브리드 방식: 선형 보간으로 초기 추정 → 정밀 이분 탐색
-    모델을 한 번만 로드하고 재사용.
+    모델을 한 번만 로드하고, 각 탐색 단계의 모든 후보를 한 번에 추론한다.
     """
-    booster, feature_columns = load_artifacts()  # 한 번만 로드
-    results = []
+    booster, feature_columns = load_artifacts()  # 캐시된 아티팩트 재사용
+    n = len(user_inputs)
+    results: list = [None] * n
 
-    for user_input in user_inputs:
-        # 물리적 가드
+    def finalize(idx: int, payload: Dict[str, Any]) -> None:
+        results[idx] = payload
+
+    # ===== 1단계: 물리 가드 및 탐색 범위 검증 =====
+    prr_min_adj = max(float(prr_min), MIN_ALLOWED_PRR)
+    prr_max_adj = min(float(prr_max), MAX_ALLOWED_PRR)
+
+    active: list[int] = []
+    for idx, user_input in enumerate(user_inputs):
         V = float(user_input.get("pulseVoltage", 0) or 0)
         cycles = float(user_input.get("numTxCycles", 0) or 0)
         if V <= 0 or cycles <= 0:
-            results.append(
+            finalize(
+                idx,
                 {
                     "best_prr": DEFAULT_POLICY_PRF,
                     "pred_temprise": 0.0,
                     "iters": 0,
                     "note": "0 V or 0 cycles",
-                }
+                },
             )
             continue
-
-        # PRF 범위 보정
-        prr_min_adj = max(float(prr_min), MIN_ALLOWED_PRR)
-        prr_max_adj = min(float(prr_max), MAX_ALLOWED_PRR)
         if prr_min_adj >= prr_max_adj:
-            results.append(
+            finalize(
+                idx,
                 {
                     "best_prr": None,
                     "pred_temprise": float("nan"),
                     "iters": 0,
                     "note": "invalid bracket after clipping",
-                }
+                },
             )
             continue
+        active.append(idx)
 
-        # 초기 로그 스케일 샘플링 (7개로 축소)
-        grid = np.geomspace(prr_min_adj, prr_max_adj, num=7)
-        preds = []
-        for g in grid:
-            u = dict(user_input)
-            u["pulseRepetRate"] = float(g)
-            y_dict = _predict_temprise_one(u, booster, feature_columns)
-            y_val = _extract_temprise(y_dict)
-            preds.append((float(g), float(y_val)))
+    if not active:
+        return results
 
-        ys = [p[1] for p in preds]
+    # ===== 2단계: 로그 스케일 초기 그리드를 한 번에 평가 =====
+    grid = np.geomspace(prr_min_adj, prr_max_adj, num=7)
+    grid_batch = [
+        {**user_inputs[idx], "pulseRepetRate": float(g)} for idx in active for g in grid
+    ]
+    grid_preds = _predict_temprise_many(grid_batch, booster, feature_columns)
+    grid_preds = grid_preds.reshape(len(active), len(grid))
+
+    # ===== 3단계: 정책 분기 및 보간 초기값 산출 =====
+    interp_candidates: list = []  # (idx, x_init, x0, y0, x1, y1)
+    for pos, idx in enumerate(active):
+        ys = [float(v) for v in grid_preds[pos]]
+        preds = list(zip([float(g) for g in grid], ys))
 
         # 정책 1: 전 구간 차단
         if max(ys) <= 0.0:
-            results.append(
+            finalize(
+                idx,
                 {
                     "best_prr": DEFAULT_POLICY_PRF,
                     "pred_temprise": max(ys),
                     "iters": 0,
                     "note": "policy: all < MIN_VALID_TEMPRISE → fallback PRF",
-                }
+                },
             )
             continue
 
@@ -476,27 +547,28 @@ def find_prr_for_temprise_batch(
         if not (min(ys) <= target_tr <= max(ys)):
             best = min(preds, key=lambda t: abs(t[1] - target_tr))
             if best[1] <= 0.0:
-                results.append(
+                finalize(
+                    idx,
                     {
                         "best_prr": DEFAULT_POLICY_PRF,
                         "pred_temprise": 0.0,
                         "iters": 0,
                         "note": "policy: no crossing & pred=0 → fallback PRF",
-                    }
+                    },
                 )
             else:
-                results.append(
+                finalize(
+                    idx,
                     {
                         "best_prr": min(float(best[0]), MAX_ALLOWED_PRR),
                         "pred_temprise": best[1],
                         "iters": 0,
                         "note": "no crossing",
-                    }
+                    },
                 )
             continue
 
-        # ===== 선형 보간으로 초기 추정값 계산 =====
-        # target_tr을 감싸는 두 점 찾기
+        # target_tr 을 감싸는 두 점 찾기
         lo_idx, hi_idx = 0, len(preds) - 1
         for i in range(len(preds) - 1):
             if preds[i][1] <= target_tr <= preds[i + 1][1]:
@@ -506,117 +578,135 @@ def find_prr_for_temprise_batch(
                 lo_idx, hi_idx = i + 1, i
                 break
 
-        # 선형 보간으로 초기 PRF 추정
         x0, y0 = preds[lo_idx]
         x1, y1 = preds[hi_idx]
 
         if abs(y1 - y0) > 1e-6:  # 0으로 나누기 방지
-            # 선형 보간: x = x0 + (target - y0) / (y1 - y0) * (x1 - x0)
             x_init = x0 + (target_tr - y0) / (y1 - y0) * (x1 - x0)
-            x_init = max(prr_min_adj, min(prr_max_adj, x_init))  # 범위 내로 클리핑
+            x_init = max(prr_min_adj, min(prr_max_adj, x_init))
         else:
             x_init = 0.5 * (x0 + x1)
 
-        # 초기 추정값 평가
-        y_init = _extract_temprise(
-            _predict_temprise_one(
-                {**user_input, "pulseRepetRate": x_init}, booster, feature_columns
-            )
-        )
+        interp_candidates.append((idx, x_init, x0, y0, x1, y1))
 
-        # 이미 충분히 가까우면 바로 반환
+    if not interp_candidates:
+        return results
+
+    # ===== 4단계: 보간 초기값을 한 번에 평가 =====
+    init_preds = _predict_temprise_many(
+        [
+            {**user_inputs[idx], "pulseRepetRate": x_init}
+            for idx, x_init, _, _, _, _ in interp_candidates
+        ],
+        booster,
+        feature_columns,
+    )
+
+    # 이분 탐색 상태: idx → 탐색 구간 및 현재 최선값
+    searching: list = []
+    for (idx, x_init, x0, y0, x1, y1), y_init in zip(interp_candidates, init_preds):
+        y_init = float(y_init)
         if abs(y_init - target_tr) <= tol * max(1.0, target_tr):
             if y_init <= 0.0:
-                results.append(
+                finalize(
+                    idx,
                     {
                         "best_prr": DEFAULT_POLICY_PRF,
                         "pred_temprise": 0.0,
                         "iters": 1,
                         "note": "policy: interpolation converged to 0 → fallback PRF",
-                    }
+                    },
                 )
             else:
-                results.append(
+                finalize(
+                    idx,
                     {
                         "best_prr": min(float(x_init), MAX_ALLOWED_PRR),
                         "pred_temprise": y_init,
                         "iters": 1,
                         "note": "converged by interpolation",
-                    }
+                    },
                 )
             continue
 
-        # ===== 선형 보간 결과 주변에서 정밀 이분 탐색 =====
-        # 탐색 범위를 보간 결과 주변으로 좁힘
         lo, hi = x0, x1
-        y_lo, y_hi = y0, y1
-
-        # 단조성 보정
-        if y_lo > y_hi:
+        if y0 > y1:  # 단조성 보정
             lo, hi = hi, lo
-            y_lo, y_hi = y_hi, y_lo
 
-        iters = 1  # 이미 초기 평가 1회 수행
-        best = (x_init, y_init)  # 보간 결과로 초기화
+        searching.append(
+            {
+                "idx": idx,
+                "lo": lo,
+                "hi": hi,
+                "iters": 1,
+                "best": (x_init, y_init),
+            }
+        )
 
-        while iters < max_iter:
-            mid = 0.5 * (lo + hi)
-            y_mid = _extract_temprise(
-                _predict_temprise_one(
-                    {**user_input, "pulseRepetRate": mid}, booster, feature_columns
-                )
-            )
+    # ===== 5단계: 이분 탐색을 스텝 동기 방식으로 일괄 수행 =====
+    # 각 스텝에서 아직 수렴하지 않은 모든 행의 중점을 한 번의 추론으로 평가한다.
+    while searching:
+        mids = [0.5 * (s["lo"] + s["hi"]) for s in searching]
+        y_mids = _predict_temprise_many(
+            [
+                {**user_inputs[s["idx"]], "pulseRepetRate": mid}
+                for s, mid in zip(searching, mids)
+            ],
+            booster,
+            feature_columns,
+        )
 
-            if abs(y_mid - target_tr) < abs(best[1] - target_tr):
-                best = (mid, y_mid)
+        still_searching: list = []
+        for state, mid, y_mid in zip(searching, mids, y_mids):
+            y_mid = float(y_mid)
+            if abs(y_mid - target_tr) < abs(state["best"][1] - target_tr):
+                state["best"] = (mid, y_mid)
 
             if abs(y_mid - target_tr) <= tol * max(1.0, target_tr):
                 if y_mid <= 0.0:
-                    results.append(
+                    finalize(
+                        state["idx"],
                         {
                             "best_prr": DEFAULT_POLICY_PRF,
                             "pred_temprise": 0.0,
-                            "iters": iters + 1,
+                            "iters": state["iters"] + 1,
                             "note": "policy: converged to 0 → fallback PRF",
-                        }
+                        },
                     )
                 else:
-                    results.append(
+                    finalize(
+                        state["idx"],
                         {
                             "best_prr": min(float(mid), MAX_ALLOWED_PRR),
                             "pred_temprise": y_mid,
-                            "iters": iters + 1,
+                            "iters": state["iters"] + 1,
                             "note": "converged",
-                        }
+                        },
                     )
-                break
+                continue
 
             if y_mid < target_tr:
-                lo, y_lo = mid, y_mid
+                state["lo"] = mid
             else:
-                hi, y_hi = mid, y_mid
-            iters += 1
-        else:
-            # 최대 반복 도달
-            if best[0] is None:
-                results.append(
-                    {
-                        "best_prr": None,
-                        "pred_temprise": float("nan"),
-                        "iters": iters,
-                        "note": "no valid candidate",
-                    }
-                )
+                state["hi"] = mid
+            state["iters"] += 1
+
+            if state["iters"] < max_iter:
+                still_searching.append(state)
             else:
-                final_prr, final_pred = best
-                results.append(
+                # 최대 반복 도달
+                final_prr, final_pred = state["best"]
+                finalize(
+                    state["idx"],
                     {
                         "best_prr": min(float(final_prr), MAX_ALLOWED_PRR),
                         "pred_temprise": final_pred,
-                        "iters": iters,
+                        "iters": state["iters"],
                         "note": "max_iter reached",
-                    }
+                    },
                 )
+
+        searching = still_searching
 
     return results
 

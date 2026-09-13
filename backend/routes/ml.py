@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 import pandas as pd
 from utils.decorators import handle_exceptions, require_auth
 from utils.logger import logger
-from utils.error_handler import error_response
+from utils.error_handler import error_response, CredentialsRequired
 
 ml_bp = Blueprint("ml", __name__, url_prefix="/api")
 
@@ -28,27 +28,25 @@ def get_ml_models():
 @require_auth
 def train_model():
     """머신러닝 모델 훈련 API"""
-    try:
-        from pkg_MachineLearning.machine_learning import MachineLearning
+    # 예외 처리는 @handle_exceptions 에 위임한다.
+    # (내부에서 광범위하게 잡으면 CredentialsRequired 가 422 대신 500 으로 반환되고
+    #  드라이버 예외 원문이 클라이언트에 노출된다)
+    from pkg_MachineLearning.machine_learning import MachineLearning
 
-        data = request.get_json()
-        selected_model = data.get("model")
+    data = request.get_json()
+    selected_model = data.get("model") if data else None
 
-        if not selected_model:
-            return error_response("모델이 선택되지 않았습니다.", 400)
+    if not selected_model:
+        return error_response("모델이 선택되지 않았습니다.", 400)
 
-        logger.info(f"Training request received for model: {selected_model}")
+    logger.info(f"Training request received for model: {selected_model}")
 
-        # MachineLearning 클래스 인스턴스 생성 및 훈련 실행
-        ml = MachineLearning()
-        result = ml.train_model(selected_model)
+    # MachineLearning 클래스 인스턴스 생성 및 훈련 실행
+    ml = MachineLearning()
+    result = ml.train_model(selected_model)
 
-        # 훈련 완료 로그는 machine_learning.py에서 처리하므로 중복 제거
-        return jsonify(result)
-
-    except Exception as e:
-        logger.error(f"Training request failed: {str(e)}", exc_info=True)
-        return error_response(str(e), 500)
+    # 훈련 완료 로그는 machine_learning.py에서 처리하므로 중복 제거
+    return jsonify(result)
 
 
 @ml_bp.route("/model_versions_performance", methods=["GET"])
@@ -192,11 +190,14 @@ def get_model_versions_performance():
 
         return jsonify({"status": "success", "data": result_data})
 
+    except CredentialsRequired:
+        # 세션 자격증명 없음은 422 로 변환되어야 하므로 상위(@handle_exceptions)로 전파
+        raise
     except Exception as e:
         logger.error(
             f"Failed to retrieve model versions performance: {str(e)}", exc_info=True
         )
-        return error_response(str(e), 500)
+        return error_response("모델 버전 성능 조회에 실패했습니다.", 500)
 
 
 @ml_bp.route("/prediction_points", methods=["GET"])
@@ -369,6 +370,8 @@ def get_prediction_points():
 
         return jsonify({"status": "success", "data": result_data})
 
+    except CredentialsRequired:
+        raise
     except Exception as e:
         logger.error(f"Failed to retrieve prediction points: {str(e)}", exc_info=True)
-        return error_response(str(e), 500)
+        return error_response("예측 포인트 조회에 실패했습니다.", 500)

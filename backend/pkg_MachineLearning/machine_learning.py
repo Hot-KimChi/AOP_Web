@@ -76,14 +76,16 @@ class MachineLearning:
                 f"Data split - Train: {train_input.shape}, Test: {test_input.shape}"
             )
 
-            # 3. 데이터 전처리 (스케일링 및 polynomial features)
-            from .data_preprocessing import DataPreprocess
+            # 3. 데이터 전처리 단계 구성 (스케일링 및 polynomial features)
+            #    전처리기는 Pipeline 으로 모델과 함께 저장되어 추론 시에도 동일하게 적용된다.
+            from .data_preprocessing import get_preprocessing_steps
 
-            data_preprocessor = DataPreprocess(train_input, test_input)
-            train_scaled, test_scaled = data_preprocessor.preprocess(
-                model_type=model_name
+            preprocessing_steps = get_preprocessing_steps(model_name)
+            train_scaled, test_scaled = train_input, test_input
+            self.logger.info(
+                f"Preprocessing steps for {model_name}: "
+                f"{[name for name, _ in preprocessing_steps] or 'none'}"
             )
-            self.logger.info(f"Data preprocessing completed for model: {model_name}")
 
             # MLflow: 전처리 정보 로깅
             if mlflow_tracker:
@@ -94,6 +96,11 @@ class MachineLearning:
 
             model_selector = MLModel(model_name)
             model = model_selector.select_model()
+
+            if preprocessing_steps:
+                from sklearn.pipeline import Pipeline
+
+                model = Pipeline(preprocessing_steps + [("model", model)])
             self.logger.info(f"Model selected: {model.__class__.__name__}")
 
             # MLflow: 모델 하이퍼파라미터 로깅
@@ -113,9 +120,11 @@ class MachineLearning:
                 mlflow_tracker.log_training_result(training_result)
 
             # 6. 모델 저장
-            evaluator.modelSave()
+            evaluator.modelSave(logical_name=model_name)
 
             # 🆕 Step 3: 모델 바이너리 데이터베이스 등록 (Option 1)
+            registration_error = None
+            model_version_id = None
             if mlflow_tracker:
                 try:
                     # 현재는 intensity 예측용으로만 등록 (하나의 모델 = 하나의 예측 타입)
@@ -150,15 +159,20 @@ class MachineLearning:
                             self.logger.warning(
                                 f"Failed to save prediction points: {point_err}"
                             )
+                    else:
+                        # register_model 은 실패를 None 으로 반환한다.
+                        # 이를 성공으로 보고하면 DB 등록 누락이 조용히 묻힌다.
+                        registration_error = (
+                            "모델 버전 등록이 반환값 없이 종료되었습니다."
+                        )
+                        self.logger.error(registration_error)
 
                 except Exception as e:
+                    registration_error = str(e)
                     self.logger.warning(f"Model registration failed: {e}")
-                    # 에러 상세 정보 출력
-                    import traceback
-
-                    self.logger.error(
-                        f"Registration error details: {traceback.format_exc()}"
-                    )
+                    self.logger.error("Registration error details", exc_info=True)
+            else:
+                registration_error = "MLflow 추적기를 초기화하지 못했습니다."
 
             # MLflow: 성공적으로 실행 종료
             if mlflow_tracker:
@@ -166,6 +180,21 @@ class MachineLearning:
 
             # 최종 완료 로그 (한 번만)
             self.logger.info(f"Model training pipeline completed for: {model_name}")
+
+            if registration_error:
+                # 학습·저장은 됐지만 DB 등록이 누락된 상태를 성공으로 보고하지 않는다.
+                return {
+                    "status": "partial_success",
+                    "message": (
+                        f"모델 '{model_name}' 훈련은 완료됐지만 데이터베이스 등록에 "
+                        f"실패했습니다: {registration_error}"
+                    ),
+                    "data_info": {
+                        "features_shape": feature_data.shape,
+                        "target_shape": target_data.shape,
+                        "training_result": training_result,
+                    },
+                }
 
             return {
                 "status": "success",

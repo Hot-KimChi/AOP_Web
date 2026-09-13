@@ -2,10 +2,9 @@ import logging
 import pandas as pd
 import numpy as np
 import time
-from flask import session
 from pkg_MachineLearning.mlflow_integration import AOP_MLflowTracker
+from utils.credential_store import get_session_credentials
 from utils.database_manager import get_db_connection
-from pkg_MeasSetGen.Temp_Prr_predict import find_prr_for_temprise
 
 logger = logging.getLogger("PredictML")
 
@@ -27,11 +26,86 @@ class PredictML:
         self.probeName = probeName
         self.database = database
 
-        self.username = session.get("username")
-        self.password = session.get("password")
+        self.username, self.password = get_session_credentials()
 
         if not self.username or not self.password:
             raise ValueError("User not authenticated")
+
+        self._probe_geo_row = None
+
+    # 추론 DataFrame 의 컬럼명은 측정셋 생성 스키마를 따르고, 학습 데이터는
+    # DB 조회 스키마를 따르므로 이름이 다르다. 같은 위치에 오는 특성끼리 매핑한다.
+    INTENSITY_FEATURE_ALIASES = {
+        "TxFrequencyHz": "txFrequencyHz",
+        "TxFocusLocCm": "focusRangeCm",
+        "NumTxElements": "numTxElements",
+        "TxpgWaveformStyle": "txpgWaveformStyle",
+        "ProbeNumTxCycles": "numTxCycles",
+        "ElevAperIndex": "elevAperIndex",
+        "IsTxChannelModulationEn": "IsTxAperModulationEn",
+    }
+
+    @classmethod
+    def _align_features(cls, model, estParams: pd.DataFrame):
+        """모델이 학습 시 사용한 특성명·순서에 맞춰 입력을 정렬한다.
+
+        `.values` 로 넘기면 컬럼 순서가 바뀌어도 오류 없이 잘못된 예측이 나온다.
+        모델이 `feature_names_in_` 을 갖고 있으면 그 순서로 재색인해 검증한다.
+        """
+        expected = getattr(model, "feature_names_in_", None)
+        if expected is None:
+            return estParams.values
+
+        renamed = estParams.rename(columns=cls.INTENSITY_FEATURE_ALIASES)
+        missing = [name for name in expected if name not in renamed.columns]
+        if missing:
+            logger.warning(
+                "학습 특성명과 일치하지 않아 위치 기반으로 예측합니다. 누락: %s", missing
+            )
+            return estParams.values
+
+        return renamed[list(expected)]
+
+    # probe_geo 는 probe 당 1행인 마스터 데이터다. intensity/temperature/power 단계가
+    # 각각 조회하면 요청마다 DB 왕복이 3회 발생하므로 한 번만 읽어 재사용한다.
+    PROBE_GEO_COLUMNS = (
+        "probePitchCm",
+        "probeRadiusCm",
+        "probeElevAperCm0",
+        "probeElevAperCm1",
+        "probeElevFocusRangCm",
+        "probeElevFocusRangCm1",
+        "probeNumElements",
+    )
+
+    def _get_probe_geo(self) -> pd.Series:
+        """해당 probe 의 geometry 1행을 반환한다(요청 단위 캐시).
+
+        Raises:
+            ValueError: 조회 결과가 정확히 1행이 아닐 때. 0행이면 IndexError,
+                복수 행이면 길이 불일치 ValueError 로 이어지던 문제를 명시적 오류로 바꾼다.
+        """
+        if self._probe_geo_row is not None:
+            return self._probe_geo_row
+
+        columns = ", ".join(f"[{c}]" for c in self.PROBE_GEO_COLUMNS)
+        query = f"SELECT {columns} FROM probe_geo WHERE probeid = ?"
+
+        connect = get_db_connection(self.database)
+        probeGeo_df = connect.execute_query(query, (self.probeId,))
+
+        if probeGeo_df is None or len(probeGeo_df) == 0:
+            raise ValueError(
+                f"probe_geo 에 probeId={self.probeId} 데이터가 없습니다."
+            )
+        if len(probeGeo_df) > 1:
+            raise ValueError(
+                f"probe_geo 에 probeId={self.probeId} 행이 {len(probeGeo_df)}개 있습니다. "
+                "1개만 존재해야 합니다."
+            )
+
+        self._probe_geo_row = probeGeo_df.fillna(0).infer_objects().iloc[0]
+        return self._probe_geo_row
 
     def _paramForIntensity(self):
         ## take parameters for ML from measSet_gen file.
@@ -47,37 +121,19 @@ class PredictML:
             ]
         ].copy()
 
-        ## load parameters from SQL database
-        connect = get_db_connection(self.database)
-        query = """
-            SELECT [probePitchCm], [probeRadiusCm], [probeElevAperCm0], [probeElevAperCm1], [probeElevFocusRangCm], [probeElevFocusRangCm1]
-            FROM probe_geo 
-            WHERE probeid = ?
-            ORDER BY 1
-            """
+        ## load parameters from SQL database (probe 당 1행, 요청 단위 캐시)
+        probeGeo = self._get_probe_geo()
 
-        probeGeo_df = connect.execute_query(query, (self.probeId,))
-        probeGeo_df = probeGeo_df.fillna(0).infer_objects()
-
-        if len(probeGeo_df) == 1:
-            probeGeo_df = pd.concat([probeGeo_df] * len(estParams), ignore_index=True)
-
-        # Assigning est_geo columns to est_params, broadcasting if necessary
+        # 스칼라 geometry 값을 모든 행에 브로드캐스트
         estParams = estParams.assign(
-            probePitchCm=probeGeo_df["probePitchCm"].values,
-            probeRadiusCm=probeGeo_df["probeRadiusCm"].values,
-            probeElevAperCm0=probeGeo_df["probeElevAperCm0"].values,
-            probeElevAperCm1=probeGeo_df["probeElevAperCm1"].values,
-            probeElevFocusRangCm=probeGeo_df["probeElevFocusRangCm"].values,
-            probeElevFocusRangCm1=probeGeo_df["probeElevFocusRangCm1"].values,
+            probePitchCm=probeGeo["probePitchCm"],
+            probeRadiusCm=probeGeo["probeRadiusCm"],
+            probeElevAperCm0=probeGeo["probeElevAperCm0"],
+            probeElevAperCm1=probeGeo["probeElevAperCm1"],
+            probeElevFocusRangCm=probeGeo["probeElevFocusRangCm"],
+            probeElevFocusRangCm1=probeGeo["probeElevFocusRangCm1"],
         )
 
-        # # Check the final DataFrame before saving to CSV
-        # print("Final est_params: ", self.est_params)
-
-        # # DataFrame을 CSV로 저장
-        # self.est_params.to_csv("measSetGen_df.csv", index=False, encoding="utf-8-sig")
-        # print("CSV file saved as measSetGen_df.csv")
         return estParams
 
     def _paramForTemperature(self):
@@ -119,30 +175,18 @@ class PredictML:
             }
         )
 
-        ## load parameters from SQL database
-        connect = get_db_connection(self.database)
-        query = """
-            SELECT [probePitchCm], [probeRadiusCm], [probeElevAperCm0], [probeNumElements]            
-            FROM probe_geo 
-            WHERE probeid = ?
-            ORDER BY 1
-            """
+        ## load parameters from SQL database (probe 당 1행, 요청 단위 캐시)
+        probeGeo = self._get_probe_geo()
 
-        probeGeo_df = connect.execute_query(query, (self.probeId,))
-        probeGeo_df = probeGeo_df.fillna(0).infer_objects()
-
-        if len(probeGeo_df) == 1:
-            probeGeo_df = pd.concat([probeGeo_df] * len(estParams), ignore_index=True)
-
-        probePitch = probeGeo_df["probePitchCm"].iloc[0]
-        probeNumElements = probeGeo_df["probeNumElements"].iloc[0]
+        probePitch = probeGeo["probePitchCm"]
+        probeNumElements = probeGeo["probeNumElements"]
         fullScanRange = probePitch * probeNumElements
 
-        # Assigning est_geo columns to est_params, broadcasting if necessary
+        # 스칼라 geometry 값을 모든 행에 브로드캐스트
         estParams = estParams.assign(
-            probePitchCm=probeGeo_df["probePitchCm"].values,
-            probeRadiusCm=probeGeo_df["probeRadiusCm"].values,
-            probeElevAperCm0=probeGeo_df["probeElevAperCm0"].values,
+            probePitchCm=probeGeo["probePitchCm"],
+            probeRadiusCm=probeGeo["probeRadiusCm"],
+            probeElevAperCm0=probeGeo["probeElevAperCm0"],
         )
 
         # Create two copies: one with fullScanRange, one with 0
@@ -176,17 +220,17 @@ class PredictML:
         model_info = mlflow_tracker.load_best_model(prediction_type="intensity")
 
         if model_info is None:
-            # 대안: 클래스 메서드로 로깅하고 기본값 사용
-            self.df["AI_param"] = pd.Series([5.0] * len(self.df), name="AI_param")
-            try:
-                AOP_MLflowTracker.log_simple_prediction(
-                    input_features={"fallback": "no_model_found"},
-                    prediction_result={"AI_param": 5.0},
-                    prediction_type="intensity",
-                )
-            except Exception as e:
-                logger.debug(f"MLflow simple prediction logging skipped: {e}")
-            return self.df
+            # 모델 부재·DB 오류·역직렬화 실패를 모두 기본값 5.0 으로 덮으면,
+            # 장애가 "성공한 측정셋"으로 위장되어 잘못된 설비 설정이 생성된다.
+            AOP_MLflowTracker.log_simple_prediction(
+                input_features={"error": "no_intensity_model"},
+                prediction_result={"AI_param": None},
+                prediction_type="intensity",
+            )
+            raise RuntimeError(
+                "intensity 예측 모델을 불러오지 못했습니다. "
+                "모델이 등록되어 있는지, DB 연결이 정상인지 확인해 주세요."
+            )
 
         loaded_model = model_info["model"]
         model_name = model_info["model_name"]
@@ -194,7 +238,7 @@ class PredictML:
 
         # 예측 수행
         prediction_start = time.time()
-        zt_est = loaded_model.predict(estParams.values)
+        zt_est = loaded_model.predict(self._align_features(loaded_model, estParams))
         prediction_time_ms = int((time.time() - prediction_start) * 1000)
 
         # MLflow prediction logging
@@ -228,17 +272,15 @@ class PredictML:
     def power_PRF_est(self):
         ## predict PRF by ML model.
 
-        ## load parameters from SQL database for transducer pitch
-        connect = get_db_connection(self.database)
-        query = """
-            SELECT [probePitchCm]
-            FROM probe_geo 
-            WHERE probeid = ?
-            ORDER BY 1
-            """
-
-        pitchCm_df = connect.execute_query(query, (self.probeId,))
-        oneCmElement = np.ceil(1 / pitchCm_df["probePitchCm"].iloc[0])
+        ## load parameters from SQL database for transducer pitch (요청 단위 캐시)
+        probeGeo = self._get_probe_geo()
+        probePitchCm = float(probeGeo["probePitchCm"])
+        if probePitchCm <= 0:
+            raise ValueError(
+                f"probe_geo.probePitchCm 값이 유효하지 않습니다(probeId={self.probeId}, "
+                f"값={probePitchCm})."
+            )
+        oneCmElement = np.ceil(1 / probePitchCm)
 
         # 각 GroupIndex 내에서 최대 TxFocusLocCm 값을 찾기
         max_values = self.df.groupby("GroupIndex")["TxFocusLocCm"].transform("max")
@@ -261,11 +303,7 @@ class PredictML:
             mlflow_tracker = AOP_MLflowTracker()
 
             input_features = {
-                "probePitch": (
-                    float(pitchCm_df["probePitchCm"].iloc[0])
-                    if not pitchCm_df.empty
-                    else None
-                ),
+                "probePitch": probePitchCm,
                 "maxTxFocusLoc": (
                     float(max_values.max()) if len(max_values) > 0 else None
                 ),

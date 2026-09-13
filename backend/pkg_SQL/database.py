@@ -1,5 +1,6 @@
 import os
-import pyodbc
+import hashlib
+import threading
 import pandas as pd
 from sqlalchemy import create_engine, text
 import logging
@@ -7,24 +8,82 @@ from urllib.parse import quote_plus
 
 logger = logging.getLogger("SQL")
 
+# (connection_string 해시) → Engine 캐시.
+# SQLAlchemy Engine 은 스레드 세이프하며 커넥션 풀을 내장한다. 요청마다 새 엔진을
+# 만들면 풀이 계속 쌓여 커넥션이 누수되고 풀링 이점도 사라지므로 재사용한다.
+_ENGINE_CACHE = {}
+_ENGINE_CACHE_LOCK = threading.Lock()
+_ENGINE_CACHE_MAX = 32
+
+
+def _get_cached_engine(connection_string: str):
+    key = hashlib.sha256(connection_string.encode("utf-8")).hexdigest()
+    with _ENGINE_CACHE_LOCK:
+        engine = _ENGINE_CACHE.get(key)
+        if engine is not None:
+            # LRU 유지: 최근 사용 항목을 뒤로 보낸다.
+            _ENGINE_CACHE[key] = _ENGINE_CACHE.pop(key)
+            return engine
+
+        engine = _create_engine(connection_string)
+        _ENGINE_CACHE[key] = engine
+
+        while len(_ENGINE_CACHE) > _ENGINE_CACHE_MAX:
+            oldest_key = next(iter(_ENGINE_CACHE))
+            evicted = _ENGINE_CACHE.pop(oldest_key)
+            try:
+                evicted.dispose()
+            except Exception:
+                logger.warning("Failed to dispose evicted engine", exc_info=True)
+        return engine
+
+
+def _create_engine(connection_string: str):
+    return create_engine(
+        connection_string,
+        fast_executemany=True,
+        pool_pre_ping=True,
+        pool_recycle=1800,
+        pool_size=5,
+        max_overflow=5,
+    )
+
 
 class SQL:
-    def __init__(self, username, password, database=None):
+    def __init__(self, username, password, database=None, reuse_engine: bool = True):
+        """
+        Args:
+            reuse_engine: True 면 동일 연결 문자열의 엔진을 전역 캐시에서 재사용한다.
+                로그인 검증처럼 일회성(특히 실패할 수 있는) 자격증명으로 연결할 때는
+                False 를 지정해 캐시 오염을 막고 close() 시 즉시 폐기되게 한다.
+        """
         self.username = username
         self.password = password
         self.database = database
+        self._reuse_engine = reuse_engine
 
         # 서버 주소 환경 변수
         self.server = os.environ.get("SERVER_ADDRESS_ADDRESS")
         self.connection_string = self.create_connection_string()
 
-        # SQLAlchemy 엔진을 초기화 시점에 한 번만 생성
-        self.engine = create_engine(
-            self.connection_string,
-            fast_executemany=True,
-            pool_pre_ping=True,
-            pool_recycle=1800,
+        self.engine = (
+            _get_cached_engine(self.connection_string)
+            if reuse_engine
+            else _create_engine(self.connection_string)
         )
+
+    def close(self):
+        """연결 자원을 정리한다.
+
+        캐시된 엔진은 다른 요청이 함께 사용하므로 dispose 하지 않는다(풀이 연결을
+        관리한다). 캐시를 쓰지 않는 일회성 엔진만 즉시 폐기한다.
+        """
+        if self._reuse_engine:
+            return
+        try:
+            self.engine.dispose()
+        except Exception:
+            logger.warning("Failed to dispose engine", exc_info=True)
 
     def create_connection_string(self):
         """연결 문자열을 생성합니다."""
@@ -72,9 +131,16 @@ class SQL:
             logger.error(f"Query execution error: {str(e)}")
             raise
 
-    def authenticate_user(self, username, password):
-        """사용자 인증 함수. 계정이 활성화되어 있고 비밀번호가 일치하는지 확인합니다."""
-        user_info = self.get_user_info(username)
+    def authenticate_user(self, username, password=None, user_info=None):
+        """사용자 인증 확인.
+
+        이 인스턴스의 엔진은 이미 `username`/`password` 자격증명으로 만들어졌으므로,
+        `get_user_info()` 가 성공했다는 사실 자체가 자격증명이 유효함을 의미한다.
+        따라서 별도의 pyodbc 연결을 다시 여는 대신 계정 활성화 여부만 확인한다.
+        (기존 구현은 로그인마다 연결을 2개 만들고 해제하지 않아 커넥션이 누수됐다.)
+        """
+        if user_info is None:
+            user_info = self.get_user_info(username)
 
         if not user_info:
             logger.warning("User does not exist.")
@@ -84,21 +150,8 @@ class SQL:
             logger.warning("User account is disabled.")
             return False
 
-        try:
-            connection_string = (
-                f"DRIVER={{ODBC Driver 17 for SQL Server}};"
-                f"SERVER={self.server};"
-                f"DATABASE=master;"
-                f"UID={username};"
-                f"PWD={password};"
-            )
-            connection = pyodbc.connect(connection_string)
-            connection.close()
-            logger.info("Authentication successful.")
-            return True
-        except pyodbc.Error as e:
-            logger.error(f"Authentication failed: {e}")
-            return False
+        logger.info("Authentication successful.")
+        return True
 
     def _sanitize_params_for_log(self, params):
         """로그에 출력할 때 바이너리 데이터를 안전하게 표시"""

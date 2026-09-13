@@ -1,19 +1,73 @@
 import configparser
 import os
+import re
+
+# 개발 편의를 위한 기본값 — 운영(AOP_ENV=production)에서는 사용이 차단된다.
+DEFAULT_AUTH_SECRET = "AOP_Admin_Token"
+DEFAULT_FLASK_SECRET = "AOP_Web_Dev_Secret_Key"
+
+# 개발 모드에서 ALLOWED_ORIGINS 미지정 시 허용할 Origin 패턴.
+# 과거 기본값이던 "*" 는 supports_credentials=True 와 결합하면 임의 사이트가
+# 인증 쿠키를 실은 요청을 보낼 수 있어(CSRF·데이터 탈취) 사용하지 않는다.
+DEV_ORIGIN_PATTERN = re.compile(
+    r"^https?://("
+    r"localhost|127\.0\.0\.1|\[::1\]|"
+    r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
+    r"192\.168\.\d{1,3}\.\d{1,3}|"
+    r"172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
+    r")(:\d+)?$"
+)
+
+
+def _parse_origins(raw: str):
+    """쉼표 구분 Origin 문자열을 파싱한다. 비어 있으면 개발용 사설망 패턴을 쓴다."""
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    return origins or [DEV_ORIGIN_PATTERN]
+
+
+def _is_production() -> bool:
+    return os.environ.get("AOP_ENV", "development").lower() == "production"
+
+
+# 업로드/생성 파일의 단일 기준 루트(절대 경로).
+# 상대 경로를 쓰면 Flask 프로세스의 작업 디렉터리에 따라 저장 위치와 조회 위치가
+# 어긋나므로(생성은 성공하지만 다운로드는 400), 저장소 루트 기준으로 고정한다.
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+UPLOADS_ROOT = os.path.join(PROJECT_ROOT, "1_uploads")
 
 
 class Config:
-    UPLOAD_FOLDER = "./1_uploads"
+    UPLOAD_FOLDER = UPLOADS_ROOT
+    UPLOADS_ROOT = UPLOADS_ROOT
     # JWT 서명 키
-    SECRET_KEY = os.environ.get("AUTH_SECRET_KEY", "AOP_Admin_Token")
+    SECRET_KEY = os.environ.get("AUTH_SECRET_KEY", DEFAULT_AUTH_SECRET)
     EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME", 7200))
-    # Flask 세션 암호화 키 (운영 환경에서는 반드시 환경변수로 지정)
-    FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "AOP_Web_Dev_Secret_Key")
-    # CORS 허용 Origins (쉼표 구분, 미설정 시 개발 편의를 위해 * 반영)
-    _origins_env = os.environ.get("ALLOWED_ORIGINS", "")
-    ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()] or ["*"]
+    # Flask 세션 서명 키 (운영 환경에서는 반드시 환경변수로 지정)
+    FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", DEFAULT_FLASK_SECRET)
+    # CORS 허용 Origins (쉼표 구분)
+    ALLOWED_ORIGINS = _parse_origins(os.environ.get("ALLOWED_ORIGINS", ""))
     # 쿠키 Secure 플래그 (운영=true, 개발=false)
     COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
+
+    @staticmethod
+    def _validate_production():
+        """운영 모드에서 개발용 기본 시크릿이 그대로 쓰이면 부팅을 중단한다."""
+        if not _is_production():
+            return
+        weak = []
+        if Config.SECRET_KEY == DEFAULT_AUTH_SECRET:
+            weak.append("AUTH_SECRET_KEY")
+        if Config.FLASK_SECRET_KEY == DEFAULT_FLASK_SECRET:
+            weak.append("FLASK_SECRET_KEY")
+        if weak:
+            raise RuntimeError(
+                "운영 모드에서는 다음 환경변수를 반드시 지정해야 합니다: "
+                + ", ".join(weak)
+            )
+        if any(not isinstance(o, str) for o in Config.ALLOWED_ORIGINS):
+            raise RuntimeError(
+                "운영 모드에서는 ALLOWED_ORIGINS 를 명시적으로 지정해야 합니다."
+            )
 
     @staticmethod
     def load_config():
@@ -32,18 +86,31 @@ class Config:
             raise ValueError(f"Config file is empty or invalid: {config_path}")
 
         # CFG 섹션/키 → 환경변수 변환 (예: [Auth] SECRET_KEY → AUTH_SECRET_KEY)
+        # 이미 설정된 환경변수는 덮어쓰지 않는다 — 운영 배포 시 환경변수로 주입한
+        # 시크릿이 저장소에 커밋된 CFG 값으로 되돌아가는 것을 막기 위함이다.
         for section in config.sections():
             for key, value in config[section].items():
                 env_var_name = f"{section.replace(' ', '_').upper()}_{key.replace(' ', '_').upper()}"
-                os.environ[env_var_name] = value
+                os.environ.setdefault(env_var_name, value)
+
+        # 섹션 접두사가 붙어 실제 설정 키와 이름이 달라지는 항목의 별칭 매핑.
+        # 예: [Flask] COOKIE_SECURE → FLASK_COOKIE_SECURE 로 변환되어
+        #     COOKIE_SECURE 를 읽는 설정에 전달되지 않던 문제를 보정한다.
+        for prefixed, canonical in (
+            ("FLASK_COOKIE_SECURE", "COOKIE_SECURE"),
+            ("FLASK_ALLOWED_ORIGINS", "ALLOWED_ORIGINS"),
+        ):
+            if prefixed in os.environ:
+                os.environ.setdefault(canonical, os.environ[prefixed])
 
         if "database" in config and "name" in config["database"]:
-            os.environ["DATABASE_NAME"] = config["database"]["name"]
+            os.environ.setdefault("DATABASE_NAME", config["database"]["name"])
 
         # 클래스 속성은 import 시점에 평가되므로, CFG 로드 후 재적용
-        Config.SECRET_KEY      = os.environ.get("AUTH_SECRET_KEY", "AOP_Admin_Token")
-        Config.EXPIRE_TIME     = int(os.environ.get("AUTH_EXPIRE_TIME", 7200))
-        Config.FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "AOP_Web_Dev_Secret_Key")
-        Config.COOKIE_SECURE   = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
-        _origins = os.environ.get("ALLOWED_ORIGINS", "")
-        Config.ALLOWED_ORIGINS = [o.strip() for o in _origins.split(",") if o.strip()] or ["*"]
+        Config.SECRET_KEY = os.environ.get("AUTH_SECRET_KEY", DEFAULT_AUTH_SECRET)
+        Config.EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME", 7200))
+        Config.FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", DEFAULT_FLASK_SECRET)
+        Config.COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
+        Config.ALLOWED_ORIGINS = _parse_origins(os.environ.get("ALLOWED_ORIGINS", ""))
+
+        Config._validate_production()

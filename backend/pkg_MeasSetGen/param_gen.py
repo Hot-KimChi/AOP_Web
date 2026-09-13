@@ -1,5 +1,8 @@
 from datetime import datetime
 
+import numpy as np
+import pandas as pd
+
 
 class ParamGen:
     def __init__(self, data, probeid, probename):
@@ -56,23 +59,22 @@ class ParamGen:
             # ("VTQ")
         }
 
-        self.df["OrgBeamstyleIdx"] = self.df.apply(
-            lambda row: mode_submode_map.get((row["Mode"], row["SubModeIndex"]), -1),
-            axis=1,
-        )
+        # apply(axis=1) 은 행마다 Series 를 새로 만들어 수천 행에서 비용이 크다.
+        # 튜플 키 조회는 동일한 결과를 내면서 행 Series 생성을 피한다.
+        self.df["OrgBeamstyleIdx"] = [
+            mode_submode_map.get(key, -1)
+            for key in zip(self.df["Mode"], self.df["SubModeIndex"])
+        ]
         return self.df
 
     def bsIdx(self):
         ## bsIndexTrace algorithm
 
-        def bsIndex(orgidx, duplicate):
-            if duplicate == 1:
-                return {0: 15, 1: 20, 5: 10}.get(orgidx, 0)
-            return 0
-
-        self.df["bsIndexTrace"] = self.df.apply(
-            lambda row: bsIndex(row["OrgBeamstyleIdx"], row["isDuplicate"]), axis=1
+        bs_map = {0: 15, 1: 20, 5: 10}
+        mapped = (
+            self.df["OrgBeamstyleIdx"].map(bs_map).fillna(0).astype(int)
         )
+        self.df["bsIndexTrace"] = np.where(self.df["isDuplicate"] == 1, mapped, 0)
         return self.df
 
     def freqidx2Hz(self):
@@ -130,30 +132,50 @@ class ParamGen:
             11428600,
         ]
 
-        self.df["TxFrequencyHz"] = self.df["SysTxFreqIndex"].apply(
-            lambda i: frequencyTable[i]
+        freq_index = pd.to_numeric(self.df["SysTxFreqIndex"], errors="coerce")
+        # 소수 인덱스는 astype(int) 에서 조용히 버림되어 "다른 주파수"가 선택된다.
+        # 원본 구현은 리스트 인덱싱에서 TypeError 로 거부했으므로 동일하게 막는다.
+        non_integral = freq_index.notna() & (freq_index % 1 != 0)
+        invalid = (
+            freq_index.isna()
+            | (freq_index < 0)
+            | (freq_index >= len(frequencyTable))
+            | non_integral
         )
+        if invalid.any():
+            # 음수 인덱스는 파이썬 리스트에서 조용히 뒤쪽 값을 선택하고, 범위 초과는
+            # IndexError 로 요청 전체를 실패시킨다. 어느 쪽이든 원인이 드러나야 한다.
+            bad_values = sorted(
+                set(map(str, self.df.loc[invalid, "SysTxFreqIndex"].tolist()))
+            )
+            raise ValueError(
+                f"SysTxFreqIndex 값이 유효한 정수 범위(0~{len(frequencyTable) - 1})를 "
+                f"벗어났습니다: {bad_values}"
+            )
+
+        self.df["TxFrequencyHz"] = np.asarray(frequencyTable)[
+            freq_index.astype(int).to_numpy()
+        ]
         return self.df
 
     def cnt_cycle(self):
         ## Calc_cycle for RLE code
 
-        def calculate_cycle(waveform, rle, cycle):
-            if waveform == 0:
-                raw_rle = map(float, str(rle).split(":"))
-                calc = [
-                    round(value - 1, 4) if value > 1 else value
-                    for value in map(abs, raw_rle)
-                ]
-                return round(sum(calc), 2)
-            return cycle
+        def calculate_cycle_from_rle(rle):
+            raw_rle = map(float, str(rle).split(":"))
+            calc = [
+                round(value - 1, 4) if value > 1 else value
+                for value in map(abs, raw_rle)
+            ]
+            return round(sum(calc), 2)
 
-        self.df["ProbeNumTxCycles"] = self.df.apply(
-            lambda row: calculate_cycle(
-                row["TxpgWaveformStyle"], row["TxPulseRle"], row["ProbeNumTxCycles"]
-            ),
-            axis=1,
-        )
+        # waveform == 0 인 행만 RLE 파싱이 필요하다. 전체 행에 apply(axis=1) 하면
+        # 계산이 필요 없는 행까지 행 Series 를 만든다.
+        mask = self.df["TxpgWaveformStyle"] == 0
+        if mask.any():
+            self.df.loc[mask, "ProbeNumTxCycles"] = self.df.loc[
+                mask, "TxPulseRle"
+            ].map(calculate_cycle_from_rle)
         return self.df
 
     def maxVolt_ceilVolt(self):
@@ -170,29 +192,27 @@ class ParamGen:
     def calc_profvolt(self):
         ## function: calc_profTxVoltage 구현
 
-        def prof_tx_voltage(maxV, ceilV, totalpt, idx=2):
-            return round((min(maxV, ceilV)) ** ((totalpt - 1 - idx) / (totalpt - 1)), 2)
+        idx = 2
+        total_pt = pd.to_numeric(self.df["totalVoltagePt"], errors="coerce")
+        if (total_pt <= 1).any() or total_pt.isna().any():
+            # totalVoltagePt 가 1 이하면 지수 계산에서 0 으로 나누게 된다.
+            raise ValueError("totalVoltagePt 는 2 이상이어야 합니다.")
 
-        self.df["profTxVoltageVolt"] = self.df.apply(
-            lambda row: prof_tx_voltage(
-                row["maxTxVoltageVolt"], row["ceilTxVoltageVolt"], row["totalVoltagePt"]
-            ),
-            axis=1,
+        base = np.minimum(
+            pd.to_numeric(self.df["maxTxVoltageVolt"], errors="coerce"),
+            pd.to_numeric(self.df["ceilTxVoltageVolt"], errors="coerce"),
         )
+        exponent = (total_pt - 1 - idx) / (total_pt - 1)
+        self.df["profTxVoltageVolt"] = np.round(base**exponent, 2)
         return self.df
 
     def zMeasNum(self):
         ## function: calc zMeasNum 구현
 
-        def z_meas_num(focus):
-            if focus <= 3:
-                return (5 - 0.5) * 10
-            elif focus <= 6:
-                return (8 - 0.5) * 10
-            elif focus <= 9:
-                return (12 - 0.5) * 10
-            else:
-                return (14 - 0.5) * 10
-
-        self.df["zMeasNum"] = self.df["TxFocusLocCm"].apply(z_meas_num)
+        focus = pd.to_numeric(self.df["TxFocusLocCm"], errors="coerce")
+        self.df["zMeasNum"] = np.select(
+            [focus <= 3, focus <= 6, focus <= 9],
+            [(5 - 0.5) * 10, (8 - 0.5) * 10, (12 - 0.5) * 10],
+            default=(14 - 0.5) * 10,
+        )
         return self.df
