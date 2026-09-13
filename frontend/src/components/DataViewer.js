@@ -2,8 +2,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { ArrowUpDown, FileSpreadsheet } from 'lucide-react';
 import { MultiSelectDropdown } from '../app/data-view/components/MultiSelectDropdown';
-
-const FLOAT2_PATTERN = /^(XP_Value_\d+|reportValue_\d+|Difference_\d+|Ambient_Temp_\d+|MaxReportValue)$/;
+import { formatNumber, truncateText } from '../app/data-view/utils/dataFormatters';
+import { escapeCSVValue } from '../app/data-view/utils/csvExport';
 
 function normalizeFilterValue(value) {
   return String(value ?? '').toLowerCase().trim();
@@ -78,11 +78,28 @@ export default function DataViewer({
     if (!sortConfig.key) return filteredData;
     const key = sortConfig.key;
     const dir = sortConfig.direction;
+
+    // 숫자 컬럼을 문자열로 비교하면 "100" < "2" 가 되어 순서가 어긋난다.
+    const parseValue = (raw) => {
+      if (raw === null || raw === undefined || raw === '') return null;
+      if (typeof raw === 'number') return raw;
+      const trimmed = String(raw).trim();
+      if (trimmed === '') return null;
+      const num = Number(trimmed);
+      return Number.isNaN(num) ? trimmed.toLowerCase() : num;
+    };
+
     return [...filteredData].sort((a, b) => {
-      if (a[key] == null) return 1;
-      if (b[key] == null) return -1;
-      const aV = typeof a[key] === 'string' ? a[key].toLowerCase() : a[key];
-      const bV = typeof b[key] === 'string' ? b[key].toLowerCase() : b[key];
+      const aV = parseValue(a[key]);
+      const bV = parseValue(b[key]);
+      if (aV === null && bV === null) return 0;
+      if (aV === null) return 1;
+      if (bV === null) return -1;
+
+      const aIsNum = typeof aV === 'number';
+      const bIsNum = typeof bV === 'number';
+      if (aIsNum !== bIsNum) return aIsNum ? -1 : 1;
+
       if (aV < bV) return dir === 'asc' ? -1 : 1;
       if (aV > bV) return dir === 'asc' ? 1 : -1;
       return 0;
@@ -120,9 +137,9 @@ export default function DataViewer({
     try {
       if (!displayData.length) throw new Error('내보낼 데이터가 없습니다.');
       const csvContent = [
-        columnList.join(','),
+        columnList.map(escapeCSVValue).join(','),
         ...displayData.map(row =>
-          columnList.map(h => formatNumber(row[h], h)).join(','),
+          columnList.map(h => escapeCSVValue(formatNumber(row[h], h))).join(','),
         ),
       ].join('\n');
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -142,18 +159,6 @@ export default function DataViewer({
   }, [displayData, columnList, title, onExport]);
 
   // ── 유틸 ─────────────────────────────────────────────────
-  function formatNumber(value, key) {
-    if (typeof value === 'number') {
-      if (key && FLOAT2_PATTERN.test(key)) return value.toFixed(2);
-      return value % 1 === 0 ? value : parseFloat(value.toFixed(4));
-    }
-    return value?.toString() || '';
-  }
-  function truncateText(text) {
-    if (!text) return '';
-    const str = text.toString();
-    return str.length > 16 ? `${str.substring(0, 16)}...` : str;
-  }
   function renderCellContent(value, key) {
     if (value === null || value === undefined) return '';
     const formatted = formatNumber(value, key);

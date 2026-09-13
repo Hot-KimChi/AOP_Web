@@ -103,7 +103,7 @@ export default function SSR_DocOut() {
           <div className="card-header">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div className="card-title-row">
-                <FileText size={16} color="#6366f1" />
+                <FileText size={16} color="var(--brand)" />
                 <h5>SSR DocOut</h5>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '400' }}>meas_station_setup</span>
               </div>

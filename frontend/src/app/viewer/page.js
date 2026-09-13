@@ -72,7 +72,7 @@ export default function Viewer() {
           {/* Header */}
           <div className="card-header">
             <div className="card-title-row">
-              <Database size={16} color="#6366f1" />
+              <Database size={16} color="var(--brand)" />
               <h5>Database Viewer</h5>
             </div>
           </div>

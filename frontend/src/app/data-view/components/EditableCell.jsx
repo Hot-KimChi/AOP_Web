@@ -34,7 +34,7 @@ const ICON_POSITION_STYLE = {
 
 export const EditableCell = React.memo(({
   value,
-  rowIndex,
+  rowId,
   columnName,
   hasError,
   isChanged,
@@ -55,7 +55,7 @@ export const EditableCell = React.memo(({
         type="text"
         style={inputStyle}
         value={value || ''}
-        onChange={(e) => onChange(rowIndex, columnName, e.target.value)}
+        onChange={(e) => onChange(rowId, columnName, e.target.value)}
         onFocus={(e) => e.target.style.borderColor = FOCUS_COLORS[variant]}
         onBlur={(e) => e.target.style.borderColor = STYLE_VARIANTS[variant].borderColor}
       />

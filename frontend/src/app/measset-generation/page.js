@@ -164,7 +164,10 @@ export default function MeasSetGen() {
       }
     });
     
-    // 업데이트 수 설정
+    // 업데이트 결과를 확인할 수 있도록 기록(이전에는 집계만 하고 버려졌다)
+    if (updateCount > 0) {
+      console.info(`updateFullData: ${updateCount}개 행이 갱신되었습니다.`);
+    }
     return newFullData;
   };
 
@@ -753,7 +756,19 @@ export default function MeasSetGen() {
                 id="probeSelect"
                 className="form-select"
                 value={selectedProbe ? JSON.stringify(selectedProbe) : ''}
-                onChange={(e) => setSelectedProbe(JSON.parse(e.target.value))}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (!raw) {
+                    setSelectedProbe(null);
+                    return;
+                  }
+                  try {
+                    setSelectedProbe(JSON.parse(raw));
+                  } catch (err) {
+                    console.error('Transducer 선택 값 파싱 실패:', err);
+                    setSelectedProbe(null);
+                  }
+                }}
                 disabled={isLoading || !selectedDatabase}
               >
                 <option value="">Select transducer…</option>
@@ -781,7 +796,7 @@ export default function MeasSetGen() {
             <div className="col-md-3">
               <button
                 className="btn w-100"
-                style={{ background: '#6366f1', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
+                style={{ background: 'var(--brand)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                 onClick={() => { handleFileUpload().then((parsedData) => { if (parsedData) openDataInNewWindow(parsedData); }); }}
                 disabled={!selectedDatabase || !selectedProbe || !file || isLoading}
               >
@@ -793,7 +808,7 @@ export default function MeasSetGen() {
             <div className="col-md-3">
               <button
                 className="btn w-100"
-                style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
+                style={{ background: 'var(--accent-success)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                 onClick={() => openDataInNewWindow()}
                 disabled={!filterCsvData || filterCsvData.length === 0}
               >
@@ -805,7 +820,7 @@ export default function MeasSetGen() {
             <div className="col-md-3">
               <button
                 className="btn w-100"
-                style={{ background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
+                style={{ background: 'var(--accent-info)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                 onClick={parseDatabase}
                 disabled={!selectedDatabase || !selectedProbe || (!fullCsvData && !file) || isLoading}
               >
@@ -817,7 +832,7 @@ export default function MeasSetGen() {
             <div className="col-md-3">
               <button
                 className="btn w-100"
-                style={{ background: '#f59e0b', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
+                style={{ background: 'var(--accent-warning)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                 onClick={() => {
                   // 팝업 창이 열려 있으면 최신 데이터 동기화
                   if (dataWindowReference && !dataWindowReference.closed) {
@@ -848,7 +863,7 @@ export default function MeasSetGen() {
               <div className="col-md-12">
                 <button
                   className="btn btn-sm"
-                  style={{ background: 'transparent', border: '1px solid #6366f1', color: '#6366f1', borderRadius: '6px', fontWeight: '500', fontSize: '0.8125rem' }}
+                  style={{ background: 'transparent', border: '1px solid var(--brand)', color: 'var(--brand)', borderRadius: '6px', fontWeight: '500', fontSize: '0.8125rem' }}
                   onClick={refreshData}
                 >
                   ↻ Refresh Data

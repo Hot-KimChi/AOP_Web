@@ -195,7 +195,7 @@ function ScoreGuide() {
           <p className="mb-2 fw-semibold" style={{ color: 'var(--text)', fontSize: '0.875rem' }}>Performance Guide</p>
           <p className="mb-2 small" style={{ color: 'var(--text-sec)', fontSize: '0.8rem' }}>
             • Higher Test Score (R²) indicates better prediction accuracy.<br />
-            • <span className="badge" style={{ background: '#fef9c3', color: '#854d0e' }}>⭐ Gold star</span>{' '}
+            • <span className="badge" style={{ background: 'var(--status-warning-bg)', color: 'var(--status-warning-text)' }}>⭐ Gold star</span>{' '}
             marks the best-performing version across all models.
           </p>
           <p className="mb-0 small" style={{ fontSize: '0.8rem' }}>

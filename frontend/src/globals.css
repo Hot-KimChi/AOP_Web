@@ -38,6 +38,17 @@
   --status-warning-bg:    #fffbeb;
   --status-warning-border:#fde68a;
   --status-warning-text:  #92400e;
+
+  /* ─ Action Accents (버튼 등 강조색) ─ */
+  --accent-success: #10b981;
+  --accent-info:    #0ea5e9;
+  --accent-warning: #f59e0b;
+
+  /* ─ Tx 매칭 팝업 전용 ─ */
+  --tx-header-bg:    #1e3a5f;
+  --tx-legend-ok:    #86efac;
+  --tx-legend-ng:    #fecaca;
+  --tx-legend-skip:  #cbd5e1;
 }
 
 /* ─── Dark Mode Tokens ───────────────────────────────────────── */
@@ -71,6 +82,17 @@
   --status-warning-bg:    #2d2611;
   --status-warning-border:#78350f;
   --status-warning-text:  #fde68a;
+
+  /* ─ Action Accents (dark) ─ */
+  --accent-success: #34d399;
+  --accent-info:    #38bdf8;
+  --accent-warning: #fbbf24;
+
+  /* ─ Tx 매칭 팝업 전용 (dark) ─ */
+  --tx-header-bg:    #172554;
+  --tx-legend-ok:    #4ade80;
+  --tx-legend-ng:    #f87171;
+  --tx-legend-skip:  #94a3b8;
 }
 
 /* ─── Dark Mode: Base ────────────────────────────────────────── */

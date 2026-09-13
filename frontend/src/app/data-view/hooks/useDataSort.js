@@ -22,13 +22,30 @@ export const useDataSort = (displayData, setDisplayData) => {
     }
     setSortConfig({ key, direction });
 
-    // 데이터 정렬
-    const sortedData = [...displayData].sort((a, b) => {
-      if (a[key] === null) return 1;
-      if (b[key] === null) return -1;
+    // 데이터 정렬 (숫자 컬럼은 숫자로 비교해야 "100" < "2" 오류가 없다)
+    const parseValue = (raw) => {
+      if (raw === null || raw === undefined || raw === '') return null;
+      if (typeof raw === 'number') return raw;
+      const trimmed = String(raw).trim();
+      if (trimmed === '') return null;
+      const num = Number(trimmed);
+      return Number.isNaN(num) ? trimmed.toLowerCase() : num;
+    };
 
-      const aVal = typeof a[key] === 'string' ? a[key].toLowerCase() : a[key];
-      const bVal = typeof b[key] === 'string' ? b[key].toLowerCase() : b[key];
+    const sortedData = [...displayData].sort((a, b) => {
+      const aVal = parseValue(a[key]);
+      const bVal = parseValue(b[key]);
+
+      // 빈 값은 방향과 무관하게 항상 뒤로 보낸다
+      if (aVal === null && bVal === null) return 0;
+      if (aVal === null) return 1;
+      if (bVal === null) return -1;
+
+      const aIsNumber = typeof aVal === 'number';
+      const bIsNumber = typeof bVal === 'number';
+
+      // 숫자와 문자열이 섞이면 숫자를 앞에 둔다
+      if (aIsNumber !== bIsNumber) return aIsNumber ? -1 : 1;
 
       if (aVal < bVal) return direction === 'asc' ? -1 : 1;
       if (aVal > bVal) return direction === 'asc' ? 1 : -1;

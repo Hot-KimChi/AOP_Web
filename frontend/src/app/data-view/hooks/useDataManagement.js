@@ -6,11 +6,10 @@
  * sessionStorage와의 동기화, 부모 창과의 통신도 담당합니다.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { STORAGE_KEYS, WINDOW_STATUS } from '../constants/storageKeys';
 import { MESSAGES } from '../constants/messages';
-import { deepCopy } from '../utils/dataFormatters';
-import { generateComboBoxOptions } from '../utils/comboBoxHelpers';
+import { assignRowIds, cloneRows } from '../utils/rowIdentity';
 
 export const useDataManagement = () => {
   const [csvData, setCsvData] = useState([]);
@@ -18,40 +17,37 @@ export const useDataManagement = () => {
   const [displayData, setDisplayData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [comboBoxOptions, setComboBoxOptions] = useState({});
   const [editableColumns, setEditableColumns] = useState({ columns: [], editableKeys: [] });
-  const [dataViewSource, setDataViewSource] = useState('');
+  const activeStorageKeyRef = useRef(null);
 
   /**
    * sessionStorage에서 데이터 로드
    */
   const loadDataFromStorage = useCallback(() => {
     try {
-      // 다양한 소스에서 데이터 찾기
-      const storedData = sessionStorage.getItem(STORAGE_KEYS.REPORT_DATA) ||
-        sessionStorage.getItem(STORAGE_KEYS.SUMMARY_DATA) ||
-        sessionStorage.getItem(STORAGE_KEYS.CSV_DATA);
+      // 다양한 소스에서 데이터 찾기 (읽은 키를 기억해 저장 시 동일 키를 갱신)
+      const candidateKeys = [
+        STORAGE_KEYS.REPORT_DATA,
+        STORAGE_KEYS.SUMMARY_DATA,
+        STORAGE_KEYS.CSV_DATA,
+      ];
+      const sourceKey = candidateKeys.find(key => sessionStorage.getItem(key));
+      const storedData = sourceKey ? sessionStorage.getItem(sourceKey) : null;
+      activeStorageKeyRef.current = sourceKey || STORAGE_KEYS.CSV_DATA;
 
       const storedEditableColumns = sessionStorage.getItem(STORAGE_KEYS.EDITABLE_COLUMNS);
 
       if (storedData) {
-        const parsedData = JSON.parse(storedData);
+        const parsedData = assignRowIds(JSON.parse(storedData));
         setCsvData(parsedData);
-        setOriginalData(deepCopy(parsedData));
+        setOriginalData(cloneRows(parsedData));
         setDisplayData(parsedData);
-        setComboBoxOptions(generateComboBoxOptions(parsedData));
       } else {
         setError(MESSAGES.ERROR_NO_DATA_FOUND);
       }
 
       if (storedEditableColumns) {
         setEditableColumns(JSON.parse(storedEditableColumns));
-      }
-
-      // 출처 정보 로드
-      const source = sessionStorage.getItem(STORAGE_KEYS.DATA_VIEW_SOURCE);
-      if (source) {
-        setDataViewSource(source);
       }
 
       // 창이 열렸음을 표시
@@ -69,10 +65,10 @@ export const useDataManagement = () => {
    */
   const refreshData = useCallback((freshData) => {
     if (freshData) {
-      setCsvData(freshData);
-      setOriginalData(deepCopy(freshData));
-      setDisplayData(freshData);
-      setComboBoxOptions(generateComboBoxOptions(freshData));
+      const withIds = assignRowIds(freshData);
+      setCsvData(withIds);
+      setOriginalData(cloneRows(withIds));
+      setDisplayData(withIds);
     }
   }, []);
 
@@ -80,7 +76,14 @@ export const useDataManagement = () => {
    * 데이터 저장 (sessionStorage 및 부모 창에 전달)
    */
   const saveData = useCallback((updatedData) => {
-    sessionStorage.setItem(STORAGE_KEYS.CSV_DATA, JSON.stringify(updatedData));
+    const payload = JSON.stringify(updatedData);
+    // 로드한 키가 CSV_DATA 가 아니면(REPORT/SUMMARY) 그 키도 함께 갱신해야
+    // 다시 열었을 때 수정 이전 데이터가 되살아나지 않는다.
+    sessionStorage.setItem(STORAGE_KEYS.CSV_DATA, payload);
+    const activeKey = activeStorageKeyRef.current;
+    if (activeKey && activeKey !== STORAGE_KEYS.CSV_DATA) {
+      sessionStorage.setItem(activeKey, payload);
+    }
     sessionStorage.setItem(STORAGE_KEYS.DATA_MODIFIED, 'true');
 
     // 부모 창에 메시지 전송 (같은 origin만 허용)
@@ -95,28 +98,15 @@ export const useDataManagement = () => {
 
   /**
    * 창 닫기 전 데이터 동기화
+   *
+   * 편집·삭제는 이미 `csvData` 에 반영되어 있으므로, 미저장 변경이 있을 때
+   * 현재 상태를 그대로 영속화한다.
    */
   const syncDataBeforeUnload = useCallback((editedData, deletedRows) => {
     sessionStorage.setItem(STORAGE_KEYS.DATA_WINDOW_OPEN, WINDOW_STATUS.CLOSED);
 
     if (Object.keys(editedData).length > 0 || deletedRows.length > 0) {
-      let updatedCsvData = [...csvData];
-
-      // 모든 편집 내용 적용
-      Object.values(editedData).forEach(edit => {
-        const { rowIndex, columnName, value } = edit;
-        updatedCsvData[rowIndex][columnName] = value;
-      });
-
-      // 삭제된 행 제거
-      if (deletedRows.length > 0) {
-        const sortedDeletedIndices = [...deletedRows].sort((a, b) => b - a);
-        sortedDeletedIndices.forEach(index => {
-          updatedCsvData.splice(index, 1);
-        });
-      }
-
-      saveData(updatedCsvData);
+      saveData(csvData);
     }
   }, [csvData, saveData]);
 
@@ -127,15 +117,12 @@ export const useDataManagement = () => {
     displayData,
     isLoading,
     error,
-    comboBoxOptions,
     editableColumns,
-    dataViewSource,
     
     // 상태 업데이트 함수
     setCsvData,
     setDisplayData,
     setOriginalData,
-    setComboBoxOptions,
     
     // 액션
     loadDataFromStorage,

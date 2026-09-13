@@ -3,21 +3,21 @@
 import { useEffect, useState, Suspense } from 'react';
 
 /* ─── 스타일 상수 ─── */
-const HDR_BG  = '#1e3a5f';
-const BORDER  = '#d1d5db';
-const ROW_ODD = '#f9fafb';
+const HDR_BG  = 'var(--tx-header-bg)';
+const BORDER  = 'var(--border)';
+const ROW_ODD = 'var(--bg)';
 
 const S = {
   page: {
     fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
-    background: '#f0f4f8',
+    background: 'var(--bg)',
     minHeight: '100vh',
     padding: '10px 10px',
     boxSizing: 'border-box',
   },
   /* ─ 상단 카드 ─ */
   headerCard: {
-    background: '#fff',
+    background: 'var(--surface)',
     borderRadius: 8,
     padding: '12px 18px',
     marginBottom: 12,
@@ -34,15 +34,15 @@ const S = {
   pageTitle: {
     fontSize: 15,
     fontWeight: 700,
-    color: '#1e293b',
+    color: 'var(--text)',
     marginRight: 4,
   },
   chip: (type) => {
     const map = {
-      total:   ['#e2e8f0', '#334155'],
-      rate:    ['#dbeafe', '#1d4ed8'],
-      success: ['#dcfce7', '#166534'],
-      danger:  ['#fee2e2', '#991b1b'],
+      total:   ['var(--border)', 'var(--text)'],
+      rate:    ['var(--brand-light)', 'var(--brand-dark)'],
+      success: ['var(--status-success-bg)', 'var(--status-success-text)'],
+      danger:  ['var(--status-error-bg)', 'var(--status-error-text)'],
     };
     const [bg, color] = map[type] || map.total;
     return {
@@ -59,10 +59,10 @@ const S = {
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: 0,
-    borderTop: '1px solid #f1f5f9',
+    borderTop: '1px solid var(--border)',
     paddingTop: 8,
     fontSize: 13,
-    color: '#64748b',
+    color: 'var(--text-sec)',
     lineHeight: 1.7,
   },
   headerRow3: {
@@ -70,23 +70,23 @@ const S = {
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: 14,
-    borderTop: '1px dashed #e2e8f0',
+    borderTop: '1px dashed var(--border)',
     marginTop: 8,
     paddingTop: 8,
     fontSize: 12,
-    color: '#64748b',
+    color: 'var(--text-sec)',
   },
-  metaLabel: { color: '#94a3b8', marginRight: 3 },
-  metaVal:   { fontWeight: 600, color: '#1e293b', marginRight: 18 },
+  metaLabel: { color: 'var(--text-muted)', marginRight: 3 },
+  metaVal:   { fontWeight: 600, color: 'var(--text)', marginRight: 18 },
   msgText: (isWarn) => ({
     fontSize: 12,
-    color: isWarn ? '#b45309' : '#475569',
+    color: isWarn ? 'var(--status-warning-text)' : 'var(--text-sec)',
     fontStyle: 'italic',
     marginTop: 0,
   }),
   /* ─ 테이블 래퍼 ─ */
   tableWrap: {
-    background: '#fff',
+    background: 'var(--surface)',
     borderRadius: 8,
     boxShadow: '0 1px 4px rgba(0,0,0,.1)',
     overflowX: 'auto',
@@ -102,7 +102,7 @@ const S = {
   /* 헤더: 파라미터명 */
   th: {
     position: 'sticky', top: 0, zIndex: 10,
-    background: HDR_BG, color: '#fff',
+    background: HDR_BG, color: '#ffffff',
     padding: '6px 6px',
     textAlign: 'center',
     whiteSpace: 'nowrap',
@@ -122,8 +122,8 @@ const S = {
       border: `1px solid ${BORDER}`,
       background: isMissing
         ? (rowIdx % 2 === 0 ? 'rgba(239,68,68,.07)' : 'rgba(239,68,68,.12)')
-        : (rowIdx % 2 === 0 ? '#fff' : ROW_ODD),
-      color: isMissing ? '#dc2626' : '#1e293b',
+        : (rowIdx % 2 === 0 ? 'var(--surface)' : ROW_ODD),
+      color: isMissing ? 'var(--status-error-text)' : 'var(--text)',
       fontWeight: isMissing ? 700 : 400,
       fontSize: 10,
       whiteSpace: 'nowrap',
@@ -133,8 +133,8 @@ const S = {
     padding: '7px 12px',
     textAlign: 'center',
     border: `1px solid ${BORDER}`,
-    background: rowIdx % 2 === 0 ? '#f8fafc' : '#f1f5f9',
-    color: '#1e293b',
+    background: rowIdx % 2 === 0 ? 'var(--bg)' : 'var(--table-hover)',
+    color: 'var(--text)',
     fontWeight: 600,
     fontSize: 12,
     whiteSpace: 'nowrap',
@@ -172,11 +172,11 @@ function TxMatchingContent() {
 
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <span style={{ color: '#64748b', fontSize: 14 }}>불러오는 중…</span>
+      <span style={{ color: 'var(--text-sec)', fontSize: 14 }}>불러오는 중…</span>
     </div>
   );
   if (error) return (
-    <div style={{ margin: 24, padding: 16, background: '#fee2e2', borderRadius: 8, color: '#991b1b', fontSize: 13 }}>
+    <div style={{ margin: 24, padding: 16, background: 'var(--status-error-bg)', borderRadius: 8, color: 'var(--status-error-text)', fontSize: 13 }}>
       {error}
     </div>
   );
@@ -251,10 +251,10 @@ function TxMatchingContent() {
             )}
           </div>
           <div style={S.headerRow3}>
-            <span><span style={{ color: '#86efac', fontWeight: 700 }}>O</span> : 매칭률 포함 + txt 컬럼 매핑됨</span>
-            <span><span style={{ color: '#fecaca', fontWeight: 700 }}>X</span> : 매칭률 포함 + txt 컬럼 매핑 안됨</span>
-            <span><span style={{ color: '#cbd5e1', fontWeight: 700 }}>-</span> : 매칭률 제외(TxSummaryID/ProbeID/SW/ProbeName/IsProcessed/Combined_mode)</span>
-            <span><span style={{ color: '#dc2626', fontWeight: 700 }}>null</span> : txt 값이 NULL(결측)인 데이터 셀</span>
+            <span><span style={{ color: 'var(--tx-legend-ok)', fontWeight: 700 }}>O</span> : 매칭률 포함 + txt 컬럼 매핑됨</span>
+            <span><span style={{ color: 'var(--tx-legend-ng)', fontWeight: 700 }}>X</span> : 매칭률 포함 + txt 컬럼 매핑 안됨</span>
+            <span><span style={{ color: 'var(--tx-legend-skip)', fontWeight: 700 }}>-</span> : 매칭률 제외(TxSummaryID/ProbeID/SW/ProbeName/IsProcessed/Combined_mode)</span>
+            <span><span style={{ color: 'var(--status-error-text)', fontWeight: 700 }}>null</span> : txt 값이 NULL(결측)인 데이터 셀</span>
           </div>
         </div>
 
@@ -271,10 +271,10 @@ function TxMatchingContent() {
                         style={{
                           color:
                             paramMatchStatus[p] === 'O'
-                              ? '#86efac'
+                              ? 'var(--tx-legend-ok)'
                               : paramMatchStatus[p] === '-'
-                                ? '#cbd5e1'
-                                : '#fecaca',
+                                ? 'var(--tx-legend-skip)'
+                                : 'var(--tx-legend-ng)',
                           fontWeight: 700,
                           fontSize: 11,
                           marginTop: 2,
@@ -344,7 +344,7 @@ function TxMatchingContent() {
   }
 
   return (
-    <div style={{ textAlign: 'center', padding: 64, color: '#94a3b8', fontSize: 14 }}>
+    <div style={{ textAlign: 'center', padding: 64, color: 'var(--text-muted)', fontSize: 14 }}>
       표시할 데이터가 없습니다.
     </div>
   );
@@ -354,7 +354,7 @@ export default function TxMatchingPopup() {
   return (
     <Suspense fallback={
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <span style={{ color: '#64748b', fontSize: 14 }}>불러오는 중…</span>
+        <span style={{ color: 'var(--text-sec)', fontSize: 14 }}>불러오는 중…</span>
       </div>
     }>
       <TxMatchingContent />

@@ -9,6 +9,7 @@ import { TableBody } from './TableBody';
 
 export const DataTable = React.memo(({
   displayData,
+  allData,
   editableKeys,
   sortConfig,
   filters,
@@ -22,9 +23,15 @@ export const DataTable = React.memo(({
   onCellChange,
   onDeleteRow
 }) => {
+  // 필터 결과가 0건이어도 헤더·필터 UI 가 사라지지 않도록
+  // 전체 데이터(allData)의 스키마를 우선 사용한다.
   const headers = useMemo(() => {
-    return displayData.length > 0 ? Object.keys(displayData[0]) : [];
-  }, [displayData]);
+    const schemaSource =
+      (allData && allData.length > 0 && allData[0]) ||
+      (displayData.length > 0 && displayData[0]) ||
+      null;
+    return schemaSource ? Object.keys(schemaSource) : [];
+  }, [allData, displayData]);
 
   return (
     <div className="table-container">
@@ -46,6 +53,7 @@ export const DataTable = React.memo(({
         </thead>
         <TableBody
           displayData={displayData}
+          headers={headers}
           editableKeys={editableKeys}
           editedData={editedData}
           validationErrors={validationErrors}

@@ -28,10 +28,11 @@ test.describe('홈페이지', () => {
     }
   });
 
-  test('버전 배지가 v 0.9.33으로 표시된다', async ({ page }) => {
+  test('버전 배지가 표시된다', async ({ page }) => {
     const badge = page.locator('.version-badge');
     await expect(badge).toBeVisible();
-    await expect(badge).toHaveText('v 0.9.33');
+    // 버전은 릴리스마다 바뀌므로 형식만 검증한다.
+    await expect(badge).toHaveText(/^v \d+\.\d+\.\d+$/);
   });
 });
 

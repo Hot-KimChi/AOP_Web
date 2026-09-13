@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useCallback } from 'react';
+import { MESSAGES } from '../constants/messages';
 
 export const useWindowSync = (refreshData, syncDataBeforeUnload, editedData, deletedRows) => {
   /**
@@ -17,11 +18,18 @@ export const useWindowSync = (refreshData, syncDataBeforeUnload, editedData, del
 
     if (event.data && event.data.type === 'REFRESH_DATA') {
       const freshData = event.data.data;
-      if (freshData) {
-        refreshData(freshData);
+      if (!freshData) return;
+
+      // 저장하지 않은 편집/삭제가 있으면 덮어쓰기 전에 확인을 받는다.
+      const hasUnsavedChanges =
+        Object.keys(editedData || {}).length > 0 || (deletedRows || []).length > 0;
+      if (hasUnsavedChanges && !confirm(MESSAGES.REFRESH_DISCARD_CONFIRM)) {
+        return;
       }
+
+      refreshData(freshData);
     }
-  }, [refreshData]);
+  }, [refreshData, editedData, deletedRows]);
 
   /**
    * 창 닫기 전 핸들러

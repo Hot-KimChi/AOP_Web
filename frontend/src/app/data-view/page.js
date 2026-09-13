@@ -120,9 +120,17 @@ function DataViewContent() {
 
   // 변경 사항 저장 핸들러
   const handleSave = useCallback(() => {
-    saveEditedData(deletedRows);
-    setDeletedRows([]);
-  }, [saveEditedData, deletedRows, setDeletedRows]);
+    if (saveEditedData()) {
+      setDeletedRows([]);
+    }
+  }, [saveEditedData, setDeletedRows]);
+
+  // 되돌리기 핸들러 — 복원 성공 시 삭제 대기 목록도 함께 비운다.
+  const handleRevert = useCallback(() => {
+    if (revertChanges()) {
+      setDeletedRows([]);
+    }
+  }, [revertChanges, setDeletedRows]);
 
   // 렌더링
   if (isLoading) {
@@ -157,7 +165,7 @@ function DataViewContent() {
               hasChanges={hasChanges}
               hasErrors={hasErrors}
               onSave={handleSave}
-              onRevert={revertChanges}
+              onRevert={handleRevert}
               onDownload={handleDownloadCSV}
               onClose={() => window.close()}
             />
@@ -177,6 +185,7 @@ function DataViewContent() {
           <div className="px-4 pb-4">
             <DataTable
               displayData={displayData}
+              allData={csvData}
               editableKeys={editableColumns.editableKeys}
               sortConfig={sortConfig}
               filters={filters}

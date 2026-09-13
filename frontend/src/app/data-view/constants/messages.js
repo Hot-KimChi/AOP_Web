@@ -14,6 +14,7 @@ export const MESSAGES = {
   DELETE_CONFIRM: '정말로 이 행을 삭제하시겠습니까? 이 작업은 저장 전까지 취소할 수 있습니다.',
   REVERT_CONFIRM: '모든 변경 사항을 취소하고 원래 데이터로 복원하시겠습니까?',
   RESTORE_CONFIRM: '삭제된 모든 행을 복원하시겠습니까?',
+  REFRESH_DISCARD_CONFIRM: '저장하지 않은 변경 사항이 있습니다. 새 데이터를 불러오면 변경 내용이 사라집니다. 계속하시겠습니까?',
   
   // 오류 메시지
   ERROR_VALIDATION: '유효성 검사 오류가 있습니다. 모든 오류를 수정한 후 다시 시도하세요.',

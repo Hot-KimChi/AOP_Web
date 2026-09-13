@@ -6,6 +6,21 @@
  */
 
 /**
+ * CSV 한 칸의 값을 RFC 4180 규칙에 맞게 이스케이프합니다.
+ *
+ * 쉼표뿐 아니라 큰따옴표·개행이 포함된 값도 감싸야 하며,
+ * 값 안의 큰따옴표는 두 개로 중복시켜야 파일이 깨지지 않는다.
+ */
+export const escapeCSVValue = (value) => {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (/[",\r\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
+
+/**
  * CSV 내용을 생성합니다
  * 
  * @param {Array<Object>} data - CSV로 변환할 데이터 배열
@@ -19,13 +34,9 @@ export const generateCSVContent = (data) => {
   
   // CSV 내용 생성
   const csvContent = [
-    headers.join(','),
+    headers.map(escapeCSVValue).join(','),
     ...data.map(row =>
-      headers.map(header => {
-        const value = row[header];
-        // 쉼표가 포함된 문자열은 따옴표로 감싸기
-        return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
-      }).join(',')
+      headers.map(header => escapeCSVValue(row[header])).join(',')
     )
   ].join('\n');
   

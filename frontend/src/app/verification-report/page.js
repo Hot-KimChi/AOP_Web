@@ -525,14 +525,23 @@ export default function VerificationReport() {
     setReportLoading(true);
     setReportError('');
     try {
-      for (const task of tasks) {
-        const response = await fetch(`${API_BASE_URL}/api/run_tx_compare`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(task.requestData),
-          credentials: 'include',
-        });
-        const data = await response.json();
+      // 요청을 순차 실행하면 SSid 개수만큼 대기 시간이 누적된다.
+      const responses = await Promise.all(
+        tasks.map(async (task) => {
+          const response = await fetch(`${API_BASE_URL}/api/run_tx_compare`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(task.requestData),
+            credentials: 'include',
+          });
+          return { task, data: await response.json() };
+        })
+      );
+
+      let popupBlocked = false;
+      const missingLabels = [];
+
+      responses.forEach(({ task, data }) => {
         if (data.status === 'success' && Array.isArray(data.reportData)) {
           setReportData(data.reportData);
           sessionStorage.setItem(`reportData_${task.label}`, JSON.stringify(data.reportData));
@@ -542,14 +551,24 @@ export default function VerificationReport() {
               JSON.stringify(data.columns)
             );
           }
-          window.open(
+          const popup = window.open(
             `/verification-report/data-view-standalone?pageLabel=${encodeURIComponent(task.label)}&storageKey=${encodeURIComponent(`reportData_${task.label}`)}`,
             '_blank',
             'width=2000,height=800,menubar=no,toolbar=no,location=no,status=no'
           );
+          if (!popup) {
+            popupBlocked = true;
+          }
         } else {
-          alert(`${task.label} 데이터 없음`);
+          missingLabels.push(task.label);
         }
+      });
+
+      if (missingLabels.length > 0) {
+        alert(`데이터 없음: ${missingLabels.join(', ')}`);
+      }
+      if (popupBlocked) {
+        alert('브라우저가 새 창을 차단했습니다. 팝업 차단을 해제한 뒤 다시 시도하세요.');
       }
     } catch (err) {
       setReportError(err.message || '리포트 추출 실패');
@@ -645,7 +664,7 @@ export default function VerificationReport() {
               <div className="col-md-12">
                 <button
                   className="btn w-100"
-                  style={{ background: '#6366f1', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
+                  style={{ background: 'var(--brand)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                   onClick={uploadTxSummary}
                   disabled={!txDatabase || !txProbe || !txSoftwareVersion || !txFile || txLoading || !txValidationOk}
                 >
@@ -773,7 +792,7 @@ export default function VerificationReport() {
               <div className="col-md-12">
                 <button
                   className="btn w-100"
-                  style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
+                  style={{ background: 'var(--accent-success)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '500', fontSize: '0.875rem' }}
                   onClick={extractReportData}
                   disabled={!reportDatabase || !reportProbe || !reportWcsSoftware || !reportSoftwareVersion || reportLoading}
                 >
