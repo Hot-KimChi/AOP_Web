@@ -7,25 +7,17 @@ test.describe('홈페이지', () => {
     await page.goto('/');
   });
 
-  test('페이지가 정상 로드되고 Hero 섹션이 표시된다', async ({ page }) => {
-    await expect(page.locator('text=AOP Web Platform')).toBeVisible();
-    await expect(page.locator('text=Acoustic Output Power management platform')).toBeVisible();
+  test('비로그인 상태에서 로그인 안내 카드가 표시된다', async ({ page }) => {
+    await expect(page.locator('h1:has-text("로그인이 필요합니다")')).toBeVisible();
+    await expect(
+      page.locator('text=로그인 후 메인페이지에서 주간 엑셀 일정을 확인할 수 있습니다.')
+    ).toBeVisible();
   });
 
-  test('5개 Feature 카드가 모두 표시된다', async ({ page }) => {
-    const cards = page.locator('.home-feature-card');
-    await expect(cards).toHaveCount(5);
-
-    const expectedTitles = [
-      'MeasSet Generation',
-      'Viewer',
-      'Verification Report',
-      'SSR DocOut',
-      'Machine Learning',
-    ];
-    for (const title of expectedTitles) {
-      await expect(page.locator(`.home-feature-card:has-text("${title}")`)).toBeVisible();
-    }
+  test('비로그인 상태에서는 주간 일정이 노출되지 않는다', async ({ page }) => {
+    // 인증 전에는 SharePoint 임베드(iframe)가 렌더링되지 않아야 한다.
+    await expect(page.locator('main iframe')).toHaveCount(0);
+    await expect(page.locator('main button:has-text("로그인")')).toBeVisible();
   });
 
   test('버전 배지가 표시된다', async ({ page }) => {
@@ -51,7 +43,8 @@ test.describe('Navbar', () => {
   });
 
   test('비로그인 상태에서 Login 버튼이 표시된다', async ({ page }) => {
-    await expect(page.locator('button:has-text("Login")')).toBeVisible();
+    // 데스크톱/모바일 두 벌의 버튼이 렌더링되므로 데스크톱 버튼을 특정한다.
+    await expect(page.locator('.navbar-login-btn')).toBeVisible();
   });
 
   test('비로그인 상태에서 메뉴 링크가 비활성화된다', async ({ page }) => {

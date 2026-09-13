@@ -6,6 +6,45 @@
 
 ---
 
+## 변경 이력 (v0.9.61 — 2026-09-13)
+
+### v0.9.61 — #1. README 전면 갱신 및 E2E 테스트 현행화
+
+**요청**: 수정된 코드나 워크플로우를 기반으로 다시 한번 README 를 업데이트.
+
+**배경**: v0.9.60 전수 리뷰로 설정 로딩·보안 정책·업로드 경로·데이터뷰 워크플로우가 크게 바뀌었으나 `README.md` 는 구동 방법 중심의 7장 구조에 머물러 있어, 신규 설치자가 운영 모드 fail-fast·CORS·재로그인 동작을 알 수 없었다.
+
+**변경 (`README.md`, 7장 → 10장)**
+
+| 장 | 상태 | 내용 |
+|----|------|------|
+| 주요 기능 표 | 신설 | 홈(`/`)·MeasSet Generation·Viewer·Verification Report·SSR DocOut·Machine Learning + `/data-view` 별도 창 설명 |
+| 3. 최초 설치 | 신설 | venv 생성 + `pip install -r requirements.txt`(구동 스크립트는 pip 설치를 하지 않음), `npm install` 은 `AOP_Web.ps1` 이 자동 수행, `AOP_config.cfg` 역할 |
+| 5. 환경 변수 및 보안 설정 | 신설 | 5.1 백엔드 변수 표(`AOP_ENV`/`AUTH_SECRET_KEY`/`FLASK_SECRET_KEY`/`AUTH_EXPIRE_TIME`/`ALLOWED_ORIGINS`/`COOKIE_SECURE`) + 운영 예시, 5.2 인증·세션(백엔드 재시작 시 재로그인 필요), 5.3 `NEXT_PUBLIC_API_BASE_URL`, 5.4 업로드 저장 위치 |
+| 8. 테스트 | 신설 | `npx playwright install` → `npm test`(15 케이스), `npm run build`, dev 서버의 `.next` 잠금 주의, **테스트는 비로그인 상태 전제**임을 명시 |
+| 9. 디렉토리 구조 | 갱신 | backend 하위 패키지·frontend `src` 세부·루트 `1_uploads/` 반영 |
+| 10. 트러블슈팅 | 확장 | "자주 발생하는 증상" 표 7행(운영 fail-fast, CORS 차단, 로그인 풀림, 401, 추상 오류 메시지, `.next` 빌드 실패, requirements 인코딩, `backend\1_uploads` 레거시) |
+
+**문서 정확성 실측 검증** — 운영 모드 fail-fast 를 단계별로 재현해 문서 내용과 일치함을 확인.
+
+```
+AOP_ENV=production 단독          → RuntimeError: ... AUTH_SECRET_KEY, FLASK_SECRET_KEY
++ AUTH/FLASK 시크릿 주입          → RuntimeError: ... ALLOWED_ORIGINS 를 명시적으로 지정
++ ALLOWED_ORIGINS 주입            → PROD_OK ['https://aop.example.com'] False
+```
+
+**E2E 테스트 현행화 (`frontend\tests\app.spec.js`)** — `npm test` 실행 결과 3건이 실패했는데, 제품 결함이 아니라 **이미 제거된 UI 를 검증하던 낡은 테스트**였다(`home-feature-card` / `AOP Web Platform` 문자열은 `globals.css` 에만 잔존하고 JSX 에는 없음).
+
+| 케이스 | Before | After |
+|--------|--------|-------|
+| 홈 Hero 섹션 | `text=AOP Web Platform` 존재 확인 → 실패 | `비로그인 상태에서 로그인 안내 카드가 표시된다` — `h1:has-text("로그인이 필요합니다")` 검증 |
+| 5개 Feature 카드 | `.home-feature-card` 5개 → 실패(0개) | `비로그인 상태에서는 주간 일정이 노출되지 않는다` — `main iframe` 0개 + 본문 로그인 버튼 검증 |
+| Navbar Login 버튼 | `button:has-text("Login")` → strict mode violation(데스크톱·모바일 2개 매치) | `.navbar-login-btn` 으로 데스크톱 버튼 특정 |
+
+**검증 결과**: `npm test` → **15 passed (25.7s)**, 실패 0건.
+
+---
+
 ## 변경 이력 (v0.9.60 — 2026-09-12)
 
 ### v0.9.60 — #1. 전체 프로젝트 전수 리뷰 및 결함·성능 개선

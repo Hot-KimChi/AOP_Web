@@ -6,6 +6,14 @@
 
 ---
 
+## 변경 이력 (v0.9.61 — 2026-09-13)
+
+| # | 요청 | 해결 | Detail |
+|---|------|------|--------|
+| 1 | 수정된 코드·워크플로우를 기반으로 README 재갱신 | v0.9.60 전수 리뷰로 바뀐 실제 코드·설정을 실사해 `README.md` 를 7장 → 10장 구조로 전면 개편. **신설**: 주요 기능 표(홈 포함 6개 메뉴 + `/data-view` 창), 3장 최초 설치(venv·`pip install -r requirements.txt`·`npm install` 자동화 범위), 5장 환경 변수 및 보안 설정(`AOP_ENV`/`AUTH_SECRET_KEY`/`FLASK_SECRET_KEY`/`ALLOWED_ORIGINS`/`COOKIE_SECURE` 표, 운영 fail-fast 예시, 재시작 시 재로그인 필요, `1_uploads/` 저장 위치), 8장 테스트(Playwright·`npm run build`), 10장 "자주 발생하는 증상" 표 7행. **검증**: 운영 모드 fail-fast 를 3단계로 실측 재현해 문서와 일치 확인. 더불어 이미 삭제된 홈 Hero/Feature 카드 UI 를 검증하던 낡은 E2E 3건을 현재 워크플로우(비로그인 로그인 안내 카드, 주간 일정 미노출, 데스크톱 `.navbar-login-btn`)에 맞게 교체해 **15/15 통과** | [→ Detail](./AI_Rearch_detail.md#v0961--1-readme-전면-갱신-및-e2e-테스트-현행화) |
+
+---
+
 ## 변경 이력 (v0.9.60 — 2026-09-12)
 
 | # | 요청 | 해결 | Detail |
