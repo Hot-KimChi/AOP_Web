@@ -201,3 +201,33 @@
 - **진행 내역 요약**:
   1. 세 질문에 실측으로 답했습니다. **접속자 selxxxxx 확인은 이미 가능**(로그인 계정명이 곧 selxxxxx 이고 JWT 로 매 요청 검증)하나 라우트에서 꺼내 쓸 수 없던 것을 `g.current_user` 로 노출했고, **Windows SSO 는 불가**함을 근거와 함께 확정했습니다(`dsregcmd` 실측 `DomainJoined: NO` / `AzureAdJoined: YES`, IIS 미설치 — 서버가 남의 Windows 자격증명을 *검증*하려면 AD 도메인 가입 + Kerberos/NTLM 이 필요하며, MS-SQL Windows 인증은 서버가 *클라이언트로서* 자기 자격증명을 제시하는 반대 방향이라 근거가 되지 않습니다. DB 접속을 Windows 인증으로 바꾸면 전원이 서버 프로세스 계정(sysadmin) 으로 붙어 사용자별 DB 권한이 사라지므로 현행 SQL 인증을 유지했습니다).
   2. 요청하신 **사용자별 todo list 를 구현**했습니다. 서버 로컬 SQLite(`backend/data/user_data.db`)에 소유자를 소문자 정규화해 저장하고 모든 쿼리에 `owner = ?` 를 강제해, 타인 항목은 조회·수정·삭제 모두 **404**(존재 여부 비노출)로 차단했습니다. 홈 화면 우측에 "내 할 일" 패널(추가·완료 토글·삭제)을 붙였고, **로그인 권한 분리**는 `AUTH_ALLOWED_USERS` 허용 목록으로 제공했습니다(미설정 시 기존과 동일한 전체 허용). **검증**: 두 계정 격리·타인 항목 404·대소문자 동일인 처리·입력 검증 3종·허용목록 3종 실측, `npm test` 15/15, `npm run build` 성공, GPT 교차 검증(Major 1·Minor 2 → **전건 수정 후 재실측 통과**: 허용목록에서 제외되면 *이미 발급된 토큰도* 즉시 403 + 쿠키 만료, 64비트 초과 id 는 500 아닌 404, 연속 토글 중복 요청 차단).
+
+
+>#### 12. frontend 엑셀을 메인화면에 띄우는데, 새창애서 열기로 하면 수정이 되는데 새창에서 열기를 하지 않고, 메인화면에서 편집할 수 있게끔 수정해죠. 아래에 Agent 재작성 명세를 작성 후에 진행해죠.
+
+> **[Agent 재작성 명세]** 메인화면 임베드된 SharePoint Excel의 동작 모드를 뷰어(`action=embedview`)에서 편집기(`action=edit`)로 전환하여 인라인 편집이 가능하도록 한다.
+>
+> - **문제 정의(원인 분석)**
+>   1. `frontend/src/app/(home)/page.js`에서 iframe 임베드 URL로 사용 중인 `WEEKLY_SCHEDULE_EMBED_URL`의 파라미터가 `action=embedview`로 고정되어 있어, 메인화면 임베드 프레임에서는 읽기 전용(View 모드)으로만 렌더링되고 있었다.
+>   2. "새 창에서 열기"(`WEEKLY_SCHEDULE_URL`) 링크는 Office Online의 기본 웹 편집 모드로 열려 편집이 가능했으나, 사용자가 새 창으로 이동하지 않고 메인 화면 iframe 내부에서 즉시 셀을 편집하고 저장할 수 있어야 한다.
+> - **목표**
+>   - 메인화면 iframe 내에서 SharePoint Excel의 온라인 웹 편집 모드(`action=edit`)가 활성화되어 직접 수정 가능하도록 변경.
+>   - 기존 "새 창에서 열기" 링크 및 레이아웃 구조(우측 내 할 일 패널, 비로그인 시 접근 차단 등)는 그대로 유지.
+> - **범위(In)**
+>   1. `frontend/src/app/(home)/page.js`의 `WEEKLY_SCHEDULE_EMBED_URL` 파라미터를 `action=embedview`에서 `action=edit`로 변경.
+>   2. `Layout.js`의 버전 배지를 `v 0.9.67`로 갱신.
+> - **범위 밖(Out)**
+>   - 백엔드 인증/API 및 DB 로직 변경 없음.
+>   - 프론트엔드 네비게이션 및 타 라우트 변경 없음.
+> - **제약(불변식)**
+>   - 비로그인 상태 시 iframe 비노출 및 로그인 안내 카드 렌더링 유지 (E2E 테스트 불변식).
+>   - `Layout.js`의 `dynamic(() => ..., { ssr: false })` 및 Layout stack 순서 유지.
+>   - E2E 15개 테스트 전원 통과.
+> - **검증**
+>   - `frontend/src/app/(home)/page.js`의 URL 파라미터 `action=edit` 반영 확인.
+>   - `cd frontend; npm test` (Playwright E2E 15/15 전건 통과 확인).
+
+- **수행 일자**: 2026-09-14 (v0.9.67)
+- **진행 내역 요약**:
+  1. 메인화면의 SharePoint 엑셀 iframe 임베드 URL(`WEEKLY_SCHEDULE_EMBED_URL`) 파라미터를 읽기 전용 뷰어 모드(`action=embedview`)에서 인라인 웹 편집 모드(`action=edit`)로 변경하여, 새 창으로 이동하지 않고도 메인화면에서 직접 엑셀 일정을 수정할 수 있도록 개선했습니다.
+  2. 비로그인 시 차단 및 내 할 일(Todo) 패널 등 기존 레이아웃 불변식을 유지하고 Playwright E2E 테스트 15건 전수 통과를 검증했습니다.
