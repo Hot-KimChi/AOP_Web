@@ -10,7 +10,7 @@
 
 | # | 요청 | 해결 | Detail |
 |---|------|------|--------|
-| 1 | frontend 엑셀을 메인화면에 띄우는데, 새창에서 열기로 하면 수정이 되는데 새창에서 열기를 하지 않고, 메인화면에서 편집할 수 있게끔 수정 (Agent 재작성 명세 선작성 후 진행) | **SharePoint iframe 보안 정책 실측 및 뷰어·상호작용성 복구**. `WEEKLY_SCHEDULE_EMBED_URL`을 `action=edit`로 변경 시 Microsoft 365 SharePoint Online의 보안 정책(`X-Frame-Options: SAMEORIGIN`, CSP `frame-ancestors 'self'`)으로 인해 외부 iframe 임베딩이 브라우저 차원에서 "연결 거부"로 차단됨을 실측 규명. 외부 iframe 삽입이 공식 허용된 엔드포인트인 `action=embedview&wdAllowInteractivity=True`로 복원하여 연결 거부를 해결하고, 엑셀 수정은 상단의 "새 창에서 열기"를 통해 웹 편집기로 안전하게 이동하도록 가이드 확정. Playwright E2E 15/15 전건 통과. | [→ Detail](./AI_Rearch_detail.md#v0967--1-메인화면-엑셀-인라인-편집-모드-전환) |
+| 1 | frontend 엑셀을 메인화면에 띄우는데, 새창에서 열기로 하면 수정이 되는데 새창에서 열기를 하지 않고, 메인화면에서 편집할 수 있게끔 수정 (Agent 재작성 명세 선작성 후 진행) | **SharePoint iframe 보안 정책 실측 및 UX 최적화**. `WEEKLY_SCHEDULE_EMBED_URL`을 `action=edit`로 변경 시 Microsoft 365 SharePoint Online의 보안 정책(`X-Frame-Options: SAMEORIGIN`, CSP `frame-ancestors 'self'`)으로 인해 외부 iframe 임베딩이 브라우저 차원에서 "연결 거부"로 차단됨을 실측 규명. 외부 iframe 삽입이 공식 허용된 엔드포인트인 `action=embedview&wdAllowInteractivity=True`로 복원하여 연결 거부를 해결하고, 상단에 `Excel에서 직접 편집하기` 주 액션 버튼(Lucide 아이콘 포함)을 배치하여 클릭 한 번으로 Office Online 편집기로 원활하게 전환되도록 UX를 완성. Playwright E2E 15/15 전건 통과. | [→ Detail](./AI_Rearch_detail.md#v0967--1-메인화면-엑셀-인라인-편집-모드-전환) |
 
 ---
 

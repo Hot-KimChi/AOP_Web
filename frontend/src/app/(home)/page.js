@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ExternalLink, Edit3 } from 'lucide-react';
 import { API_BASE_URL } from '../../lib/apiBase';
 import TodoPanel from '../../components/TodoPanel';
 
@@ -115,25 +116,40 @@ export default function HomePage() {
               flexWrap: 'wrap',
             }}
           >
-            <h1 style={{ fontSize: '1rem', margin: 0, fontWeight: '700', color: 'var(--text)' }}>
-              AOP Weekly Schedule
-            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <h1 style={{ fontSize: '1rem', margin: 0, fontWeight: '700', color: 'var(--text)' }}>
+                AOP Weekly Schedule
+              </h1>
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.15rem 0.45rem',
+                  borderRadius: '4px',
+                  background: 'var(--brand-light)',
+                  color: 'var(--brand-text)',
+                  fontWeight: '600',
+                }}
+              >
+                미리보기
+              </span>
+            </div>
             <a
               href={WEEKLY_SCHEDULE_URL}
               target="_blank"
               rel="noopener noreferrer"
+              className="btn-app btn-app-primary"
               style={{
-                color: 'var(--text)',
-                background: 'var(--bg)',
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                padding: '0.4rem 0.7rem',
                 textDecoration: 'none',
-                fontSize: '0.8rem',
-                fontWeight: '600',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                fontSize: '0.8125rem',
+                padding: '0.4rem 0.85rem',
               }}
             >
-              새 창에서 열기
+              <Edit3 size={14} />
+              <span>Excel에서 직접 편집하기</span>
+              <ExternalLink size={13} style={{ opacity: 0.8 }} />
             </a>
           </div>
           <iframe

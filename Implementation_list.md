@@ -225,4 +225,4 @@
 - **수행 일자**: 2026-09-14 (v0.9.67)
 - **진행 내역 요약**:
   1. SharePoint Online의 보안 정책(`X-Frame-Options: SAMEORIGIN`, CSP `frame-ancestors`)으로 인해 외부 iframe 내 `action=edit` 직접 임베딩이 브라우저 차원에서 차단됨을 실측 규명했습니다.
-  2. 임베드 URL을 외부 iframe 허용 엔드포인트인 `action=embedview&wdAllowInteractivity=True`로 복원하여 연결 거부 오류를 해결하고, 수정은 상단의 "새 창에서 열기"를 통해 안전하게 수행하도록 확정했습니다.
+  2. 임베드 URL을 외부 iframe 허용 엔드포인트인 `action=embedview&wdAllowInteractivity=True`로 복원하여 연결 거부 오류를 해결하고, 상단에 `Excel에서 직접 편집하기` 주 액션 버튼을 신설하여 클릭 한 번으로 편집기로 전환할 수 있도록 UX를 개선했습니다.
