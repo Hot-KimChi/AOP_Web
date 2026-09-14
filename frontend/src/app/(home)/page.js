@@ -6,7 +6,7 @@ import { API_BASE_URL } from '../../lib/apiBase';
 import TodoPanel from '../../components/TodoPanel';
 
 const WEEKLY_SCHEDULE_URL = 'https://healthineersapc.sharepoint.com/:x:/r/teams/SUSKOUE/Shared%20Documents/AOP/Z_UE_AOP%20weekly/AOP%20weekly%20schedule.xlsx?d=wdfdc89b1439d4600b6af66d46b91b13b&csf=1&web=1&e=2FAyYg';
-const WEEKLY_SCHEDULE_EMBED_URL = 'https://healthineersapc.sharepoint.com/teams/SUSKOUE/_layouts/15/Doc.aspx?sourcedoc=%7Bdfdc89b1-439d-4600-b6af-66d46b91b13b%7D&file=AOP%20weekly%20schedule.xlsx&action=edit&mobileredirect=true';
+const WEEKLY_SCHEDULE_EMBED_URL = 'https://healthineersapc.sharepoint.com/teams/SUSKOUE/_layouts/15/Doc.aspx?sourcedoc=%7Bdfdc89b1-439d-4600-b6af-66d46b91b13b%7D&file=AOP%20weekly%20schedule.xlsx&action=embedview&wdAllowInteractivity=True&mobileredirect=true';
 
 export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);

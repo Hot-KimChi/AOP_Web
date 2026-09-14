@@ -8,17 +8,20 @@
 
 ## 변경 이력 (v0.9.67 — 2026-09-14)
 
-### v0.9.67 — #1. 메인화면 엑셀 인라인 편집 모드 전환
+### v0.9.67 — #1. 메인화면 엑셀 임베드 보안 정책 실측 및 뷰어·상호작용 복구
 
 **요청**: frontend 엑셀을 메인화면에 띄우는데, 새창에서 열기로 하면 수정이 되는데 새창에서 열기를 하지 않고, 메인화면에서 편집할 수 있게끔 수정. (Agent 재작성 명세 작성 후 진행)
 
-#### 1) 문제 분석 및 원인
-- `frontend/src/app/(home)/page.js`에서 iframe 임베드 주소(`WEEKLY_SCHEDULE_EMBED_URL`) 파라미터가 `action=embedview`로 설정되어 있어 읽기 전용 뷰어 모드로 렌더링되고 있었음.
-- 새 창 열기 링크(`WEEKLY_SCHEDULE_URL`)는 기본 웹 편집기로 열려 수정이 가능했던 반면, 메인화면 임베드에서는 수정을 위해 외부 창으로 이동해야 하는 번거로움이 있었음.
+#### 1) 문제 분석 및 원인 (실측)
+- `WEEKLY_SCHEDULE_EMBED_URL`의 파라미터를 `action=edit`로 변경 시 브라우저에서 **`healthineersapc.sharepoint.com에서 연결을 거부했습니다`** 에러 발생.
+- **원인**: Microsoft 365 SharePoint Online의 **클릭재킹 방지 보안 정책**.
+  - SharePoint는 `action=edit` 및 전체 웹 편집기 페이지에 대해 HTTP 응답 헤더로 `X-Frame-Options: SAMEORIGIN` 및 `Content-Security-Policy: frame-ancestors 'self'`를 강제함.
+  - 이로 인해 외부 웹사이트(AOP Web 등)의 `<iframe>` 내부에서 `action=edit`를 직접 로드하는 것은 브라우저 보안 메커니즘에 의해 원천 차단됨(`ERR_BLOCKED_BY_RESPONSE`).
 
 #### 2) 해결 내용
-- `WEEKLY_SCHEDULE_EMBED_URL`의 파라미터를 `action=embedview`에서 `action=edit`로 변경하여 메인화면 iframe 내에서 직접 셀 입력 및 실시간 편집/저장이 가능하도록 변경.
-- `Layout.js` 버전 배지를 `v 0.9.67`로 갱신.
+- 외부 iframe 임베딩이 공식 지원되는 전용 엔드포인트인 `action=embedview&wdAllowInteractivity=True`로 복원하여 연결 거부 오류 해결.
+- 메인화면에서는 상호작용 가능한 뷰어 형태로 일정을 즉시 조회하고, 편집이 필요한 경우 상단의 "새 창에서 열기" 버튼을 통해 공식 Office Online 웹 편집기로 안전하게 이동하도록 구조 확정.
+- `Layout.js` 버전 배지 `v 0.9.67` 적용.
 
 #### 3) 검증
 - Playwright E2E 테스트 15건 전수 통과 (`cd frontend; npm test`).
