@@ -6,6 +6,33 @@
 
 ---
 
+## 변경 이력 (v0.9.68 — 2026-09-15)
+
+### v0.9.68 — #1. Windows 자동 시작 등록
+
+**요청**: 서버 컴퓨터에서 Windows 시작 시 AOP Web이 자동 실행되도록 구성하고 `AOP_Web.bat`를 수정.
+
+#### 1) 변경 전 문제
+- `AOP_Web.bat`는 기본 시작과 수동 제어만 제공하고 Windows 작업 스케줄러를 등록·해제하는 명령이 없어 자동 시작을 수동으로 구성해야 했음.
+- 자동 시작 시 개발 서버 콘솔 창을 숨길 수 있는 전용 경로가 없었음.
+
+#### 2) 해결 내용
+- `AOP_Web.bat`에 다음 명령 추가:
+  - `autostart`: 작업 스케줄러가 호출하는 무인 시작 경로
+  - `install`: 현재 사용자 로그온 시 실행되는 `AOP_Web_AutoStart` 작업 등록
+  - `uninstall`: 자동 시작 작업 해제
+- `scripts/AOP_Web.ps1`에 `InstallStartup`/`UninstallStartup` 동작과 `-Unattended` 옵션 추가.
+- 작업은 프로젝트 루트를 작업 디렉터리로 사용하고 `cmd.exe /c AOP_Web.bat autostart`를 호출하며, 현재 사용자 권한으로 로그온 시 실행됨.
+- `README.md`에 권장 등록·해제 및 수동 제어 절차를 반영.
+
+#### 3) 검증
+- PowerShell AST 구문 검사 통과.
+- `AOP_Web.bat status` 실행 결과 백엔드 포트 상태를 정상 확인.
+- 자동 시작 작업 등록 후 `Ready` 상태 및 실행 파일/인자/작업 디렉터리 확인.
+- `uninstall` 후 재등록 성공. 최종 작업명은 `AOP_Web_AutoStart`.
+
+---
+
 ## 변경 이력 (v0.9.67 — 2026-09-14)
 
 ### v0.9.67 — #1. 메인화면 엑셀 임베드 보안 정책 실측 및 뷰어·상호작용 복구
@@ -2858,4 +2885,3 @@ fetchData → merge_selectionFeature → dataSplit → DataPreprocess
 📎 **[→ Summary](./AI_Rearch_summary.md)**
 
 ---
-

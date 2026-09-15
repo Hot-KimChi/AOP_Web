@@ -226,3 +226,36 @@
 - **진행 내역 요약**:
   1. SharePoint Online의 보안 정책(`X-Frame-Options: SAMEORIGIN`, CSP `frame-ancestors`)으로 인해 외부 iframe 내 `action=edit` 직접 임베딩이 브라우저 차원에서 차단됨을 실측 규명했습니다.
   2. 임베드 URL을 외부 iframe 허용 엔드포인트인 `action=embedview&wdAllowInteractivity=True`로 복원하여 연결 거부 오류를 해결하고, 상단에 `Excel에서 직접 편집하기` 주 액션 버튼을 신설하여 클릭 한 번으로 편집기로 전환할 수 있도록 UX를 개선했습니다.
+
+>#### 13. 서버 컴퓨터에서 시작했을때(Windows) 자동으로 서버가 실행이 되도록 구성하고 싶은데 어떻게 진행해야 하나? 그리고 현재 AOP_Web.bat를 어떻게 수정해야 하나? 아래와 agent 재작성 명세를 작성 후에 진행해죠.
+
+> **[Agent 재작성 명세]** Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기동할 수 있도록 단일 진입점과 작업 스케줄러 등록 명령을 정비한다.
+>
+> - **문제 정의**
+>   1. 기존 `AOP_Web.bat`는 인자 없이 실행하면 시작되지만, Windows 자동 시작을 실제로 등록하거나 해제하는 명령이 없었다.
+>   2. 기존 README는 시작프로그램 바로 가기와 작업 스케줄러를 수동으로 설명해 설치 재현성이 낮았고, 자동 실행 시 개발 서버 콘솔 창이 사용자에게 노출될 수 있었다.
+> - **목표**
+>   - `AOP_Web.bat install` 한 번으로 현재 Windows 사용자 로그온 시 자동 실행 작업을 등록한다.
+>   - `AOP_Web.bat uninstall`으로 등록을 해제하고, `status`로 서비스 상태를 점검한다.
+>   - 자동 실행 전용 `autostart` 경로는 개발 서버 창을 숨기고 기존 수동 `start` 동작은 유지한다.
+> - **범위(In)**
+>   1. `AOP_Web.bat`에 `autostart`/`install`/`uninstall` 명령 추가.
+>   2. `scripts/AOP_Web.ps1`에 현재 사용자용 `AOP_Web_AutoStart` 작업 등록·해제 및 `-Unattended` 창 숨김 옵션 추가.
+>   3. `README.md`에 권장 등록 절차와 수동 제어 절차 갱신.
+> - **제약(불변식)**
+>   - 기존 `start`/`stop`/`restart`/`status`/`prod` 명령과 포트(5000/3000) 유지.
+>   - `$projectPath`는 스크립트 위치 기준으로 산출하고, 작업 동작 디렉터리는 프로젝트 루트로 고정.
+>   - PowerShell 컬렉션은 `@()`로 배열 고정하고 배치 종료 코드는 PowerShell 종료 코드를 전달한다.
+>   - 자동 시작 작업 등록 실패는 성공 메시지나 0 종료 코드로 위장하지 않는다.
+> - **검증**
+>   - PowerShell 구문 검사.
+>   - `AOP_Web.bat status` 실행.
+>   - `install` → 작업 속성 확인 → `uninstall` → 재등록 실측.
+>   - 기존 서비스 상태를 불필요하게 변경하지 않고 등록 작업이 `Ready` 상태인지 확인.
+
+- **수행 일자**: 2026-09-15 (v0.9.68)
+- **진행 내역 요약**:
+  1. `AOP_Web.bat`에 `autostart`, `install`, `uninstall` 명령을 추가하고, `scripts/AOP_Web.ps1`에 현재 사용자 로그온 트리거의 `AOP_Web_AutoStart` 작업 등록·해제와 무인 실행 시 개발 서버 창 숨김을 구현했습니다.
+  2. README의 자동 시작 절차를 실제 명령 중심으로 갱신하고 PowerShell 구문 검사, 상태 확인, 작업 등록/해제/재등록을 실측했습니다. 최종 작업은 `Ready` 상태로 등록되어 있습니다.
+
+  >#### 13. 서버 컴퓨터에서 시작했을때(Windows) 자동으로 서버가 실행이 되도록 구성하고 싶은데 어떻게 진행해야 하나? 그리고 현재 AOP_Web.bat를 어떻게 수정해야 하나? 아래와 agent 재작성 명세를 작성 후에 진행해죠.

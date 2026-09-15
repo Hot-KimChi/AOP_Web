@@ -3,15 +3,16 @@
 #  AOP Web Application - Unified Management Script
 #
 #  Purpose  : Start, Stop, Restart, Status 통합 관리 스크립트
-#  Usage    : .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status] [-Production] [-Force] [-Diagnose] [-Help]
+#  Usage    : .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|InstallStartup|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose] [-Help]
 #  Created  : 2026-09-11
 # ============================================================
 
 param(
-    [ValidateSet("Start", "Stop", "Restart", "Status")]
+    [ValidateSet("Start", "Stop", "Restart", "Status", "InstallStartup", "UninstallStartup")]
     [string]$Action = "Start",
     [switch]$Production,
     [switch]$Force,
+    [switch]$Unattended,
     [switch]$Diagnose,
     [switch]$Help
 )
@@ -161,6 +162,63 @@ function Wait-ForPortListening {
     }
     return $false
 }
+
+function Install-StartupTask {
+    $taskName = "AOP_Web_AutoStart"
+    $batchPath = Join-Path $projectPath "AOP_Web.bat"
+    if (!(Test-Path $batchPath)) {
+        throw "AOP_Web.bat not found at $batchPath."
+    }
+
+    $escapedBatchPath = $batchPath.Replace('"', '\"')
+    $taskAction = New-ScheduledTaskAction `
+        -Execute "cmd.exe" `
+        -Argument "/d /c `"`"$escapedBatchPath`" autostart`"" `
+        -WorkingDirectory $projectPath
+    $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+    $taskSettings = New-ScheduledTaskSettingsSet `
+        -StartWhenAvailable `
+        -RestartCount 3 `
+        -RestartInterval (New-TimeSpan -Minutes 1) `
+        -ExecutionTimeLimit ([TimeSpan]::Zero)
+    $taskPrincipal = New-ScheduledTaskPrincipal `
+        -UserId "$env:USERDOMAIN\$env:USERNAME" `
+        -LogonType Interactive `
+        -RunLevel Limited
+
+    Register-ScheduledTask `
+        -TaskName $taskName `
+        -Action $taskAction `
+        -Trigger $taskTrigger `
+        -Settings $taskSettings `
+        -Principal $taskPrincipal `
+        -Force `
+        -ErrorAction Stop | Out-Null
+
+    Write-Host "Windows auto-start task registered: $taskName" -ForegroundColor Green
+    Write-Host "Trigger: current user logon | Action: AOP_Web.bat autostart" -ForegroundColor Cyan
+}
+
+function Uninstall-StartupTask {
+    $taskName = "AOP_Web_AutoStart"
+    try {
+        $task = Get-ScheduledTask -TaskName $taskName -ErrorAction Stop
+    } catch {
+        if ($_.CategoryInfo.Category.ToString() -eq "ObjectNotFound") {
+            $task = $null
+        } else {
+            throw
+        }
+    }
+
+    if (-not $task) {
+        Write-Host "Windows auto-start task not found: $taskName" -ForegroundColor Yellow
+        return
+    }
+
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction Stop
+    Write-Host "Windows auto-start task removed: $taskName" -ForegroundColor Green
+}
 #endregion
 
 #region Help & Diagnose
@@ -168,7 +226,7 @@ if ($Help) {
     Write-Host "AOP Web Application Unified Management Script" -ForegroundColor Green
     Write-Host "===============================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Usage: .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status] [-Production] [-Force] [-Diagnose]" -ForegroundColor Yellow
+    Write-Host "Usage: .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|InstallStartup|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose]" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Actions:" -ForegroundColor Yellow
     Write-Host "  Start      Start Frontend & Backend servers (Default)"
@@ -179,6 +237,9 @@ if ($Help) {
     Write-Host "Parameters:" -ForegroundColor Yellow
     Write-Host "  -Production    Production mode (build + background)"
     Write-Host "  -Force         Non-interactive mode (force stop existing processes)"
+    Write-Host "  -Unattended    Hide development server windows for automatic startup"
+    Write-Host "  -Action InstallStartup     Register current-user logon auto-start task"
+    Write-Host "  -Action UninstallStartup   Remove current-user logon auto-start task"
     Write-Host "  -Diagnose      Run environment diagnosis only"
     Write-Host ""
     Exit 0
@@ -339,7 +400,8 @@ function Start-Services {
         $backendProcess = Start-Process -FilePath $pythonExe -ArgumentList "app.py" -WorkingDirectory $backendPath -WindowStyle Hidden -PassThru
     } else {
         $backendCmd = "Set-Location '$backendPath'; & '$pythonExe' app.py"
-        $backendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $backendCmd -PassThru
+        $backendWindowStyle = if ($Unattended) { "Hidden" } else { "Normal" }
+        $backendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $backendCmd -WindowStyle $backendWindowStyle -PassThru
     }
     Write-Log "Backend PID: $($backendProcess.Id)" "INFO"
 
@@ -389,7 +451,8 @@ function Start-Services {
         Set-Location $projectPath
     } else {
         $frontendCmd = "Set-Location '$frontendPath'; npm run dev"
-        $frontendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $frontendCmd -PassThru
+        $frontendWindowStyle = if ($Unattended) { "Hidden" } else { "Normal" }
+        $frontendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $frontendCmd -WindowStyle $frontendWindowStyle -PassThru
     }
     Write-Log "Frontend PID: $($frontendProcess.Id)" "INFO"
 
@@ -422,6 +485,8 @@ try {
         "Status"  { Show-Status }
         "Stop"    { Stop-Services -NonInteractive:$Force }
         "Start"   { Start-Services }
+        "InstallStartup"   { Install-StartupTask }
+        "UninstallStartup" { Uninstall-StartupTask }
         "Restart" {
             Stop-Services -NonInteractive:$true
             Start-Sleep -Seconds 1

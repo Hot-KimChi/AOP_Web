@@ -172,22 +172,36 @@ MeasSet 생성 결과와 검증 리포트는 **저장소 루트의 `1_uploads\`*
 
 ---
 
-## 6. Windows 시작프로그램 무인 자동 등록 (Auto-Start setup)
+## 6. Windows 자동 시작 등록 (Auto-Start setup)
 
-서버 부팅 시 로그인과 함께 애플리케이션이 자동으로 기동되도록 설정하는 방법입니다.
+권장 방식은 **현재 Windows 사용자 로그온 시 작업 스케줄러로 등록**하는 것입니다. 이 방식은 해당 사용자의 Python/Node 환경변수와 프로젝트 권한을 그대로 사용하며, 개발 서버 창은 숨겨진 상태로 실행됩니다.
 
-### 방법 1: Windows 시작프로그램 폴더(`shell:startup`) 이용
-1. `Win + R` 키를 눌러 실행 창을 엽니다.
-2. `shell:startup` 을 입력하여 시작프로그램 폴더를 엽니다.
-3. `AOP_Web.bat` 파일의 바로 가기(Shortcut)를 해당 폴더 안에 만듭니다.
-4. 서버 재부팅 시 백그라운드/독립 프로세스로 무인 자동 실행됩니다.
+### 6.1 자동 시작 등록 및 해제
 
-### 방법 2: Windows 작업 스케줄러(Task Scheduler) 이용
-1. 작업 스케줄러 실행 후 **[기본 작업 만들기]** 선택.
-2. 트리거: **[컴퓨터 시작 시]** 또는 **[로그온할 때]** 선택.
-3. 동작: **[프로그램 시작]** 선택.
-4. 프로그램/스크립트: `D:\GitHub\AOP_Web\AOP_Web.bat` 지정.
-5. 시작 위치: `D:\GitHub\AOP_Web\` 지정.
+프로젝트 루트에서 관리자 권한이 아닌 일반 PowerShell/CMD로 실행합니다.
+
+```cmd
+AOP_Web.bat install
+```
+
+등록된 작업은 `AOP_Web_AutoStart`이며, 현재 사용자가 Windows에 로그온할 때 `AOP_Web.bat autostart`를 실행합니다. 등록 상태는 작업 스케줄러에서 확인할 수 있습니다.
+
+```cmd
+AOP_Web.bat status
+AOP_Web.bat uninstall
+```
+
+`autostart`는 개발 모드로 백엔드(5000)와 프론트엔드(3000)를 무인 기동합니다. 운영 모드가 필요하면 작업 스케줄러의 동작을 `AOP_Web.bat prod`로 바꾸되, 운영 환경변수와 프론트엔드 프로덕션 빌드 조건을 먼저 준비해야 합니다.
+
+### 6.2 수동 시작/중지
+
+```cmd
+AOP_Web.bat start
+AOP_Web.bat stop
+AOP_Web.bat restart
+```
+
+인자 없이 `AOP_Web.bat`를 실행해도 기존 호환성을 유지하면서 무인 시작(`autostart`와 동일)합니다.
 
 ---
 

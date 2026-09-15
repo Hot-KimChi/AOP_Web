@@ -10,6 +10,9 @@ REM    AOP_Web.bat stop       Stop servers
 REM    AOP_Web.bat restart    Restart servers
 REM    AOP_Web.bat status     Show running status
 REM    AOP_Web.bat prod       Start in production mode
+REM    AOP_Web.bat autostart Start unattended (used by Task Scheduler)
+REM    AOP_Web.bat install   Register Windows logon auto-start task
+REM    AOP_Web.bat uninstall Remove Windows auto-start task
 REM
 REM  Implementation : scripts\AOP_Web.ps1
 REM ============================================================
@@ -26,7 +29,8 @@ set "ACTION=Start"
 set "EXTRA_ARGS="
 
 if /i "%~1"=="" (
-    rem Default: unattended start on Windows startup
+    rem Default: unattended start for backward compatibility
+    set "EXTRA_ARGS=-Unattended"
 ) else if /i "%~1"=="start" (
     set "ACTION=Start"
 ) else if /i "%~1"=="stop" (
@@ -41,9 +45,15 @@ if /i "%~1"=="" (
     set "EXTRA_ARGS=-Production"
 ) else if /i "%~1"=="production" (
     set "EXTRA_ARGS=-Production"
+) else if /i "%~1"=="autostart" (
+    set "EXTRA_ARGS=-Unattended"
+) else if /i "%~1"=="install" (
+    set "ACTION=InstallStartup"
+) else if /i "%~1"=="uninstall" (
+    set "ACTION=UninstallStartup"
 ) else (
     echo [ERROR] Unknown command: %~1
-    echo Usage: AOP_Web.bat [start^|stop^|restart^|status^|prod]
+    echo Usage: AOP_Web.bat [start^|stop^|restart^|status^|prod^|autostart^|install^|uninstall]
     exit /b 1
 )
 

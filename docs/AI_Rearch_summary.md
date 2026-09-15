@@ -12,6 +12,12 @@
 |---|------|------|--------|
 | 1 | frontend 엑셀을 메인화면에 띄우는데, 새창에서 열기로 하면 수정이 되는데 새창에서 열기를 하지 않고, 메인화면에서 편집할 수 있게끔 수정 (Agent 재작성 명세 선작성 후 진행) | **SharePoint iframe 보안 정책 실측 및 UX 최적화**. `WEEKLY_SCHEDULE_EMBED_URL`을 `action=edit`로 변경 시 Microsoft 365 SharePoint Online의 보안 정책(`X-Frame-Options: SAMEORIGIN`, CSP `frame-ancestors 'self'`)으로 인해 외부 iframe 임베딩이 브라우저 차원에서 "연결 거부"로 차단됨을 실측 규명. 외부 iframe 삽입이 공식 허용된 엔드포인트인 `action=embedview&wdAllowInteractivity=True`로 복원하여 연결 거부를 해결하고, 상단에 `Excel에서 직접 편집하기` 주 액션 버튼(Lucide 아이콘 포함)을 배치하여 클릭 한 번으로 Office Online 편집기로 원활하게 전환되도록 UX를 완성. Playwright E2E 15/15 전건 통과. | [→ Detail](./AI_Rearch_detail.md#v0967--1-메인화면-엑셀-인라인-편집-모드-전환) |
 
+## 변경 이력 (v0.9.68 — 2026-09-15)
+
+| # | 요청 | 해결 | Detail |
+|---|------|------|--------|
+| 1 | Windows 시작 시 AOP Web 자동 실행 설정 및 `AOP_Web.bat` 수정 (Agent 재작성 명세 선작성 후 진행) | `AOP_Web.bat install`/`uninstall`로 현재 사용자 로그온 트리거의 `AOP_Web_AutoStart` 작업을 등록·해제하도록 추가하고, `autostart` 경로에서 개발 서버 창을 숨겨 무인 실행하도록 개선했습니다. 기존 `start`/`stop`/`restart`/`status`/`prod` 명령은 유지했으며 README에 실제 설정·해제 절차를 반영했습니다. PowerShell 구문, 상태, 작업 등록·해제·재등록을 실측했습니다. | [→ Detail](./AI_Rearch_detail.md#v0968--1-windows-자동-시작-등록) |
+
 ---
 
 ## 변경 이력 (v0.9.66 — 2026-09-13)
@@ -645,4 +651,3 @@ AOP_Web은 **산업용 초음파 장비의 AOP 측정 관리를 위한 성숙한
   - `validate_tx_summary_file` 비교 루프에서 `iterrows`/컬럼 lookup 재생성을 제거하고 record 기반 단일 lookup으로 전환
   - SQL 엔진 `fast_executemany` + `to_sql(chunksize, multi)`로 대량 업로드 삽입 경로 처리량 개선
 - 상세: [AI_Rearch_detail.md](./AI_Rearch_detail.md)
-
