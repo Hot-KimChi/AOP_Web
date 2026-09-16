@@ -19,7 +19,8 @@ param(
 
 #region Environment & Logging Setup
 # 이 스크립트는 scripts/ 하위에 위치하므로 프로젝트 루트는 한 단계 상위 디렉터리다.
-$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+$scriptFilePath = $MyInvocation.MyCommand.Path
+$scriptPath = Split-Path -Parent $scriptFilePath
 $projectPath = Split-Path -Parent $scriptPath
 $logDir = Join-Path $projectPath "logs"
 $logTimestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
@@ -163,26 +164,43 @@ function Wait-ForPortListening {
     return $false
 }
 
-function Install-StartupTask {
-    $taskName = "AOP_Web_AutoStart"
-    $batchPath = Join-Path $projectPath "AOP_Web.bat"
-    if (!(Test-Path $batchPath)) {
-        throw "AOP_Web.bat not found at $batchPath."
+function Stop-ProcessTree {
+    param([int]$ProcessId)
+
+    $children = @(Get-CimInstance -ClassName Win32_Process `
+        -Filter "ParentProcessId = $ProcessId" `
+        -ErrorAction SilentlyContinue)
+    foreach ($child in $children) {
+        Stop-ProcessTree -ProcessId ([int]$child.ProcessId)
     }
 
-    $escapedBatchPath = $batchPath.Replace('"', '\"')
+    Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+}
+
+function Install-StartupTask {
+    $taskName = "AOP_Web_AutoStart"
+    if (!(Test-Path $scriptFilePath -PathType Leaf)) {
+        throw "AOP_Web.ps1 not found at $scriptFilePath."
+    }
+
+    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $escapedScriptPath = $scriptFilePath.Replace('"', '\"')
     $taskAction = New-ScheduledTaskAction `
-        -Execute "cmd.exe" `
-        -Argument "/d /c `"`"$escapedBatchPath`" autostart`"" `
+        -Execute (Join-Path $PSHOME "powershell.exe") `
+        -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$escapedScriptPath`" -Action Start -Unattended" `
         -WorkingDirectory $projectPath
-    $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+    $taskTrigger = New-ScheduledTaskTrigger `
+        -AtLogOn `
+        -User $currentUser
+    $taskTrigger.Delay = "PT30S"
     $taskSettings = New-ScheduledTaskSettingsSet `
+        -Hidden `
         -StartWhenAvailable `
         -RestartCount 3 `
         -RestartInterval (New-TimeSpan -Minutes 1) `
         -ExecutionTimeLimit ([TimeSpan]::Zero)
     $taskPrincipal = New-ScheduledTaskPrincipal `
-        -UserId "$env:USERDOMAIN\$env:USERNAME" `
+        -UserId $currentUser `
         -LogonType Interactive `
         -RunLevel Limited
 
@@ -196,7 +214,10 @@ function Install-StartupTask {
         -ErrorAction Stop | Out-Null
 
     Write-Host "Windows auto-start task registered: $taskName" -ForegroundColor Green
-    Write-Host "Trigger: current user logon | Action: AOP_Web.bat autostart" -ForegroundColor Cyan
+    Write-Host "User: $currentUser" -ForegroundColor Cyan
+    Write-Host "Trigger: current user logon (30 seconds delay)" -ForegroundColor Cyan
+    Write-Host "Action: powershell.exe -WindowStyle Hidden -File scripts\AOP_Web.ps1 -Action Start -Unattended" -ForegroundColor Cyan
+    Write-Host "Verify: schtasks /Query /TN $taskName /FO LIST /V" -ForegroundColor Yellow
 }
 
 function Uninstall-StartupTask {
@@ -399,7 +420,9 @@ function Start-Services {
     if ($Production) {
         $backendProcess = Start-Process -FilePath $pythonExe -ArgumentList "app.py" -WorkingDirectory $backendPath -WindowStyle Hidden -PassThru
     } else {
-        $backendCmd = "Set-Location '$backendPath'; & '$pythonExe' app.py"
+        $backendCommandPath = $backendPath.Replace("'", "''")
+        $pythonCommandPath = $pythonExe.Replace("'", "''")
+        $backendCmd = "Set-Location '$backendCommandPath'; & '$pythonCommandPath' app.py"
         $backendWindowStyle = if ($Unattended) { "Hidden" } else { "Normal" }
         $backendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $backendCmd -WindowStyle $backendWindowStyle -PassThru
     }
@@ -450,15 +473,25 @@ function Start-Services {
         $frontendProcess = Start-Process -FilePath "npm" -ArgumentList "start" -WorkingDirectory $frontendPath -WindowStyle Hidden -PassThru
         Set-Location $projectPath
     } else {
-        $frontendCmd = "Set-Location '$frontendPath'; npm run dev"
+        $frontendCommandPath = $frontendPath.Replace("'", "''")
+        $frontendCmd = "Set-Location '$frontendCommandPath'; npm run dev"
         $frontendWindowStyle = if ($Unattended) { "Hidden" } else { "Normal" }
         $frontendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $frontendCmd -WindowStyle $frontendWindowStyle -PassThru
     }
     Write-Log "Frontend PID: $($frontendProcess.Id)" "INFO"
 
-    $frontendListening = Wait-ForPortListening -Port 3000 -TimeoutSeconds 10 -IntervalMilliseconds 300
+    $frontendListening = Wait-ForPortListening -Port 3000 -TimeoutSeconds 30 -IntervalMilliseconds 300
     if ($frontendListening) {
         Write-Log "Frontend is listening on port 3000" "INFO"
+    } elseif ($Unattended) {
+        Stop-ProcessTree -ProcessId $frontendProcess.Id
+        Stop-ProcessTree -ProcessId $backendProcess.Id
+        foreach ($failedServicePort in @(3000, 5000)) {
+            foreach ($failedServiceProcess in @(Get-ProcessesOnPort -Port $failedServicePort)) {
+                Stop-Process -Id $failedServiceProcess.ProcessId -Force -ErrorAction SilentlyContinue
+            }
+        }
+        throw "Frontend failed to listen on port 3000."
     } else {
         Write-Log "Frontend port 3000 initialization in progress..." "WARN"
     }

@@ -174,7 +174,7 @@ MeasSet 생성 결과와 검증 리포트는 **저장소 루트의 `1_uploads\`*
 
 ## 6. Windows 자동 시작 등록 (Auto-Start setup)
 
-권장 방식은 **현재 Windows 사용자 로그온 시 작업 스케줄러로 등록**하는 것입니다. 이 방식은 해당 사용자의 Python/Node 환경변수와 프로젝트 권한을 그대로 사용하며, 개발 서버 창은 숨겨진 상태로 실행됩니다.
+권장 방식은 **서버 컴퓨터에서 현재 Windows 사용자 로그온 시 작업 스케줄러로 등록**하는 것입니다. 이 저장소에는 작업을 자동으로 등록하지 않으며, 아래 `install` 명령을 실행한 컴퓨터에만 등록됩니다. 해당 사용자의 Python/Node 환경변수와 프로젝트 권한을 그대로 사용하고, 개발 서버 창은 숨겨진 상태로 실행됩니다.
 
 ### 6.1 자동 시작 등록 및 해제
 
@@ -184,14 +184,19 @@ MeasSet 생성 결과와 검증 리포트는 **저장소 루트의 `1_uploads\`*
 AOP_Web.bat install
 ```
 
-등록된 작업은 `AOP_Web_AutoStart`이며, 현재 사용자가 Windows에 로그온할 때 `AOP_Web.bat autostart`를 실행합니다. 등록 상태는 작업 스케줄러에서 확인할 수 있습니다.
+`install`은 현재 실행 중인 Windows 계정으로 `AOP_Web_AutoStart`를 등록합니다. 로그온 후 30초 지연을 두어 네트워크와 사용자 환경이 준비된 뒤 `scripts\AOP_Web.ps1 -Action Start -Unattended`를 직접 실행하므로, 경로에 공백이 있어도 배치 파일 재호출 과정에서 실패하지 않습니다. 등록 상태와 마지막 실행 결과는 다음 명령으로 확인할 수 있습니다.
 
 ```cmd
-AOP_Web.bat status
+schtasks /Query /TN AOP_Web_AutoStart /FO LIST /V
+```
+
+자동 시작을 해제하려면 별도로 다음 명령을 실행합니다.
+
+```cmd
 AOP_Web.bat uninstall
 ```
 
-`autostart`는 개발 모드로 백엔드(5000)와 프론트엔드(3000)를 무인 기동합니다. 운영 모드가 필요하면 작업 스케줄러의 동작을 `AOP_Web.bat prod`로 바꾸되, 운영 환경변수와 프론트엔드 프로덕션 빌드 조건을 먼저 준비해야 합니다.
+서버에 등록한 뒤에는 `AOP_Web.bat status`로 5000/3000 포트가 `RUNNING`인지 확인합니다. 작업의 `Last Result`가 `0x0`이 아니면 `logs\start_*.log`에서 실패 원인을 확인하세요. `autostart`는 수동 재현이 필요한 경우에만 사용하며, 개발 모드로 백엔드(5000)와 프론트엔드(3000)를 무인 기동합니다. 운영 모드가 필요하면 작업 스케줄러의 동작을 `AOP_Web.bat prod`로 바꾸되, 운영 환경변수와 프론트엔드 프로덕션 빌드 조건을 먼저 준비해야 합니다.
 
 ### 6.2 수동 시작/중지
 

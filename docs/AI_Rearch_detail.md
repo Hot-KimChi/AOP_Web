@@ -6,6 +6,32 @@
 
 ---
 
+## 변경 이력 (v0.9.69 — 2026-09-16)
+
+### v0.9.69 — #14. 서버 설치용 Windows 자동 시작 작업 안정화
+
+**요청**: 개발 PC가 아니라 운영 서버에서 사용자가 직접 `AOP_Web.bat install`을 실행하도록 하고, 기존 등록 작업이 Windows 로그온 시 정상 기동하지 않던 문제를 수정.
+
+#### 1) 원인 및 설계
+- 기존 작업은 `cmd.exe`가 `AOP_Web.bat autostart`를 다시 호출하는 구조라 경로 공백과 중첩 인용부호에 취약했음.
+- 로그온 직후 네트워크·사용자 환경이 준비되기 전에 실행되면 백엔드가 초기화에 실패할 수 있었음.
+- 따라서 작업 스케줄러가 `scripts\AOP_Web.ps1`을 직접 호출하고, 실제 Windows 계정명과 로그온 지연을 사용하도록 변경함.
+
+#### 2) 변경 내용
+- `InstallStartup`이 현재 계정의 `WindowsIdentity.Name`을 작업 트리거와 주체에 사용.
+- `powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File ... -Action Start -Unattended`를 작업 동작으로 직접 등록.
+- 로그온 후 30초 지연, 숨김 실행, 사용 가능 시 시작, 1분 간격 최대 3회 재시도 설정.
+- 무인 실행에서 프론트엔드가 30초 안에 3000번 포트를 열지 못하면 래퍼와 자식 프로세스 트리를 모두 정리하고 오류 종료하여 작업 스케줄러 재시도가 작동하도록 함.
+- 설치 결과에 계정·실행 인자·`schtasks /Query` 검증 명령을 표시.
+- README에 서버에서만 설치하는 원칙, `Last Result` 및 `logs\start_*.log` 확인 절차를 추가.
+
+#### 3) 검증
+- PowerShell AST 구문 검사 통과.
+- `AOP_Web.bat status`로 기존 상태 확인.
+- 작업 등록은 사용자 PC에 부작용을 만들지 않기 위해 실행하지 않았으며, 서버에서 `install` 실행 후 `schtasks /Query /TN AOP_Web_AutoStart /FO LIST /V`로 확인하도록 절차를 문서화함.
+
+---
+
 ## 변경 이력 (v0.9.68 — 2026-09-15)
 
 ### v0.9.68 — #1. Windows 자동 시작 등록
