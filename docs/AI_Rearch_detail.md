@@ -6,6 +6,93 @@
 
 ---
 
+## 변경 이력 (v0.9.71 — 2026-09-23)
+
+### v0.9.71 — #1. 프로덕션 모드 자동 시작 등록 통합
+
+**요청**: 프로덕션 모드(빌드 + 백그라운드)가 윈도우 로그온 자동 시작 등록까지 포함하도록 수정. `install`/`uninstall` 명령은 불필요하니 삭제 → 이후 "`uninstall`은 남기는 것이 낫겠다"로 일부 철회.
+
+#### 1) 문제
+
+- `Install-StartupTask`가 등록하는 명령이 `-Action Start -Unattended`로 **고정**되어 있어, 운영 모드로는 자동 시작을 등록할 수단이 없었다.
+- 운영 모드 경로 말미의 `if ($Production) { while ($true) { ... } }` 헬스 모니터링 루프 때문에, 운영 모드로 등록하더라도 **작업이 영원히 `Running` 상태로 남아** 다음 트리거와 실행 결과 판정이 불가능했다.
+- 운영 모드 프론트엔드 기동이 항상 실패했다. `Start-Process -FilePath "npm"`은 Node 설치 디렉터리의 **확장자 없는 Unix용 `npm` 스크립트**를 먼저 잡아, 리다이렉션이 있으면 `%1 is not a valid Win32 application`, 없으면 즉시 종료 코드 1로 끝났다.
+- 작업 스케줄러는 대화형 셸의 환경변수를 물려받지 않는데, `backend\config.py`의 `_validate_production()`은 운영 시크릿이 기본값이면 `RuntimeError`로 부팅을 중단한다. 이 조합이 사전 경고 없이 로그온 시 실패로 이어졌다.
+
+#### 2) 조치 (`scripts\AOP_Web.ps1`, `AOP_Web.bat`)
+
+**(1) 등록 방식 일반화 — `install` 삭제**
+
+별도 등록 명령을 두지 않고, **서버를 직접 기동한 모드 그대로** 등록한다.
+
+| Before | After |
+|---|---|
+| `AOP_Web.bat install` → 항상 개발 모드로 등록 | `AOP_Web.bat start` → 개발 모드로 등록 |
+| 운영 모드 등록 수단 없음 | `AOP_Web.bat prod` → 운영 모드로 등록 |
+
+`Install-StartupTask`를 삭제하고 `Register-AutoStartTask`로 대체했다. 등록 인자는 현재 모드에 따라 조립한다.
+
+```powershell
+$modeSwitch = if ($Production) { " -Production" } else { "" }
+$taskArguments = "... -File `"$escapedScriptPath`" -Action Start$modeSwitch -Unattended"
+```
+
+`Start-Services` 말미에서 호출하되, 작업 스케줄러가 실행한 경로에서는 매 로그온 재등록을 피한다. 등록 실패가 이미 성공한 서버 기동을 되돌리지 않도록 `try/catch`로 감쌌다.
+
+```powershell
+if (-not $Unattended) {
+    try { Register-AutoStartTask } catch { Write-Log "Auto-start registration failed: ..." "ERROR" }
+}
+```
+
+**(2) 무인 실행 시 헬스 루프 진입 차단**
+
+```powershell
+# Before
+if ($Production) { while ($true) { ... } }
+# After
+if ($Production -and -not $Unattended) { while ($true) { ... } }
+```
+
+서버 프로세스는 `Start-Process`로 분리 실행되므로 스크립트가 끝나도 계속 동작한다. 이로써 작업이 기동 완료 후 정상 종료되고 `Last Result`가 `0x0`으로 남는다.
+
+**(3) 운영 모드 프론트엔드 기동 수정**
+
+```powershell
+# Before
+$frontendProcess = Start-Process -FilePath "npm" -ArgumentList "start" ...
+# After  (npm.cmd 가 실행되도록 cmd.exe 경유)
+$frontendProcess = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm start" ...
+```
+
+**(4) 운영 시크릿 사전 경고**
+
+`Test-ProductionSecrets`가 `AUTH_SECRET_KEY`·`FLASK_SECRET_KEY`·`ALLOWED_ORIGINS`의 User/Machine 범위 등록 여부를 확인하고, 미설정 시 `setx` 안내와 함께 경고한다(차단하지는 않는다).
+
+**(5) `uninstall` 유지**
+
+사용자 지시에 따라 `install`만 삭제하고 `uninstall`(`-Action UninstallStartup`)은 해제 수단으로 남겼다. 작업이 없어도 오류 없이 종료되는 멱등 동작이다.
+
+#### 3) 검증 (실행 증거)
+
+| 항목 | 결과 |
+|---|---|
+| PowerShell AST 구문 검사 | PARSE OK |
+| `-Action Start -Production -Unattended` | 36초 만에 정상 반환(exit 0), 헬스 루프 미진입, **재등록 안 함** |
+| `-Action Start -Production -Force` | Production 정의로 등록, 시크릿 경고 출력, 헬스 루프 진입 |
+| `AOP_Web.bat start` | Development 정의(`-Action Start -Unattended`)로 등록, exit 0 |
+| `AOP_Web.bat uninstall` ×2 | 1회차 삭제 / 2회차 "not found", 둘 다 RC=0 (멱등) |
+| `AOP_Web.bat install` | `Unknown command`, RC=1 (ERRORLEVEL 전파 유지) |
+| `Start-ScheduledTask AOP_Web_AutoStart` | `LastTaskResult=0`, `State=Ready`(Running 아님) |
+| HTTP 확인 | 백엔드 `/api/auth/status` 200, 프론트엔드 `/` 200 |
+| 운영 모드 시크릿 미설정 재현 | `AOP_ENV=production`에서 `RuntimeError` 부팅 중단 실측 |
+
+#### 4) 문서
+
+`README.md` 4.1 명령 표와 6장(Windows 자동 시작 등록)을 재작성했다. 6.2절에 운영 모드 자동 시작의 전제 조건(`setx`로 시크릿 영구 등록)을 추가했다.
+
+---
+
 ## 변경 이력 (v0.9.70 — 2026-09-23)
 
 ### v0.9.70 — #1. Windows 자동 시작 실패 (Flask 의존성 누락) 해결

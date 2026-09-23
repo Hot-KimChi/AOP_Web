@@ -3,12 +3,12 @@
 #  AOP Web Application - Unified Management Script
 #
 #  Purpose  : Start, Stop, Restart, Status 통합 관리 스크립트
-#  Usage    : .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|InstallStartup|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose] [-Help]
+#  Usage    : .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose] [-Help]
 #  Created  : 2026-09-11
 # ============================================================
 
 param(
-    [ValidateSet("Start", "Stop", "Restart", "Status", "InstallStartup", "UninstallStartup")]
+    [ValidateSet("Start", "Stop", "Restart", "Status", "UninstallStartup")]
     [string]$Action = "Start",
     [switch]$Production,
     [switch]$Force,
@@ -233,17 +233,37 @@ function Test-BackendDependencies {
     Write-Log "Backend dependencies installed successfully" "INFO"
 }
 
-function Install-StartupTask {
+function Test-ProductionSecrets {
+    # 백엔드는 운영 모드에서 개발용 기본 시크릿이 그대로면 부팅을 중단한다(backend\config.py).
+    # 작업 스케줄러는 대화형 셸의 $env: 값을 물려받지 못하므로, 사용자/시스템 범위에
+    # 영구 등록된 값이 없으면 매 로그온마다 백엔드가 죽는다. 등록 시점에 미리 경고한다.
+    $missing = @()
+    foreach ($name in @("AUTH_SECRET_KEY", "FLASK_SECRET_KEY", "ALLOWED_ORIGINS")) {
+        $userScope = [Environment]::GetEnvironmentVariable($name, "User")
+        $machineScope = [Environment]::GetEnvironmentVariable($name, "Machine")
+        if ([string]::IsNullOrWhiteSpace($userScope) -and [string]::IsNullOrWhiteSpace($machineScope)) {
+            $missing += $name
+        }
+    }
+    return $missing
+}
+
+function Register-AutoStartTask {
+    # 서버를 직접 기동했을 때 호출된다. 로그온 시 지금과 동일한 모드로 자동 기동하도록 등록한다.
     $taskName = "AOP_Web_AutoStart"
     if (!(Test-Path $scriptFilePath -PathType Leaf)) {
         throw "AOP_Web.ps1 not found at $scriptFilePath."
     }
 
+    $modeName = if ($Production) { "Production" } else { "Development" }
+    $modeSwitch = if ($Production) { " -Production" } else { "" }
     $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
     $escapedScriptPath = $scriptFilePath.Replace('"', '\"')
+    $taskArguments = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$escapedScriptPath`" -Action Start$modeSwitch -Unattended"
+
     $taskAction = New-ScheduledTaskAction `
         -Execute (Join-Path $PSHOME "powershell.exe") `
-        -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$escapedScriptPath`" -Action Start -Unattended" `
+        -Argument $taskArguments `
         -WorkingDirectory $projectPath
     $taskTrigger = New-ScheduledTaskTrigger `
         -AtLogOn `
@@ -269,11 +289,27 @@ function Install-StartupTask {
         -Force `
         -ErrorAction Stop | Out-Null
 
+    Write-Log "Auto-start task registered ($modeName mode): $taskName" "INFO"
     Write-Host "Windows auto-start task registered: $taskName" -ForegroundColor Green
     Write-Host "User: $currentUser" -ForegroundColor Cyan
     Write-Host "Trigger: current user logon (30 seconds delay)" -ForegroundColor Cyan
-    Write-Host "Action: powershell.exe -WindowStyle Hidden -File scripts\AOP_Web.ps1 -Action Start -Unattended" -ForegroundColor Cyan
+    Write-Host "Mode: $modeName (-Action Start$modeSwitch -Unattended)" -ForegroundColor Cyan
     Write-Host "Verify: schtasks /Query /TN $taskName /FO LIST /V" -ForegroundColor Yellow
+    Write-Host "Remove: AOP_Web.bat uninstall" -ForegroundColor Yellow
+
+    if (-not $Production) { return }
+
+    $missingSecrets = @(Test-ProductionSecrets)
+    if ($missingSecrets.Count -gt 0) {
+        $joined = $missingSecrets -join ", "
+        Write-Log "Production environment variables are not persisted: $joined" "WARN"
+        Write-Host "" 
+        Write-Host "[WARN] These variables are not set at User/Machine scope: $joined" -ForegroundColor Yellow
+        Write-Host "       The scheduled task does not inherit variables from this shell," -ForegroundColor Yellow
+        Write-Host "       so the backend will fail to boot on the next logon." -ForegroundColor Yellow
+        Write-Host "       Persist them, for example:" -ForegroundColor Yellow
+        Write-Host "       setx AUTH_SECRET_KEY `"<random string>`"" -ForegroundColor Yellow
+    }
 }
 
 function Uninstall-StartupTask {
@@ -303,21 +339,25 @@ if ($Help) {
     Write-Host "AOP Web Application Unified Management Script" -ForegroundColor Green
     Write-Host "===============================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Usage: .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|InstallStartup|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose]" -ForegroundColor Yellow
+    Write-Host "Usage: .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose]" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Actions:" -ForegroundColor Yellow
     Write-Host "  Start      Start Frontend & Backend servers (Default)"
     Write-Host "  Stop       Stop Frontend & Backend servers"
     Write-Host "  Restart    Stop and then Start servers"
     Write-Host "  Status     Display current running status of services"
+    Write-Host "  UninstallStartup   Remove the Windows logon auto-start task"
     Write-Host ""
     Write-Host "Parameters:" -ForegroundColor Yellow
-    Write-Host "  -Production    Production mode (build + background)"
+    Write-Host "  -Production    Production mode (build + background)."
     Write-Host "  -Force         Non-interactive mode (force stop existing processes)"
     Write-Host "  -Unattended    Hide development server windows for automatic startup"
-    Write-Host "  -Action InstallStartup     Register current-user logon auto-start task"
-    Write-Host "  -Action UninstallStartup   Remove current-user logon auto-start task"
     Write-Host "  -Diagnose      Run environment diagnosis only"
+    Write-Host ""
+    Write-Host "Auto-start task:" -ForegroundColor Yellow
+    Write-Host "  Starting the servers directly registers the Windows logon auto-start"
+    Write-Host "  task (AOP_Web_AutoStart) with the same mode you just used."
+    Write-Host "  Remove it with: .\scripts\AOP_Web.ps1 -Action UninstallStartup"
     Write-Host ""
     Exit 0
 }
@@ -528,7 +568,9 @@ function Start-Services {
             Set-Location $projectPath
             throw "Frontend build failed"
         }
-        $frontendProcess = Start-Process -FilePath "npm" -ArgumentList "start" -WorkingDirectory $frontendPath -WindowStyle Hidden -PassThru
+        # Start-Process 는 확장자 없는 Unix 용 'npm' 스크립트를 먼저 잡아 실패한다.
+        # cmd.exe 를 경유해 npm.cmd 가 실행되도록 고정한다.
+        $frontendProcess = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm start" -WorkingDirectory $frontendPath -WindowStyle Hidden -PassThru
         Set-Location $projectPath
     } else {
         $frontendCommandPath = $frontendPath.Replace("'", "''")
@@ -557,9 +599,25 @@ function Start-Services {
     Write-Log "=== Startup Complete ===" "INFO"
     Write-Log "Backend:  http://localhost:5000" "INFO"
     Write-Log "Frontend: http://localhost:3000" "INFO"
+
+    # 서버를 직접 기동했을 때만 자동 시작을 등록한다(지금과 같은 모드로).
+    # -Unattended 는 작업 스케줄러가 실행한 경로이므로 매 로그온 재등록을 피한다.
+    if (-not $Unattended) {
+        try {
+            Register-AutoStartTask
+        } catch {
+            # 등록 실패가 이미 성공한 서버 기동을 되돌릴 이유는 없다.
+            Write-Log "Auto-start registration failed: $($_.Exception.Message)" "ERROR"
+            Write-Host "[WARN] Auto-start task was not registered: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+
     Save-JsonLog
 
-    if ($Production) {
+    # 무인 실행(작업 스케줄러)에서는 감시 루프를 돌지 않는다.
+    # 루프를 돌면 작업이 영원히 Running 상태로 남아 다음 트리거·결과 판정이 불가능해진다.
+    # 서버 프로세스는 Start-Process 로 분리 실행되므로 이 스크립트가 끝나도 계속 동작한다.
+    if ($Production -and -not $Unattended) {
         Write-Log "Running health monitoring loop..." "INFO"
         while ($true) {
             Start-Sleep -Seconds 60
@@ -576,7 +634,6 @@ try {
         "Status"  { Show-Status }
         "Stop"    { Stop-Services -NonInteractive:$Force }
         "Start"   { Start-Services }
-        "InstallStartup"   { Install-StartupTask }
         "UninstallStartup" { Uninstall-StartupTask }
         "Restart" {
             Stop-Services -NonInteractive:$true
