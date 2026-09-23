@@ -6,6 +6,85 @@
 
 ---
 
+## 변경 이력 (v0.9.70 — 2026-09-23)
+
+### v0.9.70 — #1. Windows 자동 시작 실패 (Flask 의존성 누락) 해결
+
+**요청**: 윈도우 시작 시 자동으로 서버가 시작되지 않음. backend 쪽 Flask 설치 혹은 import 문제로 추정되니 확인.
+
+#### 1) 원인
+
+- `backend\.venv`가 **Python 3.14.7**로 생성돼 있었음. `pandas`·`pymssql` 등 C 확장 패키지는 cp314용 바이너리 휠이 없어 소스 빌드로 넘어갔고, meson 단계에서 실패.
+- 그 결과 가상환경에는 `pip` 외 **아무 패키지도 설치되지 않은 상태**였고, 백엔드가 `ModuleNotFoundError: No module named 'flask'`로 즉시 종료됨.
+- 기동 스크립트는 백엔드 프로세스를 띄운 뒤 포트만 감시했기 때문에, 로그에는 원인이 전혀 남지 않고 다음 한 줄만 기록됨.
+
+```text
+[2026-09-23 14:50:12] [ERROR] ERROR: Backend failed to listen on port 5000.
+```
+
+#### 2) 조치
+
+**(1) 가상환경 재생성**
+
+- `py -3.12 -m venv --clear backend\.venv` → **Python 3.12.9**
+- `requirements.txt` 전량 설치 성공 (Flask 3.0.3, Flask-Cors, SQLAlchemy, pyodbc, pymssql, pandas, numpy 등)
+
+**(2) 기동 전 의존성 선제 점검 (`scripts\AOP_Web.ps1`)**
+
+`Start-Services`가 백엔드를 띄우기 **전에** 핵심 의존성 import 가능 여부를 확인하고, 누락 시 `requirements.txt`로 자동 설치한 뒤 재확인한다. 실패하면 원인이 담긴 메시지로 중단한다. 프론트엔드가 `node_modules` 부재 시 `npm install`을 자동 실행하던 기존 패턴과 대칭이다.
+
+| 구분 | Before | After |
+|---|---|---|
+| 의존성 누락 시 로그 | `Backend failed to listen on port 5000.` (원인 불명) | `Backend dependencies are missing: ModuleNotFoundError: No module named 'flask'` → 자동 설치 시도 |
+| 설치 실패 시 | 원인 없이 포트 타임아웃 | pip 출력 tail + `Check Python version compatibility of backend\.venv.` |
+| 의존성 정상 시 | — | 동작 변화 없음 (약 0.8초 점검만 추가) |
+
+**(3) 네이티브 stderr 처리 (`Invoke-NativeCapture`)**
+
+초안은 `& $PythonExe -c "import flask" 2>&1`로 출력을 받았는데, 이 구조는 호출 맥락이 `$ErrorActionPreference = 'Stop'`일 때 **정상 처리되어야 할 "의존성 누락" 분기에서 NativeCommandError 종료 예외로 스크립트가 죽는** 문제가 있었다(실측 재현). 캡처 구간에서만 `Continue`로 고정하고 `finally`로 복원하는 헬퍼를 분리했다.
+
+```powershell
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    $global:LASTEXITCODE = 0
+    $output = @(& $FilePath @Arguments 2>&1 | ForEach-Object { $_.ToString() })
+    return [PSCustomObject]@{ ExitCode = $global:LASTEXITCODE; Output = ($output -join [Environment]::NewLine) }
+} finally {
+    $ErrorActionPreference = $prevEAP
+}
+```
+
+**(4) 작업 스케줄러 재등록**
+
+등록돼 있던 `AOP_Web_AutoStart`는 v0.9.69 이전 정의(`cmd.exe` → `AOP_Web.bat autostart`)였다. `-Action InstallStartup`으로 현재 정의(powershell 직접 실행·숨김·로그온 30초 지연·3회 재시도)로 재등록했다.
+
+#### 3) 검증 (실행 증거)
+
+`Test-BackendDependencies` 단위 테스트 5건 전건 통과:
+
+| 케이스 | 결과 |
+|---|---|
+| 의존성 정상, `EAP=Stop` | PASS — throw 없음, 824 ms |
+| 의존성 정상, `EAP=Continue` | PASS — throw 없음 |
+| 의존성 누락 → 자동 설치, `EAP=Stop` | PASS — 경고 로그 후 설치 성공, `flask ok` |
+| `requirements.txt` 부재 | PASS — 경로가 포함된 명시적 throw |
+| pip 설치 실패(존재하지 않는 패키지) | PASS — pip 출력 tail 로깅 후 명시적 throw |
+
+작업 스케줄러 종단 검증:
+
+- `Start-ScheduledTask -TaskName AOP_Web_AutoStart` → `LastTaskResult : 0`
+- 포트 5000/3000 모두 LISTEN
+- `http://localhost:5000/api/auth/status` → HTTP 200 `{"authenticated": false, ...}`
+- `http://localhost:3000` → HTTP 200
+- 평시 경로 로그에 의존성 관련 추가 출력 없음(기동 8초) — 기존 동작 유지 확인
+
+#### 4) 교차 검증
+
+`gpt-6-astra` 서브에이전트로 구동 스크립트 변경을 교차 검증. PowerShell 5.1에서 `try/finally` + EAP 복원 구조일 때 `$LASTEXITCODE`가 실패 1 / 성공 0으로 신뢰 가능함을 확인받아 수정안에 반영함.
+
+---
+
 ## 변경 이력 (v0.9.69 — 2026-09-16)
 
 ### v0.9.69 — #14. 서버 설치용 Windows 자동 시작 작업 안정화

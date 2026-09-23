@@ -177,6 +177,62 @@ function Stop-ProcessTree {
     Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
 }
 
+function Invoke-NativeCapture {
+    param(
+        [string]$FilePath,
+        [string[]]$Arguments
+    )
+
+    # 네이티브 명령의 stderr 는 PowerShell 에러 스트림으로 올라온다.
+    # 호출 맥락이 ErrorActionPreference='Stop' 이면 2>&1 이 NativeCommandError 로 종료 예외를 던져
+    # 의도한 진단 로직 대신 엉뚱한 예외로 죽으므로, 캡처 구간에서만 Continue 로 고정한다.
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $global:LASTEXITCODE = 0
+        $output = @(& $FilePath @Arguments 2>&1 | ForEach-Object { $_.ToString() })
+        return [PSCustomObject]@{
+            ExitCode = $global:LASTEXITCODE
+            Output   = ($output -join [Environment]::NewLine)
+        }
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
+}
+
+function Test-BackendDependencies {
+    param(
+        [string]$PythonExe,
+        [string]$BackendPath
+    )
+
+    # 핵심 의존성(flask)이 import 되는지 먼저 확인한다.
+    # 이 확인이 없으면 의존성 누락 시 "포트 5000 리스닝 실패"로만 기록돼 원인을 알 수 없다.
+    $probe = Invoke-NativeCapture -FilePath $PythonExe -Arguments @("-c", "import flask")
+    if ($probe.ExitCode -eq 0) { return }
+
+    Write-Log "Backend dependencies are missing: $($probe.Output)" "WARN"
+
+    $requirements = Join-Path $BackendPath "requirements.txt"
+    if (!(Test-Path $requirements)) {
+        throw "Backend dependencies are missing and requirements.txt not found at $requirements."
+    }
+
+    Write-Log "Installing backend dependencies from requirements.txt..." "INFO"
+    $install = Invoke-NativeCapture -FilePath $PythonExe -Arguments @("-m", "pip", "install", "-r", $requirements)
+    if ($install.ExitCode -ne 0) {
+        $tail = ($install.Output -split "`r?`n" | Select-Object -Last 20) -join " | "
+        Write-Log "pip install failed. Output tail: $tail" "ERROR"
+        throw "Failed to install backend dependencies. Check Python version compatibility of backend\.venv."
+    }
+
+    $probe = Invoke-NativeCapture -FilePath $PythonExe -Arguments @("-c", "import flask")
+    if ($probe.ExitCode -ne 0) {
+        throw "Backend dependencies still unavailable after install: $($probe.Output)"
+    }
+    Write-Log "Backend dependencies installed successfully" "INFO"
+}
+
 function Install-StartupTask {
     $taskName = "AOP_Web_AutoStart"
     if (!(Test-Path $scriptFilePath -PathType Leaf)) {
@@ -403,6 +459,8 @@ function Start-Services {
         }
     }
     if (-not $pythonExe) { throw "Python executable not found." }
+
+    Test-BackendDependencies -PythonExe $pythonExe -BackendPath $backendPath
 
     # Clear Port 5000 if occupied
     $existingBackend = @(Get-ProcessesOnPort -Port 5000)
