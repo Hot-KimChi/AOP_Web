@@ -4,34 +4,6 @@
 > 
 > 📎 **[→ 변경 요약 (Summary)](./AI_Rearch_summary.md)**
 
-## 변경 이력 (v0.9.72 — 2026-09-23)
-
-### v0.9.72 — #15. Windows 인증과 웹 SSO 경계 분리
-
-**요청**: SSMS에서 가능한 Windows 인증과 동일한 방식으로 AOP Web 로그인 구현.
-
-#### 1) 판단
-
-SSMS의 Windows 인증은 AOP 서버 프로세스가 SQL Server에 접속할 때 자신의 Windows 자격증명을 제시하는 서버 측 인증이다. 웹 SSO는 접속자의 Windows 자격증명을 웹 서버가 검증해야 하므로, 현재 Flask 직접 구동 구조만으로는 동일한 기능이 아니다. AD 도메인/Kerberos 또는 Entra ID OIDC와 IIS·리버스 프록시 구성이 없는 상태에서 이를 흉내 내면 모든 사용자가 서버 프로세스 계정으로 DB에 접근하는 권한 상승이 발생한다.
-
-#### 2) 조치
-
-- `backend/pkg_SQL/database.py`: `auth_mode="windows"`일 때 `Trusted_Connection=yes`를 사용하도록 연결 문자열을 추가했다.
-- `backend/pkg_SQL/database.py`: SQL 사용자명·비밀번호는 ODBC 중괄호 규칙으로 이스케이프해 세미콜론을 통한 인증 속성 주입을 차단했다.
-- `backend/pkg_SQL/database.py`: 서버·데이터베이스 값도 동일한 ODBC 이스케이프를 적용해 요청에서 전달되는 DB 이름이 인증 속성으로 해석되지 않도록 했다.
-- `backend/utils/database_manager.py` 및 ML 직접 연결 경로: 웹 로그인과 세션 연결은 `auth_mode="sql"`을 명시해 기존의 사용자별 SQL 자격증명과 DB 권한을 유지했다.
-- `backend/AOP_config.cfg`: 웹 동작을 Windows 계정으로 바꾸는 설정을 제거해 기존 SQL 로그인 동작을 유지했다.
-- `Implementation_list.md`: 재작성 명세, 범위 밖 인프라 조건, 보안 불변식 및 검증 기준을 기록했다.
-
-#### 3) 검증
-
-| 항목 | 결과 |
-|---|---|
-| Python 구문 검사 | `py_compile` 대상 4개 파일 통과 |
-| SQL 인증 우회 방지 | 로그인·세션 연결에 `auth_mode="sql"` 고정 확인 |
-| Windows 연결 모드 | `Trusted_Connection=yes` 분기 정적 확인 |
-| 서버 상태 | 3000번 포트 중지 확인, 5000번은 종료된 PID의 stale netstat 항목으로 남아 프로세스가 존재하지 않음 |
-
 ---
 
 ## 변경 이력 (v0.9.71 — 2026-09-23)
