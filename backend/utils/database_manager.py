@@ -45,6 +45,7 @@ class DatabaseManager:
             password=password,
             database=database,
             reuse_engine=False,
+            auth_mode="sql",
         )
         try:
             yield connection
@@ -80,7 +81,12 @@ class DatabaseManager:
         if hasattr(g, "db_connections") and connection_key in g.db_connections:
             return g.db_connections[connection_key]
 
-        connection = SQL(username=username, password=password, database=database)
+        connection = SQL(
+            username=username,
+            password=password,
+            database=database,
+            auth_mode="sql",
+        )
 
         if not hasattr(g, "db_connections"):
             g.db_connections = {}

@@ -33,7 +33,12 @@ def fetchData():
             # DatabaseManager를 직접 사용하지 않고 SQL 객체 직접 생성
             from pkg_SQL.database import SQL
 
-            sql_connection = SQL(auth_username, auth_password, db)
+            sql_connection = SQL(
+                username=auth_username,
+                password=auth_password,
+                database=db,
+                auth_mode="sql",
+            )
 
             query = f"""
                 SELECT * FROM

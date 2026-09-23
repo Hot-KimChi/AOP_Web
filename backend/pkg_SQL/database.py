@@ -49,8 +49,22 @@ def _create_engine(connection_string: str):
     )
 
 
+def _escape_odbc_value(value: str | None) -> str:
+    """ODBC 연결 속성 값의 구분자와 중괄호를 안전하게 이스케이프한다."""
+    if value is None:
+        return ""
+    return "{" + str(value).replace("}", "}}") + "}"
+
+
 class SQL:
-    def __init__(self, username, password, database=None, reuse_engine: bool = True):
+    def __init__(
+        self,
+        username=None,
+        password=None,
+        database=None,
+        reuse_engine: bool = True,
+        auth_mode: str | None = None,
+    ):
         """
         Args:
             reuse_engine: True 면 동일 연결 문자열의 엔진을 전역 캐시에서 재사용한다.
@@ -61,6 +75,11 @@ class SQL:
         self.password = password
         self.database = database
         self._reuse_engine = reuse_engine
+        self.auth_mode = (
+            auth_mode or os.environ.get("DATABASE_AUTH_MODE", "sql")
+        ).lower()
+        if self.auth_mode not in {"sql", "windows"}:
+            raise ValueError("DATABASE_AUTH_MODE must be 'sql' or 'windows'")
 
         # 서버 주소 환경 변수
         self.server = os.environ.get("SERVER_ADDRESS_ADDRESS")
@@ -89,15 +108,23 @@ class SQL:
         """연결 문자열을 생성합니다."""
         driver = "ODBC Driver 17 for SQL Server"
 
-        # 사용자 인증 사용
-        conn_str = (
-            f"DRIVER={driver};"
-            f"SERVER={self.server};"
-            f"DATABASE={self.database};"
-            f"UID={self.username};"
-            f"PWD={self.password};"
-            "TrustServerCertificate=yes;"
-        )
+        if self.auth_mode == "windows":
+            conn_str = (
+                f"DRIVER={driver};"
+                f"SERVER={_escape_odbc_value(self.server)};"
+                f"DATABASE={_escape_odbc_value(self.database)};"
+                "Trusted_Connection=yes;"
+                "TrustServerCertificate=yes;"
+            )
+        else:
+            conn_str = (
+                f"DRIVER={driver};"
+                f"SERVER={_escape_odbc_value(self.server)};"
+                f"DATABASE={_escape_odbc_value(self.database)};"
+                f"UID={_escape_odbc_value(self.username)};"
+                f"PWD={_escape_odbc_value(self.password)};"
+                "TrustServerCertificate=yes;"
+            )
         return f"mssql+pyodbc:///?odbc_connect={quote_plus(conn_str)}"
 
     def connect(self):

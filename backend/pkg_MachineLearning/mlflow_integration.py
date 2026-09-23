@@ -34,6 +34,7 @@ class AOP_MLflowTracker:
                 username=self.username,
                 password=self.password,
                 database="AOP_MLflow_Tracking",
+                auth_mode="sql",
             )
             self.tracking_enabled = True
         except Exception as e:
@@ -1111,7 +1112,10 @@ class AOP_MLflowTracker:
                 return None
 
             db = SQL(
-                username=username, password=password, database="AOP_MLflow_Tracking"
+                username=username,
+                password=password,
+                database="AOP_MLflow_Tracking",
+                auth_mode="sql",
             )
 
             query = """
@@ -1207,7 +1211,10 @@ class AOP_MLflowTracker:
                 return None
 
             db = SQL(
-                username=username, password=password, database="AOP_MLflow_Tracking"
+                username=username,
+                password=password,
+                database="AOP_MLflow_Tracking",
+                auth_mode="sql",
             )
 
             if model_name:
