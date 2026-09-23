@@ -8,7 +8,7 @@
 # ============================================================
 
 param(
-    [ValidateSet("Start", "Stop", "Restart", "Status", "UninstallStartup")]
+    [ValidateSet("Start", "Stop", "Restart", "Status", "Help", "UninstallStartup")]
     [string]$Action = "Start",
     [switch]$Production,
     [switch]$Force,
@@ -36,6 +36,7 @@ if (!(Test-Path $logDir)) {
 }
 
 $script:jsonLogEntries = @()
+$script:startedProcessIds = @()
 $script:scriptName = "AOP_Web.ps1"
 
 function Write-Log {
@@ -177,6 +178,41 @@ function Stop-ProcessTree {
     Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
 }
 
+function Stop-StartedServices {
+    foreach ($processId in @($script:startedProcessIds)) {
+        if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
+            Stop-ProcessTree -ProcessId $processId
+        }
+    }
+    $script:startedProcessIds = @()
+}
+
+function Stop-ProcessesOnPort {
+    param(
+        [int]$Port,
+        [int]$MaxAttempts = 5
+    )
+
+    $stoppedCount = 0
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        $processes = @(Get-ProcessesOnPort -Port $Port)
+        if ($processes.Count -eq 0) { break }
+
+        foreach ($process in $processes) {
+            try {
+                Stop-ProcessTree -ProcessId $process.ProcessId
+                $stoppedCount++
+            } catch {
+                Write-Log "Failed to stop PID $($process.ProcessId) on port $Port`: $($_.Exception.Message)" "ERROR"
+            }
+        }
+
+        Start-Sleep -Milliseconds 300
+    }
+
+    return $stoppedCount
+}
+
 function Invoke-NativeCapture {
     param(
         [string]$FilePath,
@@ -233,19 +269,35 @@ function Test-BackendDependencies {
     Write-Log "Backend dependencies installed successfully" "INFO"
 }
 
-function Test-ProductionSecrets {
-    # 백엔드는 운영 모드에서 개발용 기본 시크릿이 그대로면 부팅을 중단한다(backend\config.py).
-    # 작업 스케줄러는 대화형 셸의 $env: 값을 물려받지 못하므로, 사용자/시스템 범위에
-    # 영구 등록된 값이 없으면 매 로그온마다 백엔드가 죽는다. 등록 시점에 미리 경고한다.
+function Get-PersistedEnvironmentValue {
+    param([string]$Name)
+
+    $current = [Environment]::GetEnvironmentVariable($Name, "Process")
+    if (-not [string]::IsNullOrWhiteSpace($current)) { return $current }
+
+    $userScope = [Environment]::GetEnvironmentVariable($Name, "User")
+    if (-not [string]::IsNullOrWhiteSpace($userScope)) { return $userScope }
+
+    return [Environment]::GetEnvironmentVariable($Name, "Machine")
+}
+
+function Assert-ProductionConfiguration {
+    if (-not $Production) { return }
+
     $missing = @()
     foreach ($name in @("AUTH_SECRET_KEY", "FLASK_SECRET_KEY", "ALLOWED_ORIGINS")) {
-        $userScope = [Environment]::GetEnvironmentVariable($name, "User")
-        $machineScope = [Environment]::GetEnvironmentVariable($name, "Machine")
-        if ([string]::IsNullOrWhiteSpace($userScope) -and [string]::IsNullOrWhiteSpace($machineScope)) {
+        $value = Get-PersistedEnvironmentValue -Name $name
+        if ([string]::IsNullOrWhiteSpace($value)) {
             $missing += $name
+            continue
         }
+        # Scheduled tasks and already-open shells may not contain newly persisted values.
+        [Environment]::SetEnvironmentVariable($name, $value, "Process")
     }
-    return $missing
+
+    if ($missing.Count -gt 0) {
+        throw "Production configuration is incomplete. Set these variables at User or Machine scope before running prod: $($missing -join ', ')"
+    }
 }
 
 function Register-AutoStartTask {
@@ -297,19 +349,6 @@ function Register-AutoStartTask {
     Write-Host "Verify: schtasks /Query /TN $taskName /FO LIST /V" -ForegroundColor Yellow
     Write-Host "Remove: AOP_Web.bat uninstall" -ForegroundColor Yellow
 
-    if (-not $Production) { return }
-
-    $missingSecrets = @(Test-ProductionSecrets)
-    if ($missingSecrets.Count -gt 0) {
-        $joined = $missingSecrets -join ", "
-        Write-Log "Production environment variables are not persisted: $joined" "WARN"
-        Write-Host "" 
-        Write-Host "[WARN] These variables are not set at User/Machine scope: $joined" -ForegroundColor Yellow
-        Write-Host "       The scheduled task does not inherit variables from this shell," -ForegroundColor Yellow
-        Write-Host "       so the backend will fail to boot on the next logon." -ForegroundColor Yellow
-        Write-Host "       Persist them, for example:" -ForegroundColor Yellow
-        Write-Host "       setx AUTH_SECRET_KEY `"<random string>`"" -ForegroundColor Yellow
-    }
 }
 
 function Uninstall-StartupTask {
@@ -335,17 +374,18 @@ function Uninstall-StartupTask {
 #endregion
 
 #region Help & Diagnose
-if ($Help) {
+if ($Help -or $Action -eq "Help") {
     Write-Host "AOP Web Application Unified Management Script" -ForegroundColor Green
     Write-Host "===============================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Usage: .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose]" -ForegroundColor Yellow
+    Write-Host "Usage: .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|Help|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose] [-Help]" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Actions:" -ForegroundColor Yellow
     Write-Host "  Start      Start Frontend & Backend servers (Default)"
     Write-Host "  Stop       Stop Frontend & Backend servers"
     Write-Host "  Restart    Stop and then Start servers"
     Write-Host "  Status     Display current running status of services"
+    Write-Host "  Help       Display this help message"
     Write-Host "  UninstallStartup   Remove the Windows logon auto-start task"
     Write-Host ""
     Write-Host "Parameters:" -ForegroundColor Yellow
@@ -456,14 +496,10 @@ function Stop-Services {
             }
         }
 
-        foreach ($p in $procs) {
-            try {
-                Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop
-                Write-Log "Stopped $($svc.Name) process (PID: $($p.ProcessId)) on port $($svc.Port)" "INFO"
-                $stoppedCount++
-            } catch {
-                Write-Log "Failed to stop PID $($p.ProcessId): $($_.Exception.Message)" "ERROR"
-            }
+        $stoppedOnPort = Stop-ProcessesOnPort -Port $svc.Port
+        if ($stoppedOnPort -gt 0) {
+            Write-Log "Stopped $($svc.Name) processes on port $($svc.Port)" "INFO"
+            $stoppedCount += $stoppedOnPort
         }
     }
     Save-JsonLog
@@ -480,6 +516,8 @@ function Start-Services {
     if (!(Test-Path $backendPath) -or !(Test-Path $frontendPath)) {
         throw "Project structure invalid. Run with -Diagnose to check."
     }
+
+    Assert-ProductionConfiguration
 
     # 1. Backend Setup
     Write-Log "Setting up backend..." "INFO"
@@ -506,10 +544,7 @@ function Start-Services {
     $existingBackend = @(Get-ProcessesOnPort -Port 5000)
     if ($existingBackend.Count -gt 0) {
         Write-Log "Port 5000 is in use. Stopping existing process automatically..." "WARN"
-        foreach ($p in $existingBackend) {
-            Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
-        }
-        Start-Sleep -Milliseconds 500
+        Stop-ProcessesOnPort -Port 5000 | Out-Null
     }
 
     $env:AOP_ENV = if ($Production) { "production" } else { "development" }
@@ -525,6 +560,7 @@ function Start-Services {
         $backendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $backendCmd -WindowStyle $backendWindowStyle -PassThru
     }
     Write-Log "Backend PID: $($backendProcess.Id)" "INFO"
+    $script:startedProcessIds += [int]$backendProcess.Id
 
     Start-Sleep -Milliseconds 500
     if (-not (Get-Process -Id $backendProcess.Id -ErrorAction SilentlyContinue)) {
@@ -534,7 +570,8 @@ function Start-Services {
     if (Wait-ForPortListening -Port 5000 -TimeoutSeconds 15 -IntervalMilliseconds 300) {
         Write-Log "Backend is listening on port 5000" "INFO"
     } else {
-        Stop-Process -Id $backendProcess.Id -Force -ErrorAction SilentlyContinue
+        Stop-ProcessTree -ProcessId $backendProcess.Id
+        Stop-ProcessesOnPort -Port 5000 | Out-Null
         throw "Backend failed to listen on port 5000."
     }
 
@@ -566,7 +603,7 @@ function Start-Services {
         & npm run build
         if ($LASTEXITCODE -ne 0) {
             Set-Location $projectPath
-            throw "Frontend build failed"
+            throw "Frontend build failed. Check the npm output above."
         }
         # Start-Process 는 확장자 없는 Unix 용 'npm' 스크립트를 먼저 잡아 실패한다.
         # cmd.exe 를 경유해 npm.cmd 가 실행되도록 고정한다.
@@ -579,17 +616,16 @@ function Start-Services {
         $frontendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $frontendCmd -WindowStyle $frontendWindowStyle -PassThru
     }
     Write-Log "Frontend PID: $($frontendProcess.Id)" "INFO"
+    $script:startedProcessIds += [int]$frontendProcess.Id
 
     $frontendListening = Wait-ForPortListening -Port 3000 -TimeoutSeconds 30 -IntervalMilliseconds 300
     if ($frontendListening) {
         Write-Log "Frontend is listening on port 3000" "INFO"
-    } elseif ($Unattended) {
+    } elseif ($Unattended -or $Production) {
         Stop-ProcessTree -ProcessId $frontendProcess.Id
         Stop-ProcessTree -ProcessId $backendProcess.Id
         foreach ($failedServicePort in @(3000, 5000)) {
-            foreach ($failedServiceProcess in @(Get-ProcessesOnPort -Port $failedServicePort)) {
-                Stop-Process -Id $failedServiceProcess.ProcessId -Force -ErrorAction SilentlyContinue
-            }
+            Stop-ProcessesOnPort -Port $failedServicePort | Out-Null
         }
         throw "Frontend failed to listen on port 3000."
     } else {
@@ -642,6 +678,7 @@ try {
         }
     }
 } catch {
+    Stop-StartedServices
     Write-Log "ERROR: $($_.Exception.Message)" "ERROR"
     Write-Host "`n[ERROR] $($_.Exception.Message)" -ForegroundColor Red
     Save-JsonLog

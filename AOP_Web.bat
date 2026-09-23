@@ -43,6 +43,9 @@ if /i "%~1"=="" (
     set "EXTRA_ARGS=-Force"
 ) else if /i "%~1"=="status" (
     set "ACTION=Status"
+) else if /i "%~1"=="help" (
+    set "ACTION=Help"
+    set "EXTRA_ARGS=-Help"
 ) else if /i "%~1"=="prod" (
     set "EXTRA_ARGS=-Production"
 ) else if /i "%~1"=="production" (
@@ -53,7 +56,7 @@ if /i "%~1"=="" (
     set "ACTION=UninstallStartup"
 ) else (
     echo [ERROR] Unknown command: %~1
-    echo Usage: AOP_Web.bat [start^|stop^|restart^|status^|prod^|autostart^|uninstall]
+    echo Usage: AOP_Web.bat [start^|stop^|restart^|status^|help^|prod^|autostart^|uninstall]
     exit /b 1
 )
 

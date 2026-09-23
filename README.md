@@ -84,10 +84,13 @@ npm install
 | `AOP_Web.bat stop` | 실행 중인 백엔드(5000) 및 프론트엔드(3000) 종료 |
 | `AOP_Web.bat restart` | 서버 재시작 |
 | `AOP_Web.bat status` | 현재 백엔드/프론트엔드 포트 리스닝 및 프로세스 상태 확인 |
+| `AOP_Web.bat help` | 명령어와 옵션 도움말 표시 |
 | `AOP_Web.bat prod` | 운영 모드(Production)로 빌드 및 백그라운드 구동 |
 | `AOP_Web.bat uninstall` | Windows 로그온 자동 시작 작업(`AOP_Web_AutoStart`) 해제 |
 
 > `start`·`prod`처럼 **서버를 직접 기동하면 방금 사용한 모드 그대로 자동 시작 작업이 등록**됩니다. 자세한 내용은 [6. Windows 자동 시작 등록](#6-windows-자동-시작-등록-auto-start-setup)을 참고하세요.
+
+`prod`는 운영 필수 환경변수(`AUTH_SECRET_KEY`, `FLASK_SECRET_KEY`, `ALLOWED_ORIGINS`)를 먼저 확인한 뒤 `npm run build`와 `npm start`를 순서대로 실행합니다. 필수값이 없으면 백엔드를 먼저 실행하지 않고 원인을 출력합니다.
 
 ### 4.2 PowerShell 직접 실행 (`scripts\AOP_Web.ps1`)
 
