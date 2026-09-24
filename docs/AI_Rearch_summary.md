@@ -10,7 +10,7 @@
 
 | # | 요청 | 해결 | Detail |
 |---|---|---|---|
-| 15 | `AOP_Web.bat prod` 실행 시 환경변수 누락 오류 및 문제 해결 요청 | 운영 환경변수가 수동 설정되어 있지 않더라도 `Ensure-ProductionConfiguration`이 `backend/.env.production`에 암호학적 난수 시크릿 및 Origin을 자동 생성·영구 보관하고 현재 프로세스에 주입하도록 개선했습니다. 수동 사전 설정 없이도 `AOP_Web.bat prod` 한 번으로 `npm run build` 후 백엔드(5000)와 프론트엔드(3000)가 정상 기동되도록 원클릭 구동을 완성했습니다. | [→ Detail](./AI_Rearch_detail.md#v0974--15-운영-모드-자동-시크릿-생성-및-원클릭-빌드구동) |
+| 15 | `AOP_Web.bat prod` 실행 시 환경변수 누락 오류 및 클라이언트 PC에서 서버 IP 접근 시 연결 실패 문제 해결 요청 | 운영 환경변수가 수동 설정되어 있지 않더라도 `Ensure-ProductionConfiguration`이 `backend/.env.production`에 암호학적 난수 시크릿 및 서버의 모든 활성 IPv4 주소(예: `10.82.218.49`)를 포함한 Origin을 자동 생성·영구 보관하고 현재 프로세스에 주입하도록 개선했습니다. 수동 사전 설정 없이도 `AOP_Web.bat prod` 한 번으로 `npm run build` 후 백엔드(5000)와 프론트엔드(3000)가 정상 기동되며, 외부 클라이언트 PC에서 서버 IP 접속 시 CORS 차단 없이 원활하게 로그인/통신되도록 수정했습니다. | [→ Detail](./AI_Rearch_detail.md#v0974--15-운영-모드-자동-시크릿-생성-및-원클릭-빌드구동) |
 
 ## 변경 이력 (v0.9.71 — 2026-09-23)
 

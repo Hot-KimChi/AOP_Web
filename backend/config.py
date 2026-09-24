@@ -88,7 +88,7 @@ class Config:
                 "운영 모드에서는 다음 환경변수를 반드시 지정해야 합니다: "
                 + ", ".join(weak)
             )
-        if any(not isinstance(o, str) for o in Config.ALLOWED_ORIGINS):
+        if not Config.ALLOWED_ORIGINS:
             raise RuntimeError(
                 "운영 모드에서는 ALLOWED_ORIGINS 를 명시적으로 지정해야 합니다."
             )

@@ -286,5 +286,5 @@
 
 - **수행 일자**: 2026-09-24 (v0.9.74)
 - **진행 내역 요약**:
-  1. `AOP_Web.bat prod` 실행 시 환경변수가 없더라도 `backend/.env.production`에 암호학적 랜덤 시크릿과 Origin 설정을 자동 생성·영구 보관 및 주입하도록 `Ensure-ProductionConfiguration`을 구현했습니다.
-  2. 사전 수동 설정 없이도 `AOP_Web.bat prod` 한 번으로 `npm run build` 후 백엔드(5000)와 프론트엔드(3000)가 정상 기동(RUNNING) 및 정상 종료(STOPPED)됨을 실측 검증했습니다.
+  1. `AOP_Web.bat prod` 실행 시 환경변수가 없더라도 `backend/.env.production`에 암호학적 랜덤 시크릿과 서버 활성 IPv4 주소(예: `10.82.218.49` 등)를 포함한 CORS Origin 설정을 자동 생성·영구 보관 및 주입하도록 `Ensure-ProductionConfiguration`을 구현했습니다.
+  2. 사전 수동 설정 없이도 `AOP_Web.bat prod` 한 번으로 `npm run build` 후 백엔드(5000)와 프론트엔드(3000)가 정상 기동(RUNNING)되며, 타 PC(클라이언트)에서 서버 IP 접근 시 CORS 및 로그인 API가 정상 동작하도록 개선 및 검증 완료했습니다.

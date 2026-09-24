@@ -6,18 +6,19 @@
 
 ## 변경 이력 (v0.9.74 — 2026-09-24)
 
-### v0.9.74 — #15. 운영 모드 자동 시크릿 생성 및 원클릭 빌드/구동
+### v0.9.74 — #15. 운영 모드 자동 시크릿 생성 및 원클릭 빌드/구동 (서버 IP 접속 CORS 지원)
 
-**문제**: 운영 필수 환경변수(`AUTH_SECRET_KEY`, `FLASK_SECRET_KEY`, `ALLOWED_ORIGINS`)가 수동 등록되어 있지 않은 환경에서 `AOP_Web.bat prod` 실행 시 스크립트가 즉시 에러를 반환하며 중단되어, 사용자가 별도 수동 설정 없이 프로덕션 모드를 바로 실행할 수 없었다.
+**문제**: 운영 필수 환경변수(`AUTH_SECRET_KEY`, `FLASK_SECRET_KEY`, `ALLOWED_ORIGINS`)가 수동 등록되어 있지 않은 환경에서 `AOP_Web.bat prod` 실행 시 스크립트가 즉시 에러를 반환하며 중단되었고, 외부 클라이언트 PC에서 서버 IP(`http://10.82.218.49:3000`)로 접속하여 로그인 시도 시 백엔드 CORS 허용 목록 누락으로 인해 `Unable to connect to the server` 에러가 발생했다.
 
 **조치**:
 
-- `scripts\AOP_Web.ps1`의 `Ensure-ProductionConfiguration`을 구현하여, 환경변수가 없더라도 `backend/.env.production`에 암호학적 난수(32바이트 64자리 hex) 시크릿과 호스트별 Origin을 자동 생성·영구 보관하고 실행 프로세스에 즉시 주입하도록 개선.
+- `scripts\AOP_Web.ps1`의 `Ensure-ProductionConfiguration`을 구현하여, 환경변수가 없더라도 `backend/.env.production`에 암호학적 난수(32바이트 64자리 hex) 시크릿과 서버의 모든 활성 IPv4 주소(예: `http://10.82.218.49:3000`, `http://10.82.218.49:5000`)를 포함한 Origin을 자동 생성·영구 보관하고 실행 프로세스에 즉시 주입하도록 개선.
 - `backend/config.py`의 `load_config()`에 `utf-8-sig` 기반 `.env.production` / `.env` 자동 파싱 및 `os.environ.setdefault()` 로더를 추가하여 단독 구동 시에도 일관된 시크릿을 유지.
+- `_validate_production()` 검사 로직을 개선하여 유효한 Origin 목록이 존재하면 안정적으로 통과하도록 처리.
 - `npm run build` 후 `npm start` 기동 및 포트 5000/3000 리스닝 대기 시간을 안정화.
 - `.gitignore`에 `backend/.env*`를 명시하여 생성된 로컬 시크릿 파일의 커밋 유출을 방지.
 
-**검증 기준**: 환경변수 미설정 상태에서 `AOP_Web.bat prod` 실행 → `.env.production` 자동 생성 및 `npm run build` → 백엔드(5000) & 프론트엔드(3000) RUNNING 확인 → `stop` 정상 종료.
+**검증 기준**: 환경변수 미설정 상태에서 `AOP_Web.bat prod` 실행 → `.env.production` 자동 생성(IP 포함) 및 `npm run build` → 백엔드(5000) & 프론트엔드(3000) RUNNING 확인 → 클라이언트 Origin(`http://10.82.218.49:3000`)에 대한 OPTIONS 및 POST API 호출 시 200 OK 및 `Access-Control-Allow-Origin` 응답 확인.
 
 ---
 

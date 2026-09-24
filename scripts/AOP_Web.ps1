@@ -281,6 +281,37 @@ function Get-PersistedEnvironmentValue {
     return [Environment]::GetEnvironmentVariable($Name, "Machine")
 }
 
+function Get-ServerOriginList {
+    $origins = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    
+    # 1. Localhost & Loopback
+    $origins.Add("http://localhost:3000") | Out-Null
+    $origins.Add("http://localhost:5000") | Out-Null
+    $origins.Add("http://127.0.0.1:3000") | Out-Null
+    $origins.Add("http://127.0.0.1:5000") | Out-Null
+
+    # 2. Hostname / ComputerName
+    if (-not [string]::IsNullOrWhiteSpace($env:COMPUTERNAME)) {
+        $origins.Add("http://$($env:COMPUTERNAME):3000") | Out-Null
+        $origins.Add("http://$($env:COMPUTERNAME):5000") | Out-Null
+    }
+
+    # 3. All Active IPv4 Addresses
+    try {
+        $ipAddresses = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+            Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } |
+            Select-Object -ExpandProperty IPAddress)
+        foreach ($ip in $ipAddresses) {
+            if (-not [string]::IsNullOrWhiteSpace($ip)) {
+                $origins.Add("http://${ip}:3000") | Out-Null
+                $origins.Add("http://${ip}:5000") | Out-Null
+            }
+        }
+    } catch { }
+
+    return [string[]]$origins
+}
+
 function Ensure-ProductionConfiguration {
     if (-not $Production) { return }
 
@@ -301,7 +332,24 @@ function Ensure-ProductionConfiguration {
         }
     }
 
-    # 2. 우선순위: Process > User > Machine > .env.production > 자동생성
+    # 2. ALLOWED_ORIGINS 동적 병합 (기존 항목 + 현재 서버 IP/호스트)
+    $serverOrigins = Get-ServerOriginList
+    $existingOrigins = @()
+    $persistedOrigins = Get-PersistedEnvironmentValue -Name "ALLOWED_ORIGINS"
+    if (-not [string]::IsNullOrWhiteSpace($persistedOrigins)) {
+        $existingOrigins += $persistedOrigins.Split(",")
+    } elseif ($fileSettings.Contains("ALLOWED_ORIGINS") -and -not [string]::IsNullOrWhiteSpace($fileSettings["ALLOWED_ORIGINS"])) {
+        $existingOrigins += $fileSettings["ALLOWED_ORIGINS"].Split(",")
+    }
+
+    $mergedOriginSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($orig in ($existingOrigins + $serverOrigins)) {
+        $trimmed = $orig.Trim()
+        if ($trimmed) { $mergedOriginSet.Add($trimmed) | Out-Null }
+    }
+    $finalAllowedOrigins = ($mergedOriginSet -join ",")
+
+    # 3. 우선순위: Process > User > Machine > .env.production > 자동생성
     $requiredKeys = @("AUTH_SECRET_KEY", "FLASK_SECRET_KEY", "ALLOWED_ORIGINS")
     $updatedFile = $false
 
@@ -311,17 +359,18 @@ function Ensure-ProductionConfiguration {
             $val = $fileSettings[$name]
         }
 
-        if ([string]::IsNullOrWhiteSpace($val)) {
-            if ($name -eq "ALLOWED_ORIGINS") {
-                $computerName = if ($env:COMPUTERNAME) { $env:COMPUTERNAME } else { "localhost" }
-                $val = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5000,http://127.0.0.1:5000,http://${computerName}:3000,http://${computerName}:5000"
-            } else {
-                # 64자리 안전한 암호학적 랜덤 hex 시크릿 생성
-                $bytes = New-Object byte[] 32
-                $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-                $rng.GetBytes($bytes)
-                $val = ([BitConverter]::ToString($bytes) -replace "-","").ToLower()
+        if ($name -eq "ALLOWED_ORIGINS") {
+            if ($val -ne $finalAllowedOrigins) {
+                $val = $finalAllowedOrigins
+                $fileSettings[$name] = $val
+                $updatedFile = $true
             }
+        } elseif ([string]::IsNullOrWhiteSpace($val)) {
+            # 64자리 안전한 암호학적 랜덤 hex 시크릿 생성
+            $bytes = New-Object byte[] 32
+            $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+            $rng.GetBytes($bytes)
+            $val = ([BitConverter]::ToString($bytes) -replace "-","").ToLower()
             $fileSettings[$name] = $val
             $updatedFile = $true
         }
@@ -330,7 +379,7 @@ function Ensure-ProductionConfiguration {
         [Environment]::SetEnvironmentVariable($name, $val, "Process")
     }
 
-    if ($updatedFile) {
+    if ($updatedFile -or -not (Test-Path $envProdFile)) {
         $lines = @(
             "# Auto-generated production configuration for AOP Web",
             "# Created: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
@@ -339,7 +388,7 @@ function Ensure-ProductionConfiguration {
             $lines += "$k=$($fileSettings[$k])"
         }
         $lines | Out-File -FilePath $envProdFile -Encoding UTF8
-        Write-Log "Generated and saved production configuration to $envProdFile" "INFO"
+        Write-Log "Generated and updated production configuration to $envProdFile" "INFO"
     } else {
         Write-Log "Production configuration loaded successfully" "INFO"
     }
