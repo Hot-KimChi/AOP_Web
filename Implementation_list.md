@@ -277,14 +277,14 @@
 
 >#### 15. AOP_web.bat prod는 실행 중 에러발생. 다른 명령어도 문제없는지 전부 확인해죠. 내가 원하는 production 모드는 npm build까지 자동으로 하여 실행되는 것을 의미한다. 위의 내용을 기반으로 agent 재작업 명세를 작성하고 이를 기반으로 진행해죠.
 
-> **[Agent 재작성 명세]** 운영 모드의 사전조건·빌드·기동·실패 전파를 실제 명령으로 검증한다.
-> - **목표**: `AOP_Web.bat prod`가 운영 필수 설정을 먼저 확인한 뒤 `npm run build` 성공, `npm start` 기동, 백엔드·프론트엔드 포트 확인까지 수행한다.
-> - **원인**: 운영 시크릿이 없는데 백엔드를 먼저 실행해 포트 대기 실패만 출력하여 실제 원인이 가려졌다. 기존 `help`도 배치 명령으로 지원되지 않았다.
-> - **구현**: 사용자/시스템 영구 환경변수를 현재 PowerShell 프로세스에 주입하고, 운영 필수값이 없으면 서버를 띄우기 전에 명확한 오류로 중단한다. `help` 명령을 추가하고 `npm run build` 실패를 오류로 전파한다.
-> - **불변식**: 운영 시크릿 기본값 우회 금지, `npm run build` 생략 금지, 기존 `start`/`stop`/`restart`/`status`/`autostart`/`uninstall` 동작 유지, 오류 시 성공 종료 코드 금지.
-> - **검증**: PowerShell 구문 검사, `help`/`status`/잘못된 명령 종료 코드, 시크릿 누락 `prod`의 조기 실패, 운영 설정 주입 후 `npm run build` 및 `npm start` 포트 확인, 모든 서버 원상복구.
+> **[Agent 재작성 명세]** 운영 모드의 사전조건·빌드·기동·실패 전파를 실제 명령으로 검증하고 무설정 원클릭 구동을 완성한다.
+> - **목표**: `AOP_Web.bat prod`가 운영 환경변수 사전 등록 유무와 상관없이 자동으로 안전한 로컬 시크릿을 준비하고, `npm run build` 후 `npm start` 기동, 백엔드·프론트엔드 포트 확인까지 완벽하게 수행한다.
+> - **원인**: 운영 시크릿이 User/Machine 환경변수에 없으면 스크립트가 즉시 에러를 내며 차단되었고, 과거 서비스/환경 파편화로 인해 원클릭 구동이 가로막혔다.
+> - **구현**: 환경변수가 없더라도 `backend/.env.production`에 암호학적 난수 시크릿을 자동 생성·보관하여 주입하고, `config.py`도 UTF-8 SIG로 `.env.production`을 로드하도록 보강했다. `npm run build` 성공 후 프로덕션 서버를 자동 기동한다.
+> - **불변식**: 운영 시크릿 기본값 우회 금지(안전한 고유 난수 키 보장), `npm run build` 생략 금지, 기존 `start`/`stop`/`restart`/`status`/`autostart`/`uninstall` 동작 유지, 오류 시 성공 종료 코드 금지.
+> - **검증**: PowerShell 구문 검사, 환경변수 미설정 상태에서 `prod` 실행 시 `.env.production` 자동 생성 및 `npm run build` → 백엔드(5000) & 프론트엔드(3000) 동시 기동 실측, `status`·`stop` 및 포트 정리 전 구간 검증 완료.
 
-- **수행 일자**: 2026-09-23 (v0.9.73)
+- **수행 일자**: 2026-09-24 (v0.9.74)
 - **진행 내역 요약**:
-  1. `prod` 시작 전에 `AUTH_SECRET_KEY`, `FLASK_SECRET_KEY`, `ALLOWED_ORIGINS`를 User/Machine 환경변수에서 확인해 현재 프로세스에 주입하고, 누락 시 백엔드를 실행하지 않고 원인을 명확히 반환하도록 수정했습니다. `help` 배치 명령도 추가했습니다.
-  2. 운영 모드의 `npm run build` 성공 후 `npm start` 기동 및 3000/5000 포트 확인을 검증하고, `status`·`stop`·`restart`·`autostart`·`uninstall` 명령의 오류 코드와 원상복구를 점검했습니다.
+  1. `AOP_Web.bat prod` 실행 시 환경변수가 없더라도 `backend/.env.production`에 암호학적 랜덤 시크릿과 Origin 설정을 자동 생성·영구 보관 및 주입하도록 `Ensure-ProductionConfiguration`을 구현했습니다.
+  2. 사전 수동 설정 없이도 `AOP_Web.bat prod` 한 번으로 `npm run build` 후 백엔드(5000)와 프론트엔드(3000)가 정상 기동(RUNNING) 및 정상 종료(STOPPED)됨을 실측 검증했습니다.

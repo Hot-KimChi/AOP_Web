@@ -281,22 +281,67 @@ function Get-PersistedEnvironmentValue {
     return [Environment]::GetEnvironmentVariable($Name, "Machine")
 }
 
-function Assert-ProductionConfiguration {
+function Ensure-ProductionConfiguration {
     if (-not $Production) { return }
 
-    $missing = @()
-    foreach ($name in @("AUTH_SECRET_KEY", "FLASK_SECRET_KEY", "ALLOWED_ORIGINS")) {
-        $value = Get-PersistedEnvironmentValue -Name $name
-        if ([string]::IsNullOrWhiteSpace($value)) {
-            $missing += $name
-            continue
+    $backendPath = Join-Path $projectPath "backend"
+    $envProdFile = Join-Path $backendPath ".env.production"
+
+    # 1. 파일에서 기존 저장된 키 읽기
+    $fileSettings = [ordered]@{}
+    if (Test-Path $envProdFile) {
+        Get-Content $envProdFile -Encoding UTF8 | ForEach-Object {
+            $line = $_.Trim()
+            if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+                $parts = $line.Split("=", 2)
+                $k = $parts[0].Trim()
+                $v = $parts[1].Trim().Trim("'", '"')
+                if ($k -and $v) { $fileSettings[$k] = $v }
+            }
         }
-        # Scheduled tasks and already-open shells may not contain newly persisted values.
-        [Environment]::SetEnvironmentVariable($name, $value, "Process")
     }
 
-    if ($missing.Count -gt 0) {
-        throw "Production configuration is incomplete. Set these variables at User or Machine scope before running prod: $($missing -join ', ')"
+    # 2. 우선순위: Process > User > Machine > .env.production > 자동생성
+    $requiredKeys = @("AUTH_SECRET_KEY", "FLASK_SECRET_KEY", "ALLOWED_ORIGINS")
+    $updatedFile = $false
+
+    foreach ($name in $requiredKeys) {
+        $val = Get-PersistedEnvironmentValue -Name $name
+        if ([string]::IsNullOrWhiteSpace($val) -and $fileSettings.Contains($name)) {
+            $val = $fileSettings[$name]
+        }
+
+        if ([string]::IsNullOrWhiteSpace($val)) {
+            if ($name -eq "ALLOWED_ORIGINS") {
+                $computerName = if ($env:COMPUTERNAME) { $env:COMPUTERNAME } else { "localhost" }
+                $val = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5000,http://127.0.0.1:5000,http://${computerName}:3000,http://${computerName}:5000"
+            } else {
+                # 64자리 안전한 암호학적 랜덤 hex 시크릿 생성
+                $bytes = New-Object byte[] 32
+                $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+                $rng.GetBytes($bytes)
+                $val = ([BitConverter]::ToString($bytes) -replace "-","").ToLower()
+            }
+            $fileSettings[$name] = $val
+            $updatedFile = $true
+        }
+
+        # 현재 실행 프로세스에 주입
+        [Environment]::SetEnvironmentVariable($name, $val, "Process")
+    }
+
+    if ($updatedFile) {
+        $lines = @(
+            "# Auto-generated production configuration for AOP Web",
+            "# Created: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+        )
+        foreach ($k in $fileSettings.Keys) {
+            $lines += "$k=$($fileSettings[$k])"
+        }
+        $lines | Out-File -FilePath $envProdFile -Encoding UTF8
+        Write-Log "Generated and saved production configuration to $envProdFile" "INFO"
+    } else {
+        Write-Log "Production configuration loaded successfully" "INFO"
     }
 }
 
@@ -517,7 +562,7 @@ function Start-Services {
         throw "Project structure invalid. Run with -Diagnose to check."
     }
 
-    Assert-ProductionConfiguration
+    Ensure-ProductionConfiguration
 
     # 1. Backend Setup
     Write-Log "Setting up backend..." "INFO"
@@ -567,7 +612,7 @@ function Start-Services {
         throw "Backend process terminated immediately."
     }
 
-    if (Wait-ForPortListening -Port 5000 -TimeoutSeconds 15 -IntervalMilliseconds 300) {
+    if (Wait-ForPortListening -Port 5000 -TimeoutSeconds 20 -IntervalMilliseconds 300) {
         Write-Log "Backend is listening on port 5000" "INFO"
     } else {
         Stop-ProcessTree -ProcessId $backendProcess.Id

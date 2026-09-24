@@ -99,6 +99,24 @@ class Config:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         config_path = os.path.join(current_dir, "AOP_config.cfg")
 
+        # 로컬 .env 또는 .env.production 파일이 존재하면 환경변수로 먼저 로드
+        for env_filename in (".env.production", ".env"):
+            env_file_path = os.path.join(current_dir, env_filename)
+            if os.path.isfile(env_file_path):
+                try:
+                    with open(env_file_path, "r", encoding="utf-8-sig") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line or line.startswith("#") or "=" not in line:
+                                continue
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip("'\"")
+                            if k and v:
+                                os.environ.setdefault(k, v)
+                except Exception:
+                    pass
+
         config = configparser.ConfigParser()
 
         if not os.path.exists(config_path):
