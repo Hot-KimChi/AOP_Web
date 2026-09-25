@@ -1,6 +1,9 @@
 import configparser
+import logging
 import os
 import re
+
+logger = logging.getLogger("Config")
 
 # 개발 편의를 위한 기본값 — 운영(AOP_ENV=production)에서는 사용이 차단된다.
 DEFAULT_AUTH_SECRET = "AOP_Admin_Token"
@@ -114,8 +117,14 @@ class Config:
                             v = v.strip().strip("'\"")
                             if k and v:
                                 os.environ.setdefault(k, v)
-                except Exception:
-                    pass
+                except Exception as e:
+                    # 파일 접근/인코딩/잘못된 값(NUL 문자 등) 오류는 조용히 무시하지
+                    # 않고 경고 로그를 남긴다(silent pass 는 설정 누락 원인 추적을
+                    # 불가능하게 만든다). 단, 어떤 예외든 애플리케이션 부팅 자체는
+                    # 계속되어야 하므로 광범위하게 잡아 흐름을 보존한다.
+                    logger.warning(
+                        f"{env_filename} 파일을 읽는 중 오류가 발생하여 건너뜁니다: {e}"
+                    )
 
         config = configparser.ConfigParser()
 

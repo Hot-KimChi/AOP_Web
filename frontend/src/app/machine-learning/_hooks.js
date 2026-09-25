@@ -70,6 +70,9 @@ export function useMLPageData() {
   // Ref: 비동기 경쟁 조건 방지용 시퀀스 카운터
   //   새 클릭이 발생하면 seq 가 증가하고, 이전 in-flight 요청의 결과는 무시됩니다.
   const scatterSeqRef = useRef(0);
+  // Ref: 컴포넌트 마운트 여부. 페이지 이동 등으로 언마운트된 뒤 늦게 도착한
+  // 초기 로드 응답이 setState 를 호출하는 것을 막는다(불필요한 경고·상태 오염 방지).
+  const isMountedRef = useRef(true);
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // [Step 1] scatter 캐시 기반 단건 fetch 유틸
@@ -107,15 +110,16 @@ export function useMLPageData() {
       try {
         const res  = await fetch(`${API_BASE_URL}/api/get_ml_models`, { credentials: 'include' });
         const json = await res.json();
+        if (!isMountedRef.current) return;
         if (json.status === 'success') {
           setModels(json.models);
         } else {
           setError('모델 정보를 불러오지 못했습니다.');
         }
       } catch {
-        setError('서버 연결 오류');
+        if (isMountedRef.current) setError('서버 연결 오류');
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) setLoading(false);
       }
     }
 
@@ -139,6 +143,7 @@ export function useMLPageData() {
           { credentials: 'include' }
         );
         const json = await res.json();
+        if (!isMountedRef.current) return;
         if (json.status !== 'success') return;
 
         const rawVersions = json.data || [];
@@ -158,7 +163,7 @@ export function useMLPageData() {
 
         // ⑥ scatter fetch
         const pointData = await fetchScatterByVersionId(best.version_id);
-        if (!pointData) return;
+        if (!pointData || !isMountedRef.current) return;
 
         // 사용자가 이미 클릭했으면 초기 로드 결과를 덮어쓰지 않음
         if (scatterSeqRef.current !== initSeq) return;
@@ -166,13 +171,19 @@ export function useMLPageData() {
       } catch (e) {
         console.error('Initial load failed:', e);
       } finally {
-        setVersionsLoading(false);
-        setScatterLoading(false);
+        if (isMountedRef.current) {
+          setVersionsLoading(false);
+          setScatterLoading(false);
+        }
       }
     }
 
     fetchModels();
     fetchVersionsAndScatter();
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [API_BASE_URL, fetchScatterByVersionId]);
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

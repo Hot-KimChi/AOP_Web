@@ -4,6 +4,32 @@
 > 
 > 📎 **[→ 변경 요약 (Summary)](./AI_Rearch_summary.md)**
 
+## 변경 이력 (v0.9.75 — 2026-09-25)
+
+### v0.9.75 — #16. 전체 프로젝트 병목현상 및 에러 점검
+
+**문제**: 사용자가 전체 프로젝트(백엔드+프론트엔드)에 대해 병목현상·속도 향상 여지·에러가 있는 부분을 확인하고 수정해달라고 요청했다.
+
+**탐색**: `explore` 서브에이전트 2개(백엔드/프론트엔드)를 병렬 실행하여 전체 코드베이스를 읽기 전용으로 스캔했다. 실제 코드를 열어 확인한 근거가 있는 항목만 채택했으며, 아키텍처 변경이 필요한 항목(비동기 작업 큐, 테이블 가상화 라이브러리 도입)은 회귀 위험이 커서 이번 세션에서는 수정하지 않고 권고 사항으로만 기록했다.
+
+**조치**:
+
+1. **[백엔드] SQL 커넥션 풀 파괴 버그** — `backend/pkg_MachineLearning/fetch_selectFeature.py`의 `fetch_one_db()`가 학습 데이터를 병렬(ThreadPoolExecutor) 조회하면서 각 스레드 종료 시 `sql_connection.engine.dispose()`를 직접 호출했다. `pkg_SQL/database.py`의 `SQL` 클래스는 connection-string 해시 기준 전역 엔진 캐시(`_ENGINE_CACHE`)를 사용해 여러 요청이 같은 엔진(및 커넥션 풀)을 공유하므로, `engine.dispose()`를 직접 호출하면 **동시에 실행 중인 다른 요청/스레드의 커넥션 풀까지 파괴**되어 간헐적 DB 연결 오류를 유발할 수 있었다. `SQL.close()`(캐시 엔진은 보존하고 일회성 엔진만 폐기)로 교체했다.
+2. **[백엔드] 설정 로더 예외 은폐 제거** — `backend/config.py`의 `.env.production`/`.env` 파싱 실패를 `except Exception: pass`로 완전히 무시하고 있어 파일 권한/인코딩 문제가 있어도 원인 추적이 불가능했다. `logger.warning(...)`을 추가해 가시성을 확보하되, 부팅이 계속되어야 한다는 기존 불변식은 그대로 유지했다(첫 시도에서 예외 타입을 `(OSError, UnicodeError)`로 좁혔다가 `os.environ.setdefault()`가 NUL 문자 등에서 `ValueError`를 던질 수 있다는 GPT 교차 검증 지적(V-001)을 받고 다시 `Exception`으로 되돌렸다).
+3. **[백엔드] 업로드 요청 크기 제한 + 413 회귀 수정** — `backend/app.py`의 `create_app()`에 `MAX_CONTENT_LENGTH`(기본 100MB, `MAX_CONTENT_LENGTH_BYTES` 환경변수로 조정 가능)가 전혀 없어 대용량 업로드로 인한 스레드/메모리 점유 위험(DoS)이 있었다. 추가 직후 GPT 교차 검증에서 `handle_exceptions` 데코레이터가 `RequestEntityTooLarge`(413)까지 일반 `Exception`으로 잡아 **500으로 오변환**하는 회귀(V-002)를 발견해, `backend/utils/decorators.py`에 `except HTTPException: raise`를 추가해 werkzeug의 HTTP 예외는 원래 상태 코드로 전파되도록 수정했다.
+4. **[프론트엔드] TX 파일 중복 재검증 방지** — `frontend/src/app/verification-report/page.js`의 검증 `useEffect`가 `txProbeList` 배열 전체를 의존성으로 사용했다. `txProbeList`는 `txDatabase` 변경 시 비동기로 갱신되는 파생 데이터라, 배열 참조가 바뀔 때마다 이미 선택된 파일/DB/프로브/SW버전이 그대로인데도 검증 API 호출과 매칭 팝업이 중복 실행될 수 있었다. 실제로 필요한 값(`selectedTxProbeName`, `useMemo`로 파생)만 의존성으로 사용하도록 수정했다.
+5. **[프론트엔드] 머신러닝 페이지 언마운트 안전성** — `frontend/src/app/machine-learning/_hooks.js`의 초기 로드(`fetchModels`, `fetchVersionsAndScatter`)가 사용자가 페이지를 빠르게 이탈해도 완료 시 `setState`를 호출했다. `isMountedRef`를 추가해 언마운트 후에는 상태 갱신을 건너뛰도록 방어했다.
+
+**검증**:
+- 백엔드: `py_compile`로 구문 검사(수정 5개 파일 전부 통과).
+- 프론트엔드: `npm run build`(Next.js production build) 성공.
+- GPT(`gpt-6-astra`) 서브에이전트 교차 검증(SQL 커넥션/설정 로더/업로드 크기 제한은 위험도 기준 필수 승격 대상): 1라운드에서 Blocker 2건(V-001 설정 로더 예외 축소로 인한 부팅 실패 회귀, V-002 413→500 회귀) 발견 → 즉시 수정 → 2라운드 재검증에서 실제 격리 실행(104,857,601바이트 요청 시 413 확인, NUL 문자 포함 손상 `.env.production`으로 부팅 지속 확인)으로 **Blocker 0 / Major 0** 통과.
+- 서버는 종료 후(`AOP_Web.bat stop`) 수정하고, `AOP_Web.bat prod`로 재기동하여 백엔드(`/api/get_ml_models` → 401 인증 필요, 정상)·프론트엔드(`/` → 200) 실제 HTTP 응답으로 확인했다.
+
+**보류(권고, 미적용)**: `db_api.py`의 `export_table_to_word`(대용량 테이블 `SELECT *` 전량 조회 및 DOCX 직렬화), `routes/ml.py`/`measset_gen.py`의 동기 학습·생성 처리(비동기 작업 큐 분리 필요), `DataViewer.js`의 대량 행 렌더링(가상화 라이브러리 미도입) — 아키텍처 변경 및 신규 의존성 도입이 필요해 회귀 위험 대비 이번 세션 범위를 벗어난다고 판단해 수정하지 않았다. 별도 작업으로 진행을 권장한다.
+
+---
+
 ## 변경 이력 (v0.9.74 — 2026-09-24)
 
 ### v0.9.74 — #15. 운영 모드 자동 시크릿 생성 및 원클릭 빌드/구동 (서버 IP 접속 CORS 지원)

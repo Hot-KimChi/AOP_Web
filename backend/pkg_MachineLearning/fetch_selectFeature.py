@@ -81,8 +81,12 @@ def fetchData():
             logging.warning(f"DB '{db}' 데이터 조회 실패: {e}")
             return None
         finally:
-            if sql_connection and hasattr(sql_connection, "engine"):
-                sql_connection.engine.dispose()
+            # 주의: engine.dispose()를 직접 호출하면 다른 요청/스레드가 공유 중인
+            # 캐시된 엔진과 커넥션 풀까지 폐기되어 동시 요청에서 연결 오류를
+            # 유발한다. SQL.close()는 캐시 엔진을 안전하게 보존하고, 캐시를 쓰지
+            # 않는 일회성 엔진만 폐기하므로 반드시 close()를 사용해야 한다.
+            if sql_connection:
+                sql_connection.close()
 
     SQL_get_data = []
     with ThreadPoolExecutor(max_workers=min(8, len(list_database))) as executor:

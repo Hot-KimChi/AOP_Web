@@ -23,6 +23,12 @@ def create_app():
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = Config.COOKIE_SECURE
 
+    # 업로드 요청 본문 크기 제한(기본 100MB). 제한이 없으면 대용량 업로드가
+    # 요청 스레드/메모리를 장시간 점유하거나 서비스 거부(DoS)로 이어질 수 있다.
+    app.config["MAX_CONTENT_LENGTH"] = int(
+        os.environ.get("MAX_CONTENT_LENGTH_BYTES", 100 * 1024 * 1024)
+    )
+
     # CORS: ALLOWED_ORIGINS 환경변수 기반 (개발: *, 운영: 명시 도메인)
     CORS(
         app,

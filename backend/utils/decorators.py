@@ -2,6 +2,7 @@ from functools import wraps
 from flask import request, g
 import os
 import jwt
+from werkzeug.exceptions import HTTPException
 from config import Config
 from utils.database_manager import db_manager
 from .error_handler import error_response, CredentialsRequired
@@ -20,6 +21,11 @@ def handle_exceptions(f):
         except CredentialsRequired as e:
             logger.warning(f"Credentials required: {str(e)}")
             return error_response("Username and password are required", 422)
+        except HTTPException:
+            # 413(요청 본문 초과) 등 Flask/Werkzeug 가 이미 올바른 상태 코드를
+            # 부여한 예외는 500으로 뭉개지 않고 그대로 전파해 원래 상태 코드가
+            # 응답되도록 한다.
+            raise
         except Exception as e:
             # 상세 원인은 로그에만 남긴다. 드라이버 예외 문자열에는 서버명·스키마·
             # SQL 구문이 포함될 수 있어 클라이언트에 그대로 노출하면 정보 유출이 된다.

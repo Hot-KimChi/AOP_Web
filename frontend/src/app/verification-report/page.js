@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FileInput, ClipboardList, Upload, Table2 } from 'lucide-react';
 import Layout from '../../components/Layout';
 import { API_BASE_URL } from '../../lib/apiBase';
@@ -403,6 +403,17 @@ export default function VerificationReport() {
     // 실제 검증/매칭 팝업은 아래 useEffect가 단독으로 담당한다(팝업 중복 방지).
   };
 
+  // txProbeList 배열 참조 자체가 아니라 실제로 검증에 필요한 probeName 값만
+  // 의존성으로 사용한다. txProbeList 는 txDatabase 변경 시 비동기로 갱신되므로
+  // 배열 전체를 의존성에 두면 검증 대상(txFile/txDatabase/txProbe/txSoftwareVersion)이
+  // 바뀌지 않았는데도 재검증이 중복 실행되어 팝업이 여러 번 뜰 수 있다.
+  const selectedTxProbeName = useMemo(() => {
+    const match = txProbeList.find(
+      (probe) => normalizeProbeId(probe.probeId) === normalizeProbeId(txProbe)
+    );
+    return match?.probeName || '';
+  }, [txProbeList, txProbe]);
+
   useEffect(() => {
     if (!txFile || !txDatabase || !txProbe || !txSoftwareVersion) {
       return;
@@ -410,15 +421,12 @@ export default function VerificationReport() {
     const runValidation = async () => {
       try {
         setTxLoading(true);
-        const selectedProbe = txProbeList.find(
-          (probe) => normalizeProbeId(probe.probeId) === normalizeProbeId(txProbe)
-        );
         await validateTxFile(
           txFile,
           txDatabase,
           txProbe,
           txSoftwareVersion,
-          selectedProbe?.probeName || ''
+          selectedTxProbeName
         );
       } catch (err) {
         setTxError(err.message || '파일 검증 실패');
@@ -427,7 +435,7 @@ export default function VerificationReport() {
       }
     };
     runValidation();
-  }, [txFile, txDatabase, txProbe, txSoftwareVersion, txProbeList]);
+  }, [txFile, txDatabase, txProbe, txSoftwareVersion, selectedTxProbeName]);
 
   const uploadTxSummary = async () => {
     if (!txDatabase || !txProbe || !txSoftwareVersion || !txFile) {
