@@ -86,19 +86,24 @@
 ## 검증 흐름 (교차 모델)
 
 ```
+[Leader: Tier·위험도 판정 · 검증 예산 배정 · 타입 질문([ASK])과 사전확률([PRIOR]) 작성]  ← GPT (대행 조건은 `model-routing` §2.1)
+   ↓
 [Implement 완료 · 스모크 테스트 실행 로그 확보]  ← Claude Opus
    ↓  (위험도 승격 기준 미해당이면 여기서 종료 — 생략 사실을 응답에 명시)
-[Verify 서브에이전트 위임]  ← GPT (메인이 직접 하지 않음)
-   입력: 요구사항 + 설계 의도 + 불변식 + diff + 실행 로그 + 이미 확인된 사실
+[Verify 서브에이전트 위임]  ← GPT (구현자가 직접 하지 않음, Leader와도 다른 에이전트)
+   입력: **JEV 상태 봉투** (블록 구성·작성법은 `agent-orchestration` §JEV — 여기서 중복 정의하지 않는다)
+         이 단계에서 봉투에 담을 검증 고유 내용:
    ├─ 관련 AGENTS.md 불변식 위반 여부
    ├─ 위 스택별 체크 항목
    └─ 엣지케이스·회귀·보안
    ↓
-[리포트: Blocker / Major / Minor]
+[리포트: [DECISIONS] 질문별 값 + 확률 + 신뢰도 → Blocker / Major / Minor 집계]
    ├─ Blocker·Major → Opus가 수정 → write_agent로 재검증
+   ├─ 확률이 낮은 항목 → [RESIDUAL]로 분리 (임계값 기준: `agent-orchestration` §JEV)
    └─ Minor → 기록만, 요청 범위 밖이면 수정하지 않음
    ↓
-[Blocker 0 AND Major 0] → Change Log 기록 → 자동 커밋
+[Blocker 0 AND Major 0] → Leader 통합(보정 오차 기록) → Change Log 기록 → 자동 커밋
 ```
 
 > 승격 기준·모델 선택·iteration 상한·이견 해소: `.github/instructions/model-routing.instructions.md`
+> 봉투 형식·타입 질문·보정 보상 루프: `.github/instructions/agent-orchestration.instructions.md` §JEV

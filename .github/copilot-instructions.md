@@ -55,14 +55,20 @@
 
 ---
 
-## 4. Workflow: Design → Implement → Verify
+## 4. Workflow: Leader → Design → Implement → Verify
 
-> **Design·Implement는 Claude Opus 최신, Verify는 GPT 최신 서브에이전트에 위임한다.**
-> 계열이 바뀌는 지점은 Verify 하나뿐이며, 그 이유는 **자기 검증의 맹점 제거**다.
-> 모델 ID·승격 기준·iteration 규칙: **`.github/instructions/model-routing.instructions.md`**
+> **Leader(지시·분배)는 GPT 최신, Design·Implement는 Claude Opus 최신, Verify는 GPT 최신 서브에이전트가 수행한다.**
+> Leader와 Verify는 같은 GPT 계열이지만 **역할이 다르므로 동일 에이전트가 겸하지 않는다.**
+> 모델 ID·Leader 위임 조건·승격 기준·iteration 규칙: **`.github/instructions/model-routing.instructions.md`**
+> 에이전트 간 메시지 형식(JEV 상태 봉투)·보정 학습 루프: **`.github/instructions/agent-orchestration.instructions.md` §JEV**
 
+- **Leader는 코드를 쓰지 않는다.** 산출물은 분배 계획(Routing Plan)과 최종 통합 보고다.
+  **단순한 작업은 메인이 Leader를 대행**할 수 있고, 그 사실을 보고에 남긴다.
+  **실행 주체(메인 모델 계열별)와 GPT Leader 위임 필수 조건은 `model-routing` §2.1이 단일 기준**이며, 여기에 나열하지 않는다.
 - **승격된 Verify는 GPT 서브에이전트가 수행한다** — 구현자와 같은 모델이 검증하면 같은 추론 오류를 그대로 통과시킨다. (예외: 해당 계열 모델이 없을 때)
 - 교차 검증은 **위험도로 승격**한다(인증·SQL·데이터 손실·구동 스크립트·확신 없는 변경). 파일 수로 판단하지 않는다. **필수 조건은 생략 조건보다 우선**한다.
+- **모든 위임은 타입 질문(`[ASK]`: Choice/Score/Noul)으로 환원하고, 회신은 값 + 확률 + 신뢰도로 받는다.**
+  산문 단정("문제 없습니다")은 금지한다. `[PRIOR]` 대비 실제 결과의 **보정 오차**를 다음 라우팅에 반영한다.
 - 완료 조건은 **`Blocker 0 AND Major 0`**. 미해결 시 커밋하지 않고 보고한다.
 
 ### 4.1 작업 등급(Tier) — **착수 전에 먼저 정한다**
