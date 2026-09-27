@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="AOP Web 프로젝트 기능과 사용 방법 안내">
+  <title>AOP Web 사용자 안내</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --surface: #fff;
+      --text: #172033;
+      --muted: #5d687b;
+      --brand: #2458d6;
+      --brand-soft: #e8efff;
+      --line: #d9e1ee;
+      --code: #182337;
+      --shadow: 0 12px 30px rgba(20, 42, 80, .08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.65 "Segoe UI", "Malgun Gothic", sans-serif;
+    }
+    a { color: var(--brand); }
+    .hero {
+      background: linear-gradient(135deg, #173d9c, #2458d6 55%, #4b7bea);
+      color: #fff;
+      padding: 64px 24px 88px;
+    }
+    .wrap { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+    .hero h1 { margin: 0 0 12px; font-size: clamp(2rem, 5vw, 4rem); line-height: 1.1; }
+    .hero p { max-width: 720px; margin: 0; color: #e5edff; font-size: 1.12rem; }
+    .layout { display: grid; grid-template-columns: 230px 1fr; gap: 28px; align-items: start; margin-top: -38px; }
+    nav {
+      position: sticky; top: 20px; padding: 20px; background: var(--surface);
+      border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow);
+    }
+    nav strong { display: block; margin-bottom: 10px; }
+    nav a { display: block; padding: 5px 0; text-decoration: none; font-size: .94rem; }
+    main { min-width: 0; }
+    section {
+      margin-bottom: 24px; padding: 30px; background: var(--surface);
+      border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow);
+    }
+    h2 { margin: 0 0 18px; font-size: 1.65rem; }
+    h3 { margin: 26px 0 8px; font-size: 1.15rem; }
+    p { margin: 8px 0 14px; }
+    .lead { color: var(--muted); font-size: 1.05rem; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .card { padding: 18px; border: 1px solid var(--line); border-radius: 10px; }
+    .card h3 { margin: 0 0 5px; color: var(--brand); }
+    .path { color: var(--muted); font-family: Consolas, monospace; font-size: .9rem; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--brand-soft); }
+    code, pre { font-family: Consolas, "Courier New", monospace; }
+    code { padding: 2px 5px; background: var(--brand-soft); border-radius: 4px; }
+    pre {
+      overflow: auto; padding: 16px; color: #e8eefb; background: var(--code);
+      border-radius: 8px; line-height: 1.5;
+    }
+    .note { padding: 14px 16px; border-left: 4px solid var(--brand); background: var(--brand-soft); }
+    .steps { counter-reset: step; padding: 0; list-style: none; }
+    .steps li { counter-increment: step; position: relative; padding: 8px 0 8px 42px; }
+    .steps li::before {
+      content: counter(step); position: absolute; left: 0; top: 8px; width: 28px; height: 28px;
+      border-radius: 50%; background: var(--brand); color: #fff; text-align: center; line-height: 28px;
+    }
+    footer { padding: 30px 0 50px; color: var(--muted); text-align: center; }
+    @media (max-width: 780px) {
+      .layout { display: block; margin-top: -28px; }
+      nav { position: static; margin-bottom: 18px; }
+      .grid { grid-template-columns: 1fr; }
+      section { padding: 22px; }
+      th, td { padding: 9px 7px; font-size: .92rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <p>AOP Web 사용자 안내서</p>
+      <h1>데이터 조회부터 검증 리포트까지</h1>
+      <p>Flask 백엔드, Next.js 웹 화면, MS-SQL Server를 연결해 측정 데이터 생성·조회·검증·문서화를 지원하는 업무용 애플리케이션입니다.</p>
+    </div>
+  </header>
+
+  <div class="wrap layout">
+    <nav aria-label="문서 목차">
+      <strong>빠른 이동</strong>
+      <a href="#overview">프로젝트 개요</a>
+      <a href="#features">기능 안내</a>
+      <a href="#workflow">기본 사용 흐름</a>
+      <a href="#setup">실행 방법</a>
+      <a href="#security">로그인·보안</a>
+      <a href="#trouble">문제 해결</a>
+    </nav>
+
+    <main>
+      <section id="overview">
+        <h2>프로젝트 개요</h2>
+        <p class="lead">AOP Web은 사용자가 브라우저에서 데이터베이스와 분석 기능을 안전하게 사용하도록 화면과 API를 분리한 풀스택 애플리케이션입니다.</p>
+        <table>
+          <tr><th>구성</th><th>역할</th></tr>
+          <tr><td>Next.js 15 / React 18</td><td>메뉴, 입력 화면, 데이터 표, 결과 다운로드를 제공합니다.</td></tr>
+          <tr><td>Flask / Python</td><td>인증, 데이터베이스 조회, 파일 처리, ML 및 리포트 API를 실행합니다.</td></tr>
+          <tr><td>MS-SQL Server</td><td>업무 데이터와 측정·검증 대상 테이블을 저장합니다.</td></tr>
+        </table>
+        <div class="note">모든 인증 API 요청은 세션 쿠키를 사용합니다. 로그인 후 브라우저를 닫거나 백엔드가 재시작되면 다시 로그인해야 할 수 있습니다.</div>
+      </section>
+
+      <section id="features">
+        <h2>기능 안내</h2>
+        <div class="grid">
+          <article class="card"><h3>홈</h3><div class="path">/</div><p>SharePoint 주간 일정과 로그인 계정별 <strong>내 할 일</strong>을 확인합니다. 할 일을 추가·완료·삭제할 수 있습니다.</p></article>
+          <article class="card"><h3>MeasSet Generation</h3><div class="path">/measset-generation</div><p>데이터베이스와 프로브를 선택하고 입력 파일을 업로드해 측정 설정 CSV를 생성합니다. 생성 결과는 새 데이터 화면에서 확인·수정·저장합니다.</p></article>
+          <article class="card"><h3>Viewer</h3><div class="path">/viewer</div><p>허용된 데이터베이스와 테이블을 선택해 데이터를 조회합니다. 필요한 경우 별도 데이터 화면에서 필터·정렬·편집·행 삭제·CSV 다운로드를 수행합니다.</p></article>
+          <article class="card"><h3>Verification Report</h3><div class="path">/verification-report</div><p>검증 대상 DB·프로브·소프트웨어 버전과 Tx 요약 파일을 매칭하고 비교해 검증 리포트를 생성합니다.</p></article>
+          <article class="card"><h3>SSR DocOut</h3><div class="path">/SSR_DocOut</div><p>SSR 테이블에서 필요한 Meas SS ID를 선택한 뒤 Word 문서로 내보냅니다.</p></article>
+          <article class="card"><h3>Machine Learning</h3><div class="path">/machine-learning</div><p>등록된 모델을 확인하고 학습을 실행합니다. 모델 버전별 성능과 예측 지점을 차트로 비교합니다.</p></article>
+        </div>
+        <h3>공통 데이터 화면</h3>
+        <p>생성·조회 결과는 데이터 화면에서 공통으로 다룹니다. 열별 연쇄 필터, 정렬, 셀 편집, 행 삭제, 되돌리기, 저장, CSV 다운로드를 지원하며 편집 데이터의 행 정체성을 유지합니다.</p>
+      </section>
+
+      <section id="workflow">
+        <h2>기본 사용 흐름</h2>
+        <ol class="steps">
+          <li><strong>애플리케이션 접속</strong>: 서버 주소의 3000번 포트로 접속합니다. 예: <code>http://서버주소:3000</code></li>
+          <li><strong>로그인</strong>: 로그인 창에서 DB 계정과 비밀번호를 입력합니다. 계정 허용 목록이 설정된 경우 허용된 계정만 사용할 수 있습니다.</li>
+          <li><strong>기능 선택</strong>: 상단 메뉴에서 조회, MeasSet 생성, 검증, SSR 문서 출력, ML 중 필요한 기능을 엽니다.</li>
+          <li><strong>조건 입력 및 실행</strong>: DB·테이블·프로브·파일 등 필수 조건을 순서대로 선택하고 실행 버튼을 누릅니다.</li>
+          <li><strong>결과 확인</strong>: 표의 필터·정렬로 결과를 좁히고, 필요한 경우 편집 후 저장하거나 CSV·Word 파일로 다운로드합니다.</li>
+          <li><strong>로그아웃</strong>: 작업이 끝나면 메뉴의 로그아웃을 사용합니다. 서버 재시작 후에는 보안을 위해 다시 로그인합니다.</li>
+        </ol>
+      </section>
+
+      <section id="setup">
+        <h2>실행 방법</h2>
+        <p>Windows 서버에서는 프로젝트 루트의 통합 스크립트를 사용하는 것이 가장 간단합니다.</p>
+        <pre>AOP_Web.bat start      개발 모드 시작
+AOP_Web.bat prod       운영 모드 빌드 후 시작
+AOP_Web.bat status     백엔드·프론트엔드 상태 확인
+AOP_Web.bat restart    재시작
+AOP_Web.bat stop       종료
+AOP_Web.bat uninstall  Windows 자동 시작 작업 해제</pre>
+        <p>처음 실행하는 경우 백엔드 가상환경과 프론트엔드 의존성을 먼저 준비합니다.</p>
+        <pre>cd backend
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+cd ..\frontend
+npm install</pre>
+        <div class="note"><strong>운영 모드 주의:</strong> <code>AUTH_SECRET_KEY</code>, <code>FLASK_SECRET_KEY</code>, <code>ALLOWED_ORIGINS</code>를 사용자 또는 시스템 환경변수에 영구 등록해야 자동 시작 이후에도 정상 부팅됩니다.</div>
+      </section>
+
+      <section id="security">
+        <h2>로그인·보안 동작</h2>
+        <ul>
+          <li>로그인 성공 후 쿠키에는 불투명 인증 토큰만 저장되며 DB 비밀번호를 쿠키에 저장하지 않습니다.</li>
+          <li>인증된 API 호출은 쿠키를 포함해 전송되며, 서버는 허용된 DB·테이블 목록과 세션 상태를 확인합니다.</li>
+          <li>세션에는 만료 시간이 적용되고 요청이 이어지는 동안 유효 시간이 갱신됩니다.</li>
+          <li>외부 PC에서 접속할 때 API 주소는 브라우저가 실제로 접속한 서버 호스트를 기준으로 자동 계산됩니다.</li>
+          <li>운영 환경에서는 HTTPS 사용 시 <code>COOKIE_SECURE=true</code>를 설정하고 허용 Origin을 구체적으로 지정합니다.</li>
+        </ul>
+      </section>
+
+      <section id="trouble">
+        <h2>문제 해결</h2>
+        <table>
+          <tr><th>증상</th><th>확인할 내용</th></tr>
+          <tr><td>로그인 창에서 서버 연결 실패</td><td><code>AOP_Web.bat status</code>로 5000·3000 포트를 확인하고, 접속 주소에 <code>localhost</code>를 잘못 지정하지 않았는지 확인합니다.</td></tr>
+          <tr><td>401 또는 로그인 만료</td><td>백엔드 재시작 여부와 세션 만료 시간을 확인한 뒤 다시 로그인합니다.</td></tr>
+          <tr><td>데이터베이스 목록이 비어 있음</td><td>DB 계정 권한, <code>backend\AOP_config.cfg</code>, ODBC Driver 17 설치 여부를 확인합니다.</td></tr>
+          <tr><td>운영 모드가 시작되지 않음</td><td>운영 필수 환경변수와 <code>logs\</code>의 시작 로그를 확인합니다.</td></tr>
+          <tr><td>파일 생성·다운로드 실패</td><td>입력 파일 형식과 필수 선택값을 확인하고, 저장소 루트의 <code>1_uploads\</code> 쓰기 권한을 점검합니다.</td></tr>
+        </table>
+        <p>상태 확인으로 원인을 좁히기 어려우면 <code>scripts\AOP_Web.ps1 -Diagnose</code>를 실행한 뒤 최신 로그를 함께 확인합니다.</p>
+      </section>
+    </main>
+  </div>
+  <footer>AOP Web 사용자 안내 · 프로젝트 문서 기준 2026-09-27</footer>
+</body>
+</html>
