@@ -12,6 +12,12 @@
 |---|---|---|---|
 | 20 | 프로젝트 HTML을 초보자가 이해하기 쉽도록 기능별 예제와 가독성 중심으로 보강 | Viewer, MeasSet, Tx 검증, SSR Word, ML의 클릭 순서·성공 결과·주의사항을 예제로 추가하고 Loading·401·400·결과 없음 상태의 의미와 대응을 정리했습니다. | [→ Detail](./AI_Rearch_detail.md#v0979--20-초보자용-기능-예제-추가) |
 
+## 변경 이력 (v0.9.80 — 2026-09-28)
+
+| # | 요청 | 해결 | Detail |
+|---|---|---|---|
+| 20 보완 | 초보자용 예제 대신 데이터 workflow와 실제 input/output 매칭·알고리즘 설명 요청 | 안내 HTML을 데이터 workflow 중심으로 개편하고 MeasSet 파이프라인, Tx 파일↔DB 컬럼·ProbeID·Software_version·Mode 매칭, TxCompare 프로시저, SSR ID 선택, ML 버전·예측값 연결을 단계별로 명시했습니다. | [→ Detail](./AI_Rearch_detail.md#v0980--20-보완-데이터-workflow와-입출력-매칭-로직-개편) |
+
 ## 변경 이력 (v0.9.78 — 2026-09-28)
 
 | # | 요청 | 해결 | Detail |

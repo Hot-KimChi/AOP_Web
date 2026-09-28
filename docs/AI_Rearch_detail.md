@@ -25,6 +25,27 @@
 
 **검증**: 정적 HTML 파싱, 예제 단계·결과·주의사항의 존재 여부, diff 범위와 문서 공백 오류를 확인합니다. 문서 전용 변경이므로 애플리케이션 빌드·테스트는 수행하지 않습니다.
 
+## 변경 이력 (v0.9.80 — 2026-09-28)
+
+### v0.9.80 — #20 보완. 데이터 workflow와 입출력 매칭 로직 개편
+
+**요청**: 초보자용 예제보다 각 기능의 데이터 workflow, 실제 input/output 연결 기준, 매칭 순서와 알고리즘을 한눈에 이해할 수 있도록 안내 HTML을 보완.
+
+**변경**:
+
+- `docs/AOP_Web_guide.html`
+  - `초보자용 예제` 명칭을 `데이터 workflow`로 변경
+  - MeasSet: 파일 로드 → 중복 제거·그룹 인덱스 → 파라미터 생성 → intensity/power/temperature 예측 → CSV 출력 흐름 추가
+  - Tx 검증: `ProbeID + Software_version` 기준 DB 조회, 파일 컬럼 정규화·퍼지 매핑, Mode별 행 연결, `DB_ONLY/BOTH/FILE_ONLY` 상태와 파라미터 매핑 흐름 추가
+  - Tx 비교: 필수 키를 SQL Server `TxCompare` 프로시저에 전달하고 결과 행을 반환하는 구조 설명
+  - SSR DocOut: 선택한 `measSSId` 목록으로 대상 행을 조회해 Word로 직렬화하는 구조 설명
+  - ML: 모델·버전·메트릭 그룹화와 `target_value`/`estimation_value` 예측 포인트 연결 설명
+  - 각 workflow의 예제를 input → matching/algorithm → output 표기로 변경
+- `Match=O/X`가 DB 값과의 동일성 비교가 아니라 파일 파라미터 값의 매핑 가능 여부를 뜻한다는 구현 세부사항을 문서에 명시
+- `Implementation_list.md` 및 변경 이력 문서에 보완 내역 추가
+
+**검증**: 백엔드 라우트·MeasSet 생성 클래스·ML API의 실제 처리 순서와 HTML 설명을 대조하고, 정적 HTML 파싱 및 문서 diff를 확인합니다. 애플리케이션 코드는 변경하지 않았으므로 빌드는 수행하지 않습니다.
+
 ## 변경 이력 (v0.9.78 — 2026-09-28)
 
 ### v0.9.78 — #19. 기능별 workflow 상세화
