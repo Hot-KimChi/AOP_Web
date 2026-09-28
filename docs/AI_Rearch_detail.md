@@ -4,6 +4,27 @@
 > 
 > 📎 **[→ 변경 요약 (Summary)](./AI_Rearch_summary.md)**
 
+## 변경 이력 (v0.9.78 — 2026-09-28)
+
+### v0.9.78 — #19. 기능별 workflow 상세화
+
+**요청**: 기존 프로젝트 설명 HTML에 각 기능의 설명과 사용 workflow를 더 자세히 추가.
+
+**명세 및 범위**:
+
+- 기존 정적 안내 HTML을 유지하면서 홈, MeasSet Generation, Viewer, Verification Report, SSR DocOut, Machine Learning의 실제 사용 단계를 확장했습니다.
+- 각 기능을 입력·처리·결과·사용 순서로 통일해 사용자가 화면에서 다음 행동을 알 수 있게 했습니다.
+- 공통 데이터 결과의 검토·필터·편집·확정·보관 절차와 파일 저장 위치를 추가했습니다.
+- 애플리케이션 로직, API 계약, DB 스키마, 의존성은 변경하지 않았습니다.
+
+**변경 파일**:
+
+- `docs/AOP_Web_guide.html`: 기능별 상세 workflow 6개와 공통 결과 처리 workflow 추가, 목차 및 문서 기준일 갱신
+- `Implementation_list.md`: 19번 Agent 재작성 명세와 수행 내역 추가
+- `docs/AI_Rearch_summary.md`: v0.9.78 요약 추가
+
+**검증**: 정적 HTML 파싱, 기능별 핵심 항목 존재 여부, diff 범위와 문서 공백 오류를 확인합니다. 문서 전용 변경이므로 애플리케이션 빌드·테스트는 수행하지 않습니다.
+
 ## 변경 이력 (v0.9.77 — 2026-09-27)
 
 ### v0.9.77 — #18. 프로젝트 사용 안내 HTML 작성
