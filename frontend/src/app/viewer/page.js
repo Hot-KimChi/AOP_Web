@@ -27,27 +27,34 @@ export default function Viewer() {
       }
     };
     fetchDatabases();
-  }, [API_BASE_URL]);
+  }, []);
 
   useEffect(() => {
-    if (selectedDatabase) {
-      const fetchTables = async () => {
-        try {
-          setIsLoading(true);
-          const response = await fetch(`${API_BASE_URL}/api/get_list_table`, { credentials: 'include' });
-          if (!response.ok) throw new Error('Failed to fetch tables');
-          const result = await response.json();
-          setTableList(result.tables || []);
-        } catch (err) {
-          console.error('Failed to fetch tables:', err);
-          setError('Failed to fetch tables');
-        }finally {
-          setIsLoading(false);
-        }
-      };
-      fetchTables();
-    }
-  }, [selectedDatabase, API_BASE_URL]);
+    if (!selectedDatabase) return undefined;
+
+    const controller = new AbortController();
+    const fetchTables = async () => {
+      try {
+        setIsLoading(true);
+        const query = encodeURIComponent(selectedDatabase);
+        const response = await fetch(
+          `${API_BASE_URL}/api/get_list_table?database=${query}`,
+          { credentials: 'include', signal: controller.signal },
+        );
+        if (!response.ok) throw new Error('Failed to fetch tables');
+        const result = await response.json();
+        setTableList(result.tables || []);
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.error('Failed to fetch tables:', err);
+        setError('Failed to fetch tables');
+      } finally {
+        if (!controller.signal.aborted) setIsLoading(false);
+      }
+    };
+    fetchTables();
+    return () => controller.abort();
+  }, [selectedDatabase]);
 
   const handleDatabaseChange = (e) => {
     setSelectedDatabase(e.target.value);

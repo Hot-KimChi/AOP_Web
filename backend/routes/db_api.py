@@ -133,14 +133,21 @@ def get_csv_data():
     try:
         file_path = Path(csv_key).resolve()
         uploads_root = Path(Config.UPLOADS_ROOT).resolve()
-        file_path.relative_to(uploads_root)
+        allowed_roots = (
+            uploads_root / "0_MeasSetGen_files",
+            uploads_root / "1_Verification_Reports",
+        )
+        if file_path.suffix.lower() != ".csv" or not any(
+            file_path.is_relative_to(root) for root in allowed_roots
+        ):
+            raise ValueError("unsupported upload path")
     except ValueError:
         logger.warning(f"Path traversal attempt blocked: {csv_key!r}")
         return error_response("Invalid file path", 400)
     except Exception:
         return error_response("Invalid file path", 400)
 
-    if not file_path.exists():
+    if not file_path.is_file():
         return error_response("CSV data not found", 404)
     with open(file_path, "r", encoding="utf-8") as f:
         csv_data = f.read()
@@ -160,6 +167,14 @@ def get_list_database():
 @handle_exceptions
 @require_auth
 def get_list_table():
+    selected_database = request.args.get("database")
+    allowed_databases = {
+        database.strip()
+        for database in os.environ.get("DATABASE_NAME", "").split(",")
+        if database.strip()
+    }
+    if selected_database and selected_database not in allowed_databases:
+        return error_response("유효하지 않은 database 이름입니다.", 400)
     raw = os.environ.get("SERVER_TABLE_TABLE", "")
     tables = [t.strip() for t in raw.split(",") if t.strip()]
     return jsonify({"status": "success", "tables": tables})
@@ -769,6 +784,8 @@ def export_table_to_word():
     measSSIds = request.args.get("measSSIds")
     if not selected_database or not selected_table:
         return error_response("database, table 파라미터가 필요합니다", 400)
+    if not measSSIds:
+        return error_response("문서로 출력할 행을 하나 이상 선택하세요.", 400)
     # SQL 인젝션 방지: 테이블명 allowlist 검증
     allowed_export_tables = ["SSR_table", "Tx_summary", "probe_geo", "WCS", "meas_station_setup"]
     if selected_table not in allowed_export_tables:
@@ -776,16 +793,14 @@ def export_table_to_word():
             jsonify({"status": "error", "message": "유효하지 않은 테이블 이름입니다"}),
             400,
         )
-    if measSSIds:
-        id_list = [int(s) for s in measSSIds.split(",") if s.strip().isdigit()]
-        if not id_list:
-            return error_response("measSSIds 파라미터가 올바르지 않습니다", 400)
-        placeholders = ",".join(["?" for _ in id_list])
-        query = f"SELECT * FROM [{selected_table}] WHERE measSSId IN ({placeholders})"
-        df = g.current_db.execute_query(query, params=id_list)
-    else:
-        query = f"SELECT * FROM [{selected_table}]"
-        df = g.current_db.execute_query(query)
+    id_list = [int(s) for s in measSSIds.split(",") if s.strip().isdigit()]
+    if not id_list:
+        return error_response("measSSIds 파라미터가 올바르지 않습니다", 400)
+    if len(id_list) > 500:
+        return error_response("한 번에 최대 500개 행까지만 출력할 수 있습니다.", 400)
+    placeholders = ",".join(["?" for _ in id_list])
+    query = f"SELECT * FROM [{selected_table}] WHERE measSSId IN ({placeholders})"
+    df = g.current_db.execute_query(query, params=id_list)
     if df is None or df.empty:
         return error_response("해당 테이블에 데이터가 없습니다", 404)
     doc = Document()

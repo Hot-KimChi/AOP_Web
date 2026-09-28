@@ -675,8 +675,8 @@ function Start-Services {
     if (!(Test-Path $nodeModulesPath)) {
         Write-Log "Installing dependencies..." "INFO"
         Set-Location $frontendPath
-        & npm install
-        if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+        & npm ci
+        if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
         Set-Location $projectPath
     }
 

@@ -7,6 +7,7 @@ import logging
 from urllib.parse import quote_plus
 
 logger = logging.getLogger("SQL")
+ALLOWED_PROCEDURES = {"TxCompare"}
 
 # (connection_string 해시) → Engine 캐시.
 # SQLAlchemy Engine 은 스레드 세이프하며 커넥션 풀을 내장한다. 요청마다 새 엔진을
@@ -238,6 +239,9 @@ class SQL:
         """
         MS-SQL 저장 프로시저를 실행하고 결과를 pandas DataFrame으로 반환합니다.
         """
+        if procedure_name not in ALLOWED_PROCEDURES:
+            raise ValueError(f"Unsupported stored procedure: {procedure_name}")
+
         raw_conn = self.engine.raw_connection()
         try:
             cursor = raw_conn.cursor()

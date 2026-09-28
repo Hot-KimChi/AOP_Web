@@ -351,7 +351,9 @@ export function useMLPageData() {
       });
       const json = await res.json();
 
-      if (json.status === 'success') {
+      if (!res.ok) {
+        setError(json.message || `모델 훈련 요청에 실패했습니다. (${res.status})`);
+      } else if (json.status === 'success') {
         setTrainingResult(`모델 "${selectedModel}" 훈련이 완료되었습니다.`);
 
         // 버전 성능 갱신
@@ -369,7 +371,7 @@ export function useMLPageData() {
         );
         const json2 = await res2.json();
 
-        if (json2.status === 'success' && json2.data.length > 0) {
+        if (res2.ok && json2.status === 'success' && json2.data.length > 0) {
           const m = json2.data[0];
           // 훈련 결과는 캐시에 저장 후 단독 표시
           scatterCacheRef.current[m.version_id] = m;

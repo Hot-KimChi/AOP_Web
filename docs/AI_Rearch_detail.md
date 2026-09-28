@@ -4,6 +4,40 @@
 > 
 > 📎 **[→ 변경 요약 (Summary)](./AI_Rearch_summary.md)**
 
+## 변경 이력 (v0.9.81 — 2026-09-28)
+
+### v0.9.81 — #21. 전체 프로젝트 점검 및 안정성·성능 보완
+
+**요청**: 프로젝트 전체를 점검해 문제점·병목을 해결하고, 먼저 Agent 재작성 명세를 정의한 뒤 구현.
+
+**주요 확인 및 변경**:
+
+- `backend/routes/measset_gen.py`
+  - 필수 입력(`database`, `probeId`, `probeName`)을 파일 저장 전에 검증했습니다.
+  - 고정·원본 파일명 대신 요청별 `tempfile.mkstemp()`를 사용해 동시 업로드가 서로의 입력 파일을 덮어쓰지 않도록 했습니다.
+  - 처리 성공·실패와 관계없이 임시 파일을 정리합니다.
+- `backend/routes/db_api.py`
+  - CSV 조회를 `.csv` 파일이면서 허용된 결과 디렉터리(`0_MeasSetGen_files`, `1_Verification_Reports`) 아래인 경우로 제한했습니다.
+  - Viewer가 전달한 `database`가 설정된 데이터베이스 목록에 포함되는지 검증합니다.
+  - Word 출력은 선택한 `measSSIds`를 필수로 하고 최대 500행으로 제한해 전체 테이블 조회·대량 문서 생성을 차단했습니다.
+- `backend/pkg_SQL/database.py`
+  - 저장 프로시저 실행을 `TxCompare` allowlist로 제한했습니다.
+- `frontend/src/app/viewer/page.js`
+  - 선택한 데이터베이스를 테이블 목록 API에 전달하고, 데이터베이스 변경 시 이전 요청을 취소해 늦게 도착한 응답이 현재 화면을 덮어쓰지 않게 했습니다.
+- `frontend/src/app/machine-learning/_hooks.js`
+  - 학습·성능 조회의 HTTP 실패를 JSON 상태만으로 성공처럼 처리하지 않고 `res.ok`와 상태 코드를 확인하도록 했습니다.
+- `scripts/AOP_Web.ps1`
+  - `package-lock.json`을 기준으로 프론트 의존성을 설치하도록 `npm install`을 `npm ci`로 변경했습니다.
+
+**검증**:
+
+- `python -m compileall -q backend`: 통과
+- `frontend`에서 `npm run build`: 통과
+- `git diff --check`: 통과
+- Playwright: Chromium 실행 파일이 설치되지 않아 실행 불가. 코드 변경 실패가 아닌 환경 의존성 문제로 기록합니다.
+
+**잔여 설계 사항**: `SERVER_TABLE_TABLE`이 전역 환경변수 목록을 제공하는 현재 API 계약상, 데이터베이스별 실제 테이블 목록 필터링은 DB 메타데이터 조회 설계 없이는 수행하지 않았습니다. 이번 변경은 선택 데이터베이스 전달과 허용 목록 검증으로 범위를 제한했습니다.
+
 ## 변경 이력 (v0.9.79 — 2026-09-28)
 
 ### v0.9.79 — #20. 초보자용 기능 예제 추가
