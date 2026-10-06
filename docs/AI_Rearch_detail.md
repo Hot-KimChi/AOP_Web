@@ -4,6 +4,27 @@
 > 
 > 📎 **[→ 변경 요약 (Summary)](./AI_Rearch_summary.md)**
 
+## 변경 이력 (v0.9.85 — 2026-10-06)
+
+### v0.9.85 — #22. FQDN Kerberos SPN 진단
+
+**증상**: IP 차단 후 DNS FQDN으로 접속해도 Chrome의 Windows 자격 증명 UI가 나타나고 로그인 요청이 `401`로 종료됩니다.
+
+**실행 증거 및 원인**:
+
+- 서버에서 `setspn -Q HTTP/KRSUABN027SRV.ad005.onehc.net` 및 짧은 이름 `HTTP/KRSUABN027SRV`를 조회한 결과 모두 등록된 SPN이 없었습니다.
+- 현재 Node와 Flask 프로세스는 도메인 계정 `AD005\Z0050XJE-A01`로 실행 중입니다.
+- 서버 `klist get HTTP/KRSUABN027SRV.ad005.onehc.net` 성공은 서버 측 티켓 취득만 보여주며, 해당 SPN이 Node 서비스 계정에 올바로 등록됐다는 증거가 아닙니다.
+- `curl --negotiate` 인증 추적에서 첫 Negotiate 요청 이후 NTLM 토큰으로 폴백하는 것을 관찰했습니다. 서버의 Kerberos 전용 정책이 이를 거부해 최종 `401`을 반환합니다.
+
+**조치**:
+
+- `README.md`와 `docs/Windows_SSO_agent_spec.md`에 AD 관리자를 위한 SPN 소유권 확인·안전한 등록 예시, 클라이언트 `klist purge`/`klist get`, Chrome `chrome://policy`의 `AuthServerAllowlist` 점검, 순차적인 웹 인증 검증 절차를 추가했습니다.
+- SPN 미등록 상태에서 임의 계정으로 SPN을 만들거나 SPN 소유권을 이전하지 않았습니다. 도메인 보안에 영향이 있는 변경이므로 AD 관리자 권한과 실제 전용 서비스 계정 확인이 선행되어야 합니다.
+- `Implementation_list.md` #22 재작성 명세에 미해결 근본 원인, 외부 선행 작업, 실로그인 완료 기준을 추가했습니다. 이 항목은 완료 처리하지 않았습니다.
+
+**잔여 차단 조건**: AD 관리자가 실제 Node 서비스 계정에 `HTTP/<FQDN>` SPN을 등록하고 클라이언트 Chrome의 Windows 통합 인증 허용 정책을 적용해야 합니다. 그 후 클라이언트 티켓, 서버의 Kerberos 판정, `AUTH_ALLOWED_USERS`, JWT 쿠키와 보호 API를 끝까지 확인해야 합니다. SSMS의 Windows 통합 DB 로그인 성공은 브라우저↔Node HTTP Kerberos 인증의 성공을 의미하지 않습니다.
+
 ## 변경 이력 (v0.9.84 — 2026-10-06)
 
 ### v0.9.84 — #22. 브라우저 기본 인증 창 차단

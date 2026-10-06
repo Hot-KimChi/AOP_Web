@@ -76,3 +76,11 @@
 - IP 주소(예: `10.82.218.49`)로 `/auth/sso`에 접근하면 SSPI가 `WWW-Authenticate: Negotiate` challenge를 돌려보내 Chrome이 사용자 이름/암호 기본 인증 창을 표시할 수 있다. 이 인증 정보 입력은 IP에 대한 Kerberos SSO가 아니며, 이후 NTLM으로 협상될 수 있다.
 - IP literal 요청은 SSPI에 전달하기 전에 명시적 안내와 함께 거부하고 `WWW-Authenticate` 헤더를 보내지 않아 브라우저 기본 자격 증명 창을 띄우지 않는다.
 - 정상 Windows SSO는 실제 `HTTP/<DNS FQDN>` SPN이 등록된 호스트명으로만 시도한다. 브라우저가 FQDN에서도 통합 인증을 자동 수행하지 않으면 해당 클라이언트의 Chrome `AuthServerAllowlist`/인트라넷 정책을 운영자가 설정해야 한다. 서버는 사용자가 입력한 비밀번호를 받거나 검증하지 않는다.
+
+### FQDN 로그인 실패 재현 결과
+
+- 실행 중인 Node와 Flask 프로세스는 `AD005\Z0050XJE-A01`로 동작하고 있다. `setspn -Q HTTP/KRSUABN027SRV.ad005.onehc.net` 및 짧은 이름 조회 모두 SPN을 찾지 못했다.
+- 서버 측 `klist get HTTP/KRSUABN027SRV.ad005.onehc.net`은 티켓을 발급했지만, 이것만으로 HTTP SPN이 해당 Node 프로세스 계정에 등록·매핑됐다는 뜻은 아니다. 클라이언트 HTTP Negotiate 추적은 이후 NTLM 토큰으로 폴백했고, Kerberos 전용 게이트가 이를 거부해 `401`을 반환했다.
+- 따라서 화면에 Chrome 자격 증명 창을 숨기거나 로그인 실패 안내를 추가하는 것은 인증 수정을 대체하지 않는다. 근본 해결은 AD 관리자가 접속 FQDN의 HTTP SPN을 실제 Node 서비스 계정에 등록하고, 클라이언트 Chrome이 해당 FQDN에 통합 인증을 보내게 하는 것이다.
+- SPN은 도메인 관리자/위임된 AD 관리자만 등록한다. 먼저 `setspn -Q HTTP/<FQDN>`으로 기존 소유자를 확인하고, 미등록 상태일 때만 `setspn -S HTTP/<FQDN> <실제 Node 서비스 계정>`을 사용한다. SPN 충돌 소유자를 임의로 이전하지 않는다.
+- SPN 등록 후 클라이언트 `klist purge` 및 `klist get HTTP/<FQDN>` 결과, Chrome `chrome://policy`의 `AuthServerAllowlist`, 서버 SSO 로그에서 `req.sso.method=Kerberos`임을 차례대로 확인한다. 그런 다음에야 `AUTH_ALLOWED_USERS`와 API cookie/session 단계를 진단한다.

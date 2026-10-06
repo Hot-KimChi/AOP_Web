@@ -161,6 +161,16 @@ $env:AUTH_ALLOWED_USERS = [System.Security.Principal.WindowsIdentity]::GetCurren
 > 개발 모드는 HTTP를 사용하므로 신뢰된 격리 네트워크의 테스트 계정으로만 확인하세요. 실제 업무·민감 데이터에 대한 운영 접속에는 HTTPS와 `COOKIE_SECURE=true`를 설정해야 합니다.
 > 인증 쿠키를 함께 보내는 구성이므로 와일드카드(`*`) Origin 은 사용하지 않습니다.
 
+**웹 Kerberos가 계속 실패하면** SSMS의 Windows 인증 성공만으로 웹 SSO가 준비된 것은 아닙니다. AD 관리자가 Node 서버의 실제 실행 계정을 확인하고 `HTTP/<FQDN>` SPN이 그 계정에 연결됐는지 확인해야 합니다. 예를 들어 서비스 계정이 `DOMAIN\AOPWebSvc`라면 관리자 권한으로 다음을 확인·등록합니다.
+
+```powershell
+setspn -Q HTTP/aopserver.example.com
+setspn -S HTTP/aopserver.example.com DOMAIN\AOPWebSvc
+setspn -Q HTTP/aopserver.example.com
+```
+
+짧은 호스트 이름도 실제로 접속에 사용한다면 `HTTP/<NetBIOS이름>` SPN도 같은 서비스 계정에 등록해야 합니다. 기존 SPN의 소유자가 다르면 임의로 중복 등록·이전하지 말고 AD 관리자와 충돌을 해결하세요. 등록 후 클라이언트에서 `klist purge`를 수행하고 `klist get HTTP/aopserver.example.com`으로 티켓 발급을 확인합니다. Chrome은 `chrome://policy`에서 `AuthServerAllowlist` 정책에 FQDN이 포함되는지 확인합니다. SPN·브라우저 정책을 통과한 뒤에도 `AUTH_ALLOWED_USERS` 허용 목록과 SQL 백엔드 서비스 계정 권한은 별도로 필요합니다.
+
 ### 5.2 인증·세션 동작
 
 - 로그인 팝업은 Express Custom Server의 Windows SSPI(Kerberos) 인증을 사용합니다. 사용자명·비밀번호 입력값이나 브라우저가 임의로 보낸 계정명은 인증 근거로 사용하지 않으며, **NTLM 협상은 릴레이 위험을 줄이기 위해 거부**됩니다.

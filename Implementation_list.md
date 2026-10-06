@@ -449,3 +449,9 @@
 > - **수행 결과**: IP literal 호스트를 SSPI middleware 전에 차단하고, FQDN만 기존 협상 단계로 통과하게 했습니다. IP 판별 회귀 테스트와 SSO 테스트 14개 및 프로덕션 빌드가 통과했습니다.
 > - **실행 검증**: 개발 서버에서 IP `/auth/sso`는 `400`, `WWW-Authenticate` 없음, FQDN은 기존 `401 Negotiate` challenge를 반환했습니다. 브라우저 로그인 화면은 IP 사용 안내를 표시했고 기본 자격 증명 창은 열리지 않았습니다.
 > - **잔여 조건**: FQDN에서 실제 사용자 브라우저의 자동 Kerberos 인증 성공은 클라이언트 Chrome 정책/SPN 환경이 필요하여 이 세션에서 검증되지 않았습니다. 브라우저 기본 창에 입력한 계정·암호는 애플리케이션 로그인으로 사용되지 않습니다.
+
+> **[재작성 명세 보완 — FQDN에서도 401 발생]**
+> - **재현 증거**: FQDN `/auth/sso`가 `401 WWW-Authenticate: Negotiate`로 시작한 뒤 최종 401입니다. `setspn -Q HTTP/KRSUABN027SRV.ad005.onehc.net` 및 짧은 호스트명 조회 모두 SPN 미등록을 반환했습니다. HTTP 인증 추적에서는 Kerberos가 성립하지 않고 NTLM 토큰으로 폴백했으며, 서버의 Kerberos 전용 정책이 이를 거부합니다. 현재 Node/Flask 프로세스 실행 주체는 `AD005\Z0050XJE-A01`입니다.
+> - **목표 및 불변식**: AD 관리자가 실제 Node 서비스 실행 계정에 FQDN의 HTTP SPN을 등록하고 클라이언트 브라우저가 FQDN에 통합 인증을 보낼 수 있도록 설정한 뒤, 서버가 Kerberos 방식으로 확인하여 허용 목록 계정에 JWT를 발급합니다. NTLM 폴백이나 브라우저 암호 직접 검증으로 우회하지 않습니다.
+> - **완료 기준**: AD `setspn -Q`가 의도한 단일 서비스 계정을 반환하고, 클라이언트 `klist get HTTP/<FQDN>` 티켓 발급, Chrome `AuthServerAllowlist`, 서버에서 Kerberos 판정, Flask 허용 목록, JWT 쿠키 및 보호 API 응답을 순서대로 실측합니다.
+> - **외부 의존/현재 상태**: SPN 등록 및 클라이언트 Chrome 정책 변경은 이 실행 환경에서 권한·범위가 확인되지 않은 AD/클라이언트 관리 작업이므로 수행하지 않았습니다. AD 관리자 조치 전에는 #22 실로그인 완료로 간주하지 않습니다. 자세한 안전한 확인·등록 명령은 README와 `docs/Windows_SSO_agent_spec.md`에 기록했습니다.
