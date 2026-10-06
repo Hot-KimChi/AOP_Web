@@ -4,6 +4,7 @@ import os
 import jwt
 from werkzeug.exceptions import HTTPException
 from config import Config
+from utils import auth_sessions
 from utils.database_manager import db_manager
 from .error_handler import error_response, CredentialsRequired
 from .logger import logger
@@ -19,8 +20,8 @@ def handle_exceptions(f):
         try:
             return f(*args, **kwargs)
         except CredentialsRequired as e:
-            logger.warning(f"Credentials required: {str(e)}")
-            return error_response("Username and password are required", 422)
+            logger.warning(f"Authentication required: {str(e)}")
+            return error_response("Authentication required", 401)
         except HTTPException:
             # 413(요청 본문 초과) 등 Flask/Werkzeug 가 이미 올바른 상태 코드를
             # 부여한 예외는 500으로 뭉개지 않고 그대로 전파해 원래 상태 코드가
@@ -52,11 +53,15 @@ def require_auth(f):
             return error_response("Token expired", 401)
         except jwt.InvalidTokenError:
             return error_response("Invalid token", 403)
-        # 접속자 식별자(selxxxxx)를 요청 컨텍스트에 실어 둔다. 사용자별 기능은
+        # 접속자 식별자(DOMAIN\user)를 요청 컨텍스트에 실어 둔다. 사용자별 기능은
         # 반드시 이 값만 신뢰해야 하며, 클라이언트가 보낸 사용자명은 믿지 않는다.
         g.current_user = payload.get("username")
-        if not g.current_user:
+        # SQL 로그인 시절에 발급된 토큰은 Windows SSO 전환 후 받아들이지 않는다.
+        if not g.current_user or payload.get("auth_method") != "windows_sso":
             return error_response("Invalid token", 403)
+        # 로그아웃되었거나 Flask 재시작 전에 발급되어 서버 세션에 없는 토큰은 거부한다.
+        if not auth_sessions.is_active(payload.get("jti"), g.current_user):
+            return error_response("Session expired or logged out", 401)
         # 허용 목록은 로그인 시점뿐 아니라 매 요청마다 확인한다. 토큰은 발급 후
         # 만료까지 살아 있으므로, 여기서 막지 않으면 권한을 회수해도 기존 세션이
         # 그대로 통과한다.
@@ -93,7 +98,7 @@ def with_db_connection(database=None):
             allowed_dbs.append("AOP_MLflow_Tracking")
             if db_name not in allowed_dbs:
                 return error_response("유효하지 않은 데이터베이스입니다", 400)
-            # CredentialsRequired가 발생하면 handle_exceptions에서 422로 처리
+            # 인증 컨텍스트가 없으면 CredentialsRequired → handle_exceptions에서 401로 처리
             g.current_db = db_manager.get_connection(db_name)
             return f(*args, **kwargs)
 

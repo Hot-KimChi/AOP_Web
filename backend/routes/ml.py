@@ -29,7 +29,7 @@ def get_ml_models():
 def train_model():
     """머신러닝 모델 훈련 API"""
     # 예외 처리는 @handle_exceptions 에 위임한다.
-    # (내부에서 광범위하게 잡으면 CredentialsRequired 가 422 대신 500 으로 반환되고
+    # (내부에서 광범위하게 잡으면 CredentialsRequired 가 401 대신 500 으로 반환되고
     #  드라이버 예외 원문이 클라이언트에 노출된다)
     from pkg_MachineLearning.machine_learning import MachineLearning
 
@@ -191,7 +191,7 @@ def get_model_versions_performance():
         return jsonify({"status": "success", "data": result_data})
 
     except CredentialsRequired:
-        # 세션 자격증명 없음은 422 로 변환되어야 하므로 상위(@handle_exceptions)로 전파
+        # 인증 컨텍스트 없음은 401 로 변환되어야 하므로 상위(@handle_exceptions)로 전파
         raise
     except Exception as e:
         logger.error(

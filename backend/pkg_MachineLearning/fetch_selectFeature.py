@@ -5,17 +5,13 @@ from datetime import datetime
 from pkg_SQL.database import SQL
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import g
-from utils.credential_store import get_session_credentials
-from utils.database_manager import get_db_connection
+from utils.database_manager import get_db_connection, require_current_username
 
 
 def fetchData():
     # 데이터베이스에서 데이터를 가져오는 함수 (병렬 처리)
-    # 자격증명은 서버 메모리(credential_store)에서 가져온다 (메인 스레드에서 미리 추출)
-    username, password = get_session_credentials()
-
-    if not username or not password:
-        raise ValueError("세션에 사용자 인증 정보가 없습니다.")
+    # DB 는 프로세스 계정 통합 인증으로 접근하되, 인증된 요청에서만 허용한다.
+    require_current_username()
 
     server_address = os.environ.get("SERVER_ADDRESS_ADDRESS")
     databases_ML = os.environ.get("DATABASE_ML_NAME")
@@ -27,13 +23,13 @@ def fetchData():
 
     list_database = databases_ML.split(",")
 
-    def fetch_one_db(db, auth_username, auth_password):
+    def fetch_one_db(db):
         sql_connection = None
         try:
             # DatabaseManager를 직접 사용하지 않고 SQL 객체 직접 생성
             from pkg_SQL.database import SQL
 
-            sql_connection = SQL(auth_username, auth_password, db)
+            sql_connection = SQL(database=db)
 
             query = f"""
                 SELECT * FROM
@@ -90,9 +86,8 @@ def fetchData():
 
     SQL_get_data = []
     with ThreadPoolExecutor(max_workers=min(8, len(list_database))) as executor:
-        # 인증 정보를 각 스레드에 전달
         future_to_db = {
-            executor.submit(fetch_one_db, db, username, password): db
+            executor.submit(fetch_one_db, db): db
             for db in list_database
         }
         for future in as_completed(future_to_db):

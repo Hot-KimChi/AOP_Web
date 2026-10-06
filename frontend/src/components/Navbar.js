@@ -47,14 +47,8 @@ const Navbar = () => {
       const res  = await fetch(`${API_BASE_URL}/api/auth/status`, { credentials: 'include' });
       const data = await res.json();
       if (res.ok && data.authenticated) {
-        if (data.has_credentials === false) {
-          // JWT는 유효하지만 세션 자격증명이 없음 → 재로그인 필요
-          setIsAuthenticated(false);
-          setUsername('');
-        } else {
-          setIsAuthenticated(true);
-          setUsername(data.username);
-        }
+        setIsAuthenticated(true);
+        setUsername(data.username);
       } else {
         setIsAuthenticated(false);
         setUsername('');

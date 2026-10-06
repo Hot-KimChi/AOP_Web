@@ -2,7 +2,7 @@ from flask import jsonify
 
 
 class CredentialsRequired(Exception):
-    """세션에 DB 인증 정보가 없을 때 발생하는 예외 — handle_exceptions 가 422 로 변환합니다."""
+    """인증된 사용자 컨텍스트 없이 DB 접근을 시도할 때 발생 — handle_exceptions 가 401 로 변환합니다."""
     pass
 
 

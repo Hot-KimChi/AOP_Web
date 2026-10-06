@@ -5,10 +5,12 @@ import logging
 import sys
 import threading
 import sklearn
-from flask import session
 from pkg_SQL.database import SQL
-from utils.credential_store import get_session_credentials
-from utils.database_manager import get_mlflow_db
+from utils.database_manager import (
+    get_current_username,
+    get_mlflow_db,
+    require_current_username,
+)
 
 # 예측 요청마다 수 MB 모델 바이너리를 재전송·역직렬화하지 않도록
 # (prediction_type, stage) 별로 마지막 모델을 프로세스 캐시에 보관한다.
@@ -24,17 +26,11 @@ class AOP_MLflowTracker:
     """
 
     def __init__(self):
-        self.username, self.password = get_session_credentials()
-
-        if not self.username or not self.password:
-            raise ValueError("사용자 인증 정보가 없습니다.")
+        # 생성자·기록자 표시용 사용자. DB 연결 자체는 프로세스 계정 통합 인증이다.
+        self.username = require_current_username()
 
         try:
-            self.db = SQL(
-                username=self.username,
-                password=self.password,
-                database="AOP_MLflow_Tracking",
-            )
+            self.db = SQL(database="AOP_MLflow_Tracking")
             self.tracking_enabled = True
         except Exception as e:
             logging.warning(f"MLflow tracking disabled: {e}")
@@ -1105,14 +1101,10 @@ class AOP_MLflowTracker:
     def get_model_by_name(cls, model_name, stage="Production"):
         """모델명으로 특정 스테이지의 모델 정보 조회"""
         try:
-            username, password = get_session_credentials()
-
-            if not username or not password:
+            if not get_current_username():
                 return None
 
-            db = SQL(
-                username=username, password=password, database="AOP_MLflow_Tracking"
-            )
+            db = SQL(database="AOP_MLflow_Tracking")
 
             query = """
                 SELECT TOP 1
@@ -1177,7 +1169,7 @@ class AOP_MLflowTracker:
             request_source = f"{prediction_type}_calculation"
             processing_time_ms = 0  # 계산 기반이므로 0으로 설정
 
-            username = session.get("username", "system")  # 기본값 설정
+            username = get_current_username() or "system"
 
             db.execute_query(
                 query,
@@ -1201,14 +1193,10 @@ class AOP_MLflowTracker:
     def get_recent_predictions(cls, model_name=None, limit=10):
         """최근 예측 결과 조회"""
         try:
-            username, password = get_session_credentials()
-
-            if not username or not password:
+            if not get_current_username():
                 return None
 
-            db = SQL(
-                username=username, password=password, database="AOP_MLflow_Tracking"
-            )
+            db = SQL(database="AOP_MLflow_Tracking")
 
             if model_name:
                 query = """

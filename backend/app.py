@@ -58,7 +58,7 @@ def create_app():
         """
         from flask import session
 
-        for legacy_key in ("password", "user_password"):
+        for legacy_key in ("password", "user_password", "cred_token", "username"):
             if legacy_key in session:
                 session.pop(legacy_key, None)
 

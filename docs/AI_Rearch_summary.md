@@ -4,6 +4,14 @@
 > 
 > 📎 **[→ 상세 변경 이력 (Detail)](./AI_Rearch_detail.md)**
 
+## 변경 이력 (v0.9.82 — 2026-10-06)
+
+| # | 요청 | 해결 | Detail |
+|---|---|---|---|
+| 22 | 기존 계정·비밀번호 인증을 Windows 도메인 인증으로 전환하고, 명세 작성 후 구현 | Express Custom Server의 Kerberos SSO, 허용 계정 기반 Flask JWT, Windows 통합 SQL 인증을 적용했습니다. NTLM 협상·로그아웃 JWT 재사용·내부 리디렉션 비밀 유출 경로를 차단하고 운영 설정과 제약을 문서화했습니다. 백엔드 인증 테스트 17개, Node SSO 테스트 12개 및 프론트엔드 빌드를 통과했습니다. | [→ Detail](./AI_Rearch_detail.md#v0982--22-windows-kerberos-sso-전환) |
+
+---
+
 ## 변경 이력 (v0.9.81 — 2026-09-28)
 
 | # | 요청 | 해결 | Detail |

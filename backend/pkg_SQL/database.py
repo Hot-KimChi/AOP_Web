@@ -2,7 +2,7 @@ import os
 import hashlib
 import threading
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 import logging
 from urllib.parse import quote_plus
 
@@ -51,15 +51,16 @@ def _create_engine(connection_string: str):
 
 
 class SQL:
-    def __init__(self, username, password, database=None, reuse_engine: bool = True):
+    def __init__(self, database=None, reuse_engine: bool = True):
         """
+        DB 연결은 Flask 프로세스 실행 계정의 Windows 통합 인증(Trusted_Connection)을 쓴다.
+        Windows SSO 는 브라우저 사용자의 신원만 제공할 뿐 DB 비밀번호를 전달하지 않으므로,
+        사용자별 SQL 자격증명을 받지 않는다. 접근 통제는 JWT + AUTH_ALLOWED_USERS 가 담당한다.
+
         Args:
             reuse_engine: True 면 동일 연결 문자열의 엔진을 전역 캐시에서 재사용한다.
-                로그인 검증처럼 일회성(특히 실패할 수 있는) 자격증명으로 연결할 때는
-                False 를 지정해 캐시 오염을 막고 close() 시 즉시 폐기되게 한다.
+                일회성 연결은 False 를 지정해 close() 시 즉시 폐기되게 한다.
         """
-        self.username = username
-        self.password = password
         self.database = database
         self._reuse_engine = reuse_engine
 
@@ -87,16 +88,14 @@ class SQL:
             logger.warning("Failed to dispose engine", exc_info=True)
 
     def create_connection_string(self):
-        """연결 문자열을 생성합니다."""
+        """Windows 통합 인증 연결 문자열을 생성합니다."""
         driver = "ODBC Driver 17 for SQL Server"
 
-        # 사용자 인증 사용
         conn_str = (
             f"DRIVER={driver};"
             f"SERVER={self.server};"
             f"DATABASE={self.database};"
-            f"UID={self.username};"
-            f"PWD={self.password};"
+            "Trusted_Connection=yes;"
             "TrustServerCertificate=yes;"
         )
         return f"mssql+pyodbc:///?odbc_connect={quote_plus(conn_str)}"
@@ -104,55 +103,6 @@ class SQL:
     def connect(self):
         """SQLAlchemy 엔진을 사용하여 연결을 생성합니다."""
         return self.engine.connect()
-
-    def get_user_info(self, username):
-        """사용자 정보를 데이터베이스에서 조회합니다."""
-        query = text(
-            """
-            SELECT name, sid, is_disabled, create_date, modify_date
-            FROM sys.sql_logins
-            WHERE name = :username
-            """
-        )
-        try:
-            with self.connect() as connection:
-                result = connection.execute(query, {"username": username})
-                user = result.fetchone()
-                if user:
-                    return {
-                        "username": user.name,
-                        "sid": user.sid,
-                        "is_disabled": user.is_disabled,
-                        "create_date": user.create_date,
-                        "modify_date": user.modify_date,
-                    }
-                else:
-                    return None
-        except Exception as e:
-            logger.error(f"Query execution error: {str(e)}")
-            raise
-
-    def authenticate_user(self, username, password=None, user_info=None):
-        """사용자 인증 확인.
-
-        이 인스턴스의 엔진은 이미 `username`/`password` 자격증명으로 만들어졌으므로,
-        `get_user_info()` 가 성공했다는 사실 자체가 자격증명이 유효함을 의미한다.
-        따라서 별도의 pyodbc 연결을 다시 여는 대신 계정 활성화 여부만 확인한다.
-        (기존 구현은 로그인마다 연결을 2개 만들고 해제하지 않아 커넥션이 누수됐다.)
-        """
-        if user_info is None:
-            user_info = self.get_user_info(username)
-
-        if not user_info:
-            logger.warning("User does not exist.")
-            return False
-
-        if user_info["is_disabled"]:
-            logger.warning("User account is disabled.")
-            return False
-
-        logger.info("Authentication successful.")
-        return True
 
     def _sanitize_params_for_log(self, params):
         """로그에 출력할 때 바이너리 데이터를 안전하게 표시"""

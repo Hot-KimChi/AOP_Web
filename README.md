@@ -123,8 +123,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\AOP_Web.ps1 -D
 | `AOP_ENV` | `development` | `production` 지정 시 운영 모드. 아래 검증이 활성화됩니다. |
 | `AUTH_SECRET_KEY` | 개발용 기본값 | JWT 서명 키. **운영 모드에서 미지정 시 부팅 중단** |
 | `FLASK_SECRET_KEY` | 개발용 기본값 | Flask 세션 서명 키. **운영 모드에서 미지정 시 부팅 중단** |
-| `AUTH_EXPIRE_TIME` | `7200` | 인증 토큰 및 서버 측 자격증명 보관 TTL(초) |
-| `AUTH_ALLOWED_USERS` | (비어 있음) | 쉼표로 구분한 **로그인 허용 계정 목록**(`selxxxxx` 형식, 대소문자 무관). 지정 시 목록에 없는 계정은 자격증명이 맞아도 403 으로 차단되며, **이미 발급된 토큰도 즉시 무효화**됩니다. 비워 두면 기존과 동일하게 DB 계정이 있는 전원 허용 |
+| `AUTH_EXPIRE_TIME` | `7200` | Windows SSO 인증 토큰 유효 시간(초) |
+| `AUTH_ALLOWED_USERS` | (비어 있음) | 쉼표로 구분한 **허용 Windows 도메인 계정 목록**(`DOMAIN\user`, 대소문자 무관). 예: `AD\alice,AD\bob`. 비어 있으면 보안상 모든 로그인이 거부됩니다. 목록에서 제거된 계정은 다음 API 요청부터 차단됩니다. |
+| `AUTH_SSO_SHARED_SECRET` | 실행 스크립트가 생성 | Express Node 서버와 Flask 사이의 내부 로그인 요청을 보호하는 비밀값(최소 32자). 두 프로세스에 동일한 값을 설정해야 합니다. 직접 설정할 때는 암호학적으로 안전한 무작위 값만 사용하고 외부에 공개하지 마세요. |
+| `BACKEND_INTERNAL_URL` | `http://127.0.0.1:5000` | Express 서버에서 Flask로 보내는 내부 인증 요청 주소. 별도 호스트를 쓰면 HTTPS만 허용됩니다. |
 | `ALLOWED_ORIGINS` | (비어 있음) | 쉼표로 구분한 CORS 허용 Origin. 운영 모드에서는 **반드시 명시** |
 | `COOKIE_SECURE` | `false` | 세션 쿠키의 `Secure` 플래그. HTTPS 운영 시 `true` |
 
@@ -134,19 +136,31 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\AOP_Web.ps1 -D
 $env:AOP_ENV = "production"
 $env:AUTH_SECRET_KEY = "<무작위 문자열>"
 $env:FLASK_SECRET_KEY = "<무작위 문자열>"
+$env:AUTH_ALLOWED_USERS = "AD\alice,AD\bob"
+$env:AUTH_SSO_SHARED_SECRET = "<32자 이상 무작위 문자열>"
 $env:ALLOWED_ORIGINS = "https://aop.example.com"
 $env:COOKIE_SECURE = "true"
 .\AOP_Web.bat prod
 ```
+
+통합 실행 스크립트는 `AUTH_SSO_SHARED_SECRET`을 운영 설정 파일(`backend\.env.production`)에 생성·보관하고 프론트엔드와 백엔드 프로세스에 전달합니다. 개발 모드에서는 시작할 때마다 현재 프로세스용 비밀값을 메모리에서 생성합니다. 직접 각 서버를 실행하는 경우에는 동일한 비밀값을 양쪽 프로세스에 설정해야 합니다. 운영 설정 파일은 저장소에서 제외되어 있으나 서버 관리자만 읽을 수 있도록 파일 권한을 제한하세요.
+
+운영 자동 시작에도 계정 허용 목록이 적용되도록 `AUTH_ALLOWED_USERS`는 `backend\.env.production` 또는 Windows 사용자/시스템 환경 변수에 영구 설정하세요. 이 값이 없으면 모든 로그인 요청이 거부됩니다. 위 PowerShell `$env:` 예시는 현재 셸에서 시작하는 프로세스에만 적용됩니다.
 
 > 개발 모드에서 `ALLOWED_ORIGINS` 를 지정하지 않으면 `localhost` 와 사설망 대역(10./192.168./172.16~31.)만 허용됩니다.
 > 인증 쿠키를 함께 보내는 구성이므로 와일드카드(`*`) Origin 은 사용하지 않습니다.
 
 ### 5.2 인증·세션 동작
 
-- 로그인 시 입력한 **DB 자격증명은 쿠키에 저장되지 않습니다.** 쿠키에는 추측 불가능한 불투명 토큰만 담기고, 실제 사용자명·비밀번호는 서버 프로세스 메모리에 TTL 기반으로 보관됩니다.
-- 그 결과 **백엔드를 재시작하면 모든 사용자는 다시 로그인해야 합니다.** 이는 의도된 동작입니다.
-- 요청이 이어지는 동안 TTL 은 갱신되며(슬라이딩), 유휴 상태가 `AUTH_EXPIRE_TIME` 을 넘기면 만료됩니다.
+- 로그인 팝업은 Express Custom Server의 Windows SSPI(Kerberos) 인증을 사용합니다. 사용자명·비밀번호 입력값이나 브라우저가 임의로 보낸 계정명은 인증 근거로 사용하지 않으며, **NTLM 협상은 릴레이 위험을 줄이기 위해 거부**됩니다.
+- Kerberos 운영에는 Windows 도메인, 서비스 계정의 올바른 SPN, 도메인 계정으로 실행되는 서버, 브라우저의 인트라넷 신뢰 설정이 필요합니다. 주소는 서버의 IP가 아닌 SPN에 맞는 DNS 호스트명으로 접속해야 할 수 있습니다.
+- 로그인 허용 목록에는 `DOMAIN\user` 형식의 도메인 계정을 명시합니다. 백엔드는 이 계정을 JWT에 기록하고 각 보호 API 요청에서 허용 상태를 다시 확인합니다. 로그아웃한 토큰은 다시 사용할 수 없습니다.
+- 활성 로그인 세션은 현재 Flask 프로세스의 메모리에 보관합니다. 통합 실행 스크립트처럼 Flask 프로세스 하나로 실행해야 하며, 다중 worker·다중 서버로 확장하려면 먼저 공유 세션 저장소를 적용해야 합니다.
+- SQL Server 연결은 로그인한 개인의 SQL 비밀번호가 아니라 **Flask 백엔드 프로세스를 실행하는 Windows 계정의 통합 인증**을 사용합니다. 운영 전에 해당 서비스 계정에 필요한 데이터베이스 권한만 부여하세요.
+- JWT 쿠키는 HttpOnly·SameSite=Lax이며 HTTPS 운영 시 `COOKIE_SECURE=true`를 설정합니다. Windows SSO와 인증 쿠키를 보호하기 위해 운영 접속에는 HTTPS를 사용하세요.
+- 프론트엔드와 Flask API는 같은 호스트명으로 접속해야 브라우저가 인증 쿠키를 양쪽 요청에 전달할 수 있습니다. 별도 백엔드 주소를 구성할 때는 쿠키 도메인·HTTPS·CORS를 함께 검토하세요.
+- Flask 프로세스가 재시작되면 메모리 세션이 사라져 기존 JWT도 즉시 무효화됩니다. Windows SSO로 다시 로그인하세요.
+- 기존 개인 할 일은 이전 SQL 로그인명(`selxxxxx`)을 소유자로 저장했습니다. Windows 계정명으로 전환하면 해당 데이터가 자동 매핑되지 않으므로, 보존이 필요하면 `backend\data\user_data.db`를 백업하고 관리자에게 계정 간 소유자 이전을 요청하세요.
 
 ### 5.3 프론트엔드 환경 변수
 
@@ -329,8 +343,10 @@ AOP_Web/
 | 증상 | 원인 | 조치 |
 |------|------|------|
 | 운영 모드 기동 시 즉시 종료되고 "환경변수를 반드시 지정해야 합니다" 오류 | `AOP_ENV=production` 인데 `AUTH_SECRET_KEY` / `FLASK_SECRET_KEY` / `ALLOWED_ORIGINS` 미지정 | 5.1 표를 참고해 환경변수 주입 후 재기동 (의도된 fail-fast 동작) |
+| Windows 로그인 실패 또는 HTTP 503 | SSPI 모듈·공유 비밀·Kerberos 환경이 준비되지 않음 | Node와 Flask가 같은 `AUTH_SSO_SHARED_SECRET`을 쓰는지, `AUTH_ALLOWED_USERS`에 계정이 있는지 확인합니다. NTLM은 지원하지 않으므로 도메인·SPN·호스트명·브라우저 신뢰 설정을 점검합니다. |
+| 데이터베이스 연결 실패 | Flask 프로세스 실행 계정에 SQL 권한이 없음 | 서버에서 백엔드 프로세스 계정을 확인하고 필요한 DB 권한을 부여합니다. 개별 브라우저 사용자의 SQL 비밀번호로 연결하지 않습니다. |
 | 브라우저 콘솔에 CORS 차단 오류 | 프론트엔드 Origin 이 `ALLOWED_ORIGINS` 에 없음 | 백엔드 환경변수에 해당 Origin 추가. 개발 시에는 `localhost`·사설망 대역이 기본 허용 |
-| 갑자기 로그인이 풀림 | 백엔드 재시작 또는 유휴 TTL(`AUTH_EXPIRE_TIME`) 만료. 자격증명은 서버 메모리에만 보관됨 | 다시 로그인 (의도된 동작) |
+| 갑자기 로그인이 풀림 | JWT 만료, 서버 재시작, 로그아웃 또는 허용 목록 변경 | Windows SSO로 다시 로그인합니다. |
 | API 응답이 401 | 인증 토큰 없음/만료 | 로그인 후 재시도. `status` 로 백엔드 기동 여부 확인 |
 | API 오류 메시지가 추상적임 | 예외 원문은 클라이언트에 노출하지 않고 서버 로그에만 기록 | `logs/` 의 백엔드 로그에서 상세 원인 확인 |
 | `npm run build` 가 `.next` 관련 권한 오류로 실패 | 개발 서버가 실행 중 | `AOP_Web.bat stop` 후 빌드 |

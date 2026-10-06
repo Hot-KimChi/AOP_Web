@@ -33,10 +33,12 @@ def _is_production() -> bool:
 
 
 def _parse_allowed_users(raw: str):
-    """로그인을 허용할 사용자(selxxxxx) 목록을 파싱한다.
+    """로그인을 허용할 Windows 계정(DOMAIN\\user) 목록을 파싱한다.
 
-    비어 있으면 None 을 돌려주고, 이는 "제한 없음"(기존 동작)을 뜻한다.
-    SQL Server 로그인명은 대소문자를 구분하지 않으므로 소문자로 정규화한다.
+    비어 있으면 None 을 돌려주며, 이 경우 **아무도 로그인할 수 없다**(fail-closed).
+    Windows SSO 전환 후 DB 는 서비스 계정으로 접근하므로, 목록 없이 도메인 전체를
+    허용하면 모든 도메인 사용자가 서비스 계정 권한을 얻게 되기 때문이다.
+    Windows 계정명은 대소문자를 구분하지 않으므로 소문자로 정규화한다.
     """
     users = {u.strip().lower() for u in raw.split(",") if u.strip()}
     return users or None
@@ -61,14 +63,16 @@ class Config:
     ALLOWED_ORIGINS = _parse_origins(os.environ.get("ALLOWED_ORIGINS", ""))
     # 쿠키 Secure 플래그 (운영=true, 개발=false)
     COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
-    # 로그인 허용 사용자 목록 (미지정 시 제한 없음)
+    # 로그인 허용 Windows 계정 목록 (DOMAIN\user, 미지정 시 전원 거부)
     ALLOWED_USERS = _parse_allowed_users(os.environ.get("AUTH_ALLOWED_USERS", ""))
+    # Node(Express SSPI) → Flask 로그인 주장을 보호하는 서버 간 공유 비밀
+    SSO_SHARED_SECRET = os.environ.get("AUTH_SSO_SHARED_SECRET", "")
 
     @staticmethod
     def is_login_allowed(username: str) -> bool:
-        """해당 사용자가 로그인 가능한지 판단한다. 목록 미지정이면 전원 허용."""
+        """해당 사용자가 로그인 가능한지 판단한다. 목록 미지정이면 전원 거부."""
         if not Config.ALLOWED_USERS:
-            return True
+            return False
         if not username:
             return False
         # 목록이 코드로 직접 주입되어 정규화를 거치지 않았을 수도 있으므로
@@ -164,5 +168,6 @@ class Config:
         Config.COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
         Config.ALLOWED_ORIGINS = _parse_origins(os.environ.get("ALLOWED_ORIGINS", ""))
         Config.ALLOWED_USERS = _parse_allowed_users(os.environ.get("AUTH_ALLOWED_USERS", ""))
+        Config.SSO_SHARED_SECRET = os.environ.get("AUTH_SSO_SHARED_SECRET", "")
 
         Config._validate_production()

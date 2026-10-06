@@ -3,8 +3,7 @@ import pandas as pd
 import numpy as np
 import time
 from pkg_MachineLearning.mlflow_integration import AOP_MLflowTracker
-from utils.credential_store import get_session_credentials
-from utils.database_manager import get_db_connection
+from utils.database_manager import get_db_connection, require_current_username
 
 logger = logging.getLogger("PredictML")
 
@@ -26,10 +25,7 @@ class PredictML:
         self.probeName = probeName
         self.database = database
 
-        self.username, self.password = get_session_credentials()
-
-        if not self.username or not self.password:
-            raise ValueError("User not authenticated")
+        self.username = require_current_username()
 
         self._probe_geo_row = None
 

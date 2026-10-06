@@ -350,7 +350,7 @@ function Ensure-ProductionConfiguration {
     $finalAllowedOrigins = ($mergedOriginSet -join ",")
 
     # 3. 우선순위: Process > User > Machine > .env.production > 자동생성
-    $requiredKeys = @("AUTH_SECRET_KEY", "FLASK_SECRET_KEY", "ALLOWED_ORIGINS")
+    $requiredKeys = @("AUTH_SECRET_KEY", "FLASK_SECRET_KEY", "ALLOWED_ORIGINS", "AUTH_SSO_SHARED_SECRET")
     $updatedFile = $false
 
     foreach ($name in $requiredKeys) {
@@ -377,6 +377,11 @@ function Ensure-ProductionConfiguration {
 
         # 현재 실행 프로세스에 주입
         [Environment]::SetEnvironmentVariable($name, $val, "Process")
+    }
+
+    if (-not $fileSettings.Contains("AUTH_SSO_SHARED_SECRET")) {
+        $fileSettings["AUTH_SSO_SHARED_SECRET"] = $env:AUTH_SSO_SHARED_SECRET
+        $updatedFile = $true
     }
 
     if ($updatedFile -or -not (Test-Path $envProdFile)) {
@@ -642,6 +647,17 @@ function Start-Services {
     }
 
     $env:AOP_ENV = if ($Production) { "production" } else { "development" }
+    if ([string]::IsNullOrWhiteSpace($env:AUTH_SSO_SHARED_SECRET)) {
+        $ssoSecretBytes = New-Object byte[] 32
+        $ssoSecretRng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        try {
+            $ssoSecretRng.GetBytes($ssoSecretBytes)
+        } finally {
+            $ssoSecretRng.Dispose()
+        }
+        $env:AUTH_SSO_SHARED_SECRET = ([BitConverter]::ToString($ssoSecretBytes) -replace "-","").ToLower()
+        Write-Log "Generated an in-memory Windows SSO bridge secret for this session" "INFO"
+    }
     Write-Log "Starting backend server (Port 5000)..." "INFO"
     
     if ($Production) {

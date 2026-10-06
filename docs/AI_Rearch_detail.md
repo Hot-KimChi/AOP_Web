@@ -4,6 +4,45 @@
 > 
 > 📎 **[→ 변경 요약 (Summary)](./AI_Rearch_summary.md)**
 
+## 변경 이력 (v0.9.82 — 2026-10-06)
+
+### v0.9.82 — #22. Windows Kerberos SSO 전환
+
+**요청**: 기존 계정·비밀번호 인증을 Windows 도메인 인증으로 전환하고, 구현 전 재작성 명세를 작성한 뒤 적용.
+
+**명세 및 설계**:
+
+- `docs/Windows_SSO_agent_spec.md`에 신뢰 경계, Kerberos 전용 정책, Flask JWT 발급, SQL 통합 인증, 운영 전제와 검증 기준을 정의했습니다.
+- 브라우저가 제출한 사용자명은 신뢰하지 않고, Windows SSPI가 검증한 Kerberos 계정만 Flask 인증 요청에 사용합니다. NTLM 협상은 릴레이 위험을 줄이기 위해 거부합니다.
+- SQL Server는 Flask 프로세스의 Windows 계정으로 연결합니다. 사용자별 SQL 비밀번호 전달·저장 경로를 제거했습니다.
+
+**구현**:
+
+- `frontend/server.js`, `frontend/ssoGate.js`에 Express Custom Server와 SSO 게이트를 추가하고 로그인 화면·Navbar·홈의 인증 상태 확인을 연결했습니다. Node와 Flask 사이 내부 로그인은 공유 비밀로 보호하며, HTTP 내부 주소는 루프백으로 제한하고 리디렉션을 거부합니다.
+- Flask는 허용 목록의 도메인 계정에 JWT를 발급합니다. 토큰의 `jti`를 프로세스 메모리 세션 레지스트리에서 확인하고 로그아웃 시 폐기해 보관된 JWT의 재사용을 차단합니다.
+- `backend/utils/credential_store.py` 및 관련 사용자 SQL 자격 증명 로직을 제거하고, DB 연결을 Windows 통합 인증으로 전환했습니다.
+- `scripts/AOP_Web.ps1`에서 운영 공유 비밀을 생성·보관하고 양쪽 프로세스에 전달하도록 했습니다. 개발 실행은 실행 프로세스 범위에서 임시 비밀을 사용합니다.
+- README와 사용 안내에 허용 계정, Kerberos/SPN·HTTPS 설정, SQL 서비스 계정 권한, 단일 Flask 프로세스 전제, 서버 재시작 시 JWT 무효화, 기존 개인 할 일 소유자 이전 주의를 추가했습니다.
+
+**보안 검토 후 수정**:
+
+| ID | 발견 | 수정 및 검증 |
+|---|---|---|
+| V-001 | Negotiate가 NTLM으로 폴백할 수 있음 | Kerberos 방식만 Flask에 전달하고, NTLM·누락·알 수 없는 방식은 Flask 요청 전에 거부했습니다. |
+| V-002 | 로그아웃 후 보관 JWT 재사용 가능 | 서버 측 활성 `jti` 확인·폐기 및 프로세스 재시작 후 무효화를 적용하고 회귀 테스트를 추가했습니다. |
+| V-003 | SQL 연결 안내 설명이 손상됨 | Windows 통합 인증을 설명하는 문구로 복원했습니다. |
+| V-004 | 내부 로그인 fetch가 리디렉션을 따라 공유 비밀을 외부 Origin에 전달할 수 있음 | 리디렉션을 거부하고 3xx 응답은 쿠키 없이 502로 처리했습니다. 서로 다른 로컬 서버로 307을 보내는 테스트에서 대상 서버 요청 0회, 쿠키 전달 0개를 확인했습니다. |
+
+**검증**:
+
+- `backend`에서 `.\.venv\Scripts\python.exe -B -m unittest tests.test_auth_sso -v`: 17개 통과
+- `frontend`에서 `node --test test-node/ssoGate.test.js`: 12개 통과
+- `frontend`에서 `npm run build`: 통과
+- `node --check frontend/server.js`, PowerShell 스크립트 AST 구문 검사, `git diff --check`: 통과
+- 독립 재검증: Blocker 0 / Major 0 / Minor 0
+
+**운영 잔여 조건**: 실제 도메인 환경에서 Kerberos/SPN 로그인, 브라우저 협상, SQL Server 연결은 검증하지 못했습니다. 현재 환경의 협상이 NTLM이어서 정책에 따라 차단되는 것을 확인했습니다. 운영 전 서버 DNS 이름·SPN·서비스 계정·브라우저 신뢰 설정과 Flask 프로세스 계정의 DB 권한을 구성해야 합니다. 세션 레지스트리가 프로세스 메모리에 있으므로 다중 worker/서버 운영에는 공유 세션 저장소가 필요합니다.
+
 ## 변경 이력 (v0.9.81 — 2026-09-28)
 
 ### v0.9.81 — #21. 전체 프로젝트 점검 및 안정성·성능 보완
