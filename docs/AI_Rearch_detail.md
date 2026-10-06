@@ -4,6 +4,32 @@
 > 
 > 📎 **[→ 변경 요약 (Summary)](./AI_Rearch_summary.md)**
 
+## 변경 이력 (v0.9.84 — 2026-10-06)
+
+### v0.9.84 — #22. 브라우저 기본 인증 창 차단
+
+**증상**: 클라이언트가 `http://10.82.218.49:3000`으로 접속한 뒤 Windows 계정을 입력하자 Chrome의 기본 사용자 이름/비밀번호 인증 창이 나타났습니다.
+
+**원인**: Express SSPI middleware는 인증 정보가 없는 `/auth/sso` 요청에 `WWW-Authenticate: Negotiate`를 돌려보냅니다. 브라우저가 이 challenge로 자격 증명 UI를 표시했지만, IP 주소는 Kerberos 서비스 티켓/SPN으로 인증할 DNS 서비스 이름이 아닙니다. 브라우저의 계정 입력은 지원되는 Windows SSO 절차가 아니며 NTLM으로 협상될 수 있는데, 서버는 릴레이 위험 때문에 NTLM을 거부합니다.
+
+**변경**:
+
+- `docs/Windows_SSO_agent_spec.md`, `Implementation_list.md` #22에 화면 증거, 원인, 허용 동작과 검증 기준을 구현 전에 추가했습니다.
+- `frontend/ssoGate.js`에 IPv4/IPv6 literal 판별을 추가하고, `frontend/server.js`가 IP 호스트의 `/auth/sso` 요청을 SSPI challenge 전에 400 안내 응답으로 종료하도록 했습니다. 따라서 IP에서는 `WWW-Authenticate` 헤더가 없어 브라우저 자격 증명 창이 열리지 않습니다.
+- DNS 호스트명은 기존 Kerberos handshake 경로로 유지했습니다. IP 인증 허용이나 NTLM 폴백은 추가하지 않았습니다.
+- README에 브라우저 자격 증명 창이 표시되면 입력하지 말고 취소한 뒤 FQDN·Windows 통합 인증 설정을 확인하도록 추가했습니다.
+
+**검증**:
+
+- `frontend`에서 `npm run test:sso`: 14개 통과 (IPv4·IPv6·DNS 이름 분기 포함)
+- `frontend`에서 `npm run build`: 통과
+- `node --check frontend/server.js`: 통과
+- 실행 중인 개발 서버에서 `GET http://10.82.218.49:3000/auth/sso` → `400`, `WWW-Authenticate` 없음 확인
+- 동일 클라이언트 자동화 브라우저에서 로그인 화면이 200으로 열리고, IP SSO 호출은 400 안내를 표시하며 기본 인증 창이 나타나지 않는 것을 확인
+- FQDN SSO 경로는 기존 Negotiate challenge(401)를 유지하는 것을 확인
+
+**운영 잔여 조건**: IP 접근에서는 사용자 안내를 표시할 수 있지만 로그인되지 않습니다. 클라이언트는 `http://KRSUABN027SRV.ad005.onehc.net:3000`을 사용해야 합니다. FQDN에서도 브라우저가 통합 인증을 자동으로 보내지 않는 경우 클라이언트 Chrome의 `AuthServerAllowlist`/인트라넷 정책 조정이 필요합니다. 입력한 비밀번호를 애플리케이션이 처리하거나 검증하는 방식으로 바꾸지 않았습니다. 실제 비대화형 Kerberos SSO의 성공은 아직 확인하지 못했습니다.
+
 ## 변경 이력 (v0.9.83 — 2026-10-06)
 
 ### v0.9.83 — #22. 클라이언트 Windows SSO 진단 및 보완

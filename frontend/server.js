@@ -27,7 +27,12 @@ loadEnvConfig(__dirname, !production);
 
 const express = require('express');
 const next = require('next');
-const { createSsoForwarder, normalizeNegotiateAuthorization, validateBackendUrl } = require('./ssoGate');
+const {
+  createSsoForwarder,
+  isIpAddressHost,
+  normalizeNegotiateAuthorization,
+  validateBackendUrl,
+} = require('./ssoGate');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOSTNAME || '0.0.0.0';
@@ -82,6 +87,10 @@ async function main() {
     server.get(
       '/auth/sso',
       (req, res, nextFn) => {
+        if (isIpAddressHost(req.hostname)) {
+          console.warn('[SSO] Refused Windows authentication challenge for an IP-address host.');
+          return sendError(res, 400, 'Windows sign-in requires the server DNS host name. Do not open this site by IP address.');
+        }
         const authorization = req.headers.authorization;
         if (authorization) {
           const normalizedAuthorization = normalizeNegotiateAuthorization(authorization);

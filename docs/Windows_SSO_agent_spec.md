@@ -70,3 +70,9 @@
 - DNS FQDN 및 그 호스트 SPN을 소유·수락하는 서버 서비스 계정
 - 클라이언트 브라우저의 인트라넷/Windows 통합 인증 허용 정책
 - 운영 HTTPS 인증서와 SQL Server에서 Flask 실행 계정에 부여한 최소 권한
+
+### 브라우저 기본 인증 창 문제
+
+- IP 주소(예: `10.82.218.49`)로 `/auth/sso`에 접근하면 SSPI가 `WWW-Authenticate: Negotiate` challenge를 돌려보내 Chrome이 사용자 이름/암호 기본 인증 창을 표시할 수 있다. 이 인증 정보 입력은 IP에 대한 Kerberos SSO가 아니며, 이후 NTLM으로 협상될 수 있다.
+- IP literal 요청은 SSPI에 전달하기 전에 명시적 안내와 함께 거부하고 `WWW-Authenticate` 헤더를 보내지 않아 브라우저 기본 자격 증명 창을 띄우지 않는다.
+- 정상 Windows SSO는 실제 `HTTP/<DNS FQDN>` SPN이 등록된 호스트명으로만 시도한다. 브라우저가 FQDN에서도 통합 인증을 자동 수행하지 않으면 해당 클라이언트의 Chrome `AuthServerAllowlist`/인트라넷 정책을 운영자가 설정해야 한다. 서버는 사용자가 입력한 비밀번호를 받거나 검증하지 않는다.

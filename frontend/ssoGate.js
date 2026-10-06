@@ -8,6 +8,7 @@
  */
 
 const os = require('os');
+const { isIP } = require('net');
 
 const ALLOWED_SSO_METHOD = 'Kerberos';
 const BACKEND_TIMEOUT_MS = 10000;
@@ -16,6 +17,14 @@ function normalizeNegotiateAuthorization(value) {
   if (typeof value !== 'string') return null;
   const match = /^Negotiate\s+(\S+)$/i.exec(value);
   return match ? `Negotiate ${match[1]}` : null;
+}
+
+function isIpAddressHost(value) {
+  if (typeof value !== 'string') return false;
+  const host = value.startsWith('[') && value.endsWith(']')
+    ? value.slice(1, -1)
+    : value;
+  return isIP(host) !== 0;
 }
 
 function sendError(res, status, message) {
@@ -117,6 +126,7 @@ function createSsoForwarder({ backendUrl: rawBackendUrl, sharedSecret, fetchImpl
 module.exports = {
   ALLOWED_SSO_METHOD,
   createSsoForwarder,
+  isIpAddressHost,
   isLocalMachineAccount,
   normalizeNegotiateAuthorization,
   validateBackendUrl,

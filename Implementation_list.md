@@ -440,3 +440,12 @@
 >   1. IP 접속의 NTLM 거부, 누락된 `AUTH_ALLOWED_USERS`, FQDN CORS 누락, Production 모드 실행 및 브라우저의 토큰 없는 `Negotiate` 요청을 재현했습니다. FQDN Origin 누락과 기존 환경 파일 Origin 덮어쓰기, wildcard Origin 보존도 교차 검증에서 확인해 수정했습니다.
 >   2. 실행 스크립트가 프로세스·`.env.production`·`.env`의 exact Origin을 보존·병합하고 wildcard/잘못된 Origin을 거부하도록 했으며, 빈 인증 헤더는 토큰을 반향하지 않고 안내와 함께 거부하도록 보완했습니다. DNS FQDN에서 개발 서버를 기동했습니다.
 > - **검증 및 잔여 조건**: 백엔드 인증 테스트 17개, Node SSO 테스트 13개, 프론트엔드 빌드, PowerShell AST를 통과했습니다. FQDN 로그인 페이지와 API 응답, 기존 IP/FQDN CORS 허용 및 임의 Origin 차단을 실행 확인했습니다. 자동화 브라우저는 아직 유효한 Kerberos 토큰을 보내지 않아 실제 클라이언트 로그인·쿠키 발급은 미확인입니다. 현재 개발 세션은 실행한 도메인 사용자만 허용하며, 다른 테스트 계정은 `AUTH_ALLOWED_USERS`에 명시해야 합니다.
+
+> **[재작성 명세 보완 — 브라우저 자격 증명 창]**
+> - **재현 증거**: Chrome 화면의 주소가 `10.82.218.49:3000`이며, 서버는 `/auth/sso`에서 `WWW-Authenticate: Negotiate` challenge를 반환했습니다. 이로 인해 Chrome 자체의 사용자 이름/비밀번호 창이 표시됩니다. IP 주소에 대한 Kerberos 인증은 보장되지 않고 이후 NTLM은 서버 보안 정책상 거부됩니다.
+> - **목표 및 불변식**: IP literal로 요청된 SSO에는 `WWW-Authenticate`를 보내지 않고 DNS 호스트명 사용 안내를 반환합니다. Kerberos 전용 인증, NTLM 거부 및 서버가 브라우저 입력 암호를 받거나 저장하지 않는 기존 정책을 유지합니다.
+> - **완료 기준**: IP의 `/auth/sso`는 안내 응답(400)이며 `WWW-Authenticate` 헤더가 없어 브라우저 기본 자격 증명 창을 띄우지 않습니다. DNS FQDN은 기존 Kerberos 협상 경로를 유지합니다. IPv4·IPv6 및 호스트명 판별 타깃 테스트와 프론트엔드 빌드를 통과합니다.
+> - **수행 일자**: 2026-10-06 (v0.9.84)
+> - **수행 결과**: IP literal 호스트를 SSPI middleware 전에 차단하고, FQDN만 기존 협상 단계로 통과하게 했습니다. IP 판별 회귀 테스트와 SSO 테스트 14개 및 프로덕션 빌드가 통과했습니다.
+> - **실행 검증**: 개발 서버에서 IP `/auth/sso`는 `400`, `WWW-Authenticate` 없음, FQDN은 기존 `401 Negotiate` challenge를 반환했습니다. 브라우저 로그인 화면은 IP 사용 안내를 표시했고 기본 자격 증명 창은 열리지 않았습니다.
+> - **잔여 조건**: FQDN에서 실제 사용자 브라우저의 자동 Kerberos 인증 성공은 클라이언트 Chrome 정책/SPN 환경이 필요하여 이 세션에서 검증되지 않았습니다. 브라우저 기본 창에 입력한 계정·암호는 애플리케이션 로그인으로 사용되지 않습니다.

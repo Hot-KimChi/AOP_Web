@@ -149,7 +149,7 @@ $env:COOKIE_SECURE = "true"
 
 > 개발 모드에서 통합 스크립트로 시작하면 `localhost`, 사설망 IP, 서버 NetBIOS 이름 및 DNS FQDN의 프론트엔드 Origin만 허용 목록에 추가됩니다. 직접 실행할 경우 `ALLOWED_ORIGINS`에 클라이언트가 접속하는 정확한 Origin(예: `http://서버FQDN:3000`)을 설정해야 합니다.
 
-**클라이언트 개발 테스트**는 IP 주소 대신 `http://<서버의 DNS FQDN>:3000`으로 접속하세요. `AUTH_ALLOWED_USERS`에는 테스트할 Windows 도메인 계정을 `DOMAIN\user` 형식으로 쉼표 구분해 명시해야 합니다. 값이 비어 있으면 로그인은 모두 거부됩니다. PowerShell에서 현재 로그인 계정만 일시 허용해 개발 서버를 시작하려면:
+**클라이언트 개발 테스트**는 IP 주소 대신 `http://<서버의 DNS FQDN>:3000`으로 접속하세요. 브라우저에 사용자 이름/비밀번호 기본 인증 창이 나타나면 자격 증명을 입력하지 말고 취소한 뒤 FQDN과 Windows 통합 인증 정책을 확인하세요. IP 주소는 Kerberos SPN 대상이 아니며, Chrome이 띄운 기본 인증 창은 Windows SSO 로그인 화면이 아닙니다. `AUTH_ALLOWED_USERS`에는 테스트할 Windows 도메인 계정을 `DOMAIN\user` 형식으로 쉼표 구분해 명시해야 합니다. 값이 비어 있으면 로그인은 모두 거부됩니다. PowerShell에서 현재 로그인 계정만 일시 허용해 개발 서버를 시작하려면:
 
 ```powershell
 $env:AUTH_ALLOWED_USERS = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
