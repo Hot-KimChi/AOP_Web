@@ -1,129 +1,130 @@
-"""인증 API — Windows SSO(SSPI) 기반.
-
-흐름
-  1) 브라우저 → Node(Express Custom Server) `GET /auth/sso` 에서 SSPI(Negotiate) 인증
-  2) Node → Flask `POST /api/auth/sso` 로 검증된 Windows 계정(domain, name)을 전달.
-     이 요청은 서버 간 공유 비밀(`X-AOP-SSO-Secret`)로 보호된다.
-  3) Flask 가 AUTH_ALLOWED_USERS 를 확인하고 서명 JWT(auth_token) 쿠키를 발급한다.
-
-브라우저가 보낸 사용자명은 어떤 경우에도 인증 근거로 쓰지 않는다.
-"""
-
-import hmac
-import re
+from flask import Blueprint, request, jsonify, session
 from datetime import datetime, timedelta, timezone
-
+import re
 import jwt
-from flask import Blueprint, jsonify, request, session
-
+import sqlalchemy.exc
+import pyodbc
 from config import Config
-from utils import auth_sessions
+from utils.database_manager import DatabaseManager
+from utils.credential_store import (
+    bind_to_session,
+    clear_session,
+    has_session_credentials,
+)
 from utils.decorators import handle_exceptions
 from utils.error_handler import error_response
 from utils.logger import logger
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
-SSO_SECRET_HEADER = "X-AOP-SSO-Secret"
-MIN_SSO_SECRET_LENGTH = 32
-
-# Windows 도메인(NetBIOS)·계정명에 쓸 수 없는 문자와 제어 문자를 거부한다.
-_ACCOUNT_PART = re.compile(r'^[^\\/:*?"<>|@\[\];=,+\x00-\x1f]{1,104}$')
-
-
-def _set_auth_cookie(response, token, expires=None):
-    response.set_cookie(
-        "auth_token",
-        token,
-        expires=expires,
-        httponly=True,
-        samesite="Lax",
-        secure=Config.COOKIE_SECURE,
-    )
-    return response
+# 로그인 실패를 "자격증명 문제"와 "인프라 문제"로 나누기 위한 SQLSTATE 목록.
+# 예전에는 세 경우(비밀번호 오류 / DB 서버 다운 / ODBC 드라이버 없음)가 모두 같은
+# 401 "Invalid username or password" 로 반환되고 예외도 삼켜져서, 서버 로그만으로는
+# 원인을 전혀 알 수 없었다.
+_INFRA_SQLSTATES = frozenset({
+    "08001",  # 서버에 연결할 수 없음
+    "08S01",  # 통신 링크 실패
+    "08004",  # 서버가 연결을 거부함
+    "HYT00",  # 쿼리 타임아웃
+    "HYT01",  # 연결 타임아웃
+    "IM002",  # 데이터 원본 이름을 찾을 수 없음(ODBC 드라이버 미설치)
+    "IM003",  # 드라이버 로드 실패
+})
 
 
-def _clear_auth_cookie(response):
-    return _set_auth_cookie(response, "", expires=0)
+def _extract_sqlstate(exc):
+    """예외에서 ODBC SQLSTATE(5자리)를 뽑아낸다. 찾지 못하면 빈 문자열."""
+    orig = getattr(exc, "orig", exc)
+    args = getattr(orig, "args", ())
+    if args and isinstance(args[0], str) and len(args[0]) == 5:
+        return args[0]
+    match = re.search(r"\[(\w{5})\]", str(orig))
+    return match.group(1) if match else ""
 
 
-def _normalize_account(domain, name):
-    """SSPI 가 확인한 (domain, name) 을 `DOMAIN\\user` 로 만든다. 형식 오류면 None."""
-    if not isinstance(domain, str) or not isinstance(name, str):
-        return None
-    domain = domain.strip()
-    name = name.strip()
-    if not (_ACCOUNT_PART.match(domain) and _ACCOUNT_PART.match(name)):
-        return None
-    # 컴퓨터 계정(이름 끝 '$')은 사람이 아니므로 거부한다.
-    if name.endswith("$") or len(domain) > 64:
-        return None
-    return f"{domain}\\{name}"
-
-
-def _sso_secret_valid():
-    expected = Config.SSO_SHARED_SECRET or ""
-    provided = request.headers.get(SSO_SECRET_HEADER, "")
-    return hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
-
-
-@auth_bp.route("/sso", methods=["POST"])
-@handle_exceptions
-def sso_login():
-    """Node SSPI 서버만 호출하는 내부 로그인 엔드포인트."""
-    if len(Config.SSO_SHARED_SECRET or "") < MIN_SSO_SECRET_LENGTH:
-        logger.error(
-            "Windows SSO login rejected: AUTH_SSO_SHARED_SECRET is not configured "
-            f"(min {MIN_SSO_SECRET_LENGTH} chars)"
-        )
-        return error_response(
-            "Windows SSO is not configured on the server. Please contact the administrator.",
-            503,
-        )
-    if not _sso_secret_valid():
-        logger.warning(f"Windows SSO login rejected: invalid server secret from {request.remote_addr}")
-        return error_response("Unauthorized", 401)
-
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return error_response("Request body must be valid JSON", 400)
-    username = _normalize_account(data.get("domain"), data.get("name"))
-    if not username:
-        logger.warning("Windows SSO login rejected: invalid account format")
-        return error_response("Invalid Windows account", 400)
-
-    if not Config.is_login_allowed(username):
-        logger.warning(f"Login denied for user '{username}': not in AUTH_ALLOWED_USERS")
-        return error_response(
-            "This account is not allowed to use AOP Web. Please contact the administrator.",
-            403,
-        )
-
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=Config.EXPIRE_TIME)
-    payload = {
-        "username": username,
-        "id": username.lower(),
-        "auth_method": "windows_sso",
-        # 서버 측 세션 레지스트리 키. 로그아웃·재시작 시 이 jti 가 무효화된다.
-        "jti": auth_sessions.register(username, expires_at.timestamp()),
-        "exp": expires_at,
-    }
-    token = jwt.encode(payload, Config.SECRET_KEY, algorithm="HS256")
-    # 구버전 SQL 로그인 세션에 남은 값(cred_token 등)을 정리한다.
-    session.clear()
-    logger.info(f"Windows SSO login succeeded for user '{username}'")
-    response = jsonify({"status": "success", "message": "Login successful", "username": username})
-    return _set_auth_cookie(response, token)
+def _safe_error_text(exc, password):
+    """예외 메시지를 로그용으로 정리한다. 연결 문자열이 섞여 나올 수 있으므로
+    비밀번호가 포함돼 있으면 반드시 가린다."""
+    text = " ".join(str(exc).split())[:500]
+    if password:
+        text = text.replace(password, "***")
+    return text
 
 
 @auth_bp.route("/login", methods=["POST"])
 @handle_exceptions
 def login():
-    """SQL 계정/비밀번호 로그인은 Windows SSO 로 대체되었다."""
-    return error_response(
-        "Username/password login is no longer supported. Please sign in with your Windows account.",
-        410,
-    )
+    data = request.get_json(silent=True)
+    if not data:
+        return error_response("Request body must be valid JSON", 400)
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        return error_response("Username and password are required", 400)
+
+    try:
+        with DatabaseManager.create_explicit_connection(username, password, "master") as sql:
+            user_info = sql.get_user_info(username=username)
+            if user_info and sql.authenticate_user(username=username, user_info=user_info):
+                # 자격증명이 유효하더라도 허용 목록이 지정돼 있으면 그 안에 있어야 한다.
+                # 검증을 자격증명 확인 "뒤"에 두어, 비밀번호를 모르는 사람이 특정
+                # 계정의 권한 여부를 떠보지 못하게 한다.
+                if not Config.is_login_allowed(user_info["username"]):
+                    logger.warning(
+                        f"Login denied for user '{user_info['username']}': not in AUTH_ALLOWED_USERS"
+                    )
+                    return error_response(
+                        "This account is not allowed to use AOP Web. Please contact the administrator.",
+                        403,
+                    )
+                payload = {
+                    "username": user_info["username"],
+                    "id": str(user_info["sid"]),
+                    "exp": datetime.now(timezone.utc) + timedelta(seconds=Config.EXPIRE_TIME),
+                }
+                token = jwt.encode(payload, Config.SECRET_KEY, algorithm="HS256")
+                # 자격증명은 서버 메모리에 보관하고 세션에는 불투명 토큰만 저장한다.
+                # (Flask 기본 세션은 서명만 될 뿐 암호화되지 않아 평문 비밀번호가 노출된다)
+                bind_to_session(username, password)
+                session.permanent = False  # 브라우저 종료 시 세션 만료
+                response = jsonify({"status": "success", "message": "Login successful"})
+                response.set_cookie(
+                    "auth_token",
+                    token,
+                    httponly=True,
+                    samesite="Lax",
+                    secure=Config.COOKIE_SECURE,
+                )
+                return response
+            # 연결은 성공했으나 계정 메타데이터를 찾지 못한 경우
+            logger.warning(
+                f"Login rejected for user '{username}': "
+                f"connected to SQL Server but user metadata was not found in sys.sql_logins"
+            )
+    except (sqlalchemy.exc.InterfaceError, sqlalchemy.exc.OperationalError,
+            pyodbc.InterfaceError, pyodbc.OperationalError) as exc:
+        sqlstate = _extract_sqlstate(exc)
+        detail = _safe_error_text(exc, password)
+        if sqlstate in _INFRA_SQLSTATES:
+            # 자격증명 문제가 아니라 서버/드라이버 문제다. 401 로 뭉개면 사용자는
+            # 비밀번호만 반복해서 다시 입력하게 된다.
+            logger.error(
+                f"Login unavailable for user '{username}': "
+                f"database connection failed (SQLSTATE={sqlstate}) - {detail}"
+            )
+            return error_response(
+                "Cannot reach the authentication server. Please contact the administrator.",
+                503,
+            )
+        logger.warning(
+            f"Failed login attempt for user '{username}' "
+            f"(SQLSTATE={sqlstate or 'unknown'}): {detail}"
+        )
+        return error_response("Invalid username or password", 401)
+
+    logger.warning(f"Failed login attempt for user: {username}")
+    return error_response("Invalid username or password", 401)
 
 
 @auth_bp.route("/status", methods=["GET"])
@@ -137,17 +138,28 @@ def auth_status():
         )
     try:
         decoded_token = jwt.decode(token, Config.SECRET_KEY, algorithms=["HS256"])
-        # 허용 목록에서 빠진 계정, SQL 로그인 시절 토큰, 로그아웃·재시작으로
-        # 서버 세션이 없는 토큰은 즉시 무효로 본다.
-        if (
-            decoded_token.get("auth_method") != "windows_sso"
-            or not auth_sessions.is_active(decoded_token.get("jti"), decoded_token.get("username"))
-            or not Config.is_login_allowed(decoded_token.get("username"))
-        ):
+        # 허용 목록에서 빠진 계정의 기존 토큰은 즉시 무효로 본다.
+        # (토큰은 발급 후 EXPIRE_TIME 동안 살아 있으므로 여기서 확인하지 않으면
+        #  권한을 회수해도 기존 세션이 그대로 유지된다)
+        if not Config.is_login_allowed(decoded_token.get("username")):
             response = jsonify({"authenticated": False, "message": "Access revoked"})
-            return _clear_auth_cookie(response), 200
+            response.set_cookie(
+                "auth_token",
+                "",
+                expires=0,
+                httponly=True,
+                samesite="Lax",
+                secure=Config.COOKIE_SECURE,
+            )
+            return response, 200
+        # 세션에 DB 자격증명이 있는지도 확인 (JWT 유효하지만 세션 만료 시 422 방지)
+        has_credentials = has_session_credentials()
         return (
-            jsonify({"authenticated": True, "username": decoded_token["username"]}),
+            jsonify({
+                "authenticated": True,
+                "username": decoded_token["username"],
+                "has_credentials": has_credentials,
+            }),
             200,
         )
     except jwt.ExpiredSignatureError:
@@ -159,17 +171,14 @@ def auth_status():
 @auth_bp.route("/logout", methods=["POST"])
 @handle_exceptions
 def logout():
-    # 쿠키 삭제만으로는 보관·재주입된 토큰이 계속 유효하므로 서버 세션(jti)을 폐기한다.
-    # 서명이 유효한 토큰만 대상으로 하며, 만료된 토큰도 폐기 대상에 포함한다.
-    token = request.cookies.get("auth_token")
-    if token:
-        try:
-            decoded = jwt.decode(
-                token, Config.SECRET_KEY, algorithms=["HS256"], options={"verify_exp": False}
-            )
-            auth_sessions.revoke(decoded.get("jti"))
-        except jwt.InvalidTokenError:
-            pass
-    session.clear()
+    clear_session()
     response = jsonify({"status": "success", "message": "Logged out successfully"})
-    return _clear_auth_cookie(response)
+    response.set_cookie(
+        "auth_token",
+        "",
+        expires=0,
+        httponly=True,
+        samesite="Lax",
+        secure=Config.COOKIE_SECURE,
+    )
+    return response

@@ -3,11 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "node server.js",
+    "dev": "next dev",
     "build": "next build",
-    "start": "node server.js --production",
-    "test": "playwright test",
-    "test:sso": "node --test test-node/*.test.js"
+    "start": "next start",
+    "test": "playwright test"
   },
   "keywords": [],
   "author": "",
@@ -16,10 +15,8 @@
   "dependencies": {
     "bootstrap": "^5.3.3",
     "chart.js": "^4.5.1",
-    "express": "^4.22.3",
     "lucide-react": "^0.473.0",
     "next": "^15.1.4",
-    "node-expose-sspi": "^0.1.60",
     "process": "^0.11.10",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.3.1",

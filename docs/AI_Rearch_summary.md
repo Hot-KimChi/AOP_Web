@@ -4,38 +4,6 @@
 > 
 > 📎 **[→ 상세 변경 이력 (Detail)](./AI_Rearch_detail.md)**
 
-## 변경 이력 (v0.9.85 — 2026-10-06)
-
-| # | 요청 | 해결 | Detail |
-|---|---|---|---|
-| 22 진단 보완 | FQDN 접속에서도 Chrome 자격 증명 창 후 로그인이 401로 실패 | AD 조회에서 웹 SPN 누락을 확인하고 Negotiate의 NTLM 폴백이 서버 Kerberos 전용 정책에 의해 거부되는 경로를 재현했습니다. 웹 인증, 허용 계정, SQL 통합 인증을 별도 단계로 설명하고, 안전한 SPN/Chrome 정책 운영자 점검 절차를 추가했습니다. 실제 로그인은 AD 관리자 및 클라이언트 정책 설정 전까지 미완료로 기록했습니다. | [→ Detail](./AI_Rearch_detail.md#v0985--22-fqdn-kerberos-spn-진단) |
-
----
-
-## 변경 이력 (v0.9.84 — 2026-10-06)
-
-| # | 요청 | 해결 | Detail |
-|---|---|---|---|
-| 22 추가 보완 | IP 접속에서 Windows 계정을 입력했는데 브라우저 기본 인증 팝업이 뜨는 문제 | IP 주소에 대한 SSO 요청은 SSPI challenge 전에 거부하고, 브라우저 자격 증명 창 없이 DNS 호스트명 사용 안내를 반환합니다. Kerberos 전용 정책을 유지하고 IP/IPv6 판별 회귀 테스트를 추가했습니다. | [→ Detail](./AI_Rearch_detail.md#v0984--22-브라우저-기본-인증-창-차단) |
-
----
-
-## 변경 이력 (v0.9.83 — 2026-10-06)
-
-| # | 요청 | 해결 | Detail |
-|---|---|---|---|
-| 22 보완 | Windows SSO가 클라이언트에서 실패하고, Implementation_list의 재작성 명세 절차가 누락된 문제 확인 | #22 재작성 명세에 실제 클라이언트 운영 조건과 검증 기준을 추가했습니다. FQDN CORS Origin을 기존 설정과 안전하게 병합하고 wildcard를 거부하며, malformed Negotiate 헤더를 안전하게 처리했습니다. 개발 모드로 기동해 FQDN 화면·CORS·인증 실패 경로를 검증했습니다. 실제 클라이언트 Kerberos 로그인은 브라우저 정책과 허용 계정 설정 후 확인해야 합니다. | [→ Detail](./AI_Rearch_detail.md#v0983--22-클라이언트-windows-sso-진단-및-보완) |
-
----
-
-## 변경 이력 (v0.9.82 — 2026-10-06)
-
-| # | 요청 | 해결 | Detail |
-|---|---|---|---|
-| 22 | 기존 계정·비밀번호 인증을 Windows 도메인 인증으로 전환하고, 명세 작성 후 구현 | Express Custom Server의 Kerberos SSO, 허용 계정 기반 Flask JWT, Windows 통합 SQL 인증을 적용했습니다. NTLM 협상·로그아웃 JWT 재사용·내부 리디렉션 비밀 유출 경로를 차단하고 운영 설정과 제약을 문서화했습니다. 백엔드 인증 테스트 17개, Node SSO 테스트 12개 및 프론트엔드 빌드를 통과했습니다. | [→ Detail](./AI_Rearch_detail.md#v0982--22-windows-kerberos-sso-전환) |
-
----
-
 ## 변경 이력 (v0.9.81 — 2026-09-28)
 
 | # | 요청 | 해결 | Detail |

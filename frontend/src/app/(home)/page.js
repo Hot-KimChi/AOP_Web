@@ -17,7 +17,7 @@ export default function HomePage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/status`, { credentials: 'include' });
       const data = await res.json();
-      if (res.ok && data.authenticated) {
+      if (res.ok && data.authenticated && data.has_credentials !== false) {
         setIsAuthenticated(true);
       } else {
         setIsAuthenticated(false);

@@ -426,32 +426,3 @@
 >   3. Viewer의 DB 선택을 테이블 요청에 전달하고 `AbortController`로 이전 요청을 취소했으며, ML 학습 요청의 HTTP 오류를 상태 코드와 함께 표시하도록 보완했습니다.
 >   4. Windows 실행 스크립트의 프론트 의존성 설치를 lockfile 기반 `npm ci`로 변경해 설치 재현성을 높였습니다.
 >   5. 백엔드 구문 검사와 프론트엔드 프로덕션 빌드를 통과했습니다. Playwright는 Chromium 실행 파일 미설치로 실행하지 못했습니다.
-
-----
->#### 22. 로그인 기능을 윈도우 인증의 기능으로 변경해줄 수 있나? Next.js는 화면을 보여주는 프론트엔드이면서, 동시에 Node 서버로 실행됩니다. 따라서 Windows 인증도 이 Node 서버 쪽에서 처리하게 됩니다. 다만 Next.js의 기본 middleware.ts는 Edge 환경에서 실행되기 때문에 node-expose-sspi를 쓸 수 없습니다. 그래서 Custom Server(Express + Next) 방식으로 구성해야 합니다. 해당 내용을 기반으로 agent 재작업 명세를 작성하고 이를 기반으로 진행해죠
-
-> **[Agent 재작성 명세 — 2026-10-06 보완]** 기존 SSO 코드의 단위 테스트뿐 아니라 클라이언트 브라우저가 실제로 로그인하고 API를 호출할 수 있는 실행 조건까지 검증한다. 상세 내용은 [`docs/Windows_SSO_agent_spec.md`](docs/Windows_SSO_agent_spec.md)의 "재진단 및 보완 명세"를 기준으로 한다.
-> - **확인된 실패**: IP 접속에서는 Kerberos를 사용할 수 없어 NTLM 요청이 거부된다. `AUTH_ALLOWED_USERS`가 비어 있어 인증 성공 후에도 전 계정이 차단된다. FQDN에서 접속하는 클라이언트 Origin이 CORS 허용 목록에서 빠져 API 호출도 실패할 수 있다. 요청했던 개발 모드 대신 프론트엔드가 Production 모드로 실행된 사례가 확인됐다.
-> - **불변식**: Kerberos 전용 정책 및 빈 허용 목록의 fail-closed 동작 유지. IP/NTLM·모든 도메인 계정 허용으로 우회하지 않는다. CORS에는 서버의 FQDN만 정확히 추가하며 임의 Origin은 허용하지 않는다.
-> - **완료 기준**: Custom Server 개발 모드 기동, DNS FQDN/SPN을 통한 Kerberos 응답, 지정 허용 계정 로그인 및 HttpOnly 쿠키 발급, FQDN Origin의 쿠키 포함 API 통신을 확인한다. 클라이언트 도메인 정책·허용 계정이 없는 테스트는 환경 미충족으로 보고하며 성공 처리하지 않는다.
-
-> - **수행 일자**: 2026-10-06 (v0.9.83)
-> - **진행 내역 요약**:
->   1. IP 접속의 NTLM 거부, 누락된 `AUTH_ALLOWED_USERS`, FQDN CORS 누락, Production 모드 실행 및 브라우저의 토큰 없는 `Negotiate` 요청을 재현했습니다. FQDN Origin 누락과 기존 환경 파일 Origin 덮어쓰기, wildcard Origin 보존도 교차 검증에서 확인해 수정했습니다.
->   2. 실행 스크립트가 프로세스·`.env.production`·`.env`의 exact Origin을 보존·병합하고 wildcard/잘못된 Origin을 거부하도록 했으며, 빈 인증 헤더는 토큰을 반향하지 않고 안내와 함께 거부하도록 보완했습니다. DNS FQDN에서 개발 서버를 기동했습니다.
-> - **검증 및 잔여 조건**: 백엔드 인증 테스트 17개, Node SSO 테스트 13개, 프론트엔드 빌드, PowerShell AST를 통과했습니다. FQDN 로그인 페이지와 API 응답, 기존 IP/FQDN CORS 허용 및 임의 Origin 차단을 실행 확인했습니다. 자동화 브라우저는 아직 유효한 Kerberos 토큰을 보내지 않아 실제 클라이언트 로그인·쿠키 발급은 미확인입니다. 현재 개발 세션은 실행한 도메인 사용자만 허용하며, 다른 테스트 계정은 `AUTH_ALLOWED_USERS`에 명시해야 합니다.
-
-> **[재작성 명세 보완 — 브라우저 자격 증명 창]**
-> - **재현 증거**: Chrome 화면의 주소가 `10.82.218.49:3000`이며, 서버는 `/auth/sso`에서 `WWW-Authenticate: Negotiate` challenge를 반환했습니다. 이로 인해 Chrome 자체의 사용자 이름/비밀번호 창이 표시됩니다. IP 주소에 대한 Kerberos 인증은 보장되지 않고 이후 NTLM은 서버 보안 정책상 거부됩니다.
-> - **목표 및 불변식**: IP literal로 요청된 SSO에는 `WWW-Authenticate`를 보내지 않고 DNS 호스트명 사용 안내를 반환합니다. Kerberos 전용 인증, NTLM 거부 및 서버가 브라우저 입력 암호를 받거나 저장하지 않는 기존 정책을 유지합니다.
-> - **완료 기준**: IP의 `/auth/sso`는 안내 응답(400)이며 `WWW-Authenticate` 헤더가 없어 브라우저 기본 자격 증명 창을 띄우지 않습니다. DNS FQDN은 기존 Kerberos 협상 경로를 유지합니다. IPv4·IPv6 및 호스트명 판별 타깃 테스트와 프론트엔드 빌드를 통과합니다.
-> - **수행 일자**: 2026-10-06 (v0.9.84)
-> - **수행 결과**: IP literal 호스트를 SSPI middleware 전에 차단하고, FQDN만 기존 협상 단계로 통과하게 했습니다. IP 판별 회귀 테스트와 SSO 테스트 14개 및 프로덕션 빌드가 통과했습니다.
-> - **실행 검증**: 개발 서버에서 IP `/auth/sso`는 `400`, `WWW-Authenticate` 없음, FQDN은 기존 `401 Negotiate` challenge를 반환했습니다. 브라우저 로그인 화면은 IP 사용 안내를 표시했고 기본 자격 증명 창은 열리지 않았습니다.
-> - **잔여 조건**: FQDN에서 실제 사용자 브라우저의 자동 Kerberos 인증 성공은 클라이언트 Chrome 정책/SPN 환경이 필요하여 이 세션에서 검증되지 않았습니다. 브라우저 기본 창에 입력한 계정·암호는 애플리케이션 로그인으로 사용되지 않습니다.
-
-> **[재작성 명세 보완 — FQDN에서도 401 발생]**
-> - **재현 증거**: FQDN `/auth/sso`가 `401 WWW-Authenticate: Negotiate`로 시작한 뒤 최종 401입니다. `setspn -Q HTTP/KRSUABN027SRV.ad005.onehc.net` 및 짧은 호스트명 조회 모두 SPN 미등록을 반환했습니다. HTTP 인증 추적에서는 Kerberos가 성립하지 않고 NTLM 토큰으로 폴백했으며, 서버의 Kerberos 전용 정책이 이를 거부합니다. 현재 Node/Flask 프로세스 실행 주체는 `AD005\Z0050XJE-A01`입니다.
-> - **목표 및 불변식**: AD 관리자가 실제 Node 서비스 실행 계정에 FQDN의 HTTP SPN을 등록하고 클라이언트 브라우저가 FQDN에 통합 인증을 보낼 수 있도록 설정한 뒤, 서버가 Kerberos 방식으로 확인하여 허용 목록 계정에 JWT를 발급합니다. NTLM 폴백이나 브라우저 암호 직접 검증으로 우회하지 않습니다.
-> - **완료 기준**: AD `setspn -Q`가 의도한 단일 서비스 계정을 반환하고, 클라이언트 `klist get HTTP/<FQDN>` 티켓 발급, Chrome `AuthServerAllowlist`, 서버에서 Kerberos 판정, Flask 허용 목록, JWT 쿠키 및 보호 API 응답을 순서대로 실측합니다.
-> - **외부 의존/현재 상태**: SPN 등록 및 클라이언트 Chrome 정책 변경은 이 실행 환경에서 권한·범위가 확인되지 않은 AD/클라이언트 관리 작업이므로 수행하지 않았습니다. AD 관리자 조치 전에는 #22 실로그인 완료로 간주하지 않습니다. 자세한 안전한 확인·등록 명령은 README와 `docs/Windows_SSO_agent_spec.md`에 기록했습니다.
