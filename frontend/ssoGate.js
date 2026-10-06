@@ -12,6 +12,12 @@ const os = require('os');
 const ALLOWED_SSO_METHOD = 'Kerberos';
 const BACKEND_TIMEOUT_MS = 10000;
 
+function normalizeNegotiateAuthorization(value) {
+  if (typeof value !== 'string') return null;
+  const match = /^Negotiate\s+(\S+)$/i.exec(value);
+  return match ? `Negotiate ${match[1]}` : null;
+}
+
 function sendError(res, status, message) {
   res.status(status).json({ status: 'error', message });
 }
@@ -108,4 +114,10 @@ function createSsoForwarder({ backendUrl: rawBackendUrl, sharedSecret, fetchImpl
   };
 }
 
-module.exports = { ALLOWED_SSO_METHOD, createSsoForwarder, isLocalMachineAccount, validateBackendUrl };
+module.exports = {
+  ALLOWED_SSO_METHOD,
+  createSsoForwarder,
+  isLocalMachineAccount,
+  normalizeNegotiateAuthorization,
+  validateBackendUrl,
+};

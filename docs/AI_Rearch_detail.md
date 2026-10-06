@@ -4,6 +4,41 @@
 > 
 > 📎 **[→ 변경 요약 (Summary)](./AI_Rearch_summary.md)**
 
+## 변경 이력 (v0.9.83 — 2026-10-06)
+
+### v0.9.83 — #22. 클라이언트 Windows SSO 진단 및 보완
+
+**요청**: `Implementation_list.md`의 기존 #22 Windows 인증 전환 요구에 맞춰 재작성 명세를 보완하고, 클라이언트에서 개발 테스트할 수 있도록 실패 원인을 확인·수정한 뒤 GitHub에 반영.
+
+**재현한 원인**:
+
+- 프론트엔드가 `node server.js --production`으로 실행 중이어서 요청한 개발 모드와 달랐습니다.
+- IP로 접속한 SSO는 Kerberos 대신 NTLM 협상으로 이어져 보안 정책에 따라 `401`로 거부됩니다. IP를 통한 SSO 우회는 적용하지 않았습니다.
+- `AUTH_ALLOWED_USERS`가 환경 변수와 `.env.production`에 설정되지 않아, Kerberos가 성공해도 Flask가 전 계정을 `403`으로 거부하는 구성이었습니다.
+- FQDN으로 접속하는 브라우저 Origin이 CORS 허용 목록에 없었습니다. 기존 개발 설정은 프로세스 환경 변수 우선순위 때문에 `.env.production`에 있던 Origin을 덮어쓸 수 있었습니다.
+- Edge 자동화에서는 인증 헤더가 `Negotiate`만 포함된 요청이 발생해 `400`으로 끝났습니다. 이는 실제 클라이언트 도메인 브라우저의 Kerberos 성공 증거가 아닙니다.
+
+**보완**:
+
+- `docs/Windows_SSO_agent_spec.md`와 `Implementation_list.md` #22에 재현 증거, 접속 FQDN/SPN·브라우저 정책·허용 계정·CORS·검증 기준을 먼저 명세하고, 실제 수행 결과와 미검증 항목을 기록했습니다.
+- `scripts/AOP_Web.ps1`가 프로세스 설정 및 백엔드 `.env.production`/`.env`의 기존 Origin을 보존하면서 정확한 서버 호스트명/FQDN Origin을 추가합니다. wildcard와 URL 경로·쿼리·사용자정보·fragment 등이 포함된 비정상 Origin은 서버 시작 전에 거부합니다.
+- `frontend/server.js`와 `frontend/ssoGate.js`가 빈/잘못된 Negotiate Authorization을 고정 안내 응답으로 종료하고, 헤더의 인증 방식 대소문자를 SSPI가 처리할 형식으로 정규화합니다. Authorization 원문을 응답에 반향하지 않으며 Kerberos 전용 정책을 유지합니다.
+- README에 FQDN 접속, 명시적 도메인 계정 허용 목록, 개발 HTTP의 격리 테스트 한계와 운영 HTTPS 요구사항을 추가했습니다.
+
+**검증**:
+
+- 백엔드 인증 테스트: 17개 통과
+- Node SSO 회귀 테스트: 13개 통과
+- `npm run build`: 통과
+- PowerShell AST 구문 검사: 통과
+- 실행 구동 스크립트로 개발 서버 기동: 프론트엔드 `node server.js`, Flask 포트 5000 리스닝 확인
+- FQDN 프론트엔드 `200`, 인증 API 미인증 상태 `200`, FQDN CORS preflight `200` 및 정확한 `Access-Control-Allow-Origin`/credentials 헤더 확인
+- 기존 파일 Origin 8개 중 테스트한 IP Origin 유지, 임의 외부 Origin에는 허용 헤더 없음
+- 빈 Negotiate 헤더 `401` 및 안내 문구 확인. IP/NTLM 인증은 기존과 같이 거부
+- 독립 교차 검증: 1차 Major 1건(기존 Origin 덮어쓰기) 및 보안 Medium 1건(wildcard 보존)을 수정; 재검증 Blocker 0 / Major 0 / Minor 0
+
+**운영 잔여 조건**: 개발 서버는 `http://KRSUABN027SRV.ad005.onehc.net:3000`에서 실행 중입니다. 현재 프로세스에는 시작한 도메인 계정 하나만 임시 허용했고, 다른 클라이언트 계정은 안전한 테스트를 위해 `AUTH_ALLOWED_USERS`에 명시적으로 추가해야 합니다. 자동화 브라우저는 유효한 Kerberos 토큰을 보내지 못해 로그인 쿠키 발급 및 실제 원격 클라이언트 로그인을 검증하지 못했습니다. 테스트 클라이언트는 해당 FQDN의 Windows 통합 인증을 허용해야 하며, 운영에는 HTTPS와 SQL 서비스 계정 권한 구성이 필요합니다.
+
 ## 변경 이력 (v0.9.82 — 2026-10-06)
 
 ### v0.9.82 — #22. Windows Kerberos SSO 전환

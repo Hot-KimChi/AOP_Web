@@ -147,7 +147,18 @@ $env:COOKIE_SECURE = "true"
 
 운영 자동 시작에도 계정 허용 목록이 적용되도록 `AUTH_ALLOWED_USERS`는 `backend\.env.production` 또는 Windows 사용자/시스템 환경 변수에 영구 설정하세요. 이 값이 없으면 모든 로그인 요청이 거부됩니다. 위 PowerShell `$env:` 예시는 현재 셸에서 시작하는 프로세스에만 적용됩니다.
 
-> 개발 모드에서 `ALLOWED_ORIGINS` 를 지정하지 않으면 `localhost` 와 사설망 대역(10./192.168./172.16~31.)만 허용됩니다.
+> 개발 모드에서 통합 스크립트로 시작하면 `localhost`, 사설망 IP, 서버 NetBIOS 이름 및 DNS FQDN의 프론트엔드 Origin만 허용 목록에 추가됩니다. 직접 실행할 경우 `ALLOWED_ORIGINS`에 클라이언트가 접속하는 정확한 Origin(예: `http://서버FQDN:3000`)을 설정해야 합니다.
+
+**클라이언트 개발 테스트**는 IP 주소 대신 `http://<서버의 DNS FQDN>:3000`으로 접속하세요. `AUTH_ALLOWED_USERS`에는 테스트할 Windows 도메인 계정을 `DOMAIN\user` 형식으로 쉼표 구분해 명시해야 합니다. 값이 비어 있으면 로그인은 모두 거부됩니다. PowerShell에서 현재 로그인 계정만 일시 허용해 개발 서버를 시작하려면:
+
+```powershell
+$env:AUTH_ALLOWED_USERS = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+.\scripts\AOP_Web.ps1 -Action Start -Unattended
+```
+
+클라이언트 브라우저는 서버 FQDN에 대한 Windows 통합 인증을 허용해야 합니다. Kerberos가 아닌 NTLM 협상은 의도적으로 차단됩니다. 테스트가 끝나면 `.\scripts\AOP_Web.ps1 -Action Stop -Force`로 개발 서버를 종료하세요.
+
+> 개발 모드는 HTTP를 사용하므로 신뢰된 격리 네트워크의 테스트 계정으로만 확인하세요. 실제 업무·민감 데이터에 대한 운영 접속에는 HTTPS와 `COOKIE_SECURE=true`를 설정해야 합니다.
 > 인증 쿠키를 함께 보내는 구성이므로 와일드카드(`*`) Origin 은 사용하지 않습니다.
 
 ### 5.2 인증·세션 동작

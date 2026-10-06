@@ -426,3 +426,17 @@
 >   3. Viewer의 DB 선택을 테이블 요청에 전달하고 `AbortController`로 이전 요청을 취소했으며, ML 학습 요청의 HTTP 오류를 상태 코드와 함께 표시하도록 보완했습니다.
 >   4. Windows 실행 스크립트의 프론트 의존성 설치를 lockfile 기반 `npm ci`로 변경해 설치 재현성을 높였습니다.
 >   5. 백엔드 구문 검사와 프론트엔드 프로덕션 빌드를 통과했습니다. Playwright는 Chromium 실행 파일 미설치로 실행하지 못했습니다.
+
+----
+>#### 22. 로그인 기능을 윈도우 인증의 기능으로 변경해줄 수 있나? Next.js는 화면을 보여주는 프론트엔드이면서, 동시에 Node 서버로 실행됩니다. 따라서 Windows 인증도 이 Node 서버 쪽에서 처리하게 됩니다. 다만 Next.js의 기본 middleware.ts는 Edge 환경에서 실행되기 때문에 node-expose-sspi를 쓸 수 없습니다. 그래서 Custom Server(Express + Next) 방식으로 구성해야 합니다. 해당 내용을 기반으로 agent 재작업 명세를 작성하고 이를 기반으로 진행해죠
+
+> **[Agent 재작성 명세 — 2026-10-06 보완]** 기존 SSO 코드의 단위 테스트뿐 아니라 클라이언트 브라우저가 실제로 로그인하고 API를 호출할 수 있는 실행 조건까지 검증한다. 상세 내용은 [`docs/Windows_SSO_agent_spec.md`](docs/Windows_SSO_agent_spec.md)의 "재진단 및 보완 명세"를 기준으로 한다.
+> - **확인된 실패**: IP 접속에서는 Kerberos를 사용할 수 없어 NTLM 요청이 거부된다. `AUTH_ALLOWED_USERS`가 비어 있어 인증 성공 후에도 전 계정이 차단된다. FQDN에서 접속하는 클라이언트 Origin이 CORS 허용 목록에서 빠져 API 호출도 실패할 수 있다. 요청했던 개발 모드 대신 프론트엔드가 Production 모드로 실행된 사례가 확인됐다.
+> - **불변식**: Kerberos 전용 정책 및 빈 허용 목록의 fail-closed 동작 유지. IP/NTLM·모든 도메인 계정 허용으로 우회하지 않는다. CORS에는 서버의 FQDN만 정확히 추가하며 임의 Origin은 허용하지 않는다.
+> - **완료 기준**: Custom Server 개발 모드 기동, DNS FQDN/SPN을 통한 Kerberos 응답, 지정 허용 계정 로그인 및 HttpOnly 쿠키 발급, FQDN Origin의 쿠키 포함 API 통신을 확인한다. 클라이언트 도메인 정책·허용 계정이 없는 테스트는 환경 미충족으로 보고하며 성공 처리하지 않는다.
+
+> - **수행 일자**: 2026-10-06 (v0.9.83)
+> - **진행 내역 요약**:
+>   1. IP 접속의 NTLM 거부, 누락된 `AUTH_ALLOWED_USERS`, FQDN CORS 누락, Production 모드 실행 및 브라우저의 토큰 없는 `Negotiate` 요청을 재현했습니다. FQDN Origin 누락과 기존 환경 파일 Origin 덮어쓰기, wildcard Origin 보존도 교차 검증에서 확인해 수정했습니다.
+>   2. 실행 스크립트가 프로세스·`.env.production`·`.env`의 exact Origin을 보존·병합하고 wildcard/잘못된 Origin을 거부하도록 했으며, 빈 인증 헤더는 토큰을 반향하지 않고 안내와 함께 거부하도록 보완했습니다. DNS FQDN에서 개발 서버를 기동했습니다.
+> - **검증 및 잔여 조건**: 백엔드 인증 테스트 17개, Node SSO 테스트 13개, 프론트엔드 빌드, PowerShell AST를 통과했습니다. FQDN 로그인 페이지와 API 응답, 기존 IP/FQDN CORS 허용 및 임의 Origin 차단을 실행 확인했습니다. 자동화 브라우저는 아직 유효한 Kerberos 토큰을 보내지 않아 실제 클라이언트 로그인·쿠키 발급은 미확인입니다. 현재 개발 세션은 실행한 도메인 사용자만 허용하며, 다른 테스트 계정은 `AUTH_ALLOWED_USERS`에 명시해야 합니다.

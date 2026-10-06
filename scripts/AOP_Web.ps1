@@ -294,6 +294,13 @@ function Get-ServerOriginList {
     if (-not [string]::IsNullOrWhiteSpace($env:COMPUTERNAME)) {
         $origins.Add("http://$($env:COMPUTERNAME):3000") | Out-Null
         $origins.Add("http://$($env:COMPUTERNAME):5000") | Out-Null
+
+        $computerDomain = [string](Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue).Domain
+        if (-not [string]::IsNullOrWhiteSpace($computerDomain) -and $computerDomain -ne "WORKGROUP") {
+            $fqdn = "$($env:COMPUTERNAME).$computerDomain"
+            $origins.Add("http://${fqdn}:3000") | Out-Null
+            $origins.Add("http://${fqdn}:5000") | Out-Null
+        }
     }
 
     # 3. All Active IPv4 Addresses
@@ -647,6 +654,48 @@ function Start-Services {
     }
 
     $env:AOP_ENV = if ($Production) { "production" } else { "development" }
+
+    # Ensure CORS permits this server's exact DNS name in dev as well as prod.
+    # The browser calls Flask on :5000 using the hostname it used for the frontend.
+    $originCandidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:ALLOWED_ORIGINS)) {
+        $originCandidates += @($env:ALLOWED_ORIGINS -split ",")
+    }
+    foreach ($envFile in @(
+        (Join-Path $backendPath ".env.production"),
+        (Join-Path $backendPath ".env")
+    )) {
+        if (-not (Test-Path $envFile)) { continue }
+        foreach ($line in Get-Content $envFile -Encoding UTF8) {
+            if ($line -match '^\s*ALLOWED_ORIGINS\s*=\s*(.*)$') {
+                $fileOrigins = $matches[1].Trim().Trim("'", '"')
+                if (-not [string]::IsNullOrWhiteSpace($fileOrigins)) {
+                    $originCandidates += @($fileOrigins -split ",")
+                }
+            }
+        }
+    }
+    $originCandidates += @(Get-ServerOriginList)
+    $originSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($origin in $originCandidates) {
+        if ([string]::IsNullOrWhiteSpace($origin)) { continue }
+        $candidate = $origin.Trim()
+        if ($candidate.Contains("*")) {
+            throw "Wildcard CORS origins are not permitted: ALLOWED_ORIGINS must contain exact origins."
+        }
+        $parsedOrigin = $null
+        if (-not [Uri]::TryCreate($candidate, [UriKind]::Absolute, [ref]$parsedOrigin) -or
+            $parsedOrigin.Scheme -notin @("http", "https") -or
+            -not [string]::IsNullOrEmpty($parsedOrigin.UserInfo) -or
+            $parsedOrigin.AbsolutePath -ne "/" -or
+            -not [string]::IsNullOrEmpty($parsedOrigin.Query) -or
+            -not [string]::IsNullOrEmpty($parsedOrigin.Fragment)) {
+            throw "Invalid CORS origin in ALLOWED_ORIGINS. Specify an exact http(s) origin without path, query, or credentials."
+        }
+        $originSet.Add($parsedOrigin.GetLeftPart([UriPartial]::Authority)) | Out-Null
+    }
+    $env:ALLOWED_ORIGINS = [string]::Join(",", [string[]]$originSet)
+
     if ([string]::IsNullOrWhiteSpace($env:AUTH_SSO_SHARED_SECRET)) {
         $ssoSecretBytes = New-Object byte[] 32
         $ssoSecretRng = [System.Security.Cryptography.RandomNumberGenerator]::Create()

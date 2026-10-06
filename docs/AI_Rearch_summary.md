@@ -4,6 +4,14 @@
 > 
 > 📎 **[→ 상세 변경 이력 (Detail)](./AI_Rearch_detail.md)**
 
+## 변경 이력 (v0.9.83 — 2026-10-06)
+
+| # | 요청 | 해결 | Detail |
+|---|---|---|---|
+| 22 보완 | Windows SSO가 클라이언트에서 실패하고, Implementation_list의 재작성 명세 절차가 누락된 문제 확인 | #22 재작성 명세에 실제 클라이언트 운영 조건과 검증 기준을 추가했습니다. FQDN CORS Origin을 기존 설정과 안전하게 병합하고 wildcard를 거부하며, malformed Negotiate 헤더를 안전하게 처리했습니다. 개발 모드로 기동해 FQDN 화면·CORS·인증 실패 경로를 검증했습니다. 실제 클라이언트 Kerberos 로그인은 브라우저 정책과 허용 계정 설정 후 확인해야 합니다. | [→ Detail](./AI_Rearch_detail.md#v0983--22-클라이언트-windows-sso-진단-및-보완) |
+
+---
+
 ## 변경 이력 (v0.9.82 — 2026-10-06)
 
 | # | 요청 | 해결 | Detail |

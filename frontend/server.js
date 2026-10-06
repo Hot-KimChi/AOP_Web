@@ -27,7 +27,7 @@ loadEnvConfig(__dirname, !production);
 
 const express = require('express');
 const next = require('next');
-const { createSsoForwarder, validateBackendUrl } = require('./ssoGate');
+const { createSsoForwarder, normalizeNegotiateAuthorization, validateBackendUrl } = require('./ssoGate');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOSTNAME || '0.0.0.0';
@@ -81,6 +81,18 @@ async function main() {
     });
     server.get(
       '/auth/sso',
+      (req, res, nextFn) => {
+        const authorization = req.headers.authorization;
+        if (authorization) {
+          const normalizedAuthorization = normalizeNegotiateAuthorization(authorization);
+          if (!normalizedAuthorization) {
+            console.warn('[SSO] Browser sent a Negotiate scheme without a usable token.');
+            return sendError(res, 401, 'Windows sign-in did not complete. Use a domain browser trusted for this server hostname.');
+          }
+          req.headers.authorization = normalizedAuthorization;
+        }
+        return nextFn();
+      },
       sso.auth({
         useActiveDirectory: false,
         useGroups: false,
