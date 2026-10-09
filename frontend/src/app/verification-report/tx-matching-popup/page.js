@@ -21,7 +21,7 @@ const S = {
     borderRadius: 8,
     padding: '12px 18px',
     marginBottom: 12,
-    boxShadow: '0 1px 4px rgba(0,0,0,.1)',
+    boxShadow: 'var(--shadow-sm)',
   },
   /* 첫 번째 줄: 제목 + 통계 칩 */
   headerRow1: {
@@ -88,7 +88,7 @@ const S = {
   tableWrap: {
     background: 'var(--surface)',
     borderRadius: 8,
-    boxShadow: '0 1px 4px rgba(0,0,0,.1)',
+    boxShadow: 'var(--shadow-sm)',
     overflowX: 'auto',
     overflowY: 'auto',
     maxHeight: 'calc(100vh - 110px)',
@@ -102,11 +102,11 @@ const S = {
   /* 헤더: 파라미터명 */
   th: {
     position: 'sticky', top: 0, zIndex: 10,
-    background: HDR_BG, color: '#ffffff',
+    background: HDR_BG, color: 'var(--tx-header-text)',
     padding: '6px 6px',
     textAlign: 'center',
     whiteSpace: 'nowrap',
-    border: `1px solid rgba(255,255,255,.15)`,
+    border: '1px solid var(--tx-header-line)',
     fontWeight: 600,
     fontSize: 10,
     minWidth: 0,
@@ -121,7 +121,7 @@ const S = {
       textAlign: 'center',
       border: `1px solid ${BORDER}`,
       background: isMissing
-        ? (rowIdx % 2 === 0 ? 'rgba(239,68,68,.07)' : 'rgba(239,68,68,.12)')
+        ? (rowIdx % 2 === 0 ? 'var(--tx-missing-bg)' : 'var(--tx-missing-bg-alt)')
         : (rowIdx % 2 === 0 ? 'var(--surface)' : ROW_ODD),
       color: isMissing ? 'var(--status-error-text)' : 'var(--text)',
       fontWeight: isMissing ? 700 : 400,

@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react';
 import { Settings, Eye, ClipboardCheck, FileOutput, Brain, User, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
 import '../globals.css';
 import { API_BASE_URL } from '../lib/apiBase';
+import { openLoginPopup } from '../lib/loginPopup';
+import { useAuth } from './AuthContext';
 
 const menuItems = [
   { href: '/measset-generation',  icon: Settings,       text: 'MeasSet Generation' },
@@ -18,8 +20,8 @@ const menuItems = [
 const Navbar = () => {
   const router   = useRouter();
   const pathname = usePathname();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username,        setUsername]        = useState('');
+  const { status, username, markLoggedOut } = useAuth();
+  const isAuthenticated = status === 'authenticated';
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [isDark,          setIsDark]          = useState(false);
 
@@ -40,38 +42,11 @@ const Navbar = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => { checkAuthStatus(); }, []);
-
-  const checkAuthStatus = async () => {
-    try {
-      const res  = await fetch(`${API_BASE_URL}/api/auth/status`, { credentials: 'include' });
-      const data = await res.json();
-      if (res.ok && data.authenticated) {
-        if (data.has_credentials === false) {
-          // JWT는 유효하지만 세션 자격증명이 없음 → 재로그인 필요
-          setIsAuthenticated(false);
-          setUsername('');
-        } else {
-          setIsAuthenticated(true);
-          setUsername(data.username);
-        }
-      } else {
-        setIsAuthenticated(false);
-        setUsername('');
-      }
-    } catch (err) {
-      console.error('Auth status check failed:', err);
-      setIsAuthenticated(false);
-      setUsername('');
-    }
-  };
-
   const handleLogout = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
       if (res.ok) {
-        setIsAuthenticated(false);
-        setUsername('');
+        markLoggedOut();
         router.push('/');
       }
     } catch (err) {
@@ -92,14 +67,7 @@ const Navbar = () => {
   };
 
   const handleLogin = () => {
-    const w = 480, h = 420;
-    const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
-    const top  = Math.round(window.screenY + (window.outerHeight - h) / 2);
-    window.open(
-      '/auth/login',
-      'login',
-      `width=${w},height=${h},left=${left},top=${top},resizable=no,scrollbars=no,menubar=no,toolbar=no,location=no,status=no`
-    );
+    openLoginPopup();
     setMenuOpen(false);
   };
 
@@ -154,8 +122,8 @@ const Navbar = () => {
             {isAuthenticated ? (
               <>
                 <span className="navbar-username">
-                  <span style={{ color: 'var(--text-muted)' }}>as </span>
-                  <strong style={{ color: 'var(--text)' }}>{username}</strong>
+                  <span className="navbar-username-prefix">as </span>
+                  <strong>{username}</strong>
                 </span>
                 <button onClick={handleLogout} className="navbar-logout-btn">
                   <LogOut size={13} />

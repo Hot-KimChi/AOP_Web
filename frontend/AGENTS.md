@@ -18,10 +18,14 @@
 frontend/src/
 ├── globals.css           # CSS variables (:root + [data-theme="dark"])
 ├── components/
-│   ├── Layout.js         # Navbar + main wrapper (dynamic, ssr: false)
-│   ├── Navbar.js         # Navigation, auth check, theme toggle
+│   ├── Layout.js         # AuthProvider + Navbar + <main><AuthGate> (dynamic, ssr: false)
+│   ├── AuthContext.js    # 인증 상태 단일 원천(useAuth) + AuthGate. /api/auth/status 를 직접 호출하지 말 것
+│   ├── Navbar.js         # Navigation (useAuth), theme toggle
 │   ├── ThemeInit.js      # Applies saved theme on mount (renders null)
 │   └── DataViewer.js     # Table: cascaded filters, sort, CSV export
+├── lib/
+│   ├── apiBase.js        # API_BASE_URL
+│   └── loginPopup.js     # APP_VERSION(버전 배지), openLoginPopup()
 └── app/
     ├── (home)/           # Landing page
     ├── auth/login/       # Login (popup window)
