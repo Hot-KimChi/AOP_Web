@@ -7,7 +7,7 @@ description: '서브에이전트 선택, JEV 위임 봉투·회신 형식, Verif
 
 > 서브에이전트 선택, 모델 배정, 병렬 실행, 도구 우선순위, 스킬 활용 가이드
 > **스텝별 모델 분담(Leader=GPT, Design/Implement=Opus, Verify=GPT)은 `model-routing.instructions.md`가 기준이다.**
-> **에이전트 간 메시지 형식과 보정 루프는 이 문서 §JEV가 기준이다.** 상시 규칙 요약은 `copilot-instructions.md` §4.0.
+> **에이전트 간 메시지 형식과 보정 루프는 이 문서 §JEV가 기준이다.** 상시 규칙 요약은 `copilot-instructions.md` §4.2.
 
 ---
 
@@ -187,7 +187,7 @@ Q6 (Choice) 판정 {커밋가능, 수정후재검증, 접근법재검토}
 
 > **지연 ≈ 도구 호출 수 × 콜당 컨텍스트 크기.** 두 항을 같이 줄여야 한다.
 > 실측(v0.9.62): 메인 모델 1콜 ≈ 11초. 전수 리뷰 1턴이 317콜·91.8분이었던 반면, 국소 작업은 8콜·0.9분.
-> Tier·예산 정의는 `copilot-instructions.md` §4.1~4.2 가 기준이다.
+> Tier·예산 정의는 `copilot-instructions.md` §4·§4.4 가 기준이다.
 
 ### 콜 수를 줄이는 패턴
 
@@ -269,8 +269,8 @@ task(..., mode="background")        # Verify 발사
 |-----------|------|
 | 빌드/테스트 실패 | 에러 메시지 분석 → 원인 파일 특정 → 수정 → 재실행 |
 | Verify가 Blocker·Major 보고 | Implement(Opus)가 수정 → `write_agent`로 재검증 (규칙: `model-routing.instructions.md` §5) |
-| 구현자와 검증자 결론 충돌 | **증거 우선(Evidence Wins)** — 최소 재현 테스트를 만들어 실행 결과로 판정 (§5) |
+| 구현자와 검증자 결론 충돌 | **증거 우선(Evidence Wins)** — 최소 재현 테스트를 만들어 실행 결과로 판정 (`model-routing.instructions.md` §5) |
 | 접근 불가 파일 | 경로 확인 → 대안 경로 탐색 → 필요 시 사용자에게 질문 |
-| 반복 실패 (3회+) | `rubber-duck`(Opus)에 전체 맥락 전달 → 대안 접근법 도출 |
+| 같은 실패 2회 반복 | 루프 중단(라우터 §4.3) → `rubber-duck`(Opus)에 전체 맥락 전달 → 대안 접근법 도출 |
 | 서브에이전트가 0턴/무의미 출력 | 재실행하지 말고 **즉시 직접 수행**으로 전환 |
 | 컨텍스트 윈도우 부족 | `/compact` 실행 → 핵심만 남기고 재시작 (`todos` 테이블로 진행 스텝 복구) |
