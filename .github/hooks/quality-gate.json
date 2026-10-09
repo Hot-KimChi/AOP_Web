@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "hooks": {
+    "agentStop": [
+      {
+        "type": "command",
+        "powershell": "python .github/hooks/stop_gate.py",
+        "bash": "python3 .github/hooks/stop_gate.py",
+        "cwd": ".",
+        "timeoutSec": 30
+      }
+    ]
+  }
+}
