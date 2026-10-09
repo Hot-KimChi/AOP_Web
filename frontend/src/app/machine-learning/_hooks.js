@@ -90,6 +90,7 @@ export function useMLPageData() {
       `${API_BASE_URL}/api/prediction_points?version_id=${versionId}`,
       { credentials: 'include' }
     );
+    if (!res.ok) throw new Error(`산점도 데이터 요청 실패 (HTTP ${res.status})`);
     const json = await res.json();
     if (json.status === 'success' && json.data.length > 0) {
       // 결과를 캐시에 저장 — 같은 버전 재클릭 시 네트워크 요청 없이 즉시 반환
@@ -103,12 +104,20 @@ export function useMLPageData() {
   // [Step 2] 초기 데이터 로드 (마운트 시 1회)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   useEffect(() => {
+    // StrictMode(dev)는 setup→cleanup→setup 으로 실행하므로 매 setup 마다 다시 켠다.
+    // 그렇지 않으면 첫 cleanup 이 false 로 바꾼 값이 남아 초기 로드 결과가 모두 버려진다.
+    isMountedRef.current = true;
+
     // 드롭다운용 모델 목록 로드
     async function fetchModels() {
       setLoading(true);
       setError('');
       try {
         const res  = await fetch(`${API_BASE_URL}/api/get_ml_models`, { credentials: 'include' });
+        if (!res.ok) {
+          if (isMountedRef.current) setError(`모델 정보를 불러오지 못했습니다. (HTTP ${res.status})`);
+          return;
+        }
         const json = await res.json();
         if (!isMountedRef.current) return;
         if (json.status === 'success') {
@@ -142,6 +151,7 @@ export function useMLPageData() {
           `${API_BASE_URL}/api/model_versions_performance?prediction_type=intensity`,
           { credentials: 'include' }
         );
+        if (!res.ok) throw new Error(`버전 성능 요청 실패 (HTTP ${res.status})`);
         const json = await res.json();
         if (!isMountedRef.current) return;
         if (json.status !== 'success') return;
@@ -200,6 +210,7 @@ export function useMLPageData() {
         `${API_BASE_URL}/api/model_versions_performance?prediction_type=intensity`,
         { credentials: 'include' }
       );
+      if (!res.ok) throw new Error(`버전 성능 요청 실패 (HTTP ${res.status})`);
       const json = await res.json();
       if (json.status === 'success') {
         const rawVersions = json.data || [];

@@ -615,7 +615,7 @@ export default function VerificationReport() {
                   disabled={txLoading}
                 >
                   <option value="">Select database…</option>
-                  {DBList.map((db, i) => <option key={i} value={db}>{db}</option>)}
+                  {DBList.map((db) => <option key={db} value={db}>{db}</option>)}
                 </select>
               </div>
               <div className="col-md-3">
@@ -716,7 +716,7 @@ export default function VerificationReport() {
                   disabled={reportLoading}
                 >
                   <option value="">Select database…</option>
-                  {DBList.map((db, i) => <option key={i} value={db}>{db}</option>)}
+                  {DBList.map((db) => <option key={db} value={db}>{db}</option>)}
                 </select>
               </div>
               <div className="col-md-2">
@@ -746,7 +746,7 @@ export default function VerificationReport() {
                   disabled={reportLoading || !reportProbe}
                 >
                   <option value="">Select WCS S/W…</option>
-                  {reportFilteredWcsVersions.map((w, i) => <option key={i} value={w.myVersion}>{w.myVersion}</option>)}
+                  {reportFilteredWcsVersions.map((w) => <option key={w.myVersion} value={w.myVersion}>{w.myVersion}</option>)}
                 </select>
               </div>
               <div className="col-md-2">
@@ -830,7 +830,7 @@ export default function VerificationReport() {
                 <table className="table table-sm" style={{ fontSize: '0.8rem' }}>
                   <thead style={{ background: 'var(--bg)' }}>
                     {summaryData.length > 0 && (
-                      <tr>{Object.keys(summaryData[0]).map((k, i) => <th key={i}>{k}</th>)}</tr>
+                      <tr>{Object.keys(summaryData[0]).map((k) => <th key={k}>{k}</th>)}</tr>
                     )}
                   </thead>
                   <tbody>
@@ -859,7 +859,7 @@ export default function VerificationReport() {
                 <table className="table table-sm" style={{ fontSize: '0.8rem' }}>
                   <thead style={{ background: 'var(--bg)' }}>
                     {reportData.length > 0 && (
-                      <tr>{Object.keys(reportData[0]).map((k, i) => <th key={i}>{k}</th>)}</tr>
+                      <tr>{Object.keys(reportData[0]).map((k) => <th key={k}>{k}</th>)}</tr>
                     )}
                   </thead>
                   <tbody>

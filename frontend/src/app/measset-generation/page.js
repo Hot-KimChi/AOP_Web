@@ -237,42 +237,53 @@ export default function MeasSetGen() {
   }, [API_BASE_URL]);
 
   // 선택된 데이터베이스에 따른 프로브 목록 로딩
+  // DB 를 빠르게 바꾸면 늦게 도착한 이전 응답이 새 목록을 덮어쓰므로 이전 요청을 취소한다.
   useEffect(() => {
-    if (selectedDatabase) {
-      setIsLoading(true);
-      
-      const fetchProbes = async () => {
-        try {
-          // URL 객체를 사용하여 더 안전하게 URL과 파라미터 구성
-          const url = new URL(`${API_BASE_URL}/api/get_probes`);
-          url.searchParams.append('database', selectedDatabase);
-          url.searchParams.append('table', 'probe_geo');
-
-          const response = await fetch(url, {
-            method: 'GET',
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`에러 응답: ${response.status} - ${errorText}`);
-            throw new Error(`프로브 목록을 가져오는데 실패했습니다: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          setProbeList(data.probes || []);
-        } catch (err) {
-          console.error('프로브 목록 가져오기 실패:', err);
-          setError('프로브 목록을 가져오는데 실패했습니다');
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      
-      fetchProbes();
-    } else {
+    if (!selectedDatabase) {
       setProbeList([]);
+      return undefined;
     }
+    const controller = new AbortController();
+    let settled = false;
+    setIsLoading(true);
+
+    const fetchProbes = async () => {
+      try {
+        // URL 객체를 사용하여 더 안전하게 URL과 파라미터 구성
+        const url = new URL(`${API_BASE_URL}/api/get_probes`);
+        url.searchParams.append('database', selectedDatabase);
+        url.searchParams.append('table', 'probe_geo');
+
+        const response = await fetch(url, {
+          method: 'GET',
+          credentials: 'include',
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`에러 응답: ${response.status} - ${errorText}`);
+          throw new Error(`프로브 목록을 가져오는데 실패했습니다: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!controller.signal.aborted) setProbeList(data.probes || []);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        console.error('프로브 목록 가져오기 실패:', err);
+        setError('프로브 목록을 가져오는데 실패했습니다');
+      } finally {
+        settled = true;
+        if (!controller.signal.aborted) setIsLoading(false);
+      }
+    };
+
+    fetchProbes();
+    return () => {
+      controller.abort();
+      // 진행 중이던 요청을 취소했으면 로딩 표시도 함께 내린다(다음 요청이 다시 켠다).
+      if (!settled) setIsLoading(false);
+    };
   }, [selectedDatabase, API_BASE_URL]);
 
   // 파일 변경 핸들러

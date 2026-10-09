@@ -89,7 +89,7 @@ function VersionsTable({ versionsData, expandedModels, onToggle }) {
           </tr>
         </thead>
         <tbody>
-          {versionsData.map((model, idx) => {
+          {versionsData.map((model) => {
             if (!model.versions?.length) return null;
 
             const isExpanded     = expandedModels[model.model_name];
@@ -97,7 +97,7 @@ function VersionsTable({ versionsData, expandedModels, onToggle }) {
 
             return (
               <ModelRows
-                key={idx}
+                key={model.model_name}
                 model={model}
                 displayVersions={displayVersions}
                 isExpanded={isExpanded}
@@ -126,7 +126,7 @@ function ModelRows({ model, displayVersions, isExpanded, onToggle }) {
 
         return (
           <tr
-            key={vIdx}
+            key={version.version_id ?? vIdx}
             style={isFirstRow ? { cursor: 'pointer' } : {}}
             onClick={isFirstRow ? () => onToggle(model.model_name) : undefined}
             className={!isFirstRow ? 'table-light' : ''}
