@@ -32,7 +32,7 @@
    산출물: 분배 계획(Routing Plan) — 하위작업 / 담당 모델 / 예산 / [ASK] 타입 질문 / [PRIOR] 사전확률
 
 # Verify 스텝: 구현 후 GPT 최신 모델로 교차 검증
-#   background로 띄우고, 메인은 검증 대상과 무관한 작업(Change Log 초안 등)만 진행
+#   background로 띄우고, 메인은 검증 대상과 무관한 작업(작업 기록 초안 등)만 진행
 → task(agent_type="task", model=<GPT 최신>, reasoning_effort="high", mode="background")
 
 # 고위험 변경(인증·SQL·시크릿): 한 턴에 2개 동시 실행
@@ -187,7 +187,7 @@ Leader: [PRIOR] 작성 → [ASK] 위임 → [DECISIONS] 수신 → 실제 결과
 **⑤ 기록 위치** — 학습 신호는 휘발되면 의미가 없다.
 - 세션 내: `todos` 또는 세션 DB 테이블에 `질문 / 담당 / 답 / 확률 / 실제 / 보정오차`를 남긴다.
   단, **재조사 비용이 큰 사실만** 남긴다. 방금 읽은 한 줄까지 적지 않는다.
-- 세션 간: 과잉확신으로 전제가 뒤집힌 사례는 `docs/AI_Rearch_detail.md`에 남긴다.
+- 세션 간: 과잉확신으로 전제가 뒤집힌 사례는 `Implementation_list.md`의 해당 작업 진행 내역에 남긴다.
 
 ### 4. 경량 작업 면제 (Tier S)
 
@@ -268,7 +268,7 @@ Leader: [PRIOR] 작성 → [ASK] 위임 → [DECISIONS] 수신 → 실제 결과
 
 ```
 task(..., mode="background")        # Verify 발사
-  → 즉시 Change Log 초안·커밋 메시지 작성 (검증 대상 파일은 건드리지 않는다)
+  → 즉시 작업 기록 초안·커밋 메시지 작성 (검증 대상 파일은 건드리지 않는다)
   → 완료 알림 수신 → read_agent 1회
 ```
 

@@ -426,3 +426,12 @@
 >   3. Viewer의 DB 선택을 테이블 요청에 전달하고 `AbortController`로 이전 요청을 취소했으며, ML 학습 요청의 HTTP 오류를 상태 코드와 함께 표시하도록 보완했습니다.
 >   4. Windows 실행 스크립트의 프론트 의존성 설치를 lockfile 기반 `npm ci`로 변경해 설치 재현성을 높였습니다.
 >   5. 백엔드 구문 검사와 프론트엔드 프로덕션 빌드를 통과했습니다. Playwright는 Chromium 실행 파일 미설치로 실행하지 못했습니다.
+
+----
+
+>#### 22. AI_Rearch_detail, AI_Rearch_summary에 기록하는 부분은 삭제해죠. 진행 내역은 Implementation_list에서 확인한다.
+
+> - **수행 일자**: 2026-10-09
+> - **진행 내역 요약**:
+>   1. `copilot-instructions.md`의 Change Log 규칙을 `Implementation_list.md` 단일 기록 규칙으로 교체하고, `docs/AI_Rearch_*.md`에는 더 이상 기록하지 않도록 명시했습니다.
+>   2. `model-routing`·`agent-orchestration`·`verification` 지침의 `AI_Rearch_detail.md`/Change Log 기록 지시를 모두 `Implementation_list.md`로 바꿨습니다. 기존 `docs/AI_Rearch_*.md` 파일 자체는 과거 이력 보존을 위해 남겨두었습니다.

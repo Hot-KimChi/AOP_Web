@@ -102,7 +102,7 @@
    ├─ 확률이 낮은 항목 → [RESIDUAL]로 분리 (임계값 기준: `agent-orchestration` §JEV)
    └─ Minor → 기록만, 요청 범위 밖이면 수정하지 않음
    ↓
-[Blocker 0 AND Major 0] → Leader 통합(보정 오차 기록) → Change Log 기록 → 자동 커밋
+[Blocker 0 AND Major 0] → Leader 통합(보정 오차 기록) → 작업 기록(`Implementation_list.md`) → 자동 커밋
 ```
 
 > 승격 기준·모델 선택·iteration 상한·이견 해소: `.github/instructions/model-routing.instructions.md`
