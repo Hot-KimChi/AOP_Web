@@ -435,3 +435,23 @@
 > - **진행 내역 요약**:
 >   1. `copilot-instructions.md`의 Change Log 규칙을 `Implementation_list.md` 단일 기록 규칙으로 교체하고, `docs/AI_Rearch_*.md`에는 더 이상 기록하지 않도록 명시했습니다.
 >   2. `model-routing`·`agent-orchestration`·`verification` 지침의 `AI_Rearch_detail.md`/Change Log 기록 지시를 모두 `Implementation_list.md`로 바꿨습니다. 기존 `docs/AI_Rearch_*.md` 파일 자체는 과거 이력 보존을 위해 남겨두었습니다.
+
+>#### 23. 워크플로우를 `Leader → Design → Implement → Verify`로 진행하는 것이 최적인지 다시 한번 확인해죠. 그리고 JEV 사용을 어떻게 해야 하는지에 대한 방법도 더 효율적이고 빠른 방법이 있으면 이를 적용해죠. 해당 내용을 agent 재작성 명세를 작성하고 이를 기반으로 진행해죠.
+
+> **[Agent 재작성 명세]** 고정 4단계 파이프라인과 JEV 소통 규칙을 실측 근거로 재점검하고, 품질을 유지하면서 지연·컨텍스트 비용을 줄인다.
+> - **목표**: ① 워크플로우를 Tier별 레인으로 재정의해 단순 작업이 불필요한 단계를 거치지 않게 한다 ② JEV 형식을 더 짧고 객관적으로 만들고 검증자 편향을 제거한다 ③ 매 요청 상시 로드되는 지침 분량을 줄인다.
+> - **진단 근거**: `agent-orchestration`·`model-routing`·`verification` 지침(약 27.5K자)에 `applyTo`가 없어 "푸시해줘" 같은 단순 요청에도 매번 전부 로드되고 있었다(`applyTo`가 있는 `ms-sql-dba`는 목록만 노출됨). 또한 `[PRIOR]`(구현자의 예상)를 검증자 프롬프트에 함께 보내 앵커링을 유발할 수 있었고, `conf`(high/medium/low)는 주관적이라 보정 기록에 쓰기 어려웠다.
+> - **범위(In)**: `.github/copilot-instructions.md`, `.github/instructions/{agent-orchestration,model-routing,verification}.instructions.md`.
+> - **범위(Out)**: 애플리케이션 코드, `AGENTS.md`, 스킬·에이전트 정의, 과거 이력 문서.
+> - **불변식**: 모델 배정(Leader·Verify=GPT, Design·Implement=Opus), 위험도 기반 Verify 승격 조건, 완료 조건 `Blocker 0 AND Major 0`, 자동 커밋 정책은 유지한다.
+> - **검증**: 지침 간 참조·용어(`conf`, `[STATE]`, `[KNOWN]`, `[DECISIONS]`) 잔존 grep 0건, GPT 교차 검증(지침 변경은 이후 모든 작업에 영향하므로 "확신 없는 변경"으로 승격).
+
+> - **수행 일자**: 2026-10-09
+> - **진행 내역 요약**:
+>   1. **워크플로우 재점검 결론 — 고정 4단계는 최적이 아님**: `Leader → Design → Implement → Verify`를 Tier L의 최대 경로로 재정의하고 Tier별 레인을 `copilot-instructions.md` §4 표로 명시했습니다. S는 `Implement → 자체 확인`, M은 `Design 요약 → Implement → 타깃 테스트 → (위험 시) Verify`, L은 Leader·구현 전 설계 검토를 추가합니다. Verify는 모든 레인에서 위험도로만 승격합니다.
+>   2. **상시 로드 컨텍스트 약 80% 감소**: 세 지침에 `applyTo: '.github/**'`를 추가해, 단순 요청에도 매번 붙던 약 33.7K자를 라우터 약 7K자로 줄였습니다. 위임하지 않는 작업에 필요한 규칙(Tier, Verify 필수 조건 전체, JEV 요약, 커밋 규칙)은 라우터에 남겼습니다.
+>   3. **JEV 형식 경량화**: 위임 봉투를 4블록(`[GOAL] [CONTEXT] [ASK] [BUDGET]`)으로 줄였습니다. 주관적 `conf`는 증거 등급 `E=실행/코드/추론`(추론이면 `p ≤ 0.7`)으로 바꾸고, 회신은 질문당 1줄로 통일했습니다. Verify 표준 질문 세트(Q1~Q6)로 질문 작성 비용을 없앴고, 보정 기록은 과잉확신 예외만 남깁니다.
+>   4. **검증자 편향 제거**: 이전 규칙은 구현자의 예상(`[PRIOR]`)을 검증자 프롬프트에 함께 보내 앵커링을 유발할 수 있었습니다. 이제 메인만 보관하고 회신 후 대조합니다.
+>   5. **모델 배정 갱신**: Verify `agent_type`을 `general-purpose`로 고정했습니다(#17의 `task` 판정 회피 실측 반영). 선호 ID는 문서의 선택 알고리즘에 따라 `claude-opus-5.5`·`gpt-6.1-sol`로 갱신했습니다.
+>   6. **교차 검증(gpt-6.1-sol, 새 형식으로 실행)**: 1라운드에서 Major 2·Minor 1이 나와 수정했습니다. V-001은 상시 라우터에 Verify 필수 조건 일부가 빠져 위임 필요성을 놓칠 위험, V-002는 `agent_type` 고정과 "다른 agent_type으로 교체" 규칙의 충돌, V-003은 L 레인의 무조건 Verify 표기였습니다.
+>   7. **보정 기록(과잉확신)**: "요구사항 충족" 사전확률을 0.8로 두었으나 실제로는 미충족(V-001)이었습니다. 상시 문서로 요약을 옮길 때 **조건 목록을 부분 복사한 것**이 원인으로, #17의 ⓒ(부분 수정 후 전수 미확인)와 같은 패턴입니다.

@@ -1,8 +1,14 @@
+---
+applyTo: '.github/**'
+description: '모델 배정, Leader·Verify 위임 조건, 교차 검증 승격 기준, iteration·이견 해소. Verify·Leader를 위임할 때만 연다.'
+---
+
 # Model Routing & Cross-Model Iteration
 
 > **지시·분배는 GPT 최신(Leader), 설계·구현은 Claude Opus 최신, 검증은 GPT 최신.**
 > 목적은 "모델을 많이 쓰는 것"이 아니라 **자기 검증의 맹점을 없애고, 판단을 올바른 모델에 보내는 것**이다.
 > 에이전트 간 소통 프로토콜(JEV 기반 타입 질문 + 보정된 확률)은 `agent-orchestration.instructions.md` §JEV가 기준이다.
+> Tier별 레인(S·M은 4단계를 다 거치지 않는다)은 `copilot-instructions.md` §4가 기준이다.
 
 ---
 
@@ -27,10 +33,10 @@ Leader는 요청을 **계획으로 변환**하고, 결과를 **계획과 대조*
 
 | 스텝 | 모델 | 실행 주체 | reasoning_effort |
 |------|------|-----------|------------------|
-| **Leader** (지시·분배·통합) | **GPT 최신 (`gpt-6-astra`)** | 세션 메인 에이전트 (§2.1 참조) | `high` |
-| **Design** | Claude Opus 최신 (`claude-opus-5`) | Leader가 Opus에 배정 | `high` |
-| **Implement** | Claude Opus 최신 (`claude-opus-5`) | Design과 **동일 주체가 연속 수행** | `high` |
-| **Verify** | GPT 최신 (`gpt-6-astra`) | **`task`/`general-purpose` 서브에이전트 위임** | `high` |
+| **Leader** (지시·분배·통합) | **GPT 최신 (`gpt-6.1-sol`)** | 세션 메인 에이전트 (§2.1 참조) | `high` |
+| **Design** | Claude Opus 최신 (`claude-opus-5.5`) | Leader가 Opus에 배정 | `high` |
+| **Implement** | Claude Opus 최신 (`claude-opus-5.5`) | Design과 **동일 주체가 연속 수행** | `high` |
+| **Verify** | GPT 최신 (`gpt-6.1-sol`) | **`general-purpose` 서브에이전트 위임** (`task`는 판정 회피 실측으로 제외) | `high` |
 
 - Design·Implement는 **같은 모델·같은 주체**다. 쪼개면 설계 맥락이 유실된다.
 - Leader와 Verify는 같은 GPT 계열이지만 **역할이 다르다.** Leader는 *무엇을 누구에게 시킬지*를 정하고, Verify는 *결과가 맞는지*를 본다.
@@ -95,8 +101,8 @@ Leader는 요청을 **계획으로 변환**하고, 결과를 **계획과 대조*
    등급 표기가 있으면 상위 등급 우선 (opus > sonnet > haiku, 무접미 > mini/flash).
 3) 그래도 못 고르면 아래 참고 목록 중 **현재 노출 목록에 실제로 존재하는 첫 모델**을 쓴다.
    하나도 없으면 4단계로 간다. (이 목록은 "정답"이 아니라 순서 힌트일 뿐이다)
-   - Claude: claude-opus-5 → claude-opus-4.8 → claude-opus-4.7
-   - GPT:    gpt-6-astra → gpt-5.6-sol → gpt-5.5
+   - Claude: claude-opus-5.5 → claude-opus-5 → claude-opus-4.8
+   - GPT:    gpt-6.1-sol → gpt-6-astra → gpt-5.6-sol
 4) 해당 계열 모델이 하나도 없으면 →
    - **Verify**: 교차 검증 불가. **중단하지 말고 구현자가 직접 검증하되,
      "교차 검증이 성립하지 않았다"는 사실을 사용자에게 명시**한다. (§3 필수 조건의 유일한 예외)
@@ -117,6 +123,8 @@ Leader는 요청을 **계획으로 변환**하고, 결과를 **계획과 대조*
 > Tier S 라도 필수 조건에 걸리면 승격한다. 반대로 Tier L 이라도 위험도가 없으면 승격하지 않는다.
 
 ### 교차 검증 **필수** (Verify 위임)
+
+> 이 목록의 전체 사본이 상시 로드되는 `copilot-instructions.md` §4.1 경고에 있다. **수정 시 두 곳을 함께 갱신**한다.
 
 - 인증·권한·세션·쿠키, 시크릿 취급
 - SQL·DB 스키마·마이그레이션, 데이터 삭제/덮어쓰기
@@ -147,21 +155,21 @@ Leader는 요청을 **계획으로 변환**하고, 결과를 **계획과 대조*
 
 ```
 [Leader]   요청 해석 · Tier 판정 · §3 위험도 판정 · 작업 분해 · 담당 모델 배정
-             ↓  분배 계획(Routing Plan) + 각 하위작업의 기대 결과(예측)를 명시
+             ↓  분배 계획(Routing Plan) + 각 하위작업의 기대 결과(예측)를 메인이 보관
 [Design]   범위 확정 · 불변식 목록화 · 검증 기준(Acceptance Criteria)
              ↓  (비자명하면 rubber-duck으로 설계 사전 검증)
 [Implement] 최소·정확 구현 + 스모크 테스트 실행 로그 확보
              ↓  (§3 승격 기준 미해당이면 Leader 통합으로 직행)
-[Verify]   서브에이전트 위임 — 요구사항 + 설계 의도 + 불변식 + diff + 실행 로그를 [ASK] 타입 질문으로 환원해 전달
+[Verify]   서브에이전트 위임 — [GOAL]/[CONTEXT]/[ASK](표준 질문 세트)/[BUDGET]. [PRIOR]는 보내지 않는다
              ↓
-[리포트]   [DECISIONS] — 질문별 타입 값 + 확률 + 신뢰도 (Blocker/Major/Minor 집계 포함)
+[리포트]   질문당 1줄 — 값 + p + 증거 등급 E (Blocker/Major/Minor 집계 포함)
              ├─ Blocker·Major 있음 → Implement 복귀 (iteration)
              └─ Blocker 0 AND Major 0 → Leader 통합
              ↓
 [Leader]   [PRIOR] 대비 실제 결과 대조(보정 오차 기록) · 작업 기록(`Implementation_list.md`) · 커밋 · 사용자 보고
 ```
 
-- **Leader의 분배 계획은 산문이 아니라 타입 질문(`[ASK]`)과 사전확률(`[PRIOR]`)로 적는다.**
+- **Leader의 분배 계획은 산문이 아니라 타입 질문(`[ASK]`)과 사전확률(`[PRIOR]`)로 적는다.** `[PRIOR]`는 메인이 보관하고 하위 위임 프롬프트에는 넣지 않는다(앵커링 방지).
   회신 확률과 실제 결과의 차이가 **보정 오차**이며, 이것이 다음 라우팅 판단의 학습 신호다. → `agent-orchestration.instructions.md` §JEV
 - **Verify에 diff만 던지지 않는다.** 설계 의도와 불변식을 함께 줘야 의도된 동작을 버그로 오탐하지 않는다.
 - Verify 에이전트는 **읽기·실행 전용**이다. 수정은 Implement(Opus)가 한다. 검증자가 고치면 검증자가 없어진다.
@@ -237,11 +245,11 @@ task(..., mode="background")  →  read_agent          # 1라운드 리포트
 ⑤ 설계 의도 및 불변식 ⑥ 변경 내용(diff) ⑦ **이미 확인된 사실**(재확인 불필요 — 검증자 예산을 의미 검토에 쓰게 한다)
 ⑧ 검증 항목 ⑨ 출력 형식
 
-> 위 9블록은 **JEV 상태 봉투**(`agent-orchestration.instructions.md` §JEV)에 매핑된다:
-> ④⑤ → `[GOAL]`, ③⑥ → `[STATE]`, ⑦ → `[KNOWN]`, ⑧ → `[ASK]`, ①⑨ → `[BUDGET]`.
-> **⑧ 검증 항목은 반드시 Choice/Score/Noul 타입 질문으로 환원**하고, `[PRIOR]`(내가 믿는 답과 확률)를 추가한다.
-> 회신은 질문별 **값 + 확률 + 신뢰도**를 받는다. "확인해줘"식 열린 요청은 **판정 회피를 유발하므로 금지**한다.
-> 예: `[PRIOR] Q3(Choice 최고심각도)=이상없음 p=0.7 / Q2(Noul 413 경로 회귀)=false p=0.5 conf=low`
+> 위 9블록은 **JEV 위임 봉투 4블록**(`agent-orchestration.instructions.md` §JEV)에 매핑된다:
+> ④⑤ → `[GOAL]`, ③⑥⑦ → `[CONTEXT]`, ⑧ → `[ASK]`, ①②⑨ → `[BUDGET]`.
+> **⑧ 검증 항목은 §JEV-4 표준 질문 세트를 그대로 쓰고**, 작업 고유 질문은 최대 2개만 덧붙인다.
+> 회신은 질문당 **값 + p + 증거 등급 E** 1줄. "확인해줘"식 열린 요청은 **판정 회피를 유발하므로 금지**한다.
+> **`[PRIOR]`는 프롬프트에 넣지 않는다.** 메인이 위임 전에 메모해 두고 회신과 대조만 한다.
 
 ```markdown
 ## 실행 환경 (Windows)
@@ -249,14 +257,12 @@ task(..., mode="background")  →  read_agent          # 1라운드 리포트
 파일은 셸이 아니라 `view` 도구로 읽어라. 비교는 `git --no-pager diff HEAD -- <파일>` 헌크만 보면 된다.
 검증에 불필요한 도구 실패(외부 문서 조회 등)는 무시하고 진행하라.
 
-## 검증 항목
-1. 요구사항 충족 (미충족/**과충족** 모두) 2. 회귀 위험 3. 불변식 위반
-4. 엣지케이스(0건/1건/대량/실패 경로) 5. 보안 6. 요청 범위 이탈
+## 질문 ([ASK])
+agent-orchestration §JEV-4 표준 질문 세트 Q1~Q6 + 작업 고유 질문 최대 2개.
 
 ## 출력 형식 (엄수)
-**네 산출물은 위 항목 각각에 대한 판정이다.**
-항목마다 심각도(Blocker/Major/Minor/이상 없음) · 파일:라인 · 근거 · 개선 제안을 붙여라.
-추측이면 "추측"이라 명시하라. 이상 없으면 **무엇을 어떻게 확인했는지** 적어라.
+**네 산출물은 각 질문에 대한 판정이다.** 질문당 1줄: `Q# | 값 | p | E=실행/코드/추론 | 근거(파일:라인 또는 명령 출력)`.
+지적마다 `V-ID · 심각도 · 파일:라인 · 개선 제안`을 붙여라. E=추론이면 p ≤ 0.7, p ≤ 0.7 항목은 [RESIDUAL]에 사유와 함께.
 마지막 줄에 `Blocker n / Major n / Minor n` 집계. 도구 실패로 판정 못 하면 다른 수단으로 재시도하라.
 ```
 
@@ -267,8 +273,8 @@ task(..., mode="background")  →  read_agent          # 1라운드 리포트
 | **판정 회피** | 파일 존재·ID 유효성 등 기계적 확인만 하고 "의미 검토는 미수행"으로 종료 | "**네 산출물은 각 항목의 판정이다**" 명시 + "이미 확인된 사실" 블록 제공 |
 | **인코딩 중단** | 한글 출력 시 `UnicodeEncodeError: 'cp949'`로 명령이 죽고 그대로 포기 | 위 "실행 환경" 블록 포함 |
 
-**2라운드 연속 판정 회피 시** 같은 에이전트를 더 두드리지 말고 **다른 모델·다른 agent_type으로 교체**한다
-(예: `task`+`gpt-6-astra` → `general-purpose`+`gpt-5.6-sol`).
+**2라운드 연속 판정 회피 시** 같은 에이전트를 더 두드리지 말고 **새 `general-purpose` 에이전트를 다른 GPT 모델로** 띄운다
+(agent_type은 `general-purpose`로 고정 — 과거 `task`+`gpt-6-astra`가 판정 회피해 `general-purpose`+`gpt-5.6-sol`로 교체한 실측이 근거다).
 단 **부분 산출물은 버리지 않는다** — 위 실패 사례에서도 모델 ID·링크·스킬 존재 확인은 유효했고 실제 오류 1건을 잡아냈다.
 
 ---
@@ -278,7 +284,7 @@ task(..., mode="background")  →  read_agent          # 1라운드 리포트
 ```markdown
 ### 파이프라인 실행 내역
 - Leader (<선택한 모델> 또는 "메인 대행"): <Tier 판정 · 분배 방식 1줄>
-- Design/Implement (Claude Opus 5): <핵심 판단 1~2줄, 변경 파일 n개>
+- Design/Implement (<선택한 Opus 모델>): <핵심 판단 1~2줄, 변경 파일 n개>
 - Verify (<선택한 모델>): <라운드 수> · Blocker n / Major n / Minor n
 - Iteration: <수정한 finding ID / 기각한 ID와 사유>
 - 예측오차: <`[PRIOR]` 확률 대비 실제 결과의 보정 오차 1줄, 없으면 "없음">

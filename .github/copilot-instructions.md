@@ -39,12 +39,13 @@
 |-----------|---------------|
 | `backend/**` | `backend/AGENTS.md` |
 | `frontend/**` | `frontend/AGENTS.md` |
-| 프로젝트 구동/배포/실행 | `README.md`, `scripts/AOP_Web.ps1` |
-| 디버깅/오류 분석 | `.github/instructions/verification.instructions.md` |
-| 서브에이전트/병렬 작업 | `.github/instructions/agent-orchestration.instructions.md` |
-| **동작 변경을 수반하는 모든 작업** | `.github/instructions/model-routing.instructions.md` |
+| 프로젝트 구동/배포/실행 | `README.md`, `scripts/AOP_Web.ps1`, `verification.instructions.md` §실행 스크립트 |
+| 디버깅/오류 분석 · 완료 전 체크리스트 | `.github/instructions/verification.instructions.md` |
+| 서브에이전트 위임 프롬프트 작성(JEV 봉투·표준 질문) | `.github/instructions/agent-orchestration.instructions.md` |
+| Verify·Leader 위임, iteration, 이견 해소 | `.github/instructions/model-routing.instructions.md` |
 
 > 위 표의 파일은 **해당 작업일 때만** 연다. 라우터를 읽었다고 전부 열지 않는다. 불필요한 로딩은 그대로 지연이 된다.
+> `.github/instructions/` 의 세 지침은 `applyTo: '.github/**'` 로 **상시 로드에서 제외**되어 있다. 위임하지 않는 작업은 이 라우터만으로 충분하다.
 
 ### 컨텍스트 윈도우 관리
 
@@ -55,21 +56,34 @@
 
 ---
 
-## 4. Workflow: Leader → Design → Implement → Verify
+## 4. Workflow — Tier별 레인 (고정 4단계가 아니다)
 
-> **Leader(지시·분배)는 GPT 최신, Design·Implement는 Claude Opus 최신, Verify는 GPT 최신 서브에이전트가 수행한다.**
-> Leader와 Verify는 같은 GPT 계열이지만 **역할이 다르므로 동일 에이전트가 겸하지 않는다.**
-> 모델 ID·Leader 위임 조건·승격 기준·iteration 규칙: **`.github/instructions/model-routing.instructions.md`**
-> 에이전트 간 메시지 형식(JEV 상태 봉투)·보정 학습 루프: **`.github/instructions/agent-orchestration.instructions.md` §JEV**
+> `Leader → Design → Implement → Verify` 는 **Tier L 의 최대 경로**다. 모든 요청에 4단계를 다 태우면 지연만 늘고 품질 이득이 없다.
+> **모델**: Leader·Verify = GPT 최신, Design·Implement = Claude Opus 최신. Leader와 Verify는 **다른 에이전트**가 맡는다.
 
-- **Leader는 코드를 쓰지 않는다.** 산출물은 분배 계획(Routing Plan)과 최종 통합 보고다.
-  **단순한 작업은 메인이 Leader를 대행**할 수 있고, 그 사실을 보고에 남긴다.
-  **실행 주체(메인 모델 계열별)와 GPT Leader 위임 필수 조건은 `model-routing` §2.1이 단일 기준**이며, 여기에 나열하지 않는다.
-- **승격된 Verify는 GPT 서브에이전트가 수행한다** — 구현자와 같은 모델이 검증하면 같은 추론 오류를 그대로 통과시킨다. (예외: 해당 계열 모델이 없을 때)
-- 교차 검증은 **위험도로 승격**한다(인증·SQL·데이터 손실·구동 스크립트·확신 없는 변경). 파일 수로 판단하지 않는다. **필수 조건은 생략 조건보다 우선**한다.
-- **모든 위임은 타입 질문(`[ASK]`: Choice/Score/Noul)으로 환원하고, 회신은 값 + 확률 + 신뢰도로 받는다.**
-  산문 단정("문제 없습니다")은 금지한다. `[PRIOR]` 대비 실제 결과의 **보정 오차**를 다음 라우팅에 반영한다.
+| Tier | 레인 | 담당 |
+|------|------|------|
+| **S** | Implement → 자체 확인 1회 | 메인 단독 (Leader 대행) |
+| **M** | Design(3~5줄) → Implement → 타깃 테스트 → *(위험 시)* Verify | 메인 + GPT Verify |
+| **L** | Leader → Design → *(설계 검토)* → Implement → *(위험 시)* Verify | GPT Leader · Opus · GPT Verify |
+
+> Verify는 **모든 레인에서 위험도로만** 승격한다(§4.1 경고). L이라도 위험이 없으면 생략하고, S라도 위험하면 필수다.
+
+- **Leader는 코드를 쓰지 않는다.** 기본은 메인이 대행하고 보고에 1줄 남긴다.
+  Tier L 이거나 작업 분해가 자명하지 않으면 **`model-routing` §2.1을 열어** GPT Leader 위임 여부를 판정한다(조건 목록의 단일 기준).
+- **Verify는 Tier가 아니라 위험도로 승격**한다(아래 §4.1 경고 참조). 구현자와 같은 모델이 검증하면 같은 추론 오류를 통과시키므로 **GPT 서브에이전트**가 맡는다. 승격하면 `model-routing` §5~6을 연다.
+- **설계 검토는 구현 전에** 한다. Tier L·비자명 설계는 구현 전에 `rubber-duck`으로 검토한다 — 구현 후 재작업보다 싸다.
 - 완료 조건은 **`Blocker 0 AND Major 0`**. 미해결 시 커밋하지 않고 보고한다.
+
+### 4.0 에이전트 소통 — JEV 형식 (경량, 상시 규칙)
+
+> 이 저장소는 JEV 모델을 **호출하지 않는다.** 그 **형식(타입 질문 + 보정 확률)만 차용**해 왕복 횟수와 판정 회피를 줄인다.
+> 위임 프롬프트를 실제로 쓸 때 상세(표준 질문 세트·안티패턴): `agent-orchestration.instructions.md` §JEV
+
+- 위임 프롬프트는 **`[GOAL] [CONTEXT] [ASK] [BUDGET]` 4블록**. `[ASK]`는 Choice/Score/Noul 타입 질문을 **한 번에 묶어** 보낸다.
+- **`[PRIOR]`(내 예상)는 프롬프트에 넣지 않고 메인만 보관**한다 — 보여주면 검증자가 그쪽으로 끌려간다(앵커링).
+- 회신은 질문당 1줄: `Q# | 값 | p | E=실행/코드/추론 | 근거`. **E=추론이면 p ≤ 0.7**, p ≤ 0.7 항목은 `[RESIDUAL]`로 분리한다.
+- 산문 단정("문제 없습니다") 금지. 보정 기록은 **예외만** — p ≥ 0.8인데 틀린 항목을 `Implementation_list.md`에 1줄.
 
 ### 4.1 작업 등급(Tier) — **착수 전에 먼저 정한다**
 
@@ -84,7 +98,10 @@
 | **L (심층)** | 전수 리뷰·아키텍처 변경·"전체/완벽하게" 명시 | 병렬 서브에이전트 | 정식 | 전체 테스트 + 빌드 | **≤ 120** |
 
 > ⚠ **위 표는 교차 검증(Verify 위임) 여부를 정하지 않는다.**
-> **교차 검증 승격은 Tier 와 무관하게 위험도 단독으로 판정**한다(인증·세션·시크릿, SQL·데이터 손실, 공용 API 계약, 동시성, 구동 스크립트, 확신 없는 변경).
+> **교차 검증 승격은 Tier 와 무관하게 위험도 단독으로 판정**한다. 아래 중 하나라도 해당하면 **필수**이며, **필수 조건은 생략 조건보다 우선**한다:
+> 인증·권한·세션·쿠키 / 시크릿 취급 / SQL·DB 스키마·마이그레이션 / 데이터 삭제·덮어쓰기 / 공용 API 계약(요청·응답 스키마) /
+> 동시성·상태 전이·재시도 / 서비스 구동·배포 스크립트(`scripts/AOP_Web.ps1`, `AOP_Web.bat`) / 재현 방법이 불명확하거나 확신 없는 변경.
+> 인증·SQL·시크릿 경로면 `security-review`를 병렬 추가한다. (단일 기준: `model-routing` §3 — 이 목록은 그 전체 사본이며 함께 갱신한다)
 > **Tier S 의 한 줄짜리 인증 수정이나 `AOP_Web.ps1` 수정도 교차 검증 필수다.**
 > Tier 가 정하는 것은 **탐색 깊이·Design 서술·자체 검증 깊이·도구 호출 예산·적용 라운드 상한**이며, **교차 검증 승격은 절대 포함하지 않는다.**
 > 판정 기준: `.github/instructions/model-routing.instructions.md` §3

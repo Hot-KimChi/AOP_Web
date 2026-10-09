@@ -1,3 +1,8 @@
+---
+applyTo: '.github/**'
+description: '완료 전 검증 체크리스트(백엔드·프론트엔드·실행 스크립트)와 교차 검증 흐름. 디버깅·완료 확인 시에만 연다.'
+---
+
 # Verification & Quality Gate
 
 > 작업 완료 전 수행할 검증 체크리스트. 상세 규칙은 각 `AGENTS.md` 참조.
@@ -86,18 +91,18 @@
 ## 검증 흐름 (교차 모델)
 
 ```
-[Leader: Tier·위험도 판정 · 검증 예산 배정 · 타입 질문([ASK])과 사전확률([PRIOR]) 작성]  ← GPT (대행 조건은 `model-routing` §2.1)
+[Leader: Tier·위험도 판정 · 검증 예산 배정 · 타입 질문([ASK]) 선정 · 사전확률([PRIOR]) 메모(위임 프롬프트에는 넣지 않음)]  ← GPT (대행 조건은 `model-routing` §2.1)
    ↓
 [Implement 완료 · 스모크 테스트 실행 로그 확보]  ← Claude Opus
    ↓  (위험도 승격 기준 미해당이면 여기서 종료 — 생략 사실을 응답에 명시)
 [Verify 서브에이전트 위임]  ← GPT (구현자가 직접 하지 않음, Leader와도 다른 에이전트)
-   입력: **JEV 상태 봉투** (블록 구성·작성법은 `agent-orchestration` §JEV — 여기서 중복 정의하지 않는다)
+   입력: **JEV 위임 봉투 4블록 + 표준 질문 세트** (`agent-orchestration` §JEV — 여기서 중복 정의하지 않는다)
          이 단계에서 봉투에 담을 검증 고유 내용:
    ├─ 관련 AGENTS.md 불변식 위반 여부
    ├─ 위 스택별 체크 항목
    └─ 엣지케이스·회귀·보안
    ↓
-[리포트: [DECISIONS] 질문별 값 + 확률 + 신뢰도 → Blocker / Major / Minor 집계]
+[리포트: 질문당 1줄 — 값 + p + 증거 등급 E → Blocker / Major / Minor 집계]
    ├─ Blocker·Major → Opus가 수정 → write_agent로 재검증
    ├─ 확률이 낮은 항목 → [RESIDUAL]로 분리 (임계값 기준: `agent-orchestration` §JEV)
    └─ Minor → 기록만, 요청 범위 밖이면 수정하지 않음
