@@ -23,9 +23,15 @@ DEV_ORIGIN_PATTERN = re.compile(
 
 
 def _parse_origins(raw: str):
-    """쉼표 구분 Origin 문자열을 파싱한다. 비어 있으면 개발용 사설망 패턴을 쓴다."""
+    """쉼표 구분 Origin 문자열을 파싱한다.
+
+    비어 있으면 개발 모드에서는 사설망 패턴을 쓰고, 운영 모드에서는 빈 목록을 돌려준다.
+    운영에서 사설망 패턴으로 대체하면 _validate_production 의 미지정 검사가 무력화된다.
+    """
     origins = [o.strip() for o in raw.split(",") if o.strip()]
-    return origins or [DEV_ORIGIN_PATTERN]
+    if origins:
+        return origins
+    return [] if _is_production() else [DEV_ORIGIN_PATTERN]
 
 
 def _is_production() -> bool:
