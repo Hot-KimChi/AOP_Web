@@ -548,6 +548,65 @@ function Show-Status {
     Write-Host "  AOP Web Application Status Check"           -ForegroundColor Green
     Write-Host "=============================================" -ForegroundColor Green
 
+    $taskName = "AOP_Web_AutoStart"
+    $startupTaskQueryError = $null
+    try {
+        $startupTask = Get-ScheduledTask -TaskName $taskName -ErrorAction Stop
+    } catch {
+        if ($_.CategoryInfo.Category.ToString() -eq "ObjectNotFound") {
+            $startupTask = $null
+        } else {
+            $startupTask = $null
+            $startupTaskQueryError = $_.Exception.Message
+        }
+    }
+
+    Write-Host "`n[Automatic Startup]" -ForegroundColor Cyan
+    $startupProduction = $true
+    $hasBootTrigger = $false
+    $isS4ULogon = $false
+    $isLimitedRunLevel = $false
+    $isEnabled = $false
+    $hasEnabledBootTrigger = $false
+    if ($startupTaskQueryError) {
+        Write-Host "  Status: UNKNOWN | Task query failed: $startupTaskQueryError" -ForegroundColor Red
+    } elseif ($startupTask) {
+        $startupArguments = ($startupTask.Actions | ForEach-Object { $_.Arguments }) -join " "
+        $startupProduction = $startupArguments -match '(^|\s)-Production(?=\s|$)'
+        $bootTriggers = @($startupTask.Triggers | Where-Object {
+            $_.CimClass.CimClassName -eq "MSFT_TaskBootTrigger"
+        })
+        $hasBootTrigger = $bootTriggers.Count -gt 0
+        $hasEnabledBootTrigger = @($bootTriggers | Where-Object { $_.Enabled }).Count -gt 0
+        $hasLogonTrigger = @($startupTask.Triggers | Where-Object {
+            $_.CimClass.CimClassName -eq "MSFT_TaskLogonTrigger"
+        }).Count -gt 0
+        $isS4ULogon = $startupTask.Principal.LogonType.ToString() -eq "S4U"
+        $isLimitedRunLevel = $startupTask.Principal.RunLevel.ToString() -eq "Limited"
+        $isEnabled = $startupTask.State.ToString() -ne "Disabled"
+        $triggerDescription = if ($hasBootTrigger) {
+            "system startup"
+        } elseif ($hasLogonTrigger) {
+            "user logon"
+        } else {
+            "other"
+        }
+
+        if ($hasEnabledBootTrigger -and $isS4ULogon -and $isLimitedRunLevel -and $isEnabled) {
+            Write-Host "  Status: CONFIGURED | Trigger: $triggerDescription | Logon: S4U | Run level: Limited" -ForegroundColor Green
+        } else {
+            Write-Host "  Status: MISCONFIGURED | Trigger: $triggerDescription | Boot trigger enabled: $hasEnabledBootTrigger | Logon: $($startupTask.Principal.LogonType) | Run level: $($startupTask.Principal.RunLevel) | Enabled: $isEnabled" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "  Status: NOT REGISTERED" -ForegroundColor Red
+    }
+
+    if (-not $startupTaskQueryError -and (-not $startupTask -or -not $hasEnabledBootTrigger -or -not $isS4ULogon -or -not $isLimitedRunLevel -or -not $isEnabled)) {
+        $modeSwitch = if ($startupProduction) { " -Production" } else { "" }
+        Write-Host "  Fix (run in Administrator PowerShell):" -ForegroundColor Yellow
+        Write-Host "  powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$scriptFilePath`" -Action RegisterStartup$modeSwitch" -ForegroundColor Yellow
+    }
+
     $backendProcs = @(Get-ProcessesOnPort -Port 5000)
     Write-Host "`n[Backend Server - Port 5000]" -ForegroundColor Cyan
     if ($backendProcs.Count -gt 0) {
