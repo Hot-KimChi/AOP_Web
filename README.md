@@ -86,9 +86,9 @@ npm install
 | `AOP_Web.bat status` | 현재 백엔드/프론트엔드 포트 리스닝 및 프로세스 상태 확인 |
 | `AOP_Web.bat help` | 명령어와 옵션 도움말 표시 |
 | `AOP_Web.bat prod` | 운영 모드(Production)로 빌드 및 백그라운드 구동 |
-| `AOP_Web.bat uninstall` | Windows 로그온 자동 시작 작업(`AOP_Web_AutoStart`) 해제 |
+| `AOP_Web.bat uninstall` | Windows 부팅 자동 시작 작업(`AOP_Web_AutoStart`) 해제 |
 
-> `start`·`prod`처럼 **서버를 직접 기동하면 방금 사용한 모드 그대로 자동 시작 작업이 등록**됩니다. 자세한 내용은 [6. Windows 자동 시작 등록](#6-windows-자동-시작-등록-auto-start-setup)을 참고하세요.
+> 서버를 재부팅해도 로그인 전에 자동으로 서비스가 시작되도록 하려면 관리자 PowerShell에서 `RegisterStartup`을 한 번 실행해야 합니다. 자세한 내용은 [6. Windows 자동 시작 등록](#6-windows-자동-시작-등록-auto-start-setup)을 참고하세요.
 
 `prod`는 운영 필수 환경변수(`AUTH_SECRET_KEY`, `FLASK_SECRET_KEY`, `ALLOWED_ORIGINS`)를 먼저 확인한 뒤 `npm run build`와 `npm start`를 순서대로 실행합니다. 필수값이 없으면 백엔드를 먼저 실행하지 않고 원인을 출력합니다.
 
@@ -180,26 +180,27 @@ MeasSet 생성 결과와 검증 리포트는 **저장소 루트의 `1_uploads\`*
 
 ## 6. Windows 자동 시작 등록 (Auto-Start setup)
 
-권장 방식은 **서버 컴퓨터에서 현재 Windows 사용자 로그온 시 작업 스케줄러로 등록**하는 것입니다. 이 저장소에는 작업을 자동으로 등록하지 않으며, 아래 기동 명령을 실행한 컴퓨터에만 등록됩니다. 해당 사용자의 Python/Node 환경변수와 프로젝트 권한을 그대로 사용하고, 서버 창은 숨겨진 상태로 실행됩니다.
+권장 방식은 **서버 컴퓨터 부팅 시 작업 스케줄러로 등록**하는 것입니다. 작업은 현재 Windows 사용자 권한(제한된 권한)으로 로그인 전에 실행되므로, 서버 PC에 로그인하지 않아도 클라이언트가 접속할 수 있습니다. 저장소와 실행 환경은 서버의 로컬 디스크에 있어야 합니다. S4U 로그온은 네트워크 공유·매핑 드라이브에 접근할 수 없으며, 작업에 비밀번호를 저장하지 않습니다.
 
 ### 6.1 자동 시작 등록 및 해제
 
-별도의 등록 명령은 없습니다. **서버를 직접 기동하면 그때 사용한 모드 그대로** `AOP_Web_AutoStart` 작업이 등록(있으면 갱신)됩니다.
+작업 등록·갱신은 관리자 권한이 필요합니다. 서버 PC에서 관리자 PowerShell을 열고 운영 모드 기준으로 한 번 실행합니다. 이 명령은 서비스를 중지하거나 재기동하지 않고 자동 시작 작업만 등록합니다.
 
-```cmd
-AOP_Web.bat start   :: 개발 모드로 기동 + 개발 모드 자동 시작 등록
-AOP_Web.bat prod    :: 운영 모드로 기동 + 운영 모드 자동 시작 등록
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\AOP_Web.ps1 -Action RegisterStartup -Production
 ```
 
-등록은 현재 실행 중인 Windows 계정 기준이며, 로그온 후 30초 지연을 두어 네트워크와 사용자 환경이 준비된 뒤 `scripts\AOP_Web.ps1 -Action Start [-Production] -Unattended`를 직접 실행합니다. 경로에 공백이 있어도 배치 파일 재호출 과정에서 실패하지 않습니다.
+개발 모드를 쓰는 경우 `-Production`을 생략합니다. 트리거는 시스템 부팅 후 60초 지연이며, `StartWhenAvailable`과 최대 3회 재시작을 설정합니다. 실행 전 서버의 현재 IP로 CORS 허용 Origin을 갱신하고, 3000/5000 포트 준비를 최대 60초 기다립니다. 시작이 실패하면 `logs\start_*.log`, `logs\backend_stderr_*.log`, `logs\frontend_build_*.log`를 확인합니다.
 
-작업 스케줄러가 실행한 경로(`-Unattended`)에서는 재등록하지 않으며, 운영 모드의 헬스 모니터링 루프에도 들어가지 않습니다. 따라서 작업은 기동을 마친 뒤 정상 종료되고 `Last Result`가 `0x0`으로 남습니다.
+일반 사용자 권한으로 `start`/`prod`를 실행해도 서비스는 시작되지만, 자동 시작 작업 등록은 권한 부족 경고와 함께 건너뜁니다. 작업 스케줄러가 실행한 경로(`-Unattended`)에서는 재등록하지 않으며, 작업은 서비스를 분리 실행한 뒤 정상 종료되어 `Last Result`가 `0x0`으로 남습니다.
 
 등록 상태와 마지막 실행 결과는 다음 명령으로 확인할 수 있습니다.
 
 ```cmd
 schtasks /Query /TN AOP_Web_AutoStart /FO LIST /V
 ```
+
+출력에서 트리거가 **At startup**이고, 마지막 결과가 `0x0`인지 확인합니다. 애플리케이션이 포트 3000/5000을 열었는지는 `AOP_Web.bat status`로 확인합니다.
 
 자동 시작을 해제하려면 다음 명령을 실행합니다. 작업이 없어도 오류 없이 종료됩니다.
 
@@ -209,15 +210,7 @@ AOP_Web.bat uninstall
 
 ### 6.2 운영 모드로 자동 시작할 때의 필수 준비
 
-작업 스케줄러는 **대화형 셸에서 설정한 `set`/`$env:` 값을 물려받지 않습니다.** `backend\config.py`는 운영 모드에서 시크릿이 기본값이면 부팅을 중단하므로, 운영 모드로 등록하기 전에 다음 값을 **사용자 또는 시스템 범위에 영구 등록**해야 합니다.
-
-```cmd
-setx AUTH_SECRET_KEY  "<충분히 긴 임의 문자열>"
-setx FLASK_SECRET_KEY "<충분히 긴 임의 문자열>"
-setx ALLOWED_ORIGINS  "http://localhost:3000"
-```
-
-미설정 상태로 `AOP_Web.bat prod`를 실행하면 등록 직후 경고가 출력되며, 그대로 두면 다음 로그온 시 백엔드가 기동에 실패합니다.
+작업 스케줄러는 **대화형 셸의 임시 `set`/`$env:` 값을 물려받지 않습니다.** 운영 모드 등록은 `backend\.env.production`을 사용하며, 없으면 실행 스크립트가 시크릿을 생성하고 현재 서버 IP에 맞는 CORS Origin을 저장합니다. 이 파일은 시크릿을 포함하므로 저장소에 커밋하거나 네트워크 공유에 두지 마세요. 자동 시작 등록 후 `AOP_Web.bat status`와 `logs\backend_stderr_*.log`로 시작 결과를 확인합니다.
 
 ### 6.3 수동 시작/중지
 

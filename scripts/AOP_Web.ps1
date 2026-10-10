@@ -8,7 +8,7 @@
 # ============================================================
 
 param(
-    [ValidateSet("Start", "Stop", "Restart", "Status", "Help", "UninstallStartup")]
+    [ValidateSet("Start", "Stop", "Restart", "Status", "Help", "RegisterStartup", "UninstallStartup")]
     [string]$Action = "Start",
     [switch]$Production,
     [switch]$Force,
@@ -395,15 +395,20 @@ function Ensure-ProductionConfiguration {
 }
 
 function Register-AutoStartTask {
-    # 서버를 직접 기동했을 때 호출된다. 로그온 시 지금과 동일한 모드로 자동 기동하도록 등록한다.
+    # 부팅 시 로그인 전에도 같은 모드로 기동하도록 등록한다.
     $taskName = "AOP_Web_AutoStart"
     if (!(Test-Path $scriptFilePath -PathType Leaf)) {
         throw "AOP_Web.ps1 not found at $scriptFilePath."
     }
+    $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = [System.Security.Principal.WindowsPrincipal]::new($currentIdentity)
+    if (-not $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        throw "Registering the boot auto-start task requires an elevated PowerShell. Run -Action RegisterStartup as Administrator."
+    }
 
     $modeName = if ($Production) { "Production" } else { "Development" }
     $modeSwitch = if ($Production) { " -Production" } else { "" }
-    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $currentUser = $currentIdentity.Name
     $escapedScriptPath = $scriptFilePath.Replace('"', '\"')
     $taskArguments = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$escapedScriptPath`" -Action Start$modeSwitch -Unattended"
 
@@ -412,9 +417,8 @@ function Register-AutoStartTask {
         -Argument $taskArguments `
         -WorkingDirectory $projectPath
     $taskTrigger = New-ScheduledTaskTrigger `
-        -AtLogOn `
-        -User $currentUser
-    $taskTrigger.Delay = "PT30S"
+        -AtStartup
+    $taskTrigger.Delay = "PT1M"
     $taskSettings = New-ScheduledTaskSettingsSet `
         -Hidden `
         -StartWhenAvailable `
@@ -423,7 +427,7 @@ function Register-AutoStartTask {
         -ExecutionTimeLimit ([TimeSpan]::Zero)
     $taskPrincipal = New-ScheduledTaskPrincipal `
         -UserId $currentUser `
-        -LogonType Interactive `
+        -LogonType S4U `
         -RunLevel Limited
 
     Register-ScheduledTask `
@@ -438,8 +442,9 @@ function Register-AutoStartTask {
     Write-Log "Auto-start task registered ($modeName mode): $taskName" "INFO"
     Write-Host "Windows auto-start task registered: $taskName" -ForegroundColor Green
     Write-Host "User: $currentUser" -ForegroundColor Cyan
-    Write-Host "Trigger: current user logon (30 seconds delay)" -ForegroundColor Cyan
+    Write-Host "Trigger: system startup (60 seconds delay; user login not required)" -ForegroundColor Cyan
     Write-Host "Mode: $modeName (-Action Start$modeSwitch -Unattended)" -ForegroundColor Cyan
+    Write-Host "Run level: current user, limited privileges, no stored password" -ForegroundColor Cyan
     Write-Host "Verify: schtasks /Query /TN $taskName /FO LIST /V" -ForegroundColor Yellow
     Write-Host "Remove: AOP_Web.bat uninstall" -ForegroundColor Yellow
 
@@ -458,12 +463,12 @@ function Uninstall-StartupTask {
     }
 
     if (-not $task) {
-        Write-Host "Windows auto-start task not found: $taskName" -ForegroundColor Yellow
+        Write-Host "Windows boot auto-start task not found: $taskName" -ForegroundColor Yellow
         return
     }
 
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction Stop
-    Write-Host "Windows auto-start task removed: $taskName" -ForegroundColor Green
+    Write-Host "Windows boot auto-start task removed: $taskName" -ForegroundColor Green
 }
 #endregion
 
@@ -472,15 +477,16 @@ if ($Help -or $Action -eq "Help") {
     Write-Host "AOP Web Application Unified Management Script" -ForegroundColor Green
     Write-Host "===============================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Usage: .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|Help|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose] [-Help]" -ForegroundColor Yellow
+    Write-Host "Usage: .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|RegisterStartup|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose] [-Help]" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Actions:" -ForegroundColor Yellow
     Write-Host "  Start      Start Frontend & Backend servers (Default)"
     Write-Host "  Stop       Stop Frontend & Backend servers"
     Write-Host "  Restart    Stop and then Start servers"
     Write-Host "  Status     Display current running status of services"
+    Write-Host "  RegisterStartup  Register boot auto-start (run as Administrator)"
     Write-Host "  Help       Display this help message"
-    Write-Host "  UninstallStartup   Remove the Windows logon auto-start task"
+    Write-Host "  UninstallStartup   Remove the Windows boot auto-start task"
     Write-Host ""
     Write-Host "Parameters:" -ForegroundColor Yellow
     Write-Host "  -Production    Production mode (build + background)."
@@ -489,8 +495,8 @@ if ($Help -or $Action -eq "Help") {
     Write-Host "  -Diagnose      Run environment diagnosis only"
     Write-Host ""
     Write-Host "Auto-start task:" -ForegroundColor Yellow
-    Write-Host "  Starting the servers directly registers the Windows logon auto-start"
-    Write-Host "  task (AOP_Web_AutoStart) with the same mode you just used."
+    Write-Host "  RegisterStartup installs the Windows boot auto-start task (run as Administrator)."
+    Write-Host "  Starting directly attempts registration; elevation is required."
     Write-Host "  Remove it with: .\scripts\AOP_Web.ps1 -Action UninstallStartup"
     Write-Host ""
     Exit 0
@@ -644,14 +650,23 @@ function Start-Services {
     $env:AOP_ENV = if ($Production) { "production" } else { "development" }
     Write-Log "Starting backend server (Port 5000)..." "INFO"
     
+    if ($Production -or $Unattended) {
+        $backendStdoutLog = Join-Path $logDir "backend_stdout_$logTimestamp.log"
+        $backendStderrLog = Join-Path $logDir "backend_stderr_$logTimestamp.log"
+    }
+
     if ($Production) {
-        $backendProcess = Start-Process -FilePath $pythonExe -ArgumentList "app.py" -WorkingDirectory $backendPath -WindowStyle Hidden -PassThru
+        $backendProcess = Start-Process -FilePath $pythonExe -ArgumentList "app.py" -WorkingDirectory $backendPath -WindowStyle Hidden -RedirectStandardOutput $backendStdoutLog -RedirectStandardError $backendStderrLog -PassThru
     } else {
         $backendCommandPath = $backendPath.Replace("'", "''")
         $pythonCommandPath = $pythonExe.Replace("'", "''")
         $backendCmd = "Set-Location '$backendCommandPath'; & '$pythonCommandPath' app.py"
         $backendWindowStyle = if ($Unattended) { "Hidden" } else { "Normal" }
-        $backendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $backendCmd -WindowStyle $backendWindowStyle -PassThru
+        if ($Unattended) {
+            $backendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $backendCmd -WindowStyle $backendWindowStyle -RedirectStandardOutput $backendStdoutLog -RedirectStandardError $backendStderrLog -PassThru
+        } else {
+            $backendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $backendCmd -WindowStyle $backendWindowStyle -PassThru
+        }
     }
     Write-Log "Backend PID: $($backendProcess.Id)" "INFO"
     $script:startedProcessIds += [int]$backendProcess.Id
@@ -661,9 +676,13 @@ function Start-Services {
         throw "Backend process terminated immediately."
     }
 
-    if (Wait-ForPortListening -Port 5000 -TimeoutSeconds 20 -IntervalMilliseconds 300) {
+    $backendStartupTimeout = if ($Unattended -or $Production) { 60 } else { 20 }
+    if (Wait-ForPortListening -Port 5000 -TimeoutSeconds $backendStartupTimeout -IntervalMilliseconds 300) {
         Write-Log "Backend is listening on port 5000" "INFO"
     } else {
+        if ($backendStderrLog) {
+            Write-Log "Backend startup output: $backendStdoutLog; errors: $backendStderrLog" "ERROR"
+        }
         Stop-ProcessTree -ProcessId $backendProcess.Id
         Stop-ProcessesOnPort -Port 5000 | Out-Null
         throw "Backend failed to listen on port 5000."
@@ -694,25 +713,44 @@ function Start-Services {
     if ($Production) {
         Write-Log "Building frontend for production..." "INFO"
         Set-Location $frontendPath
-        & npm run build
-        if ($LASTEXITCODE -ne 0) {
+        if ($Unattended) {
+            $frontendBuildLog = Join-Path $logDir "frontend_build_$logTimestamp.log"
+            & npm run build *> $frontendBuildLog
+            $buildExitCode = $LASTEXITCODE
+        } else {
+            & npm run build
+            $buildExitCode = $LASTEXITCODE
+        }
+        if ($buildExitCode -ne 0) {
             Set-Location $projectPath
-            throw "Frontend build failed. Check the npm output above."
+            if ($frontendBuildLog) {
+                Write-Log "Frontend build output: $frontendBuildLog" "ERROR"
+            }
+            throw "Frontend build failed. Check the recorded npm output."
         }
         # Start-Process 는 확장자 없는 Unix 용 'npm' 스크립트를 먼저 잡아 실패한다.
         # cmd.exe 를 경유해 npm.cmd 가 실행되도록 고정한다.
-        $frontendProcess = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm start" -WorkingDirectory $frontendPath -WindowStyle Hidden -PassThru
+        $frontendStdoutLog = Join-Path $logDir "frontend_stdout_$logTimestamp.log"
+        $frontendStderrLog = Join-Path $logDir "frontend_stderr_$logTimestamp.log"
+        $frontendProcess = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm start" -WorkingDirectory $frontendPath -WindowStyle Hidden -RedirectStandardOutput $frontendStdoutLog -RedirectStandardError $frontendStderrLog -PassThru
         Set-Location $projectPath
     } else {
         $frontendCommandPath = $frontendPath.Replace("'", "''")
         $frontendCmd = "Set-Location '$frontendCommandPath'; npm run dev"
         $frontendWindowStyle = if ($Unattended) { "Hidden" } else { "Normal" }
-        $frontendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $frontendCmd -WindowStyle $frontendWindowStyle -PassThru
+        if ($Unattended) {
+            $frontendStdoutLog = Join-Path $logDir "frontend_stdout_$logTimestamp.log"
+            $frontendStderrLog = Join-Path $logDir "frontend_stderr_$logTimestamp.log"
+            $frontendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $frontendCmd -WindowStyle $frontendWindowStyle -RedirectStandardOutput $frontendStdoutLog -RedirectStandardError $frontendStderrLog -PassThru
+        } else {
+            $frontendProcess = Start-Process powershell -ArgumentList "-NoProfile", "-NoExit", "-Command", $frontendCmd -WindowStyle $frontendWindowStyle -PassThru
+        }
     }
     Write-Log "Frontend PID: $($frontendProcess.Id)" "INFO"
     $script:startedProcessIds += [int]$frontendProcess.Id
 
-    $frontendListening = Wait-ForPortListening -Port 3000 -TimeoutSeconds 30 -IntervalMilliseconds 300
+    $frontendStartupTimeout = if ($Unattended -or $Production) { 60 } else { 30 }
+    $frontendListening = Wait-ForPortListening -Port 3000 -TimeoutSeconds $frontendStartupTimeout -IntervalMilliseconds 300
     if ($frontendListening) {
         Write-Log "Frontend is listening on port 3000" "INFO"
     } elseif ($Unattended -or $Production) {
@@ -720,6 +758,9 @@ function Start-Services {
         Stop-ProcessTree -ProcessId $backendProcess.Id
         foreach ($failedServicePort in @(3000, 5000)) {
             Stop-ProcessesOnPort -Port $failedServicePort | Out-Null
+        }
+        if ($frontendStderrLog) {
+            Write-Log "Frontend startup output: $frontendStdoutLog; errors: $frontendStderrLog" "ERROR"
         }
         throw "Frontend failed to listen on port 3000."
     } else {
@@ -730,8 +771,8 @@ function Start-Services {
     Write-Log "Backend:  http://localhost:5000" "INFO"
     Write-Log "Frontend: http://localhost:3000" "INFO"
 
-    # 서버를 직접 기동했을 때만 자동 시작을 등록한다(지금과 같은 모드로).
-    # -Unattended 는 작업 스케줄러가 실행한 경로이므로 매 로그온 재등록을 피한다.
+    # 서버를 직접 기동했을 때만 자동 시작 등록을 시도한다.
+    # -Unattended 는 작업 스케줄러가 실행한 경로이므로 재등록을 피한다.
     if (-not $Unattended) {
         try {
             Register-AutoStartTask
@@ -764,6 +805,10 @@ try {
         "Status"  { Show-Status }
         "Stop"    { Stop-Services -NonInteractive:$Force }
         "Start"   { Start-Services }
+        "RegisterStartup" {
+            Ensure-ProductionConfiguration
+            Register-AutoStartTask
+        }
         "UninstallStartup" { Uninstall-StartupTask }
         "Restart" {
             Stop-Services -NonInteractive:$true
