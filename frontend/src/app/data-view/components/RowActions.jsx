@@ -12,8 +12,9 @@ export const RowActions = React.memo(({ rowId, onDelete }) => {
         className="btn-app btn-app-ghost btn-app-sm btn-app-icon-danger"
         onClick={() => onDelete(rowId)}
         title="행 삭제"
+        aria-label="행 삭제"
       >
-        <Trash2 size={15} />
+        <Trash2 size={15} aria-hidden="true" />
       </button>
     </td>
   );

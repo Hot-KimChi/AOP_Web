@@ -35,9 +35,10 @@
 |-----------|---------------|
 | `backend/**` | `backend/AGENTS.md` |
 | `frontend/**` | `frontend/AGENTS.md` |
+| UI·디자인·접근성 개선 | `.github/skills/web-design-review/SKILL.md`, `.github/agents/web-designer.agent.md` |
 | 프로젝트 구동/배포/실행 | `README.md`, `scripts/AOP_Web.ps1`, `verification.instructions.md` §실행 스크립트 |
 | 디버깅/오류 분석 · 완료 전 체크리스트 · 훅 | `.github/instructions/verification.instructions.md` |
-| 서브에이전트 위임 프롬프트 작성(JEV 봉투·표준 질문) | `.github/instructions/agent-orchestration.instructions.md` |
+| 서브에이전트 위임 프롬프트 작성(JEV 봉투·표준 질문·병렬 분배 소유권·역할별 에이전트) | `.github/instructions/agent-orchestration.instructions.md` |
 | Verify·Leader 위임, iteration, 이견 해소 | `.github/instructions/model-routing.instructions.md` |
 
 - 위 파일은 **해당 작업일 때만** 연다(세 지침은 `applyTo`로 상시 로드 제외). 위임하지 않는 작업은 이 라우터만으로 충분하다.

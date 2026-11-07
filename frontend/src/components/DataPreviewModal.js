@@ -200,8 +200,17 @@ export default function DataPreviewModal({ isOpen, onClose, data }) {
 
             return (
               <div key={gKey} className={`dp-group ${isExpanded ? 'dp-group-open' : ''}`}>
-                <div className="dp-group-header" onClick={() => toggleGroup(gKey)}>
-                  <span className="dp-expand-icon">{isExpanded ? '▼' : '▶'}</span>
+                <div
+                  className="dp-group-header"
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  onClick={() => toggleGroup(gKey)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(gKey); }
+                  }}
+                >
+                  <span className="dp-expand-icon" aria-hidden="true">{isExpanded ? '▼' : '▶'}</span>
                   <strong className="dp-group-label">Group {gKey}</strong>
                   {(() => {
                     const allRows = [...g.temperature, ...g.temperature_sa, ...g.power, ...g.intensity, ...g.unknown];

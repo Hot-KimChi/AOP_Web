@@ -23,6 +23,27 @@ description: '서브에이전트 선택, JEV 위임 봉투·회신 형식, Verif
 | 대규모 코드베이스 병렬 탐색 (3+ 독립 질문) | `explore` | 기본(경량) | 병렬·저비용 탐색 |
 | 빌드/테스트/린트 실행 | `task` | 기본(경량) | 성공 시 한 줄, 실패 시 상세 |
 | diff 중심 리뷰 | `code-review` | GPT 최신 | 버그/보안만 서핑 |
+| UI·디자인 감사/개선 | `general-purpose` (+ `web-design-review` 스킬) | Claude Opus 최신 | 접근성·토큰·상태 판정. 메인이 Opus면 감사만 위임, 수정은 메인 |
+
+### 저장소 전용 에이전트 (`.github/agents/`) — 역할 정의의 단일 원천
+
+> 서브에이전트에 위임할 때 해당 정의의 **원칙·출력 형식을 프롬프트에 그대로 담는다**(서브에이전트는 stateless). 이름은 호출 호환을 위해 유지한다.
+
+| 파일 | 역할 | 쓰기 권한 |
+|------|------|-----------|
+| `leader.agent.md` | Leader — Tier·위험도 판정, 파일 소유권 기반 병렬 분배(Routing Plan) | 없음 |
+| `plan.agent.md` | Design — 범위·불변식·인수 기준·위험·작업 분해(Design Brief) | 없음 |
+| `principal-software-engineer.agent.md` | Implement — 재현→수정→같은 명령 통과, 소유 파일만 수정 | 있음 |
+| `verify.agent.md` | Verify — JEV 표준 질문 판정, 스택별 필수 확인 | 없음(실행만) |
+| `web-designer.agent.md` | Web Design — `web-design-review` 체크리스트 감사·토큰 기반 개선 | 있음(프론트 한정) |
+| `ms-sql-dba.agent.md` / `playwright-tester.agent.md` | DBA 작업 / E2E 테스트 작성 | 있음 |
+
+### 병렬 분배 — 파일 소유권 규칙
+
+1. 하위작업마다 **소유 파일(글롭)** 을 명시한다. 소유 파일이 **서로소**이고 선행 관계가 없을 때만 병렬로 띄운다.
+2. 공용 파일(`frontend/src/globals.css`, 라우터, `Implementation_list.md`, `package.json`)은 **한 작업만 소유**한다. 다른 작업은 변경 요청을 회신에 적고 메인이 반영한다.
+3. 쓰기 에이전트는 동시에 **최대 2개**, 읽기 전용(탐색·감사·Leader)은 제한 없이 병렬. 검증 서브에이전트는 동시에 1개(라우터 §4.3).
+4. 병렬 결과는 메인이 통합한 뒤 **한 번에** 빌드·테스트한다(작업별 중복 빌드 금지).
 
 > **구체적 모델 ID·선택 알고리즘·`reasoning_effort` 기준은 `model-routing.instructions.md` §2가 단일 기준이다.** 여기에 ID를 중복 기재하지 않는다.
 > **Leader 위임 조건(언제 GPT Leader를 띄우는가)은 `model-routing.instructions.md` §2.1이 단일 기준이다.** 모든 요청에 Leader를 띄우지 않는다.
@@ -253,6 +274,7 @@ task(..., mode="background")        # Verify 발사
 | `sql-code-review` | SQL 보안·표준·안티패턴 리뷰 (`backend/routes/db_api.py` 등 변경 시) |
 | `sql-optimization` | 쿼리 튜닝·인덱스·실행계획 분석 |
 | `playwright-explore-website` / `playwright-generate-test` | 프론트엔드 동작 확인·E2E 테스트 생성 |
+| `web-design-review` | UI 감사(대비·포커스·aria·모션·토큰·상태·반응형·다크) → `D-ID` 개선안. 프론트 UI 변경 시 |
 | `acquire-codebase-knowledge` | 저장소 전체 매핑·온보딩 문서화 (명시 요청 시에만) |
 | `make-skill-template` | 새 스킬 생성 |
 | `suggest-awesome-github-copilot-*` | agents/instructions/skills 최신화 제안 |

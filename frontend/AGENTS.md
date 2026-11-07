@@ -98,6 +98,19 @@ const res = await fetch(`${API_BASE_URL}/api/endpoint`, {
 
 ---
 
+## Accessibility & Design (WCAG 2.2 AA)
+
+> 감사 절차·체크리스트: `.github/skills/web-design-review/SKILL.md`
+
+- **Contrast**: text ≥ 4.5:1, UI borders/focus ≥ 3:1 in both themes — compute from the actual HEX, don't eyeball.
+- **Focus**: never `outline: none` alone. Use `outline: 2px solid var(--border-focus); outline-offset: 2px`.
+- **Clickable `div`** → `role="button"` + `tabIndex={0}` + Enter/Space `onKeyDown` (or use `<button type="button">`).
+- **Icon-only buttons** need `aria-label`; decorative icons get `aria-hidden="true"`. `title` alone is not an accessible name.
+- **Brand surfaces** use `var(--on-brand)` for text/icons; shadows/radius use `--shadow-*` / `--radius-*` tokens.
+- **Bootstrap `.btn-close`** is inverted for dark mode in `globals.css` — do not add `btn-close-white`.
+
+---
+
 ## Common Tasks
 
 - **Add page**: `src/app/route-name/page.js` + `layout.js`, copy layout stack

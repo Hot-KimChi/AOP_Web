@@ -876,3 +876,27 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
   2. `AOP_Web.ps1 -Action Status`가 작업 등록 상태와 트리거·로그온 방식을 검사하고, 로그인 전 실행에 부적합하면 관리자 PowerShell용 `RegisterStartup` 복구 명령을 표시하도록 보완했습니다. README에 서비스 실행 상태와 부팅 자동 시작 설정은 별도 확인해야 함을 추가했습니다.
   3. 교차 검토 V-01(비활성 부팅 트리거 오판)과 V-02(작업 조회 실패 시 전체 상태 점검 중단)를 반영해, 부팅 트리거 활성화 여부를 판정하고 조회 실패는 `UNKNOWN`으로 표시하면서 포트 진단을 이어가도록 보완했습니다. 2차 교차 검토의 격리 모의 검증 33건이 통과했고 Blocker 0 / Major 0 / Minor 0으로 확인했습니다.
   4. **권한 제한**: 현재 셸은 관리자 권한이 아니므로 기존 작업을 실제 부팅 트리거로 갱신하거나 재부팅 검증할 수 없습니다. 현재 `Status` 실행은 `MISCONFIGURED | Trigger: user logon | Logon: Interactive`와 관리자 복구 명령을 표시합니다. 서버 PC에서 해당 명령을 한 번 실행한 뒤, 작업이 `At startup`/`S4U`로 등록됐는지 및 무인 재부팅 후 동작을 확인해야 합니다.
+
+
+## 30. 나의 프로젝트 AI의 성능을 개선하기 위해서 최적의 구성으로 되어있는지 다시 한번 확인해죠.루프엔지니어링, 하네스 엔지니어링, JEV 그리고 MCP, skills 등 최신의 기슬을 사용하여 개선해죠. 그리고 병렬로 업무가 진행되도록 리더에이전트가 업무를 분배 및 조율하도록 진행하며, 각 에이전트는 구현쪽에는 소프트 엔지니어의 프로 경력 수준으로 진행하며, plan 에이전트도 프로수준, 검증도 프로수준으로 모든 것을 고려하여 진행하도록 진행해죠. 추가적으로 웹디자인 에이전트도 프로수준으로 추가하여 이를 반영하도록 전체 프로젝트를 개선해죠. 위를 agnet 재작성 명세를 작성 후 이를 기반으로 진행해죠.
+
+### Agent 재작성 명세
+
+- **목표**: 이미 갖춘 Tier·JEV·훅 하네스를 유지하면서, 역할별 전용 에이전트(Leader·Plan·Implement·Verify·Web Design)를 **저장소 규칙과 일치하는 프로 수준 정의**로 갖추고, 반복 실수를 결정론적 게이트로 승격하며, 웹디자인 에이전트의 감사 결과를 프론트엔드에 반영합니다.
+- **현황 진단**: ① `.github/agents/`의 `plan`·`principal-software-engineer`는 외부 범용(영문) 정의라 JEV 회신 형식·Tier·한글 규칙과 무관하고, principal은 "이슈 생성 MUST"처럼 저장소 정책과 충돌합니다. ② Leader·Verify·웹디자인 전용 에이전트 정의가 없어 매 위임마다 봉투를 새로 작성합니다. ③ `agentStop` 훅은 `.py` 구문만 검사하고, `frontend/AGENTS.md` Top 5 실수 중 기계 감지 가능한 항목(앱 라우트 엔트리의 `'use client'` 누락, 하드코딩 API 주소, `.dark` 선택자)은 감지하지 않습니다. ④ 병렬 분배 시 **파일 소유권 분리** 규칙이 없어 병렬 구현 충돌 위험이 있습니다.
+- **범위**: `.github/agents/*`(Leader·Plan 재작성·Implement 재작성·Verify·Web Designer), `.github/skills/web-design-review/`, `.github/hooks/stop_gate.py`(프론트 게이트 추가), `.github/instructions/agent-orchestration.instructions.md`(에이전트·스킬 목록, 병렬 분배 규칙), 라우터 §3 표 1줄, `frontend/AGENTS.md`(디자인 규칙 요약), 감사에서 확인된 프론트엔드 디자인 결함 수정.
+- **불변식**: 라우터는 안정 접두부(모델 ID·날짜 금지)를 유지하고, 교차 검증 필수 목록의 단일 원천(§4.1)을 복제하지 않습니다. 훅은 수 초 이내·오탐 0·fail-open·`stop_hook_active` 1회 제한을 유지합니다. 프론트 수정은 Layout Stack·`[data-theme="dark"]`·CSS 변수·`API_BASE_URL`+`credentials` 규칙을 지키며 API·인증 동작을 바꾸지 않습니다.
+- **검증 기준**: 훅을 정상/위반 픽스처로 실행해 차단·통과를 확인하고 현 저장소에서 오탐 0, 프론트 `npm run build`와 Playwright 테스트 통과, 상시 지침·훅 변경이므로 GPT Verify 교차 검증 `Blocker 0 / Major 0`.
+
+### 수행 결과
+
+- **파이프라인(Tier L)**: 명세 작성 → GPT Leader 계획 검토(누락 3건 지적: 에이전트·스킬 인식 확인, MCP 확인, 주석·문자열·대량 파일 픽스처와 지연 실측 → 모두 반영) ∥ 디자인 감사(Opus, D-001~D-012) → 구현 → 빌드·E2E·훅 픽스처 → GPT Verify(1차 Major 2·Minor 1 → 수정 → 재검증).
+- **에이전트(`.github/agents/`)**: Leader(Routing Plan·파일 소유권 서로소 병렬 분배)·Verify(JEV 판정·수정 금지)·Web Designer 신규, Plan(Design Brief)·Principal(Implement, 재현→수정→같은 명령 통과, "이슈 생성 MUST" 제거) 저장소 맞춤 재작성. 호출 호환을 위해 기존 이름 유지.
+- **스킬**: `web-design-review`(대비·포커스·키보드·접근 가능한 이름·모션·토큰·상태·반응형·다크 9항목, 심각도, D-ID 출력).
+- **하네스(훅)**: `stop_gate.py`를 정규식 토크나이저(주석·문자열·정규식 리터럴·CSS `url()` 마스킹)로 확장 — 라우트 엔트리 `'use client'` 누락, 문자열 `http(s)://localhost:5000`, CSS `.dark` 선택자 차단. 경량 1차 게이트로서 "애매하면 통과(오탐 회피), 최종 방어선은 `npm run build`" 정책을 명시. 픽스처 22건 통과, 현 저장소 65파일 오탐 0(0.12초), 1MB 초과 파일 생략, fail-open·`stop_hook_active` 유지.
+- **지침**: agent-orchestration(역할별 에이전트 표·병렬 분배 소유권 규칙·스킬 표), verification(훅 표·UI 체크), `frontend/AGENTS.md`(접근성·디자인 규칙), 라우터 §3 표 1줄 추가·1줄 보강.
+- **프론트(디자인 감사 반영)**: 내비 `:focus-visible` 윤곽선(대비 1.3:1 → 6.3:1/4.9:1), `--on-brand` 토큰, 닫힌 모바일 메뉴 탭 순서 제외, 빈 배지 대비(1.55:1 → 5.0:1), 다크 `.btn-close` 반전, EditableCell 포커스 링·aria, MultiSelectDropdown 트리거 키보드·listbox 로빙 포커스·Esc 포커스 복귀, 아이콘 버튼 aria-label, 그룹 헤더 키보드 조작, SSR_DocOut 표 가로 스크롤, 인라인 radius·shadow 토큰화.
+- **검증**: `npm run build` 성공, Playwright 15/15 통과, 훅 픽스처 22/22. GPT Verify 3회 반복 — 1차 Major 2·Minor 1(훅 오탐 6건, listbox 키보드·포커스), 2차 Major 2·Minor 1(정규식 리터럴·CSS url 오탐, 백틱 지시문), 3차 §4.3 "같은 유형 2회 재발"에 따라 훅 정책을 재정의(경량 게이트·오탐 회피 우선) 후 **Blocker 0 / Major 0 / Minor 0**.
+- **예측 오차(학습 루프 1단계)**: 명세 범위 충족 여부를 p=0.7로 "충족"이라 봤으나 Leader가 누락 3건을 지적함. 훅 오탐 0은 1차 구현에서 p≈0.8로 확신했으나 Verify 회귀 13건 중 6건 오탐 → 줄 단위 정규식의 한계. 교훈: 소스 검사 훅은 처음부터 주석·문자열을 구분하는 토크나이저로 작성하고, 오탐/미검출 우선순위 정책을 먼저 정할 것.
+- **운영 주의**: `next start` 실행 중 `npm run build`를 하면 `.next`가 교체되어 운영 서버가 옛 CSS 해시를 참조해 스타일이 깨짐(이번에 재현·재기동으로 복구). 빌드 전 서버 정지 → 빌드 → 재기동 순서를 지킬 것.
+- **잔여(범위 밖·Minor)**: `<html lang="en">`(화면은 한글), 내비 `aria-current` 없음, 차트 JS 애니메이션 reduced-motion 미대응, 다크 점수색 `.text-*` 토큰화, 새 세션에서의 커스텀 에이전트·MCP 실제 로드는 미확인.

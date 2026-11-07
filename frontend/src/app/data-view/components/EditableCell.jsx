@@ -24,8 +24,8 @@ const STYLE_VARIANTS = {
   normal:  { border: '1px solid var(--border)', background: 'var(--surface)', borderColor: 'var(--border)' },
 };
 
-// 포커스 시 보더 색상
-const FOCUS_COLORS = { error: 'var(--status-error-border)', changed: 'var(--status-warning-border)', normal: 'var(--brand-text)' };
+// 포커스 시 보더 색상 — 평상시 보더와 확실히 달라야 포커스 위치가 보인다.
+const FOCUS_COLORS = { error: 'var(--status-error-text)', changed: 'var(--status-warning-text)', normal: 'var(--border-focus)' };
 
 // 아이콘 위치 스타일
 const ICON_POSITION_STYLE = {
@@ -55,9 +55,16 @@ export const EditableCell = React.memo(({
         type="text"
         style={inputStyle}
         value={value || ''}
+        aria-label={columnName}
         onChange={(e) => onChange(rowId, columnName, e.target.value)}
-        onFocus={(e) => e.target.style.borderColor = FOCUS_COLORS[variant]}
-        onBlur={(e) => e.target.style.borderColor = STYLE_VARIANTS[variant].borderColor}
+        onFocus={(e) => {
+          e.target.style.borderColor = FOCUS_COLORS[variant];
+          e.target.style.boxShadow = `0 0 0 1px ${FOCUS_COLORS[variant]}`;
+        }}
+        onBlur={(e) => {
+          e.target.style.borderColor = STYLE_VARIANTS[variant].borderColor;
+          e.target.style.boxShadow = 'none';
+        }}
       />
       {hasError && (
         <div style={ICON_POSITION_STYLE}>

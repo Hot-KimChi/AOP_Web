@@ -37,6 +37,9 @@ export const MultiSelectDropdown = React.memo(({
 
   const triggerRef = useRef(null);
   const panelRef   = useRef(null);
+  const searchRef  = useRef(null);
+  const optionRefs = useRef([]);
+  const [activeIdx, setActiveIdx] = useState(0);
 
   // Portal은 클라이언트에서만 마운트
   useEffect(() => { setMounted(true); }, []);
@@ -80,15 +83,22 @@ export const MultiSelectDropdown = React.memo(({
     return () => window.removeEventListener('scroll', onScroll, true);
   }, [isOpen]);
 
-  // ESC 키 → 닫힘
+  // ESC 키 → 닫힘 + 트리거로 포커스 복귀
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e) => {
-      if (e.key === 'Escape') { setIsOpen(false); setSearch(''); }
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+        setSearch('');
+        triggerRef.current?.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [isOpen]);
+
+  // 열림·검색어 변경 시 로빙 포커스 위치 초기화
+  useEffect(() => { setActiveIdx(0); }, [isOpen, search]);
 
   // ── 파생 값 ─────────────────────────────────────────────
   const filteredOptions = useMemo(() =>
@@ -100,6 +110,16 @@ export const MultiSelectDropdown = React.memo(({
 
   const hasSelection  = selected.length > 0;
   const isAllSelected = hasSelection && selected.length === options.length;
+
+  // 목록이 바뀌어 활성 옵션이 사라지면 인덱스를 보정하고, 포커스가 유실됐으면 복구
+  useEffect(() => {
+    if (!isOpen) return;
+    const next = Math.min(activeIdx, Math.max(0, filteredOptions.length - 1));
+    if (next !== activeIdx) setActiveIdx(next);
+    if (document.activeElement === document.body) {
+      (optionRefs.current[next] || searchRef.current)?.focus();
+    }
+  }, [isOpen, activeIdx, filteredOptions]);
 
   // ── 핸들러 ───────────────────────────────────────────────
   const toggle = useCallback((value) => {
@@ -116,6 +136,32 @@ export const MultiSelectDropdown = React.memo(({
   }, [filteredOptions, options, selected, search, column, onChange]);
 
   const clearAll = useCallback(() => onClear(column), [column, onClear]);
+
+  const focusOption = (idx) => {
+    if (filteredOptions.length === 0) return;
+    const next = Math.max(0, Math.min(idx, filteredOptions.length - 1));
+    setActiveIdx(next);
+    optionRefs.current[next]?.focus();
+  };
+
+  const onOptionKeyDown = (e, idx, option) => {
+    switch (e.key) {
+      case 'Enter':
+      case ' ':
+        e.preventDefault(); toggle(option); break;
+      case 'ArrowDown':
+        e.preventDefault(); focusOption(idx + 1); break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (idx === 0) searchRef.current?.focus(); else focusOption(idx - 1);
+        break;
+      case 'Home':
+        e.preventDefault(); focusOption(0); break;
+      case 'End':
+        e.preventDefault(); focusOption(filteredOptions.length - 1); break;
+      default:
+    }
+  };
 
   // ── 트리거 라벨 ──────────────────────────────────────────
   const triggerLabel = () => {
@@ -144,8 +190,8 @@ export const MultiSelectDropdown = React.memo(({
         zIndex:          99999,
         background:      'var(--surface)',
         border:          '1px solid var(--border)',
-        borderRadius:    6,
-        boxShadow:       '0 10px 25px rgba(0,0,0,0.15)',
+        borderRadius:    'var(--radius-sm)',
+        boxShadow:       'var(--shadow-lg)',
         maxHeight:       310,
         display:         'flex',
         flexDirection:   'column',
@@ -157,15 +203,20 @@ export const MultiSelectDropdown = React.memo(({
         <div style={ST.searchBox}>
           <Search size={11} color="var(--text-muted)" style={{ flexShrink: 0 }} />
           <input
+            ref={searchRef}
             autoFocus
             style={ST.searchInput}
             placeholder="검색..."
+            aria-label={`${column} 값 검색`}
             value={search}
             onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'ArrowDown') { e.preventDefault(); focusOption(activeIdx); }
+            }}
           />
           {search && (
-            <button onClick={() => setSearch('')} style={ST.iconBtn}>
-              <X size={9} color="var(--text-muted)" />
+            <button type="button" aria-label="검색어 지우기" onClick={() => setSearch('')} style={ST.iconBtn}>
+              <X size={9} color="var(--text-muted)" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -173,9 +224,9 @@ export const MultiSelectDropdown = React.memo(({
 
       {/* 전체 선택 / 해제 툴바 */}
       <div style={ST.toolbar}>
-        <button onClick={selectAll} style={ST.btnBlue}>전체 선택</button>
+        <button type="button" onClick={selectAll} style={ST.btnBlue}>전체 선택</button>
         <span style={{ color: 'var(--border)', fontSize: 11 }}>|</span>
-        <button onClick={clearAll}  style={ST.btnGray}>전체 해제</button>
+        <button type="button" onClick={clearAll}  style={ST.btnGray}>전체 해제</button>
         {hasSelection && (
           <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-muted)' }}>
             {selected.length}/{options.length}
@@ -184,7 +235,7 @@ export const MultiSelectDropdown = React.memo(({
       </div>
 
       {/* 옵션 목록 */}
-      <div style={{ overflowY: 'auto', flex: 1 }}>
+      <div style={{ overflowY: 'auto', flex: 1 }} role="listbox" aria-multiselectable="true" aria-label={`${column} 필터 값`}>
         {filteredOptions.length === 0 ? (
           <div style={ST.empty}>
             {search ? '검색 결과 없음' : '옵션 없음'}
@@ -196,7 +247,12 @@ export const MultiSelectDropdown = React.memo(({
             return (
               <div
                 key={`${strVal}-${idx}`}
-                onClick={() => toggle(option)}
+                ref={el => { optionRefs.current[idx] = el; }}
+                role="option"
+                aria-selected={isChecked}
+                tabIndex={idx === activeIdx ? 0 : -1}
+                onClick={() => { setActiveIdx(idx); toggle(option); }}
+                onKeyDown={e => onOptionKeyDown(e, idx, option)}
                 style={{
                   ...ST.optionRow,
                   background: isChecked ? 'var(--brand-light)' : 'var(--surface)',
@@ -213,6 +269,8 @@ export const MultiSelectDropdown = React.memo(({
                   type="checkbox"
                   checked={isChecked}
                   readOnly
+                  tabIndex={-1}
+                  aria-hidden="true"
                   style={ST.checkbox}
                 />
                 <span style={ST.optionText} title={strVal}>
@@ -233,7 +291,16 @@ export const MultiSelectDropdown = React.memo(({
       {/* 트리거 버튼 */}
       <div
         ref={triggerRef}
+        role="button"
+        tabIndex={0}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-label={`${column} 필터${hasSelection ? ` (${selected.length}개 선택)` : ''}`}
         onClick={() => setIsOpen(prev => !prev)}
+        onKeyDown={e => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsOpen(prev => !prev); }
+        }}
         style={{
           display:        'flex',
           alignItems:     'center',
@@ -242,7 +309,7 @@ export const MultiSelectDropdown = React.memo(({
           padding:        '1px 4px',
           minHeight:      22,
           border:         `1px solid ${hasSelection ? 'var(--border-focus)' : 'var(--border)'}`,
-          borderRadius:   4,
+          borderRadius:   'var(--radius-sm)',
           background:     hasSelection ? 'var(--brand-light)' : 'var(--surface)',
           cursor:         'pointer',
           userSelect:     'none',
@@ -257,12 +324,14 @@ export const MultiSelectDropdown = React.memo(({
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
           {hasSelection && (
             <button
+              type="button"
+              aria-label="필터 해제"
               onMouseDown={e => e.stopPropagation()}
               onClick={e => { e.stopPropagation(); clearAll(); }}
               title="필터 해제"
               style={ST.clearBtn}
             >
-              <X size={9} color="var(--text-muted)" />
+              <X size={9} color="var(--text-muted)" aria-hidden="true" />
             </button>
           )}
           <ChevronDown

@@ -144,7 +144,7 @@ export default function SSR_DocOut() {
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 0.5rem' }}>
                   Click to select a row · Ctrl+Click to multi-select · {tableData.length} rows total
                 </p>
-                <div style={{ maxHeight: '420px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                <div style={{ maxHeight: '420px', overflow: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                   <table className="table table-sm mb-0" style={{ fontSize: '0.8rem' }}>
                     <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
                       <tr>

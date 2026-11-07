@@ -9,6 +9,8 @@
   --brand-dark:   #4338ca;
   --brand-light:  #eef2ff;
   --brand-text:   #4f46e5;
+  /* --brand 배경 위 글자/아이콘 (라이트·다크 공통으로 흰색) */
+  --on-brand:     #ffffff;
   /* 로고·브랜드 그라데이션의 끝 색 */
   --brand-2:      #7c3aed;
 
@@ -92,6 +94,7 @@
   --border-focus: #818cf8;
   --brand-light:  #312e81;
   --brand-text:   #a5b4fc;
+  --on-brand:     #ffffff;
 
   --text:         #f1f5f9;
   --text-sec:     #cbd5e1;
@@ -260,6 +263,8 @@
 [data-theme="dark"] .btn-outline-secondary {
   color: var(--text-sec) !important; border-color: var(--border) !important;
 }
+/* Bootstrap 은 [data-bs-theme] 만 인식하므로 닫기(X) 아이콘을 직접 반전한다. */
+[data-theme="dark"] .btn-close { filter: invert(1) grayscale(100%) brightness(200%) !important; }
 [data-theme="dark"] .badge.bg-secondary { background: var(--border) !important; color: var(--text) !important; }
 [data-theme="dark"] .input-group-text {
   background: var(--bg) !important; border-color: var(--border) !important; color: var(--text-sec) !important;
@@ -322,7 +327,7 @@ body {
   width: 32px; height: 32px; border-radius: 8px;
   background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
   display: flex; align-items: center; justify-content: center;
-  color: white; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;
+  color: var(--on-brand); font-weight: 700; font-size: 0.9rem; flex-shrink: 0;
   box-shadow: var(--shadow-brand);
 }
 
@@ -350,7 +355,13 @@ body {
 .navbar-link:hover  { background: var(--bg); color: var(--text); }
 .navbar-link.active { background: var(--brand-light); color: var(--brand-text); font-weight: 600; }
 .navbar-link.disabled { color: var(--disabled-text); cursor: not-allowed; pointer-events: none; opacity: 0.55; }
-.navbar-link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* 포커스 링은 반투명 그림자만으로는 대비가 부족하다(≈1.4:1). 실선 윤곽선을 쓴다. */
+.navbar-link:focus-visible,
+.navbar-mobile-link:focus-visible,
+.navbar-toggle:focus-visible,
+.navbar-login-btn:focus-visible,
+.navbar-logout-btn:focus-visible,
+.theme-toggle:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; box-shadow: none; }
 
 .navbar-auth { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; padding-left: 1rem; flex-shrink: 0; }
 
@@ -361,7 +372,7 @@ body {
 .navbar-login-btn {
   display: flex; align-items: center; gap: 0.375rem;
   padding: 0.375rem 0.875rem; border-radius: 6px;
-  background: var(--brand); color: white;
+  background: var(--brand); color: var(--on-brand);
   border: none; cursor: pointer;
   font-size: 0.8125rem; font-weight: 500;
   white-space: nowrap; transition: background 0.15s;
@@ -388,7 +399,7 @@ body {
 .navbar-mobile-menu {
   display: none; flex-direction: column; gap: 0.25rem;
   background: var(--surface); border-bottom: 1px solid var(--border);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .navbar-mobile-link {
@@ -437,9 +448,12 @@ button.navbar-mobile-link {
   .navbar-mobile-menu {
     display: flex;
     max-height: 0; overflow: hidden; padding: 0 1.5rem;
-    transition: max-height 0.28s ease-out, padding 0.28s ease-out;
+    /* 닫힌 메뉴의 링크가 탭 순서에 남지 않도록 visibility 도 함께 전환한다. */
+    visibility: hidden;
+    transition: max-height 0.28s ease-out, padding 0.28s ease-out, visibility 0.28s;
   }
   .navbar-mobile-menu.open {
+    visibility: visible;
     max-height: 500px;
     padding: 0.75rem 1.5rem;
   }
@@ -464,7 +478,7 @@ button.navbar-mobile-link {
 .btn-app:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-app:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
-.btn-app-primary { background: var(--brand); color: #fff; }
+.btn-app-primary { background: var(--brand); color: var(--on-brand); }
 .btn-app-primary:hover:not(:disabled) { background: var(--brand-dark); }
 
 .btn-app-secondary { background: var(--surface); color: var(--text-sec); border-color: var(--border); }
@@ -515,8 +529,8 @@ button.navbar-mobile-link {
   width: 52px; height: 52px; border-radius: var(--radius-lg);
   background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
   display: flex; align-items: center; justify-content: center;
-  color: white; font-weight: 700; font-size: 1.25rem; margin-bottom: 0.75rem;
-  box-shadow: 0 4px 12px rgba(79,70,229,0.28);
+  color: var(--on-brand); font-weight: 700; font-size: 1.25rem; margin-bottom: 0.75rem;
+  box-shadow: var(--shadow-brand);
 }
 .login-brand-title    { font-weight: 700; font-size: 1.125rem; color: var(--text); }
 .login-brand-subtitle { font-size: 0.8125rem; color: var(--text-muted); margin-top: 0.25rem; }
@@ -656,7 +670,8 @@ button.navbar-mobile-link {
   min-width: 3rem;
   display: inline-flex; align-items: center; justify-content: center; gap: 0.2rem;
 }
-.dp-badge-empty { opacity: 0.3; }
+/* 0건 배지도 숫자는 읽혀야 한다 — 투명도 대신 점선 테두리로 "비어 있음"을 표시. */
+.dp-badge.dp-badge-empty { background: var(--bg); color: var(--text-muted); outline: 1px dashed var(--border); }
 .dp-badge-temp    { background: var(--cat-temp-bg);    color: var(--cat-temp-fg); }
 .dp-badge-tempsa  { background: var(--cat-tempsa-bg);  color: var(--cat-tempsa-fg); }
 .dp-badge-power   { background: var(--cat-power-bg);   color: var(--cat-power-fg); }

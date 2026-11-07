@@ -31,8 +31,10 @@ export const TableHeader = React.memo(({ headers, editableKeys, sortConfig, onSo
               style={{ padding: '1px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderRadius: '4px' }}
               onClick={() => onSort(header)}
               title={`정렬 ${sortConfig.key === header && sortConfig.direction === 'asc' ? '내림차순' : '오름차순'}`}
+              aria-label={`${header} 정렬`}
             >
               <ArrowUpDown
+                aria-hidden="true"
                 size={9}
                 color={sortConfig.key === header ? 'var(--brand-text)' : 'var(--text-muted)'}
               />

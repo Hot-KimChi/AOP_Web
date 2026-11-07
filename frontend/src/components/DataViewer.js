@@ -174,8 +174,10 @@ export default function DataViewer({
                     style={{ padding: '1px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderRadius: '4px' }}
                     onClick={() => handleSort(header)}
                     title={`Sort ${sortConfig.key === header && sortConfig.direction === 'asc' ? 'Descending' : 'Ascending'}`}
+                    aria-label={`${header} 정렬`}
                   >
                     <ArrowUpDown
+                      aria-hidden="true"
                       size={9}
                       color={sortConfig.key === header ? 'var(--brand-text)' : 'var(--text-muted)'}
                     />
@@ -234,8 +236,8 @@ export default function DataViewer({
           max-height: calc(100vh - 100px);
           white-space: nowrap;
           background-color: var(--surface);
-          border-radius: 0.25rem;
-          box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+          border-radius: var(--radius-sm);
+          box-shadow: var(--shadow-sm);
         }
         table {
           border-collapse: collapse;

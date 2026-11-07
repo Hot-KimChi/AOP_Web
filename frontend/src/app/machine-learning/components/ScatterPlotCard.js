@@ -62,10 +62,11 @@ export default function ScatterPlotCard({
               {meta.model_name.replace('_AOP_Intensity', '')} v{meta.version_number}
               <button
                 type="button"
-                className="btn-close btn-close-white"
+                className="btn-close"
                 style={{ fontSize: '7px', marginLeft: '3px' }}
                 onClick={() => onRemove(meta.version_id)}
                 title="이 모델 제거"
+                aria-label={`${meta.model_name} v${meta.version_number} 제거`}
               />
             </span>
           ))}

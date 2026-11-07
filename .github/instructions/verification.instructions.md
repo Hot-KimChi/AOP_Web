@@ -27,7 +27,7 @@ description: '완료 전 검증 체크리스트(백엔드·프론트엔드·실�
 
 | 훅 | 이벤트 | 동작 |
 |----|--------|------|
-| `.github/hooks/quality-gate.json` → `stop_gate.py` | `agentStop` | 변경·신규 `.py` 구문 검사 → 오류 시 `block`으로 한 턴 더 수정 강제. 연속 강제(`stop_hook_active`)는 막지 않음, 훅 자체 오류는 통과(fail-open) |
+| `.github/hooks/quality-gate.json` → `stop_gate.py` | `agentStop` | 변경·신규 파일만 검사: `.py` 구문 오류 / `frontend/src/app/**`의 `page`·`layout`·`template`가 React 훅을 쓰며 `'use client'` 누락 / 따옴표로 시작하는 `http(s)://localhost:5000` 리터럴(주석 줄 제외) / `.css`의 `.dark` 선택자 → 위반 시 `block`으로 한 턴 더 수정 강제. 연속 강제(`stop_hook_active`)는 막지 않음, 훅 자체 오류는 통과(fail-open) |
 
 - 훅 추가 기준: **빠르고(수 초 이내) 오탐이 없는** 체크만. 빌드·E2E처럼 느린 체크는 훅에 넣지 않는다(매 턴 지연).
 - 훅 스크립트·설정 변경은 매 세션 동작에 영향을 주므로 **교차 검증 필수**(구동 스크립트와 동급).
@@ -78,6 +78,7 @@ description: '완료 전 검증 체크리스트(백엔드·프론트엔드·실�
 - [ ] `credentials: 'include'` 포함 확인
 - [ ] CSS 변수만 사용 (하드코딩 색상 금지)
 - [ ] `[data-theme="dark"]` 선택자 사용 (`.dark` 금지)
+- [ ] UI 변경 시 `web-design-review` 체크리스트(대비·포커스·aria·상태) 확인
 
 ### 위험 변경 트리거
 
