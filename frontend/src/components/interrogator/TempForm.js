@@ -16,7 +16,7 @@ const VISIBLE = 6;
 const LEGEND_Y = [159, 173, 188, 202, 216, 231];
 const BOX = { Spectrum: [450, 23], HPSF: [883, 23], Voltage: [450, 395], TrSpectrum: [883, 395] };
 const MS_GRAPH = { 1: 'Spectrum', 4: 'Voltage', 3: 'HPSF', 14: 'TrSpectrum' };
-const EDITABLE = new Set(['Voltage', 'Spectrum']);
+const EDITABLE = new Set(['Voltage']);
 
 function alertAll(msgs) {
   (msgs || []).forEach((m) => window.alert(m));
@@ -305,7 +305,7 @@ export default function TempForm({ database, probeId, onClose }) {
     const editing = edit?.graph === graph;
     return (
       <div key={graph} style={{ position: 'absolute', left: x, top: y, width: 427, height: 366,
-        background: 'var(--vb-window, #fff)', border: '1px solid #888' }}>
+        background: 'var(--vb-window)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
         <TempChart x={0} y={0} w={427} h={366} data={charts[graph]} editLabel={editing}
           grid={graph === 'Voltage' || graph === 'Spectrum' ? gridOn : true}
           onContextMenu={onContext(graph)} testId={`temp-chart-${graph}`}
@@ -371,7 +371,7 @@ export default function TempForm({ database, probeId, onClose }) {
         const idx = top + k;
         return (
           <span key={`lg${ly}`} style={{ position: 'absolute', left: 15, top: ly + 1, width: 9, height: 9,
-            background: checked[idx] ? colors[idx] : 'transparent', border: checked[idx] ? '1px solid #000' : 'none' }} />
+            background: checked[idx] ? colors[idx] : 'transparent', border: checked[idx] ? '1px solid var(--vb-border)' : 'none' }} />
         );
       })}
       {LEGEND_Y.map((ly, k) => (
@@ -399,7 +399,7 @@ export default function TempForm({ database, probeId, onClose }) {
         <VbCheck x={56} y={19} w={17} h={16} checked={s.multi} onChange={(v) => ep.set({ multi: v })} testId="temp-multiedit" />
         <VbLabel x={80} y={19} w={121} h={16}>Multi-point Edit</VbLabel>
         <VbLabel x={10} y={37} w={37} h={14}>Graph</VbLabel>
-        <VbLabel x={10} y={52} w={89} h={16} style={{ border: '1px solid #888' }}>{s.graphName}</VbLabel>
+        <VbLabel x={10} y={52} w={89} h={16} style={{ border: '1px solid var(--vb-border)', borderRadius: 'var(--radius-sm)', padding: '0 4px' }}>{s.graphName}</VbLabel>
         <VbLabel x={117} y={37} w={97} h={14}>measTxFrequency</VbLabel>
         <VbText x={117} y={52} w={83} h={20} value={s.measFreq} readOnly />
         <VbLabel x={275} y={37} w={49} h={12}>Material</VbLabel>
@@ -430,8 +430,8 @@ export default function TempForm({ database, probeId, onClose }) {
         Select Edit item in pic, then double click cell in &quot;isDataUsable&quot; column to change
       </VbLabel>
       <div style={{ position: 'absolute', left: 16, top: 601, width: 416, height: 188 }}>
-        <div style={{ font: '8pt Arial', padding: '2px 6px', border: '1px solid #888', borderBottom: 'none',
-          display: 'inline-block', background: 'var(--vb-window, #fff)' }}>trtp_temp</div>
+        <div className="vb-tab-strip" style={{ font: '8pt var(--font-sans)', padding: '2px 8px', border: '1px solid var(--border)', borderBottom: 'none',
+          display: 'inline-block', background: 'var(--vb-window)' }}>trtp_temp</div>
         <VbGrid x={3} y={22} w={402} h={158} columns={gridData.columns} rows={gridData.rows} showNewRow={false}
           onCellDoubleClick={onGridDbl} testId="temp-grid" />
       </div>

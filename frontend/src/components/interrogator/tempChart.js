@@ -70,7 +70,7 @@ export function PopupMenu({ menu, onPick, onClose }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 50 }} onMouseDown={onClose}
       onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
       <div role="menu" className="vb-list" style={{ position: 'fixed', left: menu.x, top: menu.y, minWidth: 180,
-        background: 'var(--vb-face, #f0f0f0)', border: '1px solid #888', font: '8pt Arial', zIndex: 51 }}
+        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-md)', padding: 4, font: '8pt var(--font-sans)', zIndex: 51 }}
         onMouseDown={(e) => e.stopPropagation()}>
         {menu.items.map((it) => (
           <div key={it.key} role="menuitem" tabIndex={-1} className="vb-list-item"
@@ -146,7 +146,7 @@ export default function TempChart({ x, y, w, h, data, grid = true, edit, onConte
   const yt = ok ? ticks(range.yMin, range.yMax) : [];
 
   return (
-    <div className="vb-picture" style={{ position: 'absolute', left: x, top: y, width: w, height: h, background: '#fff' }}
+    <div className="vb-picture" style={{ position: 'absolute', left: x, top: y, width: w, height: h }}
       data-testid={testId} onContextMenu={(e) => { if (onContextMenu) { e.preventDefault(); onContextMenu(e); } }}>
       {editLabel && (
         <span style={{ position: 'absolute', left: 8, top: 8, color: 'red', font: 'bold 12pt Arial' }}>EDIT</span>

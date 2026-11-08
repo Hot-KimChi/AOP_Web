@@ -7,13 +7,15 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { API_BASE_URL } from '../../lib/apiBase';
 
 const PT = 96 / 72;
+// 폭이 다른 글꼴(좁은·고정폭)만 원본 그대로 두고, 나머지는 사이트 글꼴(--font-sans)을 상속한다.
+const KEEP_FAMILY = /narrow|courier|consolas|mono/i;
 
 function box(x, y, w, h, font, extra) {
   const s = { left: x, top: y, width: w, height: h, ...extra };
   if (font) {
     s.fontSize = `${(font.size ?? 8.25) * PT}px`;
     if (font.bold) s.fontWeight = 700;
-    if (font.family) s.fontFamily = font.family;
+    if (font.family && KEEP_FAMILY.test(font.family)) s.fontFamily = font.family;
   }
   return s;
 }
@@ -52,11 +54,11 @@ export function VbForm({ title, width, height, children, onClose, testId, zoom }
   );
 }
 
-export function VbLabel({ x, y, w, h, children, font, color, align, wrap, hidden, style, testId }) {
+export function VbLabel({ x, y, w, h, children, font, color, align, wrap, hidden, style, testId, className }) {
   if (hidden) return null;
   return (
     <div
-      className="vb-label"
+      className={className ? `vb-label ${className}` : 'vb-label'}
       data-testid={testId}
       style={box(x, y, wrap ? w : undefined, wrap ? h : undefined, font, {
         color,
@@ -187,7 +189,7 @@ export function cellText(v) {
 // 셀 편집(F2·타이핑·현재 셀 재클릭, Enter 확정·Esc 취소).
 export function VbGrid({
   x, y, w, h, columns, rows, testId,
-  onRowHeaderDoubleClick, onCellDoubleClick, onCellChange,
+  onRowHeaderDoubleClick, onCellDoubleClick, onCellChange, onRowAdd, onRowDelete,
   headerColor, cellColor, editable, showNewRow = true, backColor, font, maxRows = 2000,
 }) {
   const [cur, setCur] = useState(null);
@@ -195,19 +197,29 @@ export function VbGrid({
   const cols = columns || [];
   const data = rows || [];
   const shown = data.length > maxRows ? data.slice(0, maxRows) : data;
+  // DataGridView AllowUserToAddRows: '*' 행에 입력하면 새 행이 추가된다.
+  const canAdd = !!(editable && onRowAdd && showNewRow);
+  const newRowIndex = data.length;
 
   useEffect(() => {
-    if (cur && (cur.r >= data.length || cur.c >= cols.length)) setCur(null);
-    if (edit && (edit.r >= data.length || edit.c >= cols.length)) setEdit(null);
-  }, [data.length, cols.length, cur, edit]);
+    if (cur && (cur.r > data.length || (cur.r === data.length && !canAdd) || cur.c >= cols.length)) setCur(null);
+    if (edit && (edit.r > data.length || (edit.r === data.length && !canAdd) || edit.c >= cols.length)) setEdit(null);
+  }, [data.length, cols.length, cur, edit, canAdd]);
 
   const commit = () => {
-    if (edit) onCellChange?.(edit.r, edit.c, edit.value);
+    if (edit) {
+      if (edit.r === newRowIndex) {
+        if (edit.value !== '') onRowAdd?.(edit.c, edit.value);
+      } else {
+        onCellChange?.(edit.r, edit.c, edit.value);
+      }
+    }
     setEdit(null);
   };
 
   const startEdit = (r, c, initial) => {
-    if (!editable || !onCellChange) return;
+    if (!editable) return;
+    if (r === newRowIndex ? !canAdd : !onCellChange) return;
     setEdit({ r, c, value: initial ?? cellText(data[r]?.[c]) });
   };
 
@@ -220,6 +232,12 @@ export function VbGrid({
       onKeyDown={(e) => {
         if (edit || !cur) return;
         if (e.key === 'F2') { e.preventDefault(); startEdit(cur.r, cur.c); }
+        else if (e.key === 'Delete' && onRowDelete && cur.r < data.length) {
+          // DataGridView AllowUserToDeleteRows: 현재 행 삭제
+          e.preventDefault();
+          onRowDelete(cur.r);
+          setCur(null);
+        }
         else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); startEdit(cur.r, cur.c, e.key); }
       }}
     >
@@ -278,7 +296,36 @@ export function VbGrid({
           {showNewRow && cols.length > 0 && (
             <tr className="vb-newrow">
               <th className="vb-rowhead">*</th>
-              {cols.map((_, ci) => <td key={ci} />)}
+              {cols.map((_, ci) => {
+                const isCur = canAdd && cur?.r === newRowIndex && cur?.c === ci;
+                const isEdit = canAdd && edit?.r === newRowIndex && edit?.c === ci;
+                return (
+                  <td
+                    key={ci}
+                    className={isCur ? 'cur' : undefined}
+                    data-testid={testId && canAdd ? `${testId}-newrow-${ci}` : undefined}
+                    onClick={() => {
+                      if (!canAdd) return;
+                      if (isCur && !isEdit) startEdit(newRowIndex, ci, '');
+                      else setCur({ r: newRowIndex, c: ci });
+                    }}
+                  >
+                    {isEdit ? (
+                      <input
+                        autoFocus
+                        className="vb-cell-edit"
+                        value={edit.value}
+                        onChange={(e) => setEdit({ ...edit, value: e.target.value })}
+                        onBlur={commit}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+                          if (e.key === 'Escape') { e.preventDefault(); setEdit(null); }
+                        }}
+                      />
+                    ) : null}
+                  </td>
+                );
+              })}
             </tr>
           )}
         </tbody>

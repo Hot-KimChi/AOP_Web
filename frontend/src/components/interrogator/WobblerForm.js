@@ -108,7 +108,7 @@ export default function WobblerForm({ database, probeId, onClose }) {
     const { area, angle } = parseItem(item);
     call('/edit-data', { effectiveArea: area, wobbAngleDeg: angle }, (d) => {
       ep.reset();
-      ep.set({ graphName: 'Wobbler', measFreq: '' });
+      ep.set({ graphName: 'Wobbler', measFreq: angle });
       setEdit({ item, points: d.points, range: d.xMin !== undefined ? d : chart });
     });
   };
@@ -157,7 +157,7 @@ export default function WobblerForm({ database, probeId, onClose }) {
       <VbButton x={274} y={34} w={108} h={53} font={A9} onClick={onRun} disabled={!runEn || busy}
         testId="wob-run">Generate wobbling coefficients</VbButton>
       <VbLabel x={8} y={50} w={54} h={17}>ProbeId:</VbLabel>
-      <VbLabel x={62} y={50} w={79} h={23} style={{ border: '1px solid #000' }}>{probeId}</VbLabel>
+      <VbLabel x={62} y={50} w={79} h={23} style={{ border: '1px solid var(--vb-border)', borderRadius: 'var(--radius-sm)', padding: '2px 6px' }}>{probeId}</VbLabel>
       <VbLabel x={21} y={110} w={34} h={14}>Legd</VbLabel>
       <VbLabel x={58} y={111} w={110} h={14}>effectiveArea</VbLabel>
       <VbLabel x={183} y={110} w={100} h={14}>wobblingAngle</VbLabel>
@@ -185,7 +185,7 @@ export default function WobblerForm({ database, probeId, onClose }) {
         <VbCheck x={55} y={19} w={20} h={17} checked={s.multi} onChange={(v) => ep.set({ multi: v })} testId="wob-multi" />
         <VbLabel x={79} y={19} w={110} h={17}>Multi-point Edit</VbLabel>
         <VbLabel x={26} y={45} w={89} h={15}>Graph</VbLabel>
-        <VbLabel x={26} y={61} w={89} h={17} style={{ border: '1px solid #888' }}>{s.graphName}</VbLabel>
+        <VbLabel x={26} y={61} w={89} h={17} style={{ border: '1px solid var(--vb-border)', borderRadius: 'var(--radius-sm)', padding: '0 4px' }}>{s.graphName}</VbLabel>
         <VbLabel x={154} y={45} w={97} h={15}>PMpulseType</VbLabel>
         <VbText x={154} y={61} w={97} h={20} value={s.measFreq} readOnly />
         <VbLabel x={26} y={84} w={97} h={15}>Selected X</VbLabel>
@@ -210,14 +210,14 @@ export default function WobblerForm({ database, probeId, onClose }) {
       </fieldset>
 
       <div style={{ position: 'absolute', left: 45, top: 626, width: 345, height: 168 }}>
-        <div className="vb-tab-strip" style={{ font: '8pt Arial', padding: '2px 6px', border: '1px solid #888',
-          borderBottom: 'none', display: 'inline-block', background: 'var(--vb-window, #fff)' }}>trtp_power</div>
+        <div className="vb-tab-strip" style={{ font: '8pt var(--font-sans)', padding: '2px 8px', border: '1px solid var(--border)',
+          borderBottom: 'none', display: 'inline-block', background: 'var(--vb-window)' }}>trtp_power</div>
         <VbGrid x={3} y={24} w={330} h={136} columns={gridData.columns} rows={gridData.rows} showNewRow={false}
           testId="wob-grid-data" />
       </div>
 
-      <div style={{ position: 'absolute', left: 410, top: 25, width: 738, height: 770, background: 'var(--vb-window, #fff)',
-        border: '1px solid #888' }}>
+      <div style={{ position: 'absolute', left: 410, top: 25, width: 738, height: 770, background: 'var(--vb-window)',
+        border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
         <TempChart x={64} y={40} w={664} h={680} data={chart} grid={gridOn} editLabel={!!edit}
           onContextMenu={onContext} testId="wob-chart"
           edit={edit ? {

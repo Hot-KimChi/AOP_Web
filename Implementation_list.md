@@ -38,6 +38,7 @@
 | 32 | 전체 코드·시퀀스·병목·에러 점검 및 개선 (본문 ## 32) | 2026-11-08 | - |
 | 33 | MSI input·Interrogator 디자인 통일(기능·그래프 유지) (본문 ## 33) | 2026-11-08 | - |
 | 34 | MSI input·Interrogator VB 폼 완전 동일 이식(Python·웹) (본문 ## 34) | 2026-11-08 | - |
+| 35 | VB 이식 재감사·폼 모던 디자인 적용 (본문 ## 35) | 2026-11-08 | - |
 
 ---
 
@@ -980,3 +981,19 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **교차 검증 수정**: V-001(프로시저 `nextset()` 예외를 삼켜 부분 커밋 위험) → 예외 전파로 전체 롤백. V-002(`.xls` 미지원) → xlrd 2.x 추가(`requirements.txt`).
 - **검증**: pytest 176 passed, `npm run build` 성공, Production 재기동 후 HTTP 200, Playwright 18 passed, security-review 취약점 0건.
 - **잔여 위험**: 실제 DB 접속 불가(18456)로 프로시저 결과·스키마 통합 검증 미실시. `msi_excel` 저장 API 의 서버측 `confirm` 요구는 프런트 확인 대화상자에만 의존(익스플로잇 불가, 일관성 개선 후보).
+
+## 35. 추가적으로 visual basic으로 완벽하게 이식되었는지 다시 한번 확인하고, 웹디자인에 맞추어서 모던하게 해당 폼을 완벽하게 변경해죠. 실제 기능은 그대로 유지하면서 기능은 동일하게 진행되어야 한다.
+
+### 수행 결과
+
+- **디자인 방침**: VB 좌표 배치·버튼 순서·활성 규칙·이벤트는 그대로 두고 시각만 교체. `globals.css` VB 블록의 `--vb-*` 변수를 사이트 토큰(`--surface`·`--brand`·`--bg`)에 연결해 라이트/다크 자동 대응, 라운드 창·모던 타이틀바·브랜드 hover 버튼·focus 링·sticky 그리드 헤더·모달 blur 적용. 그래프는 원본 색 의미 유지를 위해 두 테마 모두 흰 종이(`--vb-paper`).
+- **공용 컨트롤**: `Vb.js` 글꼴은 고정폭/narrow 만 유지하고 나머지는 사이트 글꼴 상속. Interrogator 페이지 헤더·그라데이션 배너 추가. 폼별 하드코딩 색을 테마 변수로 치환(Tank 다크 플롯 영역 포함).
+- **이식 재감사(3개 영역 병렬, 코드 대조)** — Major 4건 수정:
+  - MSI 그리드: 원본 DataGridView 기본값(AllowUserToAddRows/DeleteRows)을 재현 — `*` 행 입력으로 행 추가, Delete 키로 행 삭제(`VbGrid` `onRowAdd`/`onRowDelete`, measSetInput 2개·msiFromDump Selected).
+  - RTP Display: RTP 이름이 비어도 원본처럼 `LIKE '%%'` 전체 조회.
+  - Tank: Mark All 초기 비활성(Get Records/OK 성공 후 활성) — 레코드 없이 전체 mark 변경 방지.
+  - 온도 fitting 최소 점수: 원본(2점 이상, Temp10 은 1건+끝점)과 같게 완화하고 계수보다 점이 적으면 경고만 반환(이전엔 400 + 롤백).
+- **Minor 정리**: msiFromDump 예시 문구 2번째 줄, 결과 폼 제목 `meas_setting`/`temp_setting`, Temp 편집 메뉴는 Voltage 만, Wobbler Edit 칸에 wobbAngleDeg 표시.
+- **검증**: pytest 177 passed(소수 점 fitting 경고 테스트 추가), `npm run build` 성공, Production 재기동 HTTP 200, 모의 API 스크린샷 8폼×2테마 pageerror 0, Playwright 18 passed.
+- **교차 검증 생략 사유**: 인증·SQL·스키마·API 계약 변경 없음(입력 길이 검증 완화와 UI 동작), 결정론적 테스트로 확인.
+- **잔여(보류 Minor)**: Tank AutoCheck dip 미발견 시 재그리기·zDis NULL 메시지, Power 편집 후 그리드 재조회, Temp 오차 그래프 축 라벨, Export 목록 외 RTP명 유지, Temp10 메인 직접 진입 — 동작 영향이 작아 보류. 실제 DB 미접속(18456)으로 통합 검증 미실시.

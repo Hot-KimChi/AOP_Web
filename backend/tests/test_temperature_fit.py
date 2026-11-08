@@ -26,7 +26,7 @@ def test_temp10_fit_tracks_synthetic_curve():
 
 def test_temp10_rejects_short_or_mismatched_input():
     with pytest.raises(FitInputError):
-        fit_temp10([0, 1, 2], [0, 1, 2])
+        fit_temp10([0], [0])
     with pytest.raises(FitInputError):
         fit_temp10(list(range(10)), list(range(9)))
     with pytest.raises(FitInputError):
@@ -48,6 +48,18 @@ def test_aperture_1d_recovers_coefficients():
 def test_aperture_1d_rejects_zero_weight():
     with pytest.raises(FitInputError):
         fit_aperture_1d([1, 2, 3], [1, 2, 3], [1, 0, 1])
+
+
+def test_few_points_fit_with_warning_like_legacy():
+    # 레거시는 2점 이상이면 fitting 했다 → 차단하지 않고 경고만
+    r1 = fit_aperture_1d([0.5, 1.5], [0.02, 0.04], [1, 1])
+    assert len(r1.coefficients) == 3 and any("계수 3개" in w for w in r1.warnings)
+    r2 = fit_aperture_2d([0.5, 1.5], [0.4, 0.9], [0.01, 0.02])
+    assert len(r2.coefficients) == 5 and any("계수 5개" in w for w in r2.warnings)
+    r3 = fit_temp10([60, 300, 0], [1.0, 2.0, 0.0])
+    assert len(r3.coefficients) == 6 and any("계수 6개" in w for w in r3.warnings)
+    with pytest.raises(FitInputError):
+        fit_aperture_1d([1.0], [1.0], [1.0])
 
 
 def test_aperture_2d_fits_and_bounds():

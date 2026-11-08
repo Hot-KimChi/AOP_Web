@@ -9,7 +9,7 @@ import { apiJson, query } from '../../lib/apiJson';
 
 const PURPOSES = ['Auto Detect', 'RTP', 'Sample', 'SSR', 'FDA', 'IEC', 'Power'];
 const TABLES = ['meas_setting', 'temp_setting'];
-const DARK = '#a0a0a0';
+const DARK = 'var(--text-muted)';
 const F9 = { size: 9 };
 const EMPTY = { columns: [], rows: [] };
 
@@ -121,8 +121,8 @@ export default function MsiDumpForm({ database, onClose }) {
       <VbLabel x={35} y={38}>Probe ID:</VbLabel>
       <VbCombo x={88} y={35} w={261} h={22} font={{ size: 8 }} value={probeId} onChange={setProbeId}
         options={probeIds} testId="msi-dump-probe" ariaLabel="Probe ID" />
-      <VbLabel x={488} y={9} w={319} h={24} wrap font={{ size: 6.75 }} color={DARK}>
-        {'Multiple Id sperated by ","; or using "~" for a range. No more than 5 segments.'}
+      <VbLabel x={488} y={9} w={319} h={24} wrap font={{ size: 6.75 }} color={DARK} style={{ whiteSpace: 'pre-line' }}>
+        {'Multiple Id sperated by ","; or using "~" for a range. No more than 5 segments.\nFor example: 1764, 1234~1256, 1861, 1900'}
       </VbLabel>
       <VbLabel x={428} y={41}>VerifId:</VbLabel>
       <VbText x={491} y={38} w={368} h={20} value={verifId} onChange={setVerifId} testId="msi-dump-verif" ariaLabel="VerifId" />
@@ -149,7 +149,10 @@ export default function MsiDumpForm({ database, onClose }) {
 
       <VbLabel x={23} y={339}>Selected subverif</VbLabel>
       <VbLabel x={139} y={339} color={DARK}>(Double click row-head to remove the row from Selected RTP)</VbLabel>
-      <VbGrid x={26} y={355} w={899} h={119} columns={selectedCols} rows={selected}
+      <VbGrid x={26} y={355} w={899} h={119} columns={selectedCols} rows={selected} editable
+        onCellChange={(ri, ci, value) => setSelected((s) => s.map((r, i) => (i === ri ? r.map((c, j) => (j === ci ? value : c)) : r)))}
+        onRowAdd={(ci, value) => setSelected((s) => [...s, selectedCols.map((_, j) => (j === ci ? value : null))])}
+        onRowDelete={(ri) => setSelected((s) => s.filter((_, k) => k !== ri))}
         onRowHeaderDoubleClick={(i) => setSelected((s) => s.filter((_, k) => k !== i))} testId="msi-dump-selected-grid" />
 
       <VbLabel x={24} y={498}>Created records</VbLabel>

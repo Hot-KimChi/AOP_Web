@@ -391,6 +391,18 @@ export default function MsiExcelForm({ database, onClose }) {
     setOut((prev) => ({ ...prev, rows: prev.rows.map((r, i) => (i === ri ? r.map((c, j) => (j === ci ? value : c)) : r)) }));
   };
 
+  // DataGridView 기본값(AllowUserToAddRows/DeleteRows=True): '*' 행 입력으로 추가, Delete 키로 삭제
+  const onOutRowAdd = (ci, value) => {
+    setOut((prev) => ({ ...prev, rows: [...prev.rows, prev.columns.map((_, j) => (j === ci ? value : null))] }));
+  };
+  const onOutRowDelete = (ri) => {
+    setOut((prev) => ({ ...prev, rows: prev.rows.filter((_, i) => i !== ri) }));
+  };
+  const onSelRowAdd = (ci, value) => {
+    setSelRows((prev) => [...prev, { v: selCols.map((_, j) => (j === ci ? value : null)), s: [] }]);
+  };
+  const onSelRowDelete = (ri) => setSelRows((prev) => prev.filter((_, i) => i !== ri));
+
   // ---- cmbTempOpt_SelectedIndexChanged (목록 항목을 고를 때만 동작 — 직접 입력은 이벤트 없음)
   const onTempOpt = (value) => {
     setCmbTempOpt(value);
@@ -465,9 +477,9 @@ export default function MsiExcelForm({ database, onClose }) {
     alertAll(data?.messages);
   });
 
-  const cmdSaveDb = () => save('save-tank', 'measSetting', `meas_setting 에 Tank RTP 조건을 저장합니다(comments=${purpose || 'RTP'}). 계속할까요?`);
-  const cmdSavePower = () => save('save-power', 'measSetting', "meas_setting 에 Power 조건을 저장합니다(comments='Power'). 계속할까요?");
-  const cmdSaveTemp = () => save('save-temp', 'tempSetting', `temp_setting 에 Temp 조건(옵션 ${cmbTempOpt})을 저장합니다. 계속할까요?`);
+  const cmdSaveDb = () => save('save-tank', 'meas_setting', `meas_setting 에 Tank RTP 조건을 저장합니다(comments=${purpose || 'RTP'}). 계속할까요?`);
+  const cmdSavePower = () => save('save-power', 'meas_setting', "meas_setting 에 Power 조건을 저장합니다(comments='Power'). 계속할까요?");
+  const cmdSaveTemp = () => save('save-temp', 'temp_setting', `temp_setting 에 Temp 조건(옵션 ${cmbTempOpt})을 저장합니다. 계속할까요?`);
 
   // ---- cmdSaveMat_Click
   const cmdSaveMat = () => run(async () => {
@@ -548,6 +560,7 @@ export default function MsiExcelForm({ database, onClose }) {
       <VbLabel x={241} y={137} color={DARK}>(Double click row-head to add the row to Selected RTP)</VbLabel>
       <VbGrid
         x={57} y={159} w={1232} h={217} columns={out.columns} rows={out.rows} editable onCellChange={onOutCellChange}
+        onRowAdd={onOutRowAdd} onRowDelete={onOutRowDelete}
         onRowHeaderDoubleClick={addRow} testId="msi-excel-output"
       />
 
@@ -562,6 +575,7 @@ export default function MsiExcelForm({ database, onClose }) {
       <VbGrid
         x={55} y={465} w={1232} h={219} columns={selCols} rows={selRows.map((r) => r.v)} editable
         onCellChange={onSelCellChange} onCellDoubleClick={onSelCellDoubleClick}
+        onRowAdd={onSelRowAdd} onRowDelete={onSelRowDelete}
         onRowHeaderDoubleClick={(ri) => setSelRows((prev) => prev.filter((_, i) => i !== ri))}
         headerColor={selHeaderColor} cellColor={(r, c) => (selRows[r]?.s.includes(c) ? SALMON : undefined)}
         testId="msi-excel-selected"

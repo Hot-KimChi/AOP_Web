@@ -10,8 +10,8 @@ import TempChart from './tempChart';
 const API = '/api/interrogator/temp/t10';
 const B9 = 'bold 9pt "Microsoft Sans Serif"';
 const B825 = 'bold 8.25pt "Microsoft Sans Serif"';
-const HINT = { font: '6.75pt "Microsoft Sans Serif"', color: 'var(--vb-border, #a0a0a0)' };
-const CAPTION = { font: 'bold 9.75pt Arial', align: 'center', style: { border: '1px solid #000' } };
+const HINT = { font: '6.75pt "Microsoft Sans Serif"', color: 'var(--text-muted)' };
+const CAPTION = { font: 'bold 9.75pt Arial', align: 'center', style: { border: '1px solid var(--vb-border)', borderRadius: 'var(--radius-sm)' } };
 const EMPTY = { columns: [], rows: [] };
 
 function alertAll(msgs) {

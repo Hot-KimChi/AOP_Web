@@ -72,6 +72,14 @@ def _same_length(*pairs: tuple[str, np.ndarray]) -> None:
         raise FitInputError(f"{names}: 길이가 같아야 합니다.")
 
 
+def _warn_underdetermined(result: FitResult, n_points: int, n_coeffs: int) -> None:
+    # 레거시(MATLAB)는 2점 이상이면 그대로 fitting 했다. 차단하지 않고 경고만 남긴다.
+    if n_points < n_coeffs:
+        result.warnings.append(
+            f"데이터 {n_points}점이 계수 {n_coeffs}개보다 적습니다 — 해가 유일하지 않을 수 있으니 결과를 확인하세요."
+        )
+
+
 def _safe_objective(fun: Callable[[np.ndarray], float]) -> Callable[[np.ndarray], float]:
     """오버플로·0 나눗셈 결과를 큰 값으로 바꿔 최적화기가 그 영역을 피하게 한다."""
 
@@ -102,8 +110,8 @@ def fit_temp10(time_elapsed_s: Sequence[float], temp_rise_c: Sequence[float]) ->
     VB 의 배열 참조 대입(``bestX = x``)으로 최소오차 해가 이후 반복 값에 덮일 수 있던
     결함은 재현하지 않고, 최소오차 해를 복사해 반환한다.
     """
-    t = _as_vector(time_elapsed_s, "timeElapsed", min_len=6)
-    y = _as_vector(temp_rise_c, "tempRise", min_len=6)
+    t = _as_vector(time_elapsed_s, "timeElapsed", min_len=2)
+    y = _as_vector(temp_rise_c, "tempRise", min_len=2)
     _same_length(("timeElapsed", t), ("tempRise", y))
 
     objective = _safe_objective(lambda x: np.mean((y - temp10_model(x, t)) ** 2))
@@ -126,6 +134,7 @@ def fit_temp10(time_elapsed_s: Sequence[float], temp_rise_c: Sequence[float]) ->
         best.warnings.append("최대 반복에 도달했습니다(MATLAB fminsearch 기본 한도와 동일). 결과를 확인하세요.")
     if best.error >= _PENALTY:
         best.warnings.append("유효한 해를 찾지 못했습니다(발산).")
+    _warn_underdetermined(best, t.size, 6)
     return best
 
 
@@ -173,9 +182,9 @@ def fit_aperture_1d(
     az_pitch_cm: float | None = None,
 ) -> FitResult:
     """1D 개구 보정 3계수. 목적함수는 정규화 계수로 가중한 평균제곱오차, 초기값 2종 중 최소오차."""
-    a = _as_vector(az_aper_cm, "azAperCm", min_len=3)
-    y = _as_vector(temp_rise, "tempRise", min_len=3)
-    w = _as_vector(norm_coeff, "normCoeff", min_len=3)
+    a = _as_vector(az_aper_cm, "azAperCm", min_len=2)
+    y = _as_vector(temp_rise, "tempRise", min_len=2)
+    w = _as_vector(norm_coeff, "normCoeff", min_len=2)
     _same_length(("azAperCm", a), ("tempRise", y), ("normCoeff", w))
     if np.any(w == 0):
         raise FitInputError("normCoeff: 0 은 허용되지 않습니다(가중치 분모).")
@@ -190,6 +199,7 @@ def fit_aperture_1d(
     assert best is not None
     if az_pitch_cm and best.coefficients[2] / az_pitch_cm < 10:
         best.warnings.append("x(3)/azPitch < 10 — fitting 계수를 확인하세요(레거시와 같은 경고).")
+    _warn_underdetermined(best, a.size, 3)
     return best
 
 
@@ -201,9 +211,9 @@ def fit_aperture_2d(
     el_pitch_cm: float | None = None,
 ) -> FitResult:
     """2D 개구 보정 5계수. 레거시와 같이 가중치 없는 평균제곱오차를 쓴다."""
-    a = _as_vector(az_aper_cm, "azAperCm", min_len=5)
-    e = _as_vector(el_aper_cm, "elAperCm", min_len=5)
-    y = _as_vector(temp_rise, "tempRise", min_len=5)
+    a = _as_vector(az_aper_cm, "azAperCm", min_len=2)
+    e = _as_vector(el_aper_cm, "elAperCm", min_len=2)
+    y = _as_vector(temp_rise, "tempRise", min_len=2)
     _same_length(("azAperCm", a), ("elAperCm", e), ("tempRise", y))
 
     objective = _safe_objective(lambda x: np.mean((y - aperture_model_2d(x, a, e)) ** 2))
@@ -213,6 +223,7 @@ def fit_aperture_2d(
     el_low = bool(el_pitch_cm) and coeffs[4] / float(el_pitch_cm) < 10
     if az_low or el_low:
         result.warnings.append("x(4)/azPitch 또는 x(5)/elPitch < 10 — fitting 계수를 확인하세요.")
+    _warn_underdetermined(result, a.size, 5)
     return result
 
 

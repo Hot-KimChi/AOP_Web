@@ -224,8 +224,8 @@ def _temp10_points(cur, probe_id: int, temp_ss_id: int, temp_set_id: int) -> dic
             continue
         t.append(float(r["timeElapsedS"]))
         y.append(float(r["temperatureC"]) - temp0)
-    if len(t) < 6:
-        raise InterrogatorInputError("fitting 에 필요한 데이터 점이 부족합니다(최소 6개).")
+    if not t:
+        raise InterrogatorInputError("fitting 할 데이터가 없습니다.")
     return {"temp0": temp0, "timeElapsedS": t, "tempRiseC": y}
 
 

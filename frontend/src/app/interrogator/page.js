@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Radar } from 'lucide-react';
 import { VbButton, VbCombo, VbDbBar, VbForm, VbLabel, VbModal, VbText } from '../../components/vb/Vb';
 import NewNameForm from '../../components/interrogator/NewNameForm';
 import RtpDisplayForm from '../../components/interrogator/RtpDisplayForm';
@@ -19,7 +20,7 @@ const NEW = '<New...>';
 const A975 = { size: 9.75, family: 'Arial' };
 const BTN = { size: 9.75, bold: true, family: 'Arial' };
 const A8 = { size: 8, family: 'Arial' };
-const ACTIVE_CAPTION = '#99b4d1';
+const ACTIVE_CAPTION = 'var(--accent-info)';
 const B = { w: 153, h: 49, font: BTN };
 
 export default function InterrogatorPage() {
@@ -94,9 +95,16 @@ export default function InterrogatorPage() {
 
   return (
     <div className="page-wrapper">
+      <div className="vb-page-header">
+        <Radar size={22} className="card-title-icon" aria-hidden="true" />
+        <div>
+          <h1>Interrogator</h1>
+          <p>RTP 데이터 점검 · 생성 · 내보내기</p>
+        </div>
+      </div>
       <VbDbBar value={database} onChange={setDatabase} testId="int-db" />
       <VbForm title="Interrogator" width={922} height={744} testId="int-main">
-        <VbLabel x={122} y={19} w={749} h={139} font={{ size: 72, bold: true, family: 'Arial' }} color="#000">Interrogator</VbLabel>
+        <VbLabel x={122} y={19} w={749} h={139} font={{ size: 72, bold: true }} className="vb-hero">Interrogator</VbLabel>
 
         <VbLabel x={138} y={176} w={103} h={23} font={A975}>Probe ID</VbLabel>
         <VbCombo x={256} y={176} w={153} h={26} font={A975} value={probeId} onChange={setProbeId}

@@ -182,7 +182,7 @@ const vbPlotPlugin = {
     const a = chart.chartArea;
     const { ctx } = chart;
     ctx.save();
-    ctx.fillStyle = cssColor('--vb-window');
+    ctx.fillStyle = cssColor('--vb-paper');
     ctx.fillRect(a.left, a.top, opts.geo.w, opts.geo.h);
     ctx.restore();
     if (opts.grid) drawGrid(ctx, a, opts.geo);

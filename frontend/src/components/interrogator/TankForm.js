@@ -94,7 +94,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
   const [view, setView] = useState('Composite');
   const [gridOn, setGridOn] = useState(true);
   const [viewMenu, setViewMenu] = useState(false);
-  const [en, setEn] = useState({ plot: false, markAll: true, autoAllMri: false, auto: false });
+  const [en, setEn] = useState({ plot: false, markAll: false, autoAllMri: false, auto: false });
   const [isSelectAll, setIsSelectAll] = useState(false);
   const [busy, setBusy] = useState('');
   const [modal, setModal] = useState(null);
@@ -564,7 +564,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
         <VbLabel x={21} y={15}>Use checked MRI?</VbLabel>
         <VbButton x={131} y={9} w={41} h={25} onClick={cmdOk} busy={!!busy} testId="tk-ok">OK</VbButton>
         <VbLabel x={8} y={32}>MeasSwVersion</VbLabel>
-        <VbLabel x={8} y={48} color="#f08080">(Selection&lt;=3)</VbLabel>
+        <VbLabel x={8} y={48} color="var(--vb-maroon)">(Selection&lt;=3)</VbLabel>
         <div className="vb-list" role="listbox" aria-multiselectable="true" data-testid="tk-sw"
           style={{ left: 89, top: 31, width: 206, height: 56, fontSize: `${6 * PT}px`, fontFamily: 'Arial' }}>
           {swList.map((v) => (
@@ -606,7 +606,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
       </div>
       {legend.map((c, k) => (c ? (
         <div key={k} data-testid={`tk-legend-${k}`}
-          style={{ left: 4, top: 293 + 12 * k, width: 10, height: 10, background: `var(${plotColorVar(c)})`, border: '1px solid #000' }} />
+          style={{ left: 4, top: 293 + 12 * k, width: 10, height: 10, background: `var(${plotColorVar(c)})`, border: '1px solid var(--vb-border)' }} />
       ) : null))}
       {MARK_Y.map((y, k) => (
         <label key={k} className="vb-check" style={{ left: 305, top: y, width: 17, height: 17 }}>
@@ -635,7 +635,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
           <input type="checkbox" checked={form.multi} data-testid="tk-multi" onChange={(e) => setF({ multi: e.target.checked })} />
         </label>
         <VbLabel x={43} y={42}>Multi-Points Edit</VbLabel>
-        <VbLabel x={6} y={60} color="#ff0000" font={{ size: 8.25, bold: true, family: 'Arial Narrow' }}>
+        <VbLabel x={6} y={60} color="var(--vb-red)" font={{ size: 8.25, bold: true, family: 'Arial Narrow' }}>
           To enable auto editing, please select a MRI in graph
         </VbLabel>
         <VbButton x={20} y={78} w={115} h={34} onClick={cmdAutoCheckAll} disabled={!en.auto} busy={!!busy}

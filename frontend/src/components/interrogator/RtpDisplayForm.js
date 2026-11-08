@@ -9,7 +9,7 @@ import { apiJson, query } from '../../lib/apiJson';
 
 const A8 = { size: 8, family: 'Arial' };
 const EMPTY = { columns: [], rows: [] };
-const CYAN = '#00ffff';
+const CYAN = 'var(--vb-cyan)';
 
 export default function RtpDisplayForm({ database, probeId, rtpName, onClose }) {
   const [data, setData] = useState(null);
@@ -18,7 +18,7 @@ export default function RtpDisplayForm({ database, probeId, rtpName, onClose }) 
   useEffect(() => {
     setData(null);
     setError('');
-    if (!database || !probeId || !rtpName) return undefined;
+    if (!database || !probeId) return undefined;
     const ctrl = new AbortController();
     apiJson(`/api/interrogator/rtp-display?${query({ database, probeId, rtpName })}`, { signal: ctrl.signal })
       .then(setData)
@@ -34,7 +34,7 @@ export default function RtpDisplayForm({ database, probeId, rtpName, onClose }) 
 
   return (
     <VbForm title="Form14" width={1118} height={775} onClose={onClose} testId="int-rtp-display">
-      <VbLabel x={296} y={19} w={487} h={41} font={{ size: 24, bold: true, family: 'Arial' }} color="#000">RTP Look-Up-Table List</VbLabel>
+      <VbLabel x={296} y={19} w={487} h={41} font={{ size: 24, bold: true, family: 'Arial' }}>RTP Look-Up-Table List</VbLabel>
       <VbLabel x={32} y={63} w={71} h={17}>RTP_LUT</VbLabel>
       <VbGrid x={35} y={83} w={1001} h={269} columns={rtp.columns} rows={rtp.rows} testId="int-rtp-grid"
         backColor={problem ? CYAN : undefined} cellColor={problem ? () => CYAN : undefined} />
@@ -44,7 +44,7 @@ export default function RtpDisplayForm({ database, probeId, rtpName, onClose }) 
       <VbGrid x={35} y={485} w={1001} h={71} columns={volt.columns} rows={volt.rows} testId="int-tempvolt-grid" />
       <VbLabel x={32} y={568} w={177} h={25} font={A8}>Temperature Pulse Data:</VbLabel>
       <VbGrid x={35} y={584} w={1001} h={71} columns={pulse.columns} rows={pulse.rows} testId="int-temppulse-grid" />
-      <VbLabel x={88} y={708} w={633} h={25} wrap font={{ size: 12, bold: true, family: 'Arial' }} color="#ff0000"
+      <VbLabel x={88} y={708} w={633} h={25} wrap font={{ size: 12, bold: true, family: 'Arial' }} color="var(--vb-red)"
         hidden={!problem && !error} testId="int-rtp-problem">
         {error || 'Please check the blue table for RTP problem(s).'}
       </VbLabel>
