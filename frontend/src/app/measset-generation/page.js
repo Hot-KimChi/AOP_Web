@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Play, ExternalLink, Database, Table2, RotateCw, Settings2 } from 'lucide-react';
 import DataPreviewModal from '../../components/DataPreviewModal';
 import { API_BASE_URL } from '../../lib/apiBase';
-import MsiInputPanel from '../../components/MsiInputPanel';
+import MsiChoice from '../../components/msi/MsiChoice';
 
 function CondorMeasSetGen() {
   // 기본 상태 변수 선언
@@ -934,17 +934,7 @@ export default function MeasSetGen() {
       </div>
       <div hidden={mode !== 'msi'}>
         <div className="page-wrapper">
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title-row">
-                <Database size={16} className="card-title-icon" />
-                <h5>MSI input (Silverstone)</h5>
-              </div>
-            </div>
-            <div className="card-body" style={{ padding: '1.25rem' }}>
-              <MsiInputPanel />
-            </div>
-          </div>
+          <MsiChoice />
         </div>
       </div>
     </>

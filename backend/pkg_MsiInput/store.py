@@ -76,6 +76,18 @@ def records(cursor, sql: str, params: list | tuple = ()) -> list[dict]:
     return [{k: json_value(v) for k, v in row.items()} for row in fetch_dicts(cursor, sql, params)]
 
 
+def grid(cursor, sql: str, params: list | tuple = (), limit: int = MAX_LIST_ROWS) -> dict:
+    """DataGridView 표시용 ``{columns, rows, truncated}``. Flask JSON 은 dict 키를 정렬하므로
+    원본 SELECT 열 순서를 보존하려면 이 형식을 쓴다."""
+    cursor.execute(sql, list(params))
+    if cursor.description is None:
+        return {"columns": [], "rows": [], "truncated": False}
+    cols = [c[0] for c in cursor.description]
+    fetched = cursor.fetchmany(limit + 1)
+    rows = [[json_value(v) for v in row] for row in fetched[:limit]]
+    return {"columns": cols, "rows": rows, "truncated": len(fetched) > limit}
+
+
 class DbStore:
     def __init__(self, cursor):
         self.cur = cursor
@@ -318,3 +330,77 @@ def create(sql_obj, probe_id: int, sub_verif_ids, purpose_mode: str, min_meas_se
             except Exception:
                 pass
         conn.close()
+
+# ─── msiFromDump 화면(원본 열 순서 그대로 표시) ─────────────────────────────
+
+DUMP_VERIF_COLUMNS = (
+    "verifId, probeId, swVersion, purpose, reportTerm, comments, probeSn, sysSn, recordDate, ExamId, "
+    "Ispta3Limit, MiLimit, TiLimit, TraLimit, TrtLimit, apcIspta3, apcIspta, apcMI, apcTempRiseAir, "
+    "apcTempRiseTmm, apcTis, apcTib, apcTic, apcMif, measTempRiseAir, measTempRiseTmm, isDataUsable, "
+    "imageMode, apcTTIb, apcTTIsb, apcTTIs, ProbeName"
+)
+DUMP_SUBVERIF_COLUMNS = (
+    "subVerifId, verifId, submodeName, PulseType, ApodType, AperType, FmMHz, FocusPCm, FocusQCm, AzimFnum, "
+    "ElevFnum, ElevIndex, IsPhaseInverse, splitFocusEnable, PulseDurUs, FrameDurationTimeUsec, "
+    "NumTimesFiredInFrame, NumLinesPerSlice, NumSlices, NumCollinearFirings, LineSpaceAt0cm, LineSpaceAt1cm, "
+    "SliceSpaceAt0cm, SliceSpaceAt1cm, MaskCoefficient, EffectiveAreaCm2, Active12DbArea, txPowerUserSel, "
+    "TxGain, ArfiDutyFactor, DisplayMultiHz, SpaceTimeIndex, ZoomFactor, RoiAxialSpanMm, RoiAzimSpan, "
+    "RoiAzimMin, RoiAxialMinMm, NumFocalZones, FocusOrder, isReportable, PatternPrMPa, PatternIspta3, "
+    "PatternIspta, PatternMI, PatternMIF, PatternTRair, PatternTRtmm, PatternTISass, PatternTISasu, "
+    "PatternTISbsu, PatternTIBu, PatternTIC, PatternTTIb, PatternTTIsb, PatternTTIs, DepthCm, isCompound, "
+    "SieClearIndex, InFocus, DisplayedPrfHz, IsHprfEnabled, RequestedPrfHz, splitFocusEnable, IsAutoHzEn, "
+    "SoundSpeed"
+)
+
+
+def _read_only(sql_obj, fn):
+    conn = open_raw_connection(sql_obj)
+    try:
+        return fn(conn.cursor())
+    finally:
+        try:
+            conn.rollback()
+        finally:
+            conn.close()
+
+
+def list_probe_ids(sql_obj) -> list[int]:
+    """msiFromDump/frmMain Load: ``SELECT ProbeId FROM probe_info ORDER BY ProbeId``."""
+    rows = _read_only(sql_obj, lambda cur: fetch_dicts(
+        cur, f"SELECT TOP ({MAX_LIST_ROWS}) probeId FROM dbo.probe_info ORDER BY probeId ASC", lower=True))
+    return [int(r["probeid"]) for r in rows if r.get("probeid") is not None]
+
+
+def dump_records(sql_obj, probe_id: int, verif_filter: str | None) -> dict:
+    """msiFromDump ``Get Records``: imag_verification / imag_subverif 를 원본 열 순서 그대로."""
+    clause, params = parse_verif_filter(verif_filter)
+    where = (
+        "WHERE probeId = ? AND isDataUsable = 'Yes' "
+        "AND reportTerm NOT LIKE '%Temp' AND purpose NOT LIKE '%WCS'"
+    )
+    if clause:
+        where += f" AND {clause}"
+
+    def run(cur):
+        verif = grid(cur, f"SELECT TOP ({MAX_LIST_ROWS}) {DUMP_VERIF_COLUMNS} FROM dbo.imag_verification {where}",
+                     [probe_id, *params])
+        sub = grid(
+            cur,
+            f"SELECT TOP ({MAX_LIST_ROWS}) {DUMP_SUBVERIF_COLUMNS} FROM dbo.imag_subverif "
+            f"WHERE verifId IN (SELECT verifId FROM dbo.imag_verification {where}) "
+            "ORDER BY verifId, submodeName, FocusPCm",
+            [probe_id, *params],
+        )
+        return {"verification": verif, "subVerification": sub}
+
+    return _read_only(sql_obj, run)
+
+
+def meas_setting_rows(sql_obj, meas_set_ids: list[int]) -> dict:
+    """msiFromDump ``Created records``: 이번 실행에서 새로 만든 meas_setting 행."""
+    ids = sorted({int(i) for i in meas_set_ids if isinstance(i, int) and not isinstance(i, bool) and i > 0})[:MAX_SELECTION]
+    if not ids:
+        return {"columns": [], "rows": [], "truncated": False}
+    marks = ",".join("?" * len(ids))
+    return _read_only(sql_obj, lambda cur: grid(
+        cur, f"SELECT * FROM dbo.meas_setting WHERE measSetId IN ({marks}) ORDER BY measSetId", ids))

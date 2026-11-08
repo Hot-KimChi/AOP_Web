@@ -36,6 +36,10 @@ def anon(monkeypatch):
     ("post", "/api/interrogator/temp10/save"),
     ("post", "/api/interrogator/fit/aperture"),
     ("post", "/api/interrogator/fit/tr-spectrum"),
+    ("get", "/api/msi/probe-ids?database=BizDb"),
+    ("get", "/api/msi/dump-records?database=BizDb&probeId=1"),
+    ("get", "/api/interrogator/rtp-names-all?database=BizDb"),
+    ("post", "/api/interrogator/rtp-analysis"),
 ])
 def test_requires_auth(anon, method, url):
     assert getattr(anon, method)(url, json={}).status_code == 401
@@ -67,6 +71,38 @@ def test_msi_preview_validates_input(client, body):
 def test_msi_verifications_rejects_bad_filter(client):
     res = client.get("/api/msi/verifications?database=BizDb&probeId=1&verifFilter=1;DROP")
     assert res.status_code == 400
+
+
+def test_msi_dump_records_rejects_bad_filter(client):
+    res = client.get("/api/msi/dump-records?database=BizDb&probeId=1&verifFilter=1;DROP")
+    assert res.status_code == 400
+    assert client.get("/api/msi/dump-records?database=BizDb&probeId=x").status_code == 400
+
+
+@pytest.mark.parametrize("name", ["", "   ", "x" * 129, 5])
+def test_rtp_analysis_rejects_bad_name(client, name):
+    res = client.post("/api/interrogator/rtp-analysis", json={"database": "BizDb", "rtpName": name})
+    assert res.status_code == 400
+
+
+class _FakeCursor:
+    description = [("b",), ("a",), ("c",)]
+
+    def execute(self, sql, params):
+        self.sql, self.params = sql, params
+
+    def fetchmany(self, n):
+        rows = [(1, "x", None), (2, "y", float("nan")), (3, "z", 1.5)]
+        return rows[:n]
+
+
+def test_grid_keeps_column_order_and_truncates():
+    from pkg_MsiInput.store import grid
+
+    out = grid(_FakeCursor(), "SELECT b, a, c FROM t", [], limit=2)
+    assert out["columns"] == ["b", "a", "c"]
+    assert out["rows"] == [[1, "x", None], [2, "y", None]]
+    assert out["truncated"] is True
 
 
 def test_rtp_generate_requires_confirm_and_variant(client):

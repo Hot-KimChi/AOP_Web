@@ -138,20 +138,60 @@ test.describe('MSI input · Interrogator', () => {
     }));
   });
 
-  test('MeasSet Generation 에서 MSI input 탭으로 전환된다', async ({ page }) => {
+  test('MeasSet Generation 에서 MSI input 탭으로 전환된다(MsiChoice)', async ({ page }) => {
     await page.goto('/measset-generation');
     await expect(page.getByTestId('mode-tab-condor')).toBeVisible();
     await page.getByTestId('mode-tab-msi').click();
-    await expect(page.getByTestId('msi-input-panel')).toBeVisible();
+    await expect(page.getByTestId('msi-choice')).toBeVisible();
+    await expect(page.getByTestId('msi-choice-excel')).toHaveText('MSI Input From Excel');
+    await expect(page.getByTestId('msi-choice-dump')).toHaveText('MSI Input From Dumped Data');
     await page.getByTestId('mode-tab-condor').click();
-    await expect(page.getByTestId('msi-input-panel')).toBeHidden();
+    await expect(page.getByTestId('msi-choice')).toBeHidden();
   });
 
-  test('Interrogator 페이지가 섹션과 계산기를 표시한다', async ({ page }) => {
+  test('Interrogator 메인 폼이 원본(intMain) 버튼·활성 규칙을 따른다', async ({ page }) => {
+    await page.route('**/api/get_list_database', (route) => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ databases: ['BizDb'] }),
+    }));
+    await page.route('**/api/interrogator/probes?*', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 'success', data: [{ probeId: 7, probeName: 'C1-6' }] }),
+    }));
+    await page.route('**/api/interrogator/rtp-names?*', (route) => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: ['RTP_A'] }),
+    }));
+    await page.route('**/api/interrogator/rtp-display?*', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 'success', data: {
+        rtpLut: { columns: ['pmRTPId', 'RTPName'], rows: [[1, 'RTP_A']] },
+        tempPrbLut: { columns: [], rows: [] }, tempPrbVoltLut: { columns: [], rows: [] },
+        tempPulseLut: { columns: [], rows: [] }, problemCount: 1,
+      } }),
+    }));
     await page.goto('/interrogator');
-    await expect(page.getByTestId('interrogator-page')).toBeVisible();
-    await expect(page.locator('h5:has-text("RTP Display / Generation")')).toBeVisible();
-    await expect(page.locator('h5:has-text("Temp10 Fitting")')).toBeVisible();
-    await expect(page.locator('h5:has-text("MATLAB 계산기")')).toBeVisible();
+    await expect(page.getByTestId('int-main')).toBeVisible();
+    await expect(page.getByTestId('int-btn-simu')).toBeDisabled();
+    await expect(page.getByTestId('int-btn-tank')).toBeDisabled();
+    await expect(page.getByTestId('int-btn-runaper')).toBeEnabled();
+
+    await page.getByTestId('int-db').selectOption('BizDb');
+    await page.getByTestId('int-probe').selectOption('7');
+    await expect(page.getByTestId('int-probe-name')).toHaveValue('C1-6');
+    await expect(page.getByTestId('int-btn-tank')).toBeEnabled();
+    await expect(page.getByTestId('int-btn-power')).toBeEnabled();
+    await expect(page.getByTestId('int-btn-simu')).toBeDisabled();
+
+    await page.getByTestId('int-rtp-name').selectOption('<New...>');
+    await expect(page.getByTestId('int-newname')).toBeVisible();
+    await page.getByTestId('int-newname-text').fill('RTP_NEW');
+    await page.getByTestId('int-newname-ok').click();
+    await expect(page.getByTestId('int-rtp-name')).toHaveValue('RTP_NEW');
+
+    await page.getByTestId('int-rtp-name').selectOption('RTP_A');
+    await page.getByTestId('int-btn-display').click();
+    await expect(page.getByTestId('int-rtp-display')).toBeVisible();
+    await expect(page.getByTestId('int-rtp-problem')).toBeVisible();
+    await page.getByTestId('int-rtp-close').click();
+    await expect(page.getByTestId('int-rtp-display')).toBeHidden();
   });
 });

@@ -10,6 +10,11 @@ from routes.ml import ml_bp
 from routes.todo import todo_bp
 from routes.msi_input import msi_input_bp
 from routes.interrogator import interrogator_bp
+from routes.interrogator_tank import interrogator_tank_bp
+from routes.interrogator_power import interrogator_power_bp
+from routes.interrogator_temp import interrogator_temp_bp
+from routes.interrogator_export import interrogator_export_bp
+from routes.msi_excel import msi_excel_bp
 
 
 def create_app():
@@ -52,6 +57,11 @@ def create_app():
     app.register_blueprint(todo_bp)
     app.register_blueprint(msi_input_bp)
     app.register_blueprint(interrogator_bp)
+    app.register_blueprint(interrogator_tank_bp)
+    app.register_blueprint(interrogator_power_bp)
+    app.register_blueprint(interrogator_temp_bp)
+    app.register_blueprint(interrogator_export_bp)
+    app.register_blueprint(msi_excel_bp)
 
     @app.before_request
     def purge_legacy_session_secrets():

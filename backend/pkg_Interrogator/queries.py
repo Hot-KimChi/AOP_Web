@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 
-from pkg_MsiInput.store import MAX_LIST_ROWS, open_raw_connection, records
+from pkg_MsiInput.store import MAX_LIST_ROWS, grid, open_raw_connection, records
 
 from .temperature_fit import _PENALTY, fit_temp10
 
@@ -38,7 +38,7 @@ def _read(sql_obj, fn):
 
 def list_probes(sql_obj) -> list[dict]:
     return _read(sql_obj, lambda cur: records(
-        cur, f"SELECT TOP ({MAX_LIST_ROWS}) probeId, probeName FROM dbo.probe_info ORDER BY probeName"))
+        cur, f"SELECT TOP ({MAX_LIST_ROWS}) probeId, probeName FROM dbo.probe_info ORDER BY probeId ASC"))
 
 
 def list_rtp_names(sql_obj, probe_id: int) -> list[str]:
@@ -57,51 +57,101 @@ def _check_name(rtp_name: str) -> str:
 
 
 def rtp_display(sql_obj, probe_id: int, rtp_name: str) -> dict:
+    """intRtpDisplay1: 네 그리드를 원본 SELECT 열 순서 그대로 반환한다."""
     name = _check_name(rtp_name)
     like = f"%{_escape_like(name)}%"
 
     def run(cur):
-        rtp = records(
-            cur,
-            f"SELECT TOP ({MAX_LIST_ROWS}) * FROM dbo.RTP_LUT WHERE ProbeId = ? AND RTPName = ? ORDER BY pmRTPId",
-            [probe_id, name],
-        )
-        temp_prb = records(
-            cur,
-            f"SELECT TOP ({MAX_LIST_ROWS}) * FROM dbo.tempPrb_LUT WHERE ProbeId = ? AND LUTname LIKE ? ORDER BY tempPrbLUTId",
-            [probe_id, like],
-        )
-        temp_pulse = records(
-            cur,
-            f"SELECT TOP ({MAX_LIST_ROWS}) * FROM dbo.tempPulse_LUT WHERE ProbeId = ? AND LUTname LIKE ? ORDER BY tempPulseId",
-            [probe_id, like],
-        )
-        temp_volt = records(
-            cur,
-            f"SELECT TOP ({MAX_LIST_ROWS}) v.* FROM dbo.tempPrbVolt_LUT v "
-            "JOIN dbo.tempPrb_LUT p ON v.tempPrbLUTId = p.tempPrbLUTId "
-            "WHERE p.ProbeId = ? AND p.LUTname LIKE ? ORDER BY v.tempPrbVoltID",
-            [probe_id, like],
-        )
         problems = records(
             cur,
             "SELECT COUNT(*) AS n FROM dbo.RTP_LUT WHERE probeId = ? AND RTPName = ? AND problemReport > 0",
             [probe_id, name],
         )
-        return rtp, temp_prb, temp_pulse, temp_volt, int(problems[0]["n"] or 0) if problems else 0
+        rtp = grid(cur, "SELECT * FROM dbo.RTP_LUT WHERE ProbeId = ? AND RTPName = ? ORDER BY pmRTPId",
+                   [probe_id, name])
+        temp_prb = grid(cur, "SELECT * FROM dbo.tempPrb_LUT WHERE ProbeId = ? AND LUTname LIKE ? ORDER BY tempPrbLUTId",
+                        [probe_id, like])
+        temp_pulse = grid(cur, "SELECT * FROM dbo.tempPulse_LUT WHERE ProbeId = ? AND LUTname LIKE ? ORDER BY tempPulseId",
+                          [probe_id, like])
+        temp_volt = grid(
+            cur,
+            "SELECT v.* FROM dbo.tempPrbVolt_LUT v "
+            "JOIN dbo.tempPrb_LUT p ON v.tempPrbLUTId = p.tempPrbLUTId "
+            "WHERE p.ProbeId = ? AND p.LUTname LIKE ? ORDER BY v.tempPrbVoltID",
+            [probe_id, like],
+        )
+        return {
+            "rtpLut": rtp,
+            "tempPrbLut": temp_prb,
+            "tempPrbVoltLut": temp_volt,
+            "tempPulseLut": temp_pulse,
+            "problemCount": int(problems[0]["n"] or 0) if problems else 0,
+        }
 
-    rtp, temp_prb, temp_pulse, temp_volt, problems = _read(sql_obj, run)
-    warnings = []
-    if problems:
-        warnings.append(f"problemReport 가 표시된 RTP 행이 {problems}개 있습니다.")
-    return {
-        "rtpLut": rtp,
-        "tempPrbLut": temp_prb,
-        "tempPulseLut": temp_pulse,
-        "tempPrbVoltLut": temp_volt,
-        "warnings": warnings,
-        "truncated": any(len(t) >= MAX_LIST_ROWS for t in (rtp, temp_prb, temp_pulse, temp_volt)),
-    }
+    return _read(sql_obj, run)
+
+
+def list_all_rtp_names(sql_obj) -> list[str]:
+    """intRTPanalysis Load: ``SELECT DISTINCT(RTPName) FROM dbo.RTP_LUT ORDER BY RTPName``."""
+    rows = _read(sql_obj, lambda cur: records(
+        cur, f"SELECT DISTINCT TOP ({MAX_LIST_ROWS}) RTPName FROM dbo.RTP_LUT ORDER BY RTPName"))
+    return [r["RTPName"] for r in rows if r.get("RTPName") is not None]
+
+
+RTP_ANALYSIS_TIMEOUT_S = 150
+RTP_ANALYSIS_LOCK = "AOP_Web_RtpAnalysis"
+
+
+def rtp_analysis(sql_obj, rtp_name: str) -> dict:
+    """intRTPanalysis: 사용자 스키마 tRTP_LUT 를 다시 만들고 ``RtpAnalysis`` 실행 후 RTP_analysis 조회.
+
+    원본은 문자열 연결 SQL·자동 커밋이었다. 파라미터 바인딩과 단일 트랜잭션,
+    사용자별 앱 락(같은 사용자의 동시 실행이 같은 작업 테이블을 덮어쓰지 않도록)으로 교정한다.
+    """
+    name = _check_name(rtp_name)
+    conn = open_raw_connection(sql_obj)
+    driver = getattr(conn, "driver_connection", None) or getattr(conn, "dbapi_connection", None) or conn
+    previous_timeout = getattr(driver, "timeout", 0)
+    committed = False
+    try:
+        driver.timeout = RTP_ANALYSIS_TIMEOUT_S
+        cur = conn.cursor()
+        cur.execute(
+            "SET NOCOUNT ON; IF @@TRANCOUNT = 0 BEGIN TRANSACTION; DECLARE @rc INT; "
+            "DECLARE @res NVARCHAR(255) = ? + N':' + USER_NAME(); "
+            "EXEC @rc = sp_getapplock @Resource = @res, @LockMode = 'Exclusive', "
+            "@LockOwner = 'Transaction', @LockTimeout = 15000; SELECT @rc;",
+            [RTP_ANALYSIS_LOCK],
+        )
+        rc = cur.fetchone()
+        if rc is None or rc[0] is None or int(rc[0]) < 0:
+            raise InterrogatorInputError("다른 RTP Analysis 가 실행 중입니다. 잠시 후 다시 시도하세요.")
+        cur.execute(
+            "IF EXISTS (SELECT * FROM sysobjects WHERE name = 'tRTP_LUT' AND uid = USER_ID()) "
+            "DROP TABLE tRTP_LUT; "
+            "SELECT * INTO tRTP_LUT FROM dbo.RTP_LUT WHERE rtpName = ?;",
+            [name],
+        )
+        while cur.nextset():
+            pass
+        cur.execute("EXEC RtpAnalysis")
+        while cur.nextset():
+            pass
+        result = grid(cur, "SELECT * FROM RTP_analysis")
+        conn.commit()
+        committed = True
+        return result
+    finally:
+        if not committed:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        try:
+            driver.timeout = previous_timeout
+        except Exception:
+            pass
+        conn.close()
 
 
 def generate_rtp(sql_obj, probe_id: int, variant: str) -> None:

@@ -978,3 +978,121 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, summary:fo
   background: var(--surface);
   border-color: var(--border) var(--border) var(--surface);
 }
+
+/* ===== 레거시 VB WinForms 재현(components/vb/Vb.js) ===== */
+:root {
+  --vb-face: #f0f0f0;
+  --vb-window: #ffffff;
+  --vb-text: #000000;
+  --vb-border: #7a7a7a;
+  --vb-border-light: #adadad;
+  --vb-button: #e1e1e1;
+  --vb-button-hover: #e5f1fb;
+  --vb-button-hover-border: #0078d7;
+  --vb-disabled: #a0a0a0;
+  --vb-highlight: #0078d7;
+  --vb-highlight-text: #ffffff;
+  --vb-titlebar: #ffffff;
+  --vb-grid-head: #f0f0f0;
+  --vb-grid-line: #d5d5d5;
+  --vb-grid-empty: #abababab;
+  --vb-cyan: #00ffff;
+  --vb-salmon: #ffa07a;
+  --vb-lightgray: #d3d3d3;
+  --vb-maroon: #800000;
+  --vb-red: #c00000;
+}
+.vb-outer { width: 100%; overflow-x: auto; padding: 4px 0 12px; }
+.vb-window {
+  border: 1px solid var(--vb-border); background: var(--vb-face); color: var(--vb-text);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  font-family: 'Microsoft Sans Serif', 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 11px;
+}
+.vb-titlebar {
+  height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 0 0 8px;
+  background: var(--vb-titlebar); border-bottom: 1px solid var(--vb-border-light); font-size: 12px;
+}
+.vb-title-icon { width: 16px; height: 16px; border-radius: 2px; background: linear-gradient(135deg, #4a8f3c, #2b5d8a); }
+.vb-title-text { flex: 1; }
+.vb-title-close { border: 0; background: transparent; width: 46px; height: 30px; color: var(--vb-text); }
+.vb-title-close:hover { background: #e81123; color: #fff; }
+.vb-client { position: relative; overflow: hidden; }
+.vb-client > * { position: absolute; box-sizing: border-box; }
+.vb-label { line-height: 1.2; overflow: visible; }
+.vb-button {
+  background: var(--vb-button); border: 1px solid var(--vb-border-light); color: var(--vb-text);
+  font: inherit; padding: 2px 4px; line-height: 1.15; white-space: normal; cursor: default;
+}
+.vb-button:hover:not(:disabled) { background: var(--vb-button-hover); border-color: var(--vb-button-hover-border); }
+.vb-button:active:not(:disabled) { background: #cce4f7; }
+.vb-button:focus-visible { outline: 1px dotted var(--vb-text); outline-offset: -4px; }
+.vb-button:disabled { color: var(--vb-disabled); border-color: #bfbfbf; background: #cccccc; }
+.vb-button[aria-busy='true'] { cursor: progress; }
+.vb-text, .vb-combo {
+  background: var(--vb-window); color: var(--vb-text); border: 1px solid var(--vb-border);
+  font: inherit; padding: 1px 3px; border-radius: 0;
+}
+.vb-text[readonly] { background: var(--vb-face); }
+.vb-combo:disabled { background: var(--vb-face); color: var(--vb-disabled); }
+.vb-check { display: flex; align-items: center; gap: 4px; margin: 0; white-space: nowrap; }
+.vb-check input { margin: 0; }
+.vb-list { background: var(--vb-window); border: 1px solid var(--vb-border); overflow-y: auto; }
+.vb-list-item { padding: 0 3px; white-space: nowrap; cursor: default; }
+.vb-list-item.selected { background: var(--vb-highlight); color: var(--vb-highlight-text); }
+.vb-grid { background: var(--vb-grid-empty); border: 1px solid var(--vb-border); overflow: auto; outline: none; }
+.vb-grid table { border-collapse: collapse; background: var(--vb-window); }
+.vb-grid th, .vb-grid td {
+  border: 1px solid var(--vb-grid-line); padding: 1px 4px; white-space: nowrap; height: 20px;
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis; font-weight: 400; text-align: left;
+}
+.vb-grid thead th { position: sticky; top: 0; z-index: 2; background: var(--vb-grid-head); }
+.vb-grid .vb-rowhead {
+  position: sticky; left: 0; z-index: 1; background: var(--vb-grid-head); width: 20px; min-width: 20px;
+  padding: 0; text-align: center; font-size: 9px; cursor: default; user-select: none;
+}
+.vb-grid thead .vb-rowhead { z-index: 3; }
+.vb-grid td.cur { background: var(--vb-highlight); color: var(--vb-highlight-text); }
+.vb-grid tr.current .vb-rowhead { background: #d9e8f7; }
+.vb-grid .vb-newrow td { background: var(--vb-window); }
+.vb-cell-edit { width: 100%; min-width: 60px; border: 0; padding: 0; font: inherit; color: var(--vb-text); background: var(--vb-window); }
+.vb-grid-more { position: sticky; left: 0; padding: 2px 6px; font-size: 10px; color: var(--vb-maroon); }
+.vb-group { border: 1px solid var(--vb-border-light); margin: 0; padding: 0; }
+.vb-group > legend { float: none; width: auto; font-size: inherit; margin: 0 0 0 6px; padding: 0 2px; }
+.vb-group > * { position: absolute; box-sizing: border-box; }
+.vb-group > legend { position: static; }
+.vb-busy { position: absolute; right: 8px; bottom: 6px; font-size: 11px; color: var(--vb-maroon); }
+.vb-picture { background: var(--vb-window); border: 1px solid var(--vb-border); }
+.vb-modal {
+  position: fixed; inset: 0; z-index: 1050; background: rgba(0, 0, 0, 0.35);
+  overflow: auto; padding: 24px 16px;
+}
+.vb-modal > .vb-outer { max-width: 100%; margin: 0 auto; width: fit-content; padding: 0; }
+.vb-modal .vb-window { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); }
+.vb-dbbar { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; }
+.vb-dbbar select { min-width: 220px; }
+.vb-msg { color: var(--vb-red); white-space: pre-wrap; }
+
+/* intPower 그래프(vbplot) 색 — OLE 색 상수(frmGlobals LoadColorArray) 그대로 */
+:root {
+  --vb-plot-1: #0000ff; --vb-plot-2: #00ff00; --vb-plot-3: #00ffff; --vb-plot-4: #ff0000;
+  --vb-plot-5: #ff00ff; --vb-plot-6: #ffff00; --vb-plot-7: #0000c0; --vb-plot-8: #00c000;
+  --vb-plot-9: #00c0c0; --vb-plot-10: #c00000; --vb-plot-11: #c000c0; --vb-plot-12: #c0c000;
+  --vb-plot-13: #000080; --vb-plot-14: #008000; --vb-plot-15: #008080; --vb-plot-16: #800000;
+  --vb-plot-17: #800080; --vb-plot-18: #808000; --vb-plot-19: #c0c0c0; --vb-plot-20: #808080;
+  --vb-plot-21: #000000; --vb-plot-purple: #9400d3; --vb-plot-grid: #808080; --vb-plot-title: #00008b;
+  --vb-plot-cross: #ffff00; --vb-plot-select: #ff0000; --vb-plot-tick: #000000;
+}
+.vb-ctxmenu {
+  position: absolute; z-index: 20; min-width: 120px; padding: 2px; background: var(--vb-window);
+  border: 1px solid var(--vb-border); box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25); font-size: 11px;
+}
+.vb-ctxmenu-item { position: relative; padding: 3px 20px; white-space: nowrap; cursor: default; }
+.vb-ctxmenu-item:hover:not(.disabled) { background: var(--vb-button-hover); }
+.vb-ctxmenu-item.disabled { color: var(--vb-disabled); }
+.vb-ctxmenu-item > .vb-ctxmenu { left: 100%; top: -3px; }
+.vb-menubar { display: flex; align-items: center; background: var(--vb-face); }
+.vb-menubar > button { border: 0; background: transparent; font: inherit; padding: 2px 7px; color: var(--vb-text); }
+.vb-menubar > button:hover { background: var(--vb-button-hover); }
+.vb-checklist-item { display: flex; align-items: center; gap: 3px; padding: 0 2px; white-space: pre; cursor: default; height: 15px; }
+.vb-checklist-item.selected { background: var(--vb-highlight); color: var(--vb-highlight-text); }
+.vb-checklist-item input { margin: 0; }

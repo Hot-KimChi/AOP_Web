@@ -59,6 +59,30 @@ def verifications():
     return _guard(run)
 
 
+@msi_input_bp.route("/probe-ids", methods=["GET"])
+@handle_exceptions
+@require_auth
+@with_db_connection()
+def probe_ids():
+    return _guard(lambda: (require_business_db(), _ok(msi_store.list_probe_ids(g.current_db)))[1])
+
+
+@msi_input_bp.route("/dump-records", methods=["GET"])
+@handle_exceptions
+@require_auth
+@with_db_connection()
+def dump_records():
+    def run():
+        require_business_db()
+        probe_id = int_param(request.args, "probeId")
+        verif_filter = request.args.get("verifFilter", "")
+        if len(verif_filter) > MAX_FILTER_LEN:
+            raise RouteInputError("verifId 필터가 너무 깁니다.")
+        return _ok(msi_store.dump_records(g.current_db, probe_id, verif_filter))
+
+    return _guard(run)
+
+
 @msi_input_bp.route("/preview", methods=["POST"])
 @handle_exceptions
 @require_auth
@@ -92,6 +116,7 @@ def create():
             f"MSI input created by {g.current_user}: probeId={args[0]}, "
             f"mode={args[2]}, measSetIds={plan.created_ids}"
         )
-        return _ok({**plan.to_dict(), "createdIds": plan.created_ids})
+        created = msi_store.meas_setting_rows(g.current_db, plan.created_ids)
+        return _ok({**plan.to_dict(), "createdIds": plan.created_ids, "created": created})
 
     return _guard(run)

@@ -79,6 +79,29 @@ def rtp_generate():
     return _db_route(run)
 
 
+@interrogator_bp.route("/rtp-names-all", methods=["GET"])
+@handle_exceptions
+@require_auth
+@with_db_connection()
+def rtp_names_all():
+    return _db_route(lambda: _ok(queries.list_all_rtp_names(g.current_db)))
+
+
+@interrogator_bp.route("/rtp-analysis", methods=["POST"])
+@handle_exceptions
+@require_auth
+@with_db_connection()
+def rtp_analysis():
+    def run():
+        body = json_body()
+        name = body.get("rtpName", "")
+        result = queries.rtp_analysis(g.current_db, name)
+        logger.info(f"RTP analysis by {g.current_user}: rtpName={name!r}")
+        return _ok(result)
+
+    return _db_route(run)
+
+
 @interrogator_bp.route("/temp10/stations", methods=["GET"])
 @handle_exceptions
 @require_auth

@@ -37,6 +37,7 @@
 | 31 | MSI input(Silverstone)·Interrogator 웹 이식 (본문 ## 31) | 2026-11-08 | - |
 | 32 | 전체 코드·시퀀스·병목·에러 점검 및 개선 (본문 ## 32) | 2026-11-08 | - |
 | 33 | MSI input·Interrogator 디자인 통일(기능·그래프 유지) (본문 ## 33) | 2026-11-08 | - |
+| 34 | MSI input·Interrogator VB 폼 완전 동일 이식(Python·웹) (본문 ## 34) | 2026-11-08 | - |
 
 ---
 
@@ -966,3 +967,16 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **MSI input**: 진행 순서 안내, 단계 번호 제목(1 verification → 2 선택 → 3 미리보기 → 4 결과), 선택 수·미리보기 요약 배지, 처리 중 표시.
 - **공용**: `globals.css` 에 `step-title`·`sub-panel`·`chart-box`·`busy-indicator` 추가, `lib/useIsDark.js`(`data-theme` 추적) 추가.
 - **검증**: `npm run build` 성공, Playwright 18 passed, 모의 응답으로 Temp10 결과 화면을 라이트·다크 스크린샷 확인. 교차 검증은 UI 전용 변경(인증·SQL·API 계약 무변경)이라 생략.
+
+## 34. visual basic과 같은 순서와 버튼 등 양식등 기능도 동일하게 구현하라고 하는 것이 내가 원하는 것이다. 그런데 많이 ui등이 다르다. 완전히 동일하게 생성해죠. 대신 파이썬 & 웹으로 설계할 것이며, 매트랩보다 파이썬으로 이를 대체할 것. (MSI 기능 표·Interrogator 폼 스크린샷 첨부, "완벽하게 동일하게 구현해라. 매트랩이나 에러는 빼고 파이썬으로")
+
+### 수행 결과
+
+- **방식**: VB Designer 좌표를 파싱해 절대배치하는 공용 컨트롤(`components/vb/Vb.js`: VbForm·VbButton·VbGrid·VbModal·VbDbBar 등)을 만들고, 원본 폼별로 버튼 순서·활성 규칙·이벤트 순서를 이식. MATLAB 은 SciPy 로 대체, 그래프는 SVG.
+- **MSI input**: `MsiChoice`(원본 선택 폼) → `MsiDumpForm`·`MsiExcelForm`(measSetInput: 열기·편집·Save Tank/Power/Temp·PRF 갱신·엑셀 저장). `.xls`(BIFF)는 xlrd, `.xlsx` 는 표준 라이브러리로 읽음.
+- **Interrogator**: intMain 메인 폼 재현 + Tank(상세·VoltageS)·Power·Export(IntExport)·Temp(Temp10·Wobbler)·RTP Display/Analysis·NewName 폼.
+- **백엔드**: 블루프린트 5개(`msi_excel`·`interrogator_tank/power/temp/export`), 열 순서를 보존하는 `grid()` 응답 형식(jsonify 키 정렬 회피), 모든 SQL 파라미터 바인딩, 쓰기 작업 단일 트랜잭션·오류 시 롤백.
+- **원본 대비 의도적 차이(에러 교정)**: Excel COM·로컬 경로 출력 → 다운로드, 쓰기 전 확인 대화상자, Temp `pre_RTP_temp` 는 폼 열 때 1회, BeamWidth Simulation 은 원본처럼 비활성.
+- **교차 검증 수정**: V-001(프로시저 `nextset()` 예외를 삼켜 부분 커밋 위험) → 예외 전파로 전체 롤백. V-002(`.xls` 미지원) → xlrd 2.x 추가(`requirements.txt`).
+- **검증**: pytest 176 passed, `npm run build` 성공, Production 재기동 후 HTTP 200, Playwright 18 passed, security-review 취약점 0건.
+- **잔여 위험**: 실제 DB 접속 불가(18456)로 프로시저 결과·스키마 통합 검증 미실시. `msi_excel` 저장 API 의 서버측 `confirm` 요구는 프런트 확인 대화상자에만 의존(익스플로잇 불가, 일관성 개선 후보).
