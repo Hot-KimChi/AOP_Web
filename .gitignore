@@ -34,3 +34,6 @@ backend/.env.production
 
 # ===== IDE =====
 .vscode/settings.json
+
+# 레거시 VB 참고 소스(인증서 포함, 커밋 금지)
+11_소스_CompassTool_VB_2nd/

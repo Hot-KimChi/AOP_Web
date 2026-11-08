@@ -34,6 +34,7 @@
 | 26 | [Implementation_list 가독성 개선](#26-implementation_list-가독성-개선) | 2026-10-09 | - |
 | 27 | [프론트엔드 모던 디자인 및 전체 버그·병목 개선](#27-프론트엔드-모던-디자인-및-전체-버그병목-개선) | 2026-10-09 | v0.9.82 |
 | 28 | [재부팅 후 클라이언트 접속 불가 원인 분석·해결](#28-서버-컴퓨터가-재시작되었더니-클라이언트-피씨에서-접속하지-못하는-현상이-확인되었다-지금-현재-피씨가-서버-컴퓨터인데-현재-나의-프로젝트에-어떠한-문제점이-있는가-이를-분석하고-해결해죠-그리고-이러한-진행에-있어-agent-재작성-명세를-작성-후에-이를-기반으로-진행해죠) | 2026-10-10 | v0.9.83 |
+| 31 | MSI input(Silverstone)·Interrogator 웹 이식 (본문 ## 31) | 2026-11-08 | - |
 
 ---
 
@@ -900,3 +901,34 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **예측 오차(학습 루프 1단계)**: 명세 범위 충족 여부를 p=0.7로 "충족"이라 봤으나 Leader가 누락 3건을 지적함. 훅 오탐 0은 1차 구현에서 p≈0.8로 확신했으나 Verify 회귀 13건 중 6건 오탐 → 줄 단위 정규식의 한계. 교훈: 소스 검사 훅은 처음부터 주석·문자열을 구분하는 토크나이저로 작성하고, 오탐/미검출 우선순위 정책을 먼저 정할 것.
 - **운영 주의**: `next start` 실행 중 `npm run build`를 하면 `.next`가 교체되어 운영 서버가 옛 CSS 해시를 참조해 스타일이 깨짐(이번에 재현·재기동으로 복구). 빌드 전 서버 정지 → 빌드 → 재기동 순서를 지킬 것.
 - **잔여(범위 밖·Minor)**: `<html lang="en">`(화면은 한글), 내비 `aria-current` 없음, 차트 JS 애니메이션 reduced-motion 미대응, 다크 점수색 `.text-*` 토큰화, 새 세션에서의 커스텀 에이전트·MCP 실제 로드는 미확인.
+
+
+## 31. 11폴더(11_소스_CompassTool_VB_2nd)를 추가하였다. 이 안에 MSI input은 measset generation과 동일한 기능이다. 차이점은 AOP web안에 있는 것은 한국에서 생성한 condor전용 버전이며, 11폴더는 앞으로 silverstone에 사용할 것이다. MSI input을 기존에 measset generation 안에 추가해죠. 그리고 추가적으로 1가지 기능을 더 추가해죠(Interrogator). Interrogator는 11폴더 안에 있으며, 해당 기능을 AOP web 메뉴에 한개 추가하여 생성해죠. interrogator의 기능 중 매트랩 기능은 파이썬으로 컨버팅하여 진행하도록 수정해죠. 모든 기능에 대한 부분은 agent명세를 작성하여 이를 기반으로 진행하도록 해죠.
+
+### Agent 명세
+
+- **가정(사용자 부재로 자율 결정)**: 레거시 VB 약 15,000줄 전체를 한 번에 이식하지 않고 **1단계 MVP**를 구현한 뒤 나머지는 단계별 계획으로 남긴다. 대상 DB는 기존 DB 선택 목록(`DATABASE_NAME`)에서 사용자가 고르며, Silverstone DB가 목록에 없으면 `AOP_config.cfg [database] name`에 추가해야 한다. 이 PC 계정은 DB 직접 접속 권한이 없어(18456) 실제 테이블·프로시저 존재는 **로그인 사용자 세션에서만** 확인된다 → 조회 테이블이 없으면 API는 일반 오류(500)로 실패한다. MSI 생성은 단일 트랜잭션이라 중간 실패 시 전체 롤백된다.
+- **현황 진단(정적 분석, 11폴더는 읽기 전용)**
+  1. **MSI input**(`MsiChoice` → `msiFromDump` / `msiReader`): Silverstone MSI는 파일 업로드가 아니라 DB 덤프(`imag_verification`→`imag_subverif`)에서 측정 조건을 계산해 `meas_setting`에 넣는다. purpose(SSR/IEC/FDA)별 중복 검사 → 중복이면 `ExcelFileName`에 subVerifId만 덧붙이고, 아니면 최근 `comments='RTP'` 기준 행의 전압·apex 등을 복사해 INSERT, Auto/Power면 `comments='Power'` 행도 생성. VB는 문자열 연결 SQL(인젝션), `max(measSetId)` 선조회(경합), 지원 외 purpose에서 잘못된 레코드셋 참조로 예외, bit 값 `Val("True")=0` 오변환 결함이 있다. Excel 입력(`msiReader`, 1,945줄)은 MATLAB 빔폭 시뮬레이션(`R:\` 경로)에 의존한다.
+  2. **Interrogator**(`intMain`): Probe(`probe_info`) → RTP 이름(`RTP_LUT`) 선택 → Display(`RTP_LUT`·`tempPrb_LUT`·`tempPulse_LUT`·`tempPrbVolt_LUT`, `problemReport>0` 경고), RTP Generation(프로시저 `RTP_main`/`RTP_main_modified` → Display), 하위 폼 Tank(3,130줄)·Power(1,229)·Temperature(2,902)·Export(918)·RTP Analysis·Simulation.
+  3. **MATLAB(COM `Matlab.Application`)**: ① 10분 온도상승 6계수 모델 `fminsearch`(초기값 7종 중 최소오차, `frmTemp10`/`AWCSTemp`), ② 개구 보정 1D 3계수(가중) / 2D 5계수 `fmincon`(경계 0~100, `frmTemp`), ③ TR 스펙트럼 `sys_spectrum\TR_meas`(최소제곱). 서버에 MATLAB 라이선스가 없어도 동작하도록 SciPy/NumPy로 변환한다.
+- **범위(In, 1단계)**
+  - **MSI(Silverstone)**: MeasSet Generation 페이지에 `Condor`/`Silverstone MSI` 모드 탭. Probe → verifId 필터(`1,3,5~9`) → Verification·SubVerif 조회 → 행 선택 → **미리보기(읽기 전용 가상 상태 계산, DB 쓰기 없음, `planHash` 발급)** → 확인 후 생성(`sp_getapplock` + 트랜잭션 안에서 재계산·`planHash` 비교, 불일치 시 409와 새 계획 반환, 일치 시 단일 트랜잭션 커밋). 백엔드 `pkg_MsiInput/` + `routes/msi_input.py`.
+  - **Interrogator 메뉴**: `/interrogator` 페이지와 내비 항목. Probe/RTP 조회, RTP Display(4개 표), RTP Generation(허용 목록 프로시저 `RTP_main`/`RTP_main_modified`, **Probe 전체 RTP를 재생성**하므로 확인 대화상자 필수), 10분 온도 fitting(DB 조회 → SciPy → 곡선·계수 표시 → 선택 저장 `temp10_fit_coeff`, 기존 행 있으면 저장 안 함), 개구 보정·TR 스펙트럼 계산기(입력 배열 → 계수, DB 쓰기 없음). 백엔드 `pkg_Interrogator/` + `routes/interrogator.py`.
+- **범위(Out, 후속 단계 계획)**: 2단계 Tank/Power 분석(`frmTank`·`frmPower`, 측정 데이터 가공·그래프), 3단계 Export(IPOD, `tempVoltPoint`·`rtp_M_duplicate`), 4단계 개구 보정의 DB 데이터 수집부(`pre_RTP_temp` + 사용자 스키마 임시 테이블 `trtp_temp`)와 결과 저장(`temp_coeff`·`trSpectrum`), 5단계 RTP Analysis(`tRTP_LUT` 사용자 스키마 테이블 생성)·Simulation·MSI Excel 입력(`msiReader`, MATLAB 빔폭 시뮬레이션 의존)·Wobbler fitting(Interrogator 외).
+- **불변식**: 11폴더 읽기 전용·미커밋(`.pfx` 인증서 포함 → `.gitignore` 추가). 모든 SQL `?` 파라미터(동적 부분은 코드 상수 컬럼명·플레이스홀더 개수뿐), 데코레이터 순서 `handle_exceptions → require_auth → with_db_connection`, 프로시저는 허용 목록, DB 쓰기는 사용자 확인 + 단일 트랜잭션(실패 시 전체 롤백), 응답 크기 상한. 기존 Condor MeasSet 흐름·API 무변경. 레거시 계산식·조건(단위 혼용 `2*azPitchCm` 비교 포함)은 그대로 보존하되 위 결함(인젝션·경합·예외·bit 변환)만 교정하고 표시한다.
+- **검증 기준**: pytest — MSI 파라미터 계산(CW·12사이클 상한·1D/2D·Fnum 0), verifId 파서(범위·오류), fitting 수치(합성 데이터 계수 복원, 경계 준수, 최소제곱 = `numpy.linalg.lstsq`), Flask 라우트 인증·입력 검증. `py_compile`, `npm run build`, Playwright(내비 링크 6개·`/interrogator` 라우트), 서버 재기동 후 HTTP 확인. SQL·DB 쓰기·공용 API 추가 → GPT Verify + `security-review` 병렬, `Blocker 0 / Major 0`.
+
+### 수행 결과
+
+- **구현(1단계 MVP)**
+  - MSI(Silverstone): `pkg_MsiInput/calculator.py`(VB `msiFromDump` 이식, 순수 엔진), `store.py`(읽기 전용 미리보기 `DryRunStore` + 생성 `sp_getapplock`·명시 트랜잭션·`planHash` 사전/사후 비교), `routes/msi_input.py`(`/api/msi/probes|verifications|preview|create`). 화면은 MeasSet Generation 의 `Condor`/`Silverstone MSI` 모드 탭(`MsiInputPanel`).
+  - Interrogator: `pkg_Interrogator/queries.py`(RTP 조회·생성, temp10 조회·fitting·저장), `temperature_fit.py`(MATLAB `fminsearch`/`fmincon`/최소제곱 → SciPy Nelder-Mead/L-BFGS-B/`lstsq`), `routes/interrogator.py`, `/interrogator` 페이지와 내비 항목. `scipy` 의존성 추가.
+- **교차 검증 반영**(GPT Verify Major 3·Minor 1·잔여 1, security-review 취약점 0)
+  - 신규 실제 ID 가 `minMeasSetId` 보다 작을 때 미리보기와 실행 계획이 달라지던 문제 → 이번 실행 생성 행 표시(`_created_in_run`)로 판정 일치, 해시는 신규 ID 를 생성 순번으로 정규화, 실행 후 재비교 불일치 시 롤백.
+  - RTP 프로시저 timeout 이 풀 프록시에 설정돼 무시되던 문제 → 실제 드라이버 연결에 설정 후 복원.
+  - 요청 중 선택 변경 시 이전 대상 결과가 표시·저장되던 문제 → 요청 순번으로 늦은 응답 폐기, 저장은 fitting 에 쓴 ID 로만. 재검증에서 나온 RTP 생성 후 목록 갱신 경합(V-005)도 같은 방식으로 수정 → 최종 `Blocker 0 / Major 0`.
+  - subVerifId SQL INT 상한 검사, applock 전 `IF @@TRANCOUNT = 0 BEGIN TRANSACTION`.
+- **검증**: pytest 45 passed, `npm run build` 성공, Playwright 18 passed(인증 상태 API 가로채기로 MSI 탭·Interrogator 화면 확인), Production 재기동 후 `/`·`/interrogator` 200, 비인증 API 401.
+- **한계·후속**: 이 PC 계정은 DB 접속 권한이 없어(18456) 실제 테이블·컬럼·프로시저 통합 검증을 하지 못했다 → 로그인 세션에서 미리보기부터 확인 필요. Silverstone DB 는 `AOP_config.cfg [database] name` 에 추가해야 선택 목록에 나타난다. 2~5단계(Tank/Power·Export·개구 보정 DB 연동·RTP Analysis 등)는 범위(Out) 계획대로 후속 진행.
+- **학습 루프(1단계)**: 풀 프록시(`_ConnectionFairy`)에 드라이버 속성(timeout)을 설정하면 무시된다 — `driver_connection` 에 설정할 것.

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { Settings, Eye, ClipboardCheck, FileOutput, Brain, User, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
+import { Settings, Eye, ClipboardCheck, FileOutput, Brain, Activity, User, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
 import '../globals.css';
 import { API_BASE_URL } from '../lib/apiBase';
 import { openLoginPopup } from '../lib/loginPopup';
@@ -15,6 +15,7 @@ const menuItems = [
   { href: '/verification-report', icon: ClipboardCheck, text: 'Verification Report' },
   { href: '/SSR_DocOut',          icon: FileOutput,     text: 'SSR DocOut' },
   { href: '/machine-learning',    icon: Brain,          text: 'Machine Learning' },
+  { href: '/interrogator',        icon: Activity,       text: 'Interrogator' },
 ];
 
 const Navbar = () => {

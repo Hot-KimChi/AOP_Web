@@ -8,6 +8,8 @@ from routes.measset_gen import measset_gen_bp
 from routes.db_api import db_api_bp
 from routes.ml import ml_bp
 from routes.todo import todo_bp
+from routes.msi_input import msi_input_bp
+from routes.interrogator import interrogator_bp
 
 
 def create_app():
@@ -48,6 +50,8 @@ def create_app():
     app.register_blueprint(db_api_bp)
     app.register_blueprint(ml_bp)
     app.register_blueprint(todo_bp)
+    app.register_blueprint(msi_input_bp)
+    app.register_blueprint(interrogator_bp)
 
     @app.before_request
     def purge_legacy_session_secrets():

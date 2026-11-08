@@ -39,7 +39,7 @@ test.describe('Navbar', () => {
     await expect(page.locator('.navbar-logo-text')).toHaveText('AOP Web');
 
     const navLinks = page.locator('.navbar-link');
-    await expect(navLinks).toHaveCount(5);
+    await expect(navLinks).toHaveCount(6);
   });
 
   test('비로그인 상태에서 Login 버튼이 표시된다', async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe('Navbar', () => {
 
   test('비로그인 상태에서 메뉴 링크가 비활성화된다', async ({ page }) => {
     const disabledLinks = page.locator('.navbar-link.disabled');
-    await expect(disabledLinks).toHaveCount(5);
+    await expect(disabledLinks).toHaveCount(6);
   });
 
   test('다크/라이트 테마 토글이 동작한다', async ({ page }) => {
@@ -87,6 +87,7 @@ test.describe('페이지 라우팅', () => {
     { path: '/machine-learning', titleOrText: 'Machine Learning' },
     { path: '/verification-report', titleOrText: 'Verification' },
     { path: '/SSR_DocOut', titleOrText: 'SSR' },
+    { path: '/interrogator', titleOrText: 'Interrogator' },
   ];
 
   for (const route of routes) {
@@ -121,5 +122,36 @@ test.describe('스타일 및 레이아웃', () => {
       return getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
     });
     expect(bgColor).toBeTruthy();
+  });
+});
+
+// ─── #31 신규 화면 ───────────────────────────────────────────
+test.describe('MSI input · Interrogator', () => {
+  // 프런트 게이트는 UX 용도이므로 상태 API 만 가로채 화면을 검증한다(실제 권한은 백엔드가 판정).
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/auth/status', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ authenticated: true, username: 'e2e', has_credentials: true }),
+    }));
+    await page.route('**/api/get_list_database', (route) => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ databases: [] }),
+    }));
+  });
+
+  test('MeasSet Generation 에서 MSI input 탭으로 전환된다', async ({ page }) => {
+    await page.goto('/measset-generation');
+    await expect(page.getByTestId('mode-tab-condor')).toBeVisible();
+    await page.getByTestId('mode-tab-msi').click();
+    await expect(page.getByTestId('msi-input-panel')).toBeVisible();
+    await page.getByTestId('mode-tab-condor').click();
+    await expect(page.getByTestId('msi-input-panel')).toBeHidden();
+  });
+
+  test('Interrogator 페이지가 섹션과 계산기를 표시한다', async ({ page }) => {
+    await page.goto('/interrogator');
+    await expect(page.getByTestId('interrogator-page')).toBeVisible();
+    await expect(page.locator('h5:has-text("RTP Display / Generation")')).toBeVisible();
+    await expect(page.locator('h5:has-text("Temp10 Fitting")')).toBeVisible();
+    await expect(page.locator('h5:has-text("MATLAB 계산기")')).toBeVisible();
   });
 });

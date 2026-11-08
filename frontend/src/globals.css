@@ -946,3 +946,12 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, summary:fo
     scroll-behavior: auto !important;
   }
 }
+
+/* ── 페이지 내 모드 탭 (MeasSet Generation 등) ── */
+.aop-mode-tabs { border-bottom-color: var(--border); }
+.aop-mode-tabs .nav-link { color: var(--text-muted, #64748b); font-size: 0.875rem; }
+.aop-mode-tabs .nav-link.active {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border) var(--border) var(--surface);
+}

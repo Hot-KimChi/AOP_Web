@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Play, ExternalLink, Database, Table2, RotateCw, Settings2 } from 'lucide-react';
 import DataPreviewModal from '../../components/DataPreviewModal';
 import { API_BASE_URL } from '../../lib/apiBase';
+import MsiInputPanel from '../../components/MsiInputPanel';
 
-export default function MeasSetGen() {
+function CondorMeasSetGen() {
   // 기본 상태 변수 선언
   const [probeList, setProbeList] = useState([]);                // 프로브 목록
   const [DBList, setDBList] = useState([]);                      // 데이터베이스 목록
@@ -883,5 +884,55 @@ export default function MeasSetGen() {
         data={fullCsvData}
       />
     </div>
+  );
+}
+
+const MODES = [
+  { id: 'condor', label: 'Condor (파일 입력)' },
+  { id: 'msi', label: 'MSI input (Silverstone)' },
+];
+
+export default function MeasSetGen() {
+  const [mode, setMode] = useState('condor');
+  return (
+    <>
+      <div className="page-wrapper" style={{ paddingBottom: 0 }}>
+        <ul className="nav nav-tabs aop-mode-tabs" role="tablist">
+          {MODES.map((m) => (
+            <li className="nav-item" key={m.id} role="presentation">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === m.id}
+                className={`nav-link${mode === m.id ? ' active' : ''}`}
+                onClick={() => setMode(m.id)}
+                data-testid={`mode-tab-${m.id}`}
+              >
+                {m.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {/* 탭을 바꿔도 입력 상태가 유지되도록 두 패널을 모두 렌더링하고 숨긴다. */}
+      <div hidden={mode !== 'condor'}>
+        <CondorMeasSetGen />
+      </div>
+      <div hidden={mode !== 'msi'}>
+        <div className="page-wrapper">
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title-row">
+                <Database size={16} className="card-title-icon" />
+                <h5>MSI input (Silverstone)</h5>
+              </div>
+            </div>
+            <div className="card-body" style={{ padding: '1.25rem' }}>
+              <MsiInputPanel />
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
