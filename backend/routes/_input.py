@@ -18,14 +18,18 @@ def json_body() -> dict:
     return body
 
 
+def is_business_db(name) -> bool:
+    allowed = {d.strip() for d in os.environ.get("DATABASE_NAME", "").split(",") if d.strip()}
+    return isinstance(name, str) and name in allowed
+
+
 def require_business_db() -> None:
     """업무 DB(DATABASE_NAME 목록)만 허용한다. MLflow 추적 DB 는 제외."""
     name = request.args.get("database")
     if not name and request.is_json:
         body = request.get_json(silent=True) or {}
         name = body.get("database") if isinstance(body, dict) else None
-    allowed = {d.strip() for d in os.environ.get("DATABASE_NAME", "").split(",") if d.strip()}
-    if name not in allowed:
+    if not is_business_db(name):
         raise RouteInputError("유효하지 않은 데이터베이스입니다.")
 
 

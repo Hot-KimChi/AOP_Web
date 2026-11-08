@@ -491,7 +491,7 @@ if ($Help -or $Action -eq "Help") {
     Write-Host "Parameters:" -ForegroundColor Yellow
     Write-Host "  -Production    Production mode (build + background)."
     Write-Host "  -Force         Non-interactive mode (force stop existing processes)"
-    Write-Host "  -Unattended    Hide development server windows for automatic startup"
+    Write-Host "  -Unattended    Hide development server windows for automatic startup; Stop without confirmation"
     Write-Host "  -Diagnose      Run environment diagnosis only"
     Write-Host ""
     Write-Host "Auto-start task:" -ForegroundColor Yellow
@@ -650,7 +650,7 @@ function Stop-Services {
         if (-not $NonInteractive -and -not $Force) {
             $choice = Read-Host "Stop $($svc.Name) processes? (Y/N)"
             if ($choice -ne 'Y' -and $choice -ne 'y') {
-                Write-Log "User skipped stopping $($svc.Name)" "INFO"
+                Write-Log "User skipped stopping $($svc.Name) (use -Force or -Unattended for non-interactive stop)" "WARN"
                 continue
             }
         }
@@ -862,7 +862,8 @@ function Start-Services {
 try {
     switch ($Action) {
         "Status"  { Show-Status }
-        "Stop"    { Stop-Services -NonInteractive:$Force }
+        # -Unattended 는 입력을 받을 수 없는 실행이므로 확인 질문 없이 정지한다(빈 입력이 '건너뜀'으로 처리되던 문제).
+        "Stop"    { Stop-Services -NonInteractive:($Force -or $Unattended) }
         "Start"   { Start-Services }
         "RegisterStartup" {
             Ensure-ProductionConfiguration

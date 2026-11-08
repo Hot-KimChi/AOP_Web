@@ -35,6 +35,7 @@
 | 27 | [프론트엔드 모던 디자인 및 전체 버그·병목 개선](#27-프론트엔드-모던-디자인-및-전체-버그병목-개선) | 2026-10-09 | v0.9.82 |
 | 28 | [재부팅 후 클라이언트 접속 불가 원인 분석·해결](#28-서버-컴퓨터가-재시작되었더니-클라이언트-피씨에서-접속하지-못하는-현상이-확인되었다-지금-현재-피씨가-서버-컴퓨터인데-현재-나의-프로젝트에-어떠한-문제점이-있는가-이를-분석하고-해결해죠-그리고-이러한-진행에-있어-agent-재작성-명세를-작성-후에-이를-기반으로-진행해죠) | 2026-10-10 | v0.9.83 |
 | 31 | MSI input(Silverstone)·Interrogator 웹 이식 (본문 ## 31) | 2026-11-08 | - |
+| 32 | 전체 코드·시퀀스·병목·에러 점검 및 개선 (본문 ## 32) | 2026-11-08 | - |
 | 33 | MSI input·Interrogator 디자인 통일(기능·그래프 유지) (본문 ## 33) | 2026-11-08 | - |
 
 ---
@@ -933,6 +934,28 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **검증**: pytest 45 passed, `npm run build` 성공, Playwright 18 passed(인증 상태 API 가로채기로 MSI 탭·Interrogator 화면 확인), Production 재기동 후 `/`·`/interrogator` 200, 비인증 API 401.
 - **한계·후속**: 이 PC 계정은 DB 접속 권한이 없어(18456) 실제 테이블·컬럼·프로시저 통합 검증을 하지 못했다 → 로그인 세션에서 미리보기부터 확인 필요. Silverstone DB 는 `AOP_config.cfg [database] name` 에 추가해야 선택 목록에 나타난다. 2~5단계(Tank/Power·Export·개구 보정 DB 연동·RTP Analysis 등)는 범위(Out) 계획대로 후속 진행.
 - **학습 루프(1단계)**: 풀 프록시(`_ConnectionFairy`)에 드라이버 속성(timeout)을 설정하면 무시된다 — `driver_connection` 에 설정할 것.
+
+## 32. 마무리한 뒤에 전반적인 프로젝트의 코드나 스퀸스가 문제없는지 확인 및 개선작업을 진행해죠. 그리고 병목현상이나 여러가지 에러등 기술적인 부분에도 문제없는지 확인작업을 진행하면 좋을 것 같다.
+
+### 수행 결과
+
+- **점검 방식**: 백엔드·프런트 전수 감사(탐색 에이전트 2개) → 근거가 확인된 항목만 수정 → GPT Verify 교차 검증(`Blocker 0 / Major 0`, 신뢰도 8/10).
+- **백엔드**
+  - `pkg_SQL/database.py`: `execute_query` 쓰기 경로와 `execute_procedure` 에서 예외가 나면 롤백한 뒤 원래 예외를 다시 던지고, 커서를 항상 닫도록 수정. 이전에는 실패한 트랜잭션이 연결에 남을 수 있었다.
+  - `routes/measset_gen.py`: DB 허용목록 검사가 빠져 있던 경로에 `is_business_db` 검사를 추가해, 목록에 없는 DB는 400으로 거부(`routes/_input.py` 헬퍼 공용화).
+  - `routes/db_api.py`: `run_tx_compare` 의 잘못된 `probeId` 가 500 대신 400을 반환하도록 수정.
+  - 회귀 테스트 2개 추가 → pytest 47 passed.
+- **프런트**
+  - `verification-report`: DB·Probe·SW 선택이나 파일을 바꾼 뒤 이전 요청의 늦은 응답이 목록이나 검증 결과(팝업 포함)를 덮어쓰지 않도록 요청 세대로 폐기. TX Summary 업로드는 중복 클릭 시 두 번 INSERT 되지 않게 막음. `run_tx_compare` 오류 응답을 "데이터 없음"과 구분해 표시.
+  - `SSR_DocOut`: DB 전환 시 이전 응답을 폐기하고, Word 내보내기 중복 클릭을 방지.
+  - `measset-generation`: SQL 저장 중복 실행을 방지하고, 신규 행 판정을 O(n²)에서 O(n)으로 개선(서명 Set·groupIndex Map).
+- **스크립트**: `AOP_Web.ps1 -Action Stop -Unattended` 가 확인 질문의 빈 입력을 "건너뜀"으로 처리해 실제로 정지하지 않던 문제를 수정했다. `-Unattended`/`-Force` 를 지정하면 질문 없이 정지하며, 실행해 2개 프로세스가 정지되는 것을 확인했다.
+- **보류(근거)**
+  - 전역 쿼리 timeout: 긴 정상 작업이 깨질 위험이 있고, pool·로그인 timeout은 이미 기본값이 있다.
+  - 업로드 메모리: `MAX_CONTENT_LENGTH` 100MB 상한이 이미 있다.
+  - 전체 행 렌더링(`SSR_DocOut`·`DataViewer`): 행 선택 동작이 바뀌므로 보류.
+  - Minor 항목(컬럼 캐시 상한 등)과 이형 키 행 비교(`undefined`/`NaN` 한정): 실제 경로에서 발생하지 않는다.
+- **검증**: pytest 47 passed, `npm run build` 성공, Playwright 18 passed, Production 재기동 후 HTTP 200. 실제 DB 통합 검증은 접속 권한이 없어(18456) 미실시.
 
 ## 33. 2개 추가한 기능의 그래프나 기능은 동일하게 유지하도록 디자인해죠.
 

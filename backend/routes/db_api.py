@@ -735,7 +735,10 @@ def run_tx_compare():
             "measSSId_Temp, measSSId_MI, measSSId_Ispta 중 적어도 하나는 입력해야 합니다.",
             400,
         )
-    probeid = int(float(data.get("probeId")))
+    try:
+        probeid = int(float(data.get("probeId")))
+    except (TypeError, ValueError, OverflowError):
+        return error_response("probeId 값이 올바르지 않습니다.", 400)
     tx_sw = data.get("TxSumSoftware")
     wcs_sw = data.get("wcsSoftware")
     ssid_temp = None if ssid_temp == "" or ssid_temp is None else ssid_temp

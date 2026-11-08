@@ -12,6 +12,7 @@ export default function SSR_DocOut() {
   const [tableData, setTableData] = useState([]);
   const [columns, setColumns] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState(null);
   const [selectedRowIdxs, setSelectedRowIdxs] = useState([]);
 
@@ -31,6 +32,8 @@ export default function SSR_DocOut() {
   }, [API_BASE_URL]);
 
   useEffect(() => {
+    // DB를 빠르게 바꿨을 때 이전 DB의 늦은 응답이 현재 표를 덮어쓰지 않게 한다.
+    let cancelled = false;
     if (selectedDatabase) {
       const fetchTableData = async () => {
         try {
@@ -39,6 +42,7 @@ export default function SSR_DocOut() {
           const response = await fetch(url, { credentials: 'include' });
           if (!response.ok) throw new Error('테이블 데이터 조회 실패');
           const result = await response.json();
+          if (cancelled) return;
           if (result.status === 'success' && result.data?.length > 0) {
             setTableData(result.data);
             setColumns(result.columns?.length ? result.columns : Object.keys(result.data[0]));
@@ -47,12 +51,13 @@ export default function SSR_DocOut() {
             setColumns([]);
           }
         } catch (err) {
+          if (cancelled) return;
           console.error('테이블 데이터 조회 실패:', err);
           setError('테이블 데이터 조회 실패');
           setTableData([]);
           setColumns([]);
         } finally {
-          setIsLoading(false);
+          if (!cancelled) setIsLoading(false);
         }
       };
       fetchTableData();
@@ -60,15 +65,18 @@ export default function SSR_DocOut() {
       setTableData([]);
       setColumns([]);
     }
+    return () => { cancelled = true; };
   }, [selectedDatabase, API_BASE_URL]);
 
   const handleExportWord = async () => {
+    if (isExporting) return;
     if (!selectedDatabase || selectedRowIdxs.length === 0) {
       setError('행을 선택하세요.');
       return;
     }
     const selectedIds = selectedRowIdxs.map(idx => tableData[idx]?.measSSId).filter(Boolean);
     if (selectedIds.length === 0) { setError('선택된 행에 measSSId 값이 없습니다.'); return; }
+    setIsExporting(true);
     try {
       const url = `${API_BASE_URL}/api/export_table_to_word?database=${encodeURIComponent(selectedDatabase)}&table=SSR_table&measSSIds=${encodeURIComponent(selectedIds.join(','))}`;
       const response = await fetch(url, { credentials: 'include' });
@@ -82,6 +90,8 @@ export default function SSR_DocOut() {
     } catch (err) {
       console.error('Word 파일 다운로드 실패:', err);
       setError('Word 파일 다운로드 실패');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -119,7 +129,7 @@ export default function SSR_DocOut() {
                 </select>
                 <button
                   onClick={handleExportWord}
-                  disabled={!selectedDatabase || selectedRowIdxs.length === 0}
+                  disabled={!selectedDatabase || selectedRowIdxs.length === 0 || isExporting}
                   className="btn-app btn-app-primary btn-app-sm"
                 >
                   <Download size={13} />

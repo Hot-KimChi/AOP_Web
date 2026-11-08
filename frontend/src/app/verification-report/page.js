@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileInput, ClipboardList, Upload, Table2 } from 'lucide-react';
 import Layout from '../../components/Layout';
 import { API_BASE_URL } from '../../lib/apiBase';
@@ -48,6 +48,13 @@ export default function VerificationReport() {
   const [txValidationMessage, setTxValidationMessage] = useState('');
   const [txValidationOk, setTxValidationOk] = useState(false);
 
+  // 선택(DB·Probe·파일)이 바뀐 뒤 늦게 도착한 이전 응답이 화면 상태를 덮어쓰지 않도록 요청 세대를 둔다.
+  const reportGenRef = useRef(0);
+  const txProbeGenRef = useRef(0);
+  const txSwGenRef = useRef(0);
+  const txValidationGenRef = useRef(0);
+  const txUploadingRef = useRef(false);
+
   const [summaryData, setSummaryData] = useState(null);
   const [reportData, setReportData] = useState(null);
 
@@ -70,7 +77,7 @@ export default function VerificationReport() {
     fetchDatabases();
   }, [API_BASE_URL]);
 
-  const loadReportSoftwareData = async (database) => {
+  const loadReportSoftwareData = async (database, isCurrent = () => true) => {
     const url = new URL(`${API_BASE_URL}/api/get_table_data`);
     url.searchParams.append('database', database);
     url.searchParams.append('table', 'Tx_summary');
@@ -80,12 +87,13 @@ export default function VerificationReport() {
       throw new Error(`Software 데이터 조회 실패: ${txt}`);
     }
     const data = await response.json();
+    if (!isCurrent()) return;
     setReportProbeList(data.probes || []);
     setReportSoftwareList(data.software || []);
     setReportProbeSoftwareMapping(data.mapping || {});
   };
 
-  const loadReportWcsData = async (database) => {
+  const loadReportWcsData = async (database, isCurrent = () => true) => {
     const url = new URL(`${API_BASE_URL}/api/get_table_data`);
     url.searchParams.append('database', database);
     url.searchParams.append('table', 'WCS');
@@ -102,10 +110,13 @@ export default function VerificationReport() {
           myVersion: String(wcs.myVersion),
         }))
       : [];
+    if (!isCurrent()) return;
     setReportWcsVersionList(wcsData);
   };
 
   useEffect(() => {
+    const gen = ++reportGenRef.current;
+    const isCurrent = () => gen === reportGenRef.current;
     if (!reportDatabase) {
       setReportProbeList([]);
       setReportSoftwareList([]);
@@ -123,13 +134,13 @@ export default function VerificationReport() {
       setReportError('');
       try {
         await Promise.all([
-          loadReportSoftwareData(reportDatabase),
-          loadReportWcsData(reportDatabase),
+          loadReportSoftwareData(reportDatabase, isCurrent),
+          loadReportWcsData(reportDatabase, isCurrent),
         ]);
       } catch (err) {
-        setReportError(err.message || 'Verification 데이터 조회 실패');
+        if (isCurrent()) setReportError(err.message || 'Verification 데이터 조회 실패');
       } finally {
-        setReportLoading(false);
+        if (isCurrent()) setReportLoading(false);
       }
     };
     fetchData();
@@ -155,7 +166,7 @@ export default function VerificationReport() {
     setReportWcsSoftware('');
   }, [reportProbe, reportProbeSoftwareMapping, reportSoftwareList, reportWcsVersionList]);
 
-  const loadTxProbes = async (database) => {
+  const loadTxProbes = async (database, isCurrent = () => true) => {
     const url = new URL(`${API_BASE_URL}/api/get_table_data`);
     url.searchParams.append('database', database);
     url.searchParams.append('table', 'Tx_summary');
@@ -165,10 +176,10 @@ export default function VerificationReport() {
       throw new Error(`Tx Probe 조회 실패: ${txt}`);
     }
     const data = await response.json();
-    setTxProbeList(data.probes || []);
+    if (isCurrent()) setTxProbeList(data.probes || []);
   };
 
-  const loadTxSoftwareVersions = async (database, probeId) => {
+  const loadTxSoftwareVersions = async (database, probeId, isCurrent = () => true) => {
     const normalizedProbeId = normalizeProbeId(probeId);
     const url = new URL(`${API_BASE_URL}/api/get_imaging_sw_versions`);
     url.searchParams.append('database', database);
@@ -202,7 +213,7 @@ export default function VerificationReport() {
           _id: `fallback_sw_${versions.length}`,
         });
       }
-      setTxSoftwareVersionList(versions);
+      if (isCurrent()) setTxSoftwareVersionList(versions);
       return;
     }
     if (!response.ok) {
@@ -210,10 +221,12 @@ export default function VerificationReport() {
       throw new Error(`Software version 조회 실패: ${txt}`);
     }
     const data = await response.json();
-    setTxSoftwareVersionList(data.softwareVersions || []);
+    if (isCurrent()) setTxSoftwareVersionList(data.softwareVersions || []);
   };
 
   useEffect(() => {
+    const gen = ++txProbeGenRef.current;
+    const isCurrent = () => gen === txProbeGenRef.current;
     if (!txDatabase) {
       setTxProbeList([]);
       setTxProbe('');
@@ -225,17 +238,19 @@ export default function VerificationReport() {
       setTxLoading(true);
       setTxError('');
       try {
-        await loadTxProbes(txDatabase);
+        await loadTxProbes(txDatabase, isCurrent);
       } catch (err) {
-        setTxError(err.message || 'Tx Probe 조회 실패');
+        if (isCurrent()) setTxError(err.message || 'Tx Probe 조회 실패');
       } finally {
-        setTxLoading(false);
+        if (isCurrent()) setTxLoading(false);
       }
     };
     fetchTxProbes();
   }, [txDatabase]);
 
   useEffect(() => {
+    const gen = ++txSwGenRef.current;
+    const isCurrent = () => gen === txSwGenRef.current;
     if (!txDatabase || !txProbe) {
       setTxSoftwareVersionList([]);
       setTxSoftwareVersion('');
@@ -245,11 +260,11 @@ export default function VerificationReport() {
       setTxLoading(true);
       setTxError('');
       try {
-        await loadTxSoftwareVersions(txDatabase, txProbe);
+        await loadTxSoftwareVersions(txDatabase, txProbe, isCurrent);
       } catch (err) {
-        setTxError(err.message || 'Software version 조회 실패');
+        if (isCurrent()) setTxError(err.message || 'Software version 조회 실패');
       } finally {
-        setTxLoading(false);
+        if (isCurrent()) setTxLoading(false);
       }
     };
     fetchVersions();
@@ -315,7 +330,7 @@ export default function VerificationReport() {
     );
   };
 
-  const validateTxFile = async (file, database, probeId, softwareVersion, probeName) => {
+  const validateTxFile = async (file, database, probeId, softwareVersion, probeName, isCurrent = () => true) => {
     if (!file || !database || !probeId || !softwareVersion) {
       return;
     }
@@ -343,6 +358,8 @@ export default function VerificationReport() {
       throw new Error(data.message || '파일 파라미터 검증 실패');
     }
     const validation = data.validation || {};
+    // 검증 도중 파일·선택이 바뀌었으면 이전 결과로 통과 처리하거나 팝업을 띄우지 않는다.
+    if (!isCurrent()) return false;
 
     // 카드 메시지: 매핑률 + 미매핑 파라미터명 표시
     const comparisonRows = Array.isArray(validation.comparisonRows) ? validation.comparisonRows : [];
@@ -415,6 +432,8 @@ export default function VerificationReport() {
   }, [txProbeList, txProbe]);
 
   useEffect(() => {
+    const gen = ++txValidationGenRef.current;
+    const isCurrent = () => gen === txValidationGenRef.current;
     if (!txFile || !txDatabase || !txProbe || !txSoftwareVersion) {
       return;
     }
@@ -426,18 +445,21 @@ export default function VerificationReport() {
           txDatabase,
           txProbe,
           txSoftwareVersion,
-          selectedTxProbeName
+          selectedTxProbeName,
+          isCurrent
         );
       } catch (err) {
-        setTxError(err.message || '파일 검증 실패');
+        if (isCurrent()) setTxError(err.message || '파일 검증 실패');
       } finally {
-        setTxLoading(false);
+        if (isCurrent()) setTxLoading(false);
       }
     };
     runValidation();
   }, [txFile, txDatabase, txProbe, txSoftwareVersion, selectedTxProbeName]);
 
   const uploadTxSummary = async () => {
+    // 업로드 중 재클릭으로 같은 파일이 두 번 INSERT 되지 않도록 즉시 잠근다.
+    if (txUploadingRef.current) return;
     if (!txDatabase || !txProbe || !txSoftwareVersion || !txFile) {
       alert('Database, Probe, Software version, Input file을 모두 선택하세요.');
       return;
@@ -446,6 +468,7 @@ export default function VerificationReport() {
       alert('파일 파라미터 검증이 완료되지 않았습니다. 검증 결과를 확인하세요.');
       return;
     }
+    txUploadingRef.current = true;
     setTxLoading(true);
     setTxError('');
     try {
@@ -468,13 +491,16 @@ export default function VerificationReport() {
         throw new Error(data.message || 'TX Summary 업로드 실패');
       }
       alert(data.message || 'TX Summary 업로드가 완료되었습니다.');
+      const probeGen = txProbeGenRef.current;
+      const swGen = txSwGenRef.current;
       await Promise.all([
-        loadTxProbes(txDatabase),
-        loadTxSoftwareVersions(txDatabase, txProbe),
+        loadTxProbes(txDatabase, () => probeGen === txProbeGenRef.current),
+        loadTxSoftwareVersions(txDatabase, txProbe, () => swGen === txSwGenRef.current),
       ]);
     } catch (err) {
       setTxError(err.message || 'TX Summary 업로드 실패');
     } finally {
+      txUploadingRef.current = false;
       setTxLoading(false);
     }
   };
@@ -543,14 +569,30 @@ export default function VerificationReport() {
             body: JSON.stringify(task.requestData),
             credentials: 'include',
           });
-          return { task, data: await response.json() };
+          // 오류 응답(HTML·빈 본문 포함)을 '데이터 없음'으로 오인하지 않도록 상태와 메시지를 분리한다.
+          const rawText = await response.text();
+          let data = {};
+          try {
+            data = rawText ? JSON.parse(rawText) : {};
+          } catch {
+            data = {};
+          }
+          if (!response.ok) {
+            return { task, error: data.message || data.error || `HTTP ${response.status}` };
+          }
+          return { task, data };
         })
       );
 
       let popupBlocked = false;
       const missingLabels = [];
+      const failedLabels = [];
 
-      responses.forEach(({ task, data }) => {
+      responses.forEach(({ task, data, error }) => {
+        if (error) {
+          failedLabels.push(`${task.label} (${error})`);
+          return;
+        }
         if (data.status === 'success' && Array.isArray(data.reportData)) {
           setReportData(data.reportData);
           sessionStorage.setItem(`reportData_${task.label}`, JSON.stringify(data.reportData));
@@ -573,6 +615,9 @@ export default function VerificationReport() {
         }
       });
 
+      if (failedLabels.length > 0) {
+        setReportError(`리포트 추출 실패: ${failedLabels.join(', ')}`);
+      }
       if (missingLabels.length > 0) {
         alert(`데이터 없음: ${missingLabels.join(', ')}`);
       }

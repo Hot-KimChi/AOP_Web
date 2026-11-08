@@ -196,32 +196,42 @@ class SQL:
                 # INSERT/UPDATE/DELETE 쿼리
                 raw_conn = connection.connection
                 cursor = raw_conn.cursor()
-
-                if params is not None:
-                    converted_params = self._convert_params(params)
-
+                try:
                     insert_id = None
-                    if return_type == "insert" and query_upper.startswith("INSERT"):
-                        if "OUTPUT" in query_upper:
-                            cursor.execute(query, tuple(converted_params))
-                            result = cursor.fetchone()
-                            if result and result[0] is not None:
-                                insert_id = int(result[0])
+                    if params is not None:
+                        converted_params = self._convert_params(params)
+                        if return_type == "insert" and query_upper.startswith("INSERT"):
+                            if "OUTPUT" in query_upper:
+                                cursor.execute(query, tuple(converted_params))
+                                result = cursor.fetchone()
+                                if result and result[0] is not None:
+                                    insert_id = int(result[0])
+                            else:
+                                cursor.execute(query, tuple(converted_params))
+                                cursor.execute("SELECT SCOPE_IDENTITY() AS insert_id")
+                                result = cursor.fetchone()
+                                if result and result[0] is not None:
+                                    insert_id = int(result[0])
+                                else:
+                                    logger.warning("SCOPE_IDENTITY returned None")
                         else:
                             cursor.execute(query, tuple(converted_params))
-                            cursor.execute("SELECT SCOPE_IDENTITY() AS insert_id")
-                            result = cursor.fetchone()
-                            if result and result[0] is not None:
-                                insert_id = int(result[0])
-                            else:
-                                logger.warning("SCOPE_IDENTITY returned None")
                     else:
-                        cursor.execute(query, tuple(converted_params))
-                else:
-                    cursor.execute(query)
+                        cursor.execute(query)
 
-                raw_conn.commit()
-                cursor.close()
+                    raw_conn.commit()
+                except Exception:
+                    # 실패한 쓰기가 풀로 반환되는 연결에 열린 트랜잭션으로 남지 않게 즉시 되돌린다.
+                    try:
+                        raw_conn.rollback()
+                    except Exception:
+                        logger.warning("Rollback failed", exc_info=True)
+                    raise
+                finally:
+                    try:
+                        cursor.close()
+                    except Exception:
+                        pass
 
                 if return_type == "insert":
                     return {"insert_id": insert_id}
@@ -243,6 +253,8 @@ class SQL:
             raise ValueError(f"Unsupported stored procedure: {procedure_name}")
 
         raw_conn = self.engine.raw_connection()
+        cursor = None
+        committed = False
         try:
             cursor = raw_conn.cursor()
 
@@ -277,8 +289,8 @@ class SQL:
             else:
                 df = pd.DataFrame()
 
-            cursor.close()
             raw_conn.commit()
+            committed = True
 
             logger.info(f"Stored procedure '{procedure_name}' executed successfully")
             return df
@@ -286,6 +298,16 @@ class SQL:
             logger.error(f"Stored procedure execution error: {str(e)}")
             raise
         finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if not committed:
+                try:
+                    raw_conn.rollback()
+                except Exception:
+                    pass
             try:
                 raw_conn.close()
             except Exception:

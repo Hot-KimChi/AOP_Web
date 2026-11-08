@@ -86,3 +86,19 @@ def test_fit_endpoints(client):
                       json={"mode": "1d", "azAperCm": [0.5, 1, 2, 3], "tempRise": [1, 2, 3, 3.5], "normCoeff": [1, 1, 1, 1]})
     assert res.status_code == 200
     assert len(res.get_json()["data"]["coefficients"]) == 3
+
+
+def test_measset_generation_rejects_unlisted_database(client):
+    import io
+    res = client.post("/api/measset-generation", data={
+        "database": "master", "probeId": "1", "probeName": "P",
+        "file": (io.BytesIO(b"x"), "in.csv"),
+    }, content_type="multipart/form-data")
+    assert res.status_code == 400
+
+
+def test_tx_compare_rejects_bad_probe_id(client):
+    res = client.post("/api/run_tx_compare", json={
+        "database": "BizDb", "probeId": "abc", "TxSumSoftware": "a", "wcsSoftware": "b", "measSSId_MI": 1,
+    })
+    assert res.status_code == 400

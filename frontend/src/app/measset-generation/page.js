@@ -402,8 +402,24 @@ function CondorMeasSetGen() {
     return fullCsvData;
   };
 
-  // SQL 데이터를 데이터베이스에 삽입
+  // 저장 중 재클릭으로 같은 데이터가 두 번 INSERT 되지 않도록 즉시 잠근다
+  // (팝업 동기화 대기 1.5초 동안은 isLoading 이 아직 false 이다).
+  const savingRef = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
   const parseDatabase = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      await saveToDatabase();
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
+  };
+
+  // SQL 데이터를 데이터베이스에 삽입
+  const saveToDatabase = async () => {
     if (!selectedDatabase || !selectedProbe) {
       alert('데이터베이스와 프로브를 선택해주세요.');
       return;
@@ -484,22 +500,25 @@ function CondorMeasSetGen() {
       return null;
     };
     
-    // 전체 데이터에 존재하는 행인지 확인하는 함수
+    // 전체 데이터에 존재하는 행인지 확인하는 함수.
+    // groupIndex 별로 미리 묶어 두어 행마다 전체 데이터를 다시 훑지 않는다(O(n²) → O(n)).
+    const fullByIndex = new Map();
+    latestFullData.forEach(fullRow => {
+      const info = normalizeKey(fullRow);
+      if (!info) return;
+      const bucket = fullByIndex.get(info.value);
+      if (bucket) bucket.push(fullRow); else fullByIndex.set(info.value, [fullRow]);
+    });
     const existsInFullData = (filteredRow) => {
-      return latestFullData.some(fullRow => {
-        // groupIndex가 같고, 전체 행이 동일한지 확인 (편집 가능한 열 제외)
-        const filteredIndexInfo = normalizeKey(filteredRow);
-        const fullIndexInfo = normalizeKey(fullRow);
-        
-        if (!filteredIndexInfo || !fullIndexInfo) return false;
-        
-        // groupIndex가 같은 행들 중에서 편집 불가능한 열들이 모두 일치하는 행이 있는지 확인
-        return filteredIndexInfo.value === fullIndexInfo.value && 
-               Object.keys(filteredRow).every(key => 
-                 key === 'maxTxVoltageVolt' || key === 'ceilTxVoltageVolt' || 
-                 filteredRow[key] === fullRow[key]
-               );
-      });
+      const filteredIndexInfo = normalizeKey(filteredRow);
+      if (!filteredIndexInfo) return false;
+      // groupIndex가 같은 행들 중에서 편집 불가능한 열들이 모두 일치하는 행이 있는지 확인
+      return (fullByIndex.get(filteredIndexInfo.value) || []).some(fullRow =>
+        Object.keys(filteredRow).every(key =>
+          key === 'maxTxVoltageVolt' || key === 'ceilTxVoltageVolt' ||
+          filteredRow[key] === fullRow[key]
+        )
+      );
     };
     
     // 기존 행만 업데이트 맵에 포함 (새로운 행은 제외)
@@ -569,24 +588,19 @@ function CondorMeasSetGen() {
       }
       
       // 신규행: filteredData에서 전체데이터에 존재하지 않는 행
-      // 행 동등성 비교 함수 (편집 가능한 열 제외)
-      const isRowEqual = (row1, row2) => {
-        const keys1 = Object.keys(row1);
-        const keys2 = Object.keys(row2);
-        if (keys1.length !== keys2.length) return false;
-        
-        // maxTxVoltageVolt와 ceilTxVoltageVolt를 제외한 모든 열이 같은지 확인
-        return keys1.every(key => {
-          if (key === 'maxTxVoltageVolt' || key === 'ceilTxVoltageVolt') {
-            return true; // 이 열들은 비교에서 제외
-          }
-          return row1[key] === row2[key];
-        });
+      // 필터링된 데이터에서 새로운 행 찾기.
+      // isRowEqual 과 같은 기준(열 개수 + 편집 열 제외 값 일치)의 서명으로 집합을 만들어 O(n) 으로 판정한다.
+      const rowSignature = (row) => {
+        const keys = Object.keys(row);
+        const fixed = keys
+          .filter(k => k !== 'maxTxVoltageVolt' && k !== 'ceilTxVoltageVolt')
+          .sort()
+          .map(k => [k, typeof row[k], row[k]]);
+        return JSON.stringify([keys.length, fixed]);
       };
-      
-      // 필터링된 데이터에서 새로운 행 찾기
-      const newRows = latestFilteredData 
-        ? latestFilteredData.filter(fRow => !latestFullData.some(fullRow => isRowEqual(fRow, fullRow)))
+      const fullSignatures = new Set(latestFullData.map(rowSignature));
+      const newRows = latestFilteredData
+        ? latestFilteredData.filter(fRow => !fullSignatures.has(rowSignature(fRow)))
         : [];
       
       // 전체데이터 + 신규행만 DB에 저장
@@ -829,7 +843,7 @@ function CondorMeasSetGen() {
                 <button
                   className="btn-app btn-app-secondary"
                   onClick={parseDatabase}
-                  disabled={!selectedDatabase || !selectedProbe || (!fullCsvData && !file) || isLoading}
+                  disabled={!selectedDatabase || !selectedProbe || (!fullCsvData && !file) || isLoading || isSaving}
                 >
                   <Database size={15} />
                   Save to SQL Database

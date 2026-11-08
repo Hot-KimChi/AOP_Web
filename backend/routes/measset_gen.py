@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 from utils.decorators import handle_exceptions, require_auth
 from utils.error_handler import error_response
 from pkg_MeasSetGen.meas_generation import MeasSetGen
+from routes._input import is_business_db
 
 measset_gen_bp = Blueprint("measset_gen", __name__, url_prefix="/api")
 
@@ -25,6 +26,9 @@ def upload_file():
         return error_response(
             "Missing required fields: database, probeId, or probeName", 400
         )
+    # with_db_connection 을 쓰지 않는 경로이므로 DB 이름 허용 목록을 직접 검증한다.
+    if not is_business_db(database):
+        return error_response("유효하지 않은 데이터베이스입니다", 400)
 
     upload_folder = app.config["UPLOAD_FOLDER"]
     os.makedirs(upload_folder, exist_ok=True)
