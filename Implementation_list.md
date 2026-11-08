@@ -35,6 +35,7 @@
 | 27 | [프론트엔드 모던 디자인 및 전체 버그·병목 개선](#27-프론트엔드-모던-디자인-및-전체-버그병목-개선) | 2026-10-09 | v0.9.82 |
 | 28 | [재부팅 후 클라이언트 접속 불가 원인 분석·해결](#28-서버-컴퓨터가-재시작되었더니-클라이언트-피씨에서-접속하지-못하는-현상이-확인되었다-지금-현재-피씨가-서버-컴퓨터인데-현재-나의-프로젝트에-어떠한-문제점이-있는가-이를-분석하고-해결해죠-그리고-이러한-진행에-있어-agent-재작성-명세를-작성-후에-이를-기반으로-진행해죠) | 2026-10-10 | v0.9.83 |
 | 31 | MSI input(Silverstone)·Interrogator 웹 이식 (본문 ## 31) | 2026-11-08 | - |
+| 33 | MSI input·Interrogator 디자인 통일(기능·그래프 유지) (본문 ## 33) | 2026-11-08 | - |
 
 ---
 
@@ -932,3 +933,13 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **검증**: pytest 45 passed, `npm run build` 성공, Playwright 18 passed(인증 상태 API 가로채기로 MSI 탭·Interrogator 화면 확인), Production 재기동 후 `/`·`/interrogator` 200, 비인증 API 401.
 - **한계·후속**: 이 PC 계정은 DB 접속 권한이 없어(18456) 실제 테이블·컬럼·프로시저 통합 검증을 하지 못했다 → 로그인 세션에서 미리보기부터 확인 필요. Silverstone DB 는 `AOP_config.cfg [database] name` 에 추가해야 선택 목록에 나타난다. 2~5단계(Tank/Power·Export·개구 보정 DB 연동·RTP Analysis 등)는 범위(Out) 계획대로 후속 진행.
 - **학습 루프(1단계)**: 풀 프록시(`_ConnectionFairy`)에 드라이버 속성(timeout)을 설정하면 무시된다 — `driver_connection` 에 설정할 것.
+
+## 33. 2개 추가한 기능의 그래프나 기능은 동일하게 유지하도록 디자인해죠.
+
+### 수행 결과
+
+- **해석(사용자 부재로 자율 결정)**: #31 에서 추가한 MSI input·Interrogator 의 API 호출·계산·그래프 데이터는 그대로 두고, 화면 디자인만 기존 페이지(카드 헤더·Machine Learning 차트) 규격으로 통일.
+- **Interrogator**: 섹션 헤더에 부제·처리 중 표시, 상단에 선택 DB·Probe 배지, Temp10 은 단계(1 조회 → 2 Fitting → 3 결과) 표시와 그래프(측정점·Fit 곡선 동일) + 계수 세로 표 2단 배치, 그래프는 ML 차트와 같은 제목·범례·라이트/다크 테마 색 적용(기존엔 다크모드에서 축 글자가 안 보임). RTP temp LUT 3종은 3단 패널, 계산기 2종은 보조 패널로 구분.
+- **MSI input**: 진행 순서 안내, 단계 번호 제목(1 verification → 2 선택 → 3 미리보기 → 4 결과), 선택 수·미리보기 요약 배지, 처리 중 표시.
+- **공용**: `globals.css` 에 `step-title`·`sub-panel`·`chart-box`·`busy-indicator` 추가, `lib/useIsDark.js`(`data-theme` 추적) 추가.
+- **검증**: `npm run build` 성공, Playwright 18 passed, 모의 응답으로 Temp10 결과 화면을 라이트·다크 스크린샷 확인. 교차 검증은 UI 전용 변경(인증·SQL·API 계약 무변경)이라 생략.

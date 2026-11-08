@@ -205,7 +205,7 @@ export default function MsiInputPanel() {
         </div>
       </div>
 
-      <div className="action-bar mt-3" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="action-bar mt-3">
         <button type="button" className="btn-app btn-app-secondary" onClick={loadVerifications}
           disabled={busy || !database || !probeId}>
           <Search size={14} /> Verification 조회
@@ -218,7 +218,18 @@ export default function MsiInputPanel() {
           disabled={busy || !plan}>
           <PlusCircle size={14} /> meas_setting 생성
         </button>
+        {busy && (
+          <span className="busy-indicator action-bar-end" role="status">
+            <span className="spinner-border spinner-border-sm text-secondary" aria-hidden="true" />
+            처리 중…
+          </span>
+        )}
       </div>
+      {!verifData && !busy && (
+        <p className="hint-text mt-3">
+          ① Verification 조회 → ② 생성 대상 subVerif 선택 → ③ 미리보기(DB 변경 없음) → ④ meas_setting 생성 순서로 진행합니다.
+        </p>
+      )}
 
       {error && <div className="alert alert-danger mt-3 mb-0" role="alert">{error}</div>}
       {verifData?.truncated && (
@@ -227,9 +238,12 @@ export default function MsiInputPanel() {
 
       {verifData && (
         <>
-          <h6 className="mt-4">imag_verification</h6>
+          <div className="step-title"><span className="step-num">1</span>imag_verification</div>
           <RecordTable rows={verifData.verifications} rowKey="verifId" maxHeight={220} testId="msi-verif-table" />
-          <h6 className="mt-4">imag_subverif (생성 대상 선택, 최대 {MAX_SELECTION}개)</h6>
+          <div className="step-title">
+            <span className="step-num">2</span>imag_subverif 생성 대상 선택
+            <span className="chip-soft">{selected.size} / 최대 {MAX_SELECTION}</span>
+          </div>
           <RecordTable rows={verifData.subVerifications} rowKey="subVerifId" selectable selected={selected}
             onToggle={toggle} onToggleAll={toggleAll} testId="msi-subverif-table" />
         </>
@@ -237,10 +251,14 @@ export default function MsiInputPanel() {
 
       {plan && (
         <>
-          <h6 className="mt-4">미리보기 (DB 변경 없음)</h6>
+          <div className="step-title"><span className="step-num">3</span>미리보기 (DB 변경 없음)</div>
           {summary && (
-            <div className="small mb-2">
-              신규 {summary.insert} · 추가 {summary.append} · 이미 연결 {summary.exists} · 길이 초과 {summary.too_long} · 건너뜀 {summary.skip}
+            <div className="d-flex flex-wrap gap-2 mb-2" data-testid="msi-plan-summary">
+              <span className="chip-soft">신규 {summary.insert}</span>
+              <span className="chip-soft">추가 {summary.append}</span>
+              <span className="chip-soft">이미 연결 {summary.exists}</span>
+              <span className="chip-soft">길이 초과 {summary.too_long}</span>
+              <span className="chip-soft">건너뜀 {summary.skip}</span>
             </div>
           )}
           <RecordTable rows={planRows(plan)} testId="msi-plan-table" />
@@ -248,10 +266,13 @@ export default function MsiInputPanel() {
       )}
 
       {result && (
-        <div className="alert alert-success mt-3" role="status">
-          완료: 신규 measSetId {result.createdIds?.length ? result.createdIds.join(', ') : '없음'}
-          {result.summary ? ` / subVerifId 추가 ${result.summary.append}건` : ''}
-        </div>
+        <>
+          <div className="step-title"><span className="step-num">4</span>생성 결과</div>
+          <div className="alert alert-success mb-0" role="status">
+            완료: 신규 measSetId {result.createdIds?.length ? result.createdIds.join(', ') : '없음'}
+            {result.summary ? ` / subVerifId 추가 ${result.summary.append}건` : ''}
+          </div>
+        </>
       )}
     </div>
   );

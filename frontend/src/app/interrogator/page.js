@@ -3,14 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Table2, RefreshCw, Thermometer, Save, Calculator } from 'lucide-react';
 import {
-  Chart as ChartJS, LinearScale, PointElement, LineElement, Tooltip, Legend,
+  Chart as ChartJS, LinearScale, PointElement, LineElement, Tooltip, Legend, Title,
 } from 'chart.js';
 import { Scatter } from 'react-chartjs-2';
 import RecordTable from '../../components/RecordTable';
 import { apiJson, query } from '../../lib/apiJson';
 import { API_BASE_URL } from '../../lib/apiBase';
+import useIsDark from '../../lib/useIsDark';
 
-ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
+ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend, Title);
 
 const TEMP10_COEFF_NAMES = ['tau1', 'tau2', 'c1', 'c2', 'c3', 'c4'];
 
@@ -36,32 +37,82 @@ function columnsOf(rows, n) {
   return Array.from({ length: n }, (_, i) => rows.map((r) => r[i]));
 }
 
-function Section({ icon: Icon, title, children }) {
+// Machine Learning 차트와 같은 테마 색(라이트/다크)을 쓴다.
+function chartTheme(isDark) {
+  return {
+    text: isDark ? '#f1f5f9' : '#374151',
+    tick: isDark ? '#94a3b8' : '#6b7280',
+    grid: isDark ? 'rgba(241, 245, 249, 0.12)' : 'rgba(0, 0, 0, 0.1)',
+    border: isDark ? 'rgba(241, 245, 249, 0.2)' : 'rgba(0, 0, 0, 0.15)',
+  };
+}
+
+function temp10ChartOptions(isDark) {
+  const c = chartTheme(isDark);
+  const axis = (text) => ({
+    type: 'linear',
+    title: { display: true, text, font: { size: 13, weight: 'bold' }, color: c.text },
+    ticks: { color: c.tick },
+    grid: { color: c.grid },
+    border: { color: c.border },
+  });
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: true, position: 'top', labels: { usePointStyle: true, font: { size: 11 }, color: c.text } },
+      title: { display: true, text: 'Temp10 ΔT vs time (측정 · Fit)', font: { size: 15, weight: 'bold' }, color: c.text },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => `${ctx.dataset.label}: t=${ctx.parsed.x.toFixed(1)} s, ΔT=${ctx.parsed.y.toFixed(3)} °C`,
+        },
+      },
+    },
+    scales: { x: axis('timeElapsed (s)'), y: axis('ΔT (°C)') },
+  };
+}
+
+function Section({ icon: Icon, title, subtitle, busy, children }) {
   return (
     <div className="card mt-3">
-      <div className="card-header">
+      <div className="card-header d-flex justify-content-between align-items-center" style={{ flexWrap: 'wrap', gap: 8 }}>
         <div className="card-title-row">
           <Icon size={16} className="card-title-icon" />
           <h5>{title}</h5>
+          {subtitle && <span className="card-title-sub">{subtitle}</span>}
         </div>
+        {busy && (
+          <span className="busy-indicator" role="status">
+            <span className="spinner-border spinner-border-sm text-secondary" aria-hidden="true" />
+            처리 중…
+          </span>
+        )}
       </div>
       <div className="card-body" style={{ padding: '1.25rem' }}>{children}</div>
     </div>
   );
 }
 
+function StepTitle({ n, children }) {
+  return (
+    <div className="step-title">
+      <span className="step-num">{n}</span>
+      {children}
+    </div>
+  );
+}
+
+// 계수는 세로 표(계수 · 값)로 보여 좁은 칸에서도 가로 스크롤 없이 읽히게 한다. 값 자체는 서버 결과 그대로.
 function FitResultView({ result, names }) {
   if (!result) return null;
+  const rows = [
+    ...names.map((n, i) => ({ 항목: n, 값: result.coefficients?.[i] })),
+    { 항목: 'error(MSE)', 값: result.error },
+    { 항목: '수렴', 값: result.success ? 'Yes' : 'No' },
+  ];
   return (
     <div className="mt-3">
-      <RecordTable
-        rows={[Object.fromEntries([
-          ...names.map((n, i) => [n, result.coefficients?.[i]]),
-          ['error(MSE)', result.error],
-          ['수렴', result.success ? 'Yes' : 'No'],
-        ])]}
-        maxHeight={120}
-      />
+      <RecordTable rows={rows} maxHeight={320} />
       {(result.warnings || []).map((w) => <div key={w} className="alert alert-warning mt-2 mb-0 py-2">{w}</div>)}
     </div>
   );
@@ -146,7 +197,8 @@ function RtpSection({ database, probeId }) {
   };
 
   return (
-    <Section icon={Table2} title="RTP Display / Generation">
+    <Section icon={Table2} title="RTP Display / Generation" subtitle="RTP_LUT · temp LUT 조회와 RTP_main 실행" busy={busy}>
+      {!probeId && <p className="hint-text mb-3">상단에서 Database 와 Probe 를 선택하면 RTP 목록을 불러옵니다.</p>}
       <div className="row g-3 align-items-end">
         <div className="col-md-4">
           <label htmlFor="rtpName" className="form-label">RTP Name</label>
@@ -163,7 +215,7 @@ function RtpSection({ database, probeId }) {
             <option value="modified">RTP_main_modified</option>
           </select>
         </div>
-        <div className="col-md-5" style={{ display: 'flex', gap: 8 }}>
+        <div className="col-md-5 action-bar">
           <button type="button" className="btn-app btn-app-secondary" onClick={() => loadDisplay()} disabled={busy || !rtpName}>
             <RefreshCw size={14} /> 다시 조회
           </button>
@@ -178,14 +230,28 @@ function RtpSection({ database, probeId }) {
         <>
           {display.warnings.map((w) => <div key={w} className="alert alert-warning mt-3 mb-0">{w}</div>)}
           {display.truncated && <div className="alert alert-warning mt-3 mb-0">일부 표가 최대 행 수를 넘어 잘렸습니다.</div>}
-          <h6 className="mt-4">RTP_LUT</h6>
+          <div className="step-title mt-4">RTP_LUT <span className="chip-soft">{rtpName}</span></div>
           <RecordTable rows={display.rtpLut} testId="rtp-lut-table" />
-          <h6 className="mt-4">tempPrb_LUT</h6>
-          <RecordTable rows={display.tempPrbLut} maxHeight={240} />
-          <h6 className="mt-4">tempPulse_LUT</h6>
-          <RecordTable rows={display.tempPulseLut} maxHeight={240} />
-          <h6 className="mt-4">tempPrbVolt_LUT</h6>
-          <RecordTable rows={display.tempPrbVoltLut} maxHeight={240} />
+          <div className="row g-3 mt-1">
+            <div className="col-xl-4">
+              <div className="sub-panel">
+                <h6 className="sub-panel-title">tempPrb_LUT</h6>
+                <RecordTable rows={display.tempPrbLut} maxHeight={240} />
+              </div>
+            </div>
+            <div className="col-xl-4">
+              <div className="sub-panel">
+                <h6 className="sub-panel-title">tempPulse_LUT</h6>
+                <RecordTable rows={display.tempPulseLut} maxHeight={240} />
+              </div>
+            </div>
+            <div className="col-xl-4">
+              <div className="sub-panel">
+                <h6 className="sub-panel-title">tempPrbVolt_LUT</h6>
+                <RecordTable rows={display.tempPrbVoltLut} maxHeight={240} />
+              </div>
+            </div>
+          </div>
         </>
       )}
     </Section>
@@ -270,6 +336,9 @@ function Temp10Section({ database, probeId }) {
     }
   };
 
+  const isDark = useIsDark();
+  const chartOptions = useMemo(() => temp10ChartOptions(isDark), [isDark]);
+
   const chartData = useMemo(() => {
     if (!fit) return null;
     const pts = fit.timeElapsedS.map((t, i) => ({ x: t, y: fit.tempRiseC[i] }));
@@ -287,10 +356,11 @@ function Temp10Section({ database, probeId }) {
   }, [fit]);
 
   return (
-    <Section icon={Thermometer} title="Temp10 Fitting (MATLAB fminsearch → SciPy Nelder-Mead)">
-      <h6>temp_station_setup</h6>
+    <Section icon={Thermometer} title="Temp10 Fitting" subtitle="MATLAB fminsearch → SciPy Nelder-Mead" busy={busy}>
+      <StepTitle n={1}>temp_station_setup</StepTitle>
       <RecordTable rows={stations} maxHeight={200} emptyText="Probe 를 선택하면 표시됩니다." />
-      <div className="row g-3 align-items-end mt-1">
+      <StepTitle n={2}>측정 세트 선택 · Fitting</StepTitle>
+      <div className="row g-3 align-items-end">
         <div className="col-md-3">
           <label htmlFor="tempSSId" className="form-label">tempSSId</label>
           <select id="tempSSId" className="form-select" value={tempSSId} onChange={(e) => setTempSSId(e.target.value)} disabled={busy || !stations.length}>
@@ -305,7 +375,7 @@ function Temp10Section({ database, probeId }) {
             {sets.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
-        <div className="col-md-6" style={{ display: 'flex', gap: 8 }}>
+        <div className="col-md-6 action-bar">
           <button type="button" className="btn-app btn-app-secondary" onClick={runFit} disabled={busy || !tempSetId}>
             <Activity size={14} /> Fitting
           </button>
@@ -318,13 +388,23 @@ function Temp10Section({ database, probeId }) {
       {notice && <div className="alert alert-success mt-3 mb-0">{notice}</div>}
       {fit && (
         <>
-          {fit.existing && <div className="alert alert-info mt-3 mb-0">이미 저장된 계수가 있습니다(temp10FitId {fit.existing.temp10FitId ?? '-'}).</div>}
-          <FitResultView result={fit.fit} names={TEMP10_COEFF_NAMES} />
-          <div style={{ height: 320 }} className="mt-3">
-            <Scatter data={chartData} options={{
-              maintainAspectRatio: false,
-              scales: { x: { title: { display: true, text: 'timeElapsed (s)' } }, y: { title: { display: true, text: 'ΔT (°C)' } } },
-            }} />
+          <StepTitle n={3}>
+            결과
+            <span className="chip-soft">{fit.fit.success ? '수렴' : '미수렴'}</span>
+          </StepTitle>
+          {fit.existing && <div className="alert alert-info mb-3">이미 저장된 계수가 있습니다(temp10FitId {fit.existing.temp10FitId ?? '-'}).</div>}
+          <div className="row g-3">
+            <div className="col-xl-8">
+              <div className="chart-box" data-testid="temp10-chart">
+                <Scatter data={chartData} options={chartOptions} />
+              </div>
+            </div>
+            <div className="col-xl-4">
+              <div className="sub-panel">
+                <h6 className="sub-panel-title">Fit 계수</h6>
+                <FitResultView result={fit.fit} names={TEMP10_COEFF_NAMES} />
+              </div>
+            </div>
           </div>
         </>
       )}
@@ -385,10 +465,11 @@ function CalculatorSection() {
   const apNames = apMode === '1d' ? ['x1', 'x2', 'x3'] : ['x1', 'x2', 'x3', 'x4', 'x5'];
 
   return (
-    <Section icon={Calculator} title="MATLAB 계산기 (DB 저장 없음)">
-      <div className="row g-4">
+    <Section icon={Calculator} title="MATLAB 계산기" subtitle="DB 저장 없음 · 붙여넣은 값으로 바로 계산" busy={busy}>
+      <div className="row g-3">
         <div className="col-lg-6">
-          <h6>개구(aperture) 보정 fitting</h6>
+          <div className="sub-panel">
+          <h6 className="sub-panel-title">개구(aperture) 보정 fitting</h6>
           <div className="row g-2 align-items-end">
             <div className="col-4">
               <label htmlFor="apMode" className="form-label">모드</label>
@@ -416,9 +497,11 @@ function CalculatorSection() {
             <Activity size={14} /> 계산
           </button>
           <FitResultView result={apResult} names={apNames} />
+          </div>
         </div>
         <div className="col-lg-6">
-          <h6>TR 스펙트럼 (sys_spectrum \ TR_meas)</h6>
+          <div className="sub-panel">
+          <h6 className="sub-panel-title">TR 스펙트럼 (sys_spectrum \ TR_meas)</h6>
           <label htmlFor="matrixText" className="form-label">sys_spectrum (행: 주파수, 열: bin)</label>
           <textarea id="matrixText" className="form-control" rows={4} value={matrixText} onChange={(e) => setMatrixText(e.target.value)} style={{ fontFamily: 'monospace' }} />
           <label htmlFor="trText" className="form-label mt-2">TR_meas (행 수만큼)</label>
@@ -433,6 +516,7 @@ function CalculatorSection() {
               {trResult.warnings.map((w) => <div key={w} className="alert alert-warning mt-2 mb-0 py-2">{w}</div>)}
             </div>
           )}
+          </div>
         </div>
       </div>
       {error && <div className="alert alert-danger mt-3 mb-0">{error}</div>}
@@ -465,13 +549,20 @@ export default function InterrogatorPage() {
     return () => ctrl.abort();
   }, [database]);
 
+  const selectedProbe = probes.find((p) => String(p.probeId) === String(probeId));
+
   return (
     <div className="page-wrapper" data-testid="interrogator-page">
       <div className="card">
-        <div className="card-header">
+        <div className="card-header d-flex justify-content-between align-items-center" style={{ flexWrap: 'wrap', gap: 8 }}>
           <div className="card-title-row">
             <Activity size={16} className="card-title-icon" />
             <h5>Interrogator</h5>
+            <span className="card-title-sub">RTP · Temp10 · MATLAB 계산</span>
+          </div>
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            {database && <span className="chip-soft">{database}</span>}
+            {selectedProbe && <span className="chip-soft">{selectedProbe.probeName} ({selectedProbe.probeId})</span>}
           </div>
         </div>
         <div className="card-body" style={{ padding: '1.25rem' }}>
