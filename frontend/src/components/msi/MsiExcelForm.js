@@ -534,7 +534,7 @@ export default function MsiExcelForm({ database, onClose }) {
   };
 
   return (
-    <VbForm title="measSetInput" width={1379} height={956} onClose={onClose} testId="msi-excel-form">
+    <VbForm title="measSetInput" width={1379} height={956} fill onClose={onClose} testId="msi-excel-form">
       <input
         ref={pickerRef}
         type="file"

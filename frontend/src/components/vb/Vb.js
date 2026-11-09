@@ -20,7 +20,9 @@ function box(x, y, w, h, font, extra) {
   return s;
 }
 
-export function VbForm({ title, width, height, children, onClose, testId, zoom }) {
+// fill: 가용 폭에 맞춰 확대까지 허용(전체 화면 모달용, 최대 maxZoom 배).
+// toolbar: 타이틀바 아래 카드 안에 들어가는 웹 전용 영역(DB 선택 등).
+export function VbForm({ title, width, height, children, onClose, testId, zoom, fill = false, maxZoom = 1.6, toolbar }) {
   const outerRef = useRef(null);
   const [scale, setScale] = useState(zoom ?? 1);
 
@@ -30,14 +32,16 @@ export function VbForm({ title, width, height, children, onClose, testId, zoom }
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(() => {
       const avail = el.clientWidth;
-      setScale(avail > 0 ? Math.min(1, avail / (width + 2)) : 1);
+      // fit-content 모달에서는 avail 이 자기 폭이므로 분모를 width+2 로 고정해야 배율이 수렴한다.
+      const fit = avail / (width + (fill ? 4 : 2));
+      setScale(avail > 0 ? Math.min(fill ? maxZoom : 1, fit) : 1);
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [width, zoom]);
+  }, [width, zoom, fill, maxZoom]);
 
   return (
-    <div ref={outerRef} className="vb-outer" data-testid={testId}>
+    <div ref={outerRef} className={fill ? 'vb-outer vb-outer-fill' : 'vb-outer'} data-testid={testId}>
       <div className="vb-window" style={{ width: width + 2, zoom: scale }}>
         <div className="vb-titlebar">
           <span className="vb-title-icon" aria-hidden="true" />
@@ -46,6 +50,7 @@ export function VbForm({ title, width, height, children, onClose, testId, zoom }
             <button type="button" className="vb-title-close" onClick={onClose} aria-label="닫기">✕</button>
           )}
         </div>
+        {toolbar && <div className="vb-toolbar">{toolbar}</div>}
         <div className="vb-client" style={{ width, height }}>
           {children}
         </div>
@@ -355,7 +360,7 @@ const modalStack = [];
 
 // 하위 폼(ShowDialog)을 화면 위에 띄운다. closeOnEsc 이면 Esc 로 가장 위 폼만 닫는다
 // (WinForms 는 CancelButton 이 지정된 폼만 Esc 로 닫히므로 기본값은 false).
-export function VbModal({ children, onClose, testId, closeOnEsc = false }) {
+export function VbModal({ children, onClose, testId, closeOnEsc = false, full = false }) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
@@ -374,7 +379,7 @@ export function VbModal({ children, onClose, testId, closeOnEsc = false }) {
     };
   }, [closeOnEsc]);
   return (
-    <div className="vb-modal" role="dialog" aria-modal="true" data-testid={testId}>
+    <div className={full ? 'vb-modal vb-modal-full' : 'vb-modal'} role="dialog" aria-modal="true" data-testid={testId}>
       {children}
     </div>
   );
@@ -395,10 +400,11 @@ export function useDatabaseList() {
   return { list, error };
 }
 
-export function VbDbBar({ value, onChange, testId = 'vb-db' }) {
+// inline: 카드(VbForm toolbar) 안에 넣을 때 별도 카드 테두리 없이 표시
+export function VbDbBar({ value, onChange, testId = 'vb-db', inline = false }) {
   const { list, error } = useDatabaseList();
   return (
-    <div className="vb-dbbar">
+    <div className={inline ? 'vb-dbbar vb-dbbar-inline' : 'vb-dbbar'}>
       <label htmlFor={testId}>Database</label>
       <select id={testId} data-testid={testId} className="form-select form-select-sm" value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">Select database…</option>

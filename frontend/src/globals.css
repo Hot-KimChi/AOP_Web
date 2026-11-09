@@ -1135,6 +1135,17 @@ select.vb-list option:checked { background: var(--vb-highlight); color: var(--vb
   display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 8px 12px; font-size: 13px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm);
 }
+.vb-dbbar-inline { margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.vb-toolbar {
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.vb-toolbar .vb-dbbar select { min-width: 0; flex: 1; }
+.vb-toolbar .vb-dbbar { flex: 1; }
+.vb-modal-full { padding: 0; background: var(--bg); backdrop-filter: none; }
+.vb-modal-full > .vb-outer { width: 100%; max-width: none; margin: 0; padding: 0; overflow: visible; }
+.vb-modal-full .vb-window { border-radius: 0; border: 0; box-shadow: none; margin: 0 auto; overflow: visible; }
+.vb-modal-full .vb-titlebar { position: sticky; top: 0; z-index: 2; }
 .vb-dbbar > label { font-weight: 600; color: var(--text-sec); margin: 0; }
 .vb-dbbar select { min-width: 220px; width: auto; }
 .vb-msg { color: var(--vb-red); white-space: pre-wrap; }

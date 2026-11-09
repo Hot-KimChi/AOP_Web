@@ -39,6 +39,7 @@
 | 33 | MSI input·Interrogator 디자인 통일(기능·그래프 유지) (본문 ## 33) | 2026-11-08 | - |
 | 34 | MSI input·Interrogator VB 폼 완전 동일 이식(Python·웹) (본문 ## 34) | 2026-11-08 | - |
 | 35 | VB 이식 재감사·폼 모던 디자인 적용 (본문 ## 35) | 2026-11-08 | - |
+| 36 | MSI input 카드에 DB 선택 통합·measSetInput 전체 화면 (본문 ## 36) | 2026-11-09 | - |
 
 ---
 
@@ -997,3 +998,13 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **검증**: pytest 177 passed(소수 점 fitting 경고 테스트 추가), `npm run build` 성공, Production 재기동 HTTP 200, 모의 API 스크린샷 8폼×2테마 pageerror 0, Playwright 18 passed.
 - **교차 검증 생략 사유**: 인증·SQL·스키마·API 계약 변경 없음(입력 길이 검증 완화와 UI 동작), 결정론적 테스트로 확인.
 - **잔여(보류 Minor)**: Tank AutoCheck dip 미발견 시 재그리기·zDis NULL 메시지, Power 편집 후 그리드 재조회, Temp 오차 그래프 축 라벨, Export 목록 외 RTP명 유지, Temp10 메인 직접 진입 — 동작 영향이 작아 보류. 실제 DB 미접속(18456)으로 통합 검증 미실시.
+
+## 36. MSI input(silverstone) 메뉴 카드창 안에 데이터베이스 선택을 넣어서 한개의 카드창으로 수정해죠. 추가적으로 measSetInput창도 전체창이 되도록 가독성을 개선해죠.
+
+### 수행 결과
+
+- **MsiChoice 단일 카드**: `VbForm` 에 `toolbar` 슬롯(타이틀바 아래 카드 내부 영역)을 추가하고, `VbDbBar inline` 으로 DB 선택을 카드 안에 배치. 별도 DB 바 카드 제거.
+- **measSetInput 전체 화면**: `VbModal full`(화면 전체·배경 없음·모서리 없음) + `VbForm fill`(가용 폭에 맞춰 최대 1.6배까지 확대, 타이틀바 sticky). 원본 좌표·기능은 그대로이며 글자·컨트롤이 커져 가독성 개선.
+- **버그 예방**: fit-content 모달에서 배율 분모를 `width+2` 로 유지해야 배율이 수렴함(여유값을 넣으면 매 프레임 축소되어 요소가 흔들림) — fill 모드에만 여유값 적용.
+- **검증**: `npm run build` 성공, Production 재기동 HTTP 200, 모의 API 스크린샷 pageerror 0, Playwright 18 passed.
+- **교차 검증 생략 사유**: UI 레이아웃 전용 변경(인증·SQL·API 계약 무관), 빌드·E2E·스크린샷으로 직접 확인.

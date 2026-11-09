@@ -16,15 +16,15 @@ export default function MsiChoice() {
 
   return (
     <div>
-      <VbDbBar value={database} onChange={setDatabase} testId="msi-db" />
-      <VbForm title="MsiChoice" width={543} height={253} testId="msi-choice">
+      <VbForm title="MsiChoice" width={543} height={253} testId="msi-choice"
+        toolbar={<VbDbBar inline value={database} onChange={setDatabase} testId="msi-db" />}>
         <VbButton x={55} y={88} w={163} h={72} font={BOLD} disabled={!database}
           onClick={() => setOpen('excel')} testId="msi-choice-excel">MSI Input From Excel</VbButton>
         <VbButton x={285} y={88} w={163} h={72} font={BOLD} disabled={!database}
           onClick={() => setOpen('dump')} testId="msi-choice-dump">MSI Input From Dumped Data</VbButton>
       </VbForm>
       {open === 'excel' && (
-        <VbModal onClose={close} testId="msi-excel-modal">
+        <VbModal full onClose={close} testId="msi-excel-modal">
           <MsiExcelForm database={database} onClose={close} />
         </VbModal>
       )}
