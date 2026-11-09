@@ -42,6 +42,7 @@
 | 36 | MSI input 카드에 DB 선택 통합·measSetInput 전체 화면 (본문 ## 36) | 2026-11-09 | - |
 | 37 | measSetInput 새 창(/msi-input) 오픈·버튼/표 가독성 개선 (본문 ## 37) | 2026-11-09 | - |
 | 38 | measSetInput 새 창 한 화면 맞춤·구역 패널 가독성 개선 (본문 ## 38) | 2026-11-09 | - |
+| 39 | measSetInput 파일 선택 카드 왼쪽 열 배치·표 영역 확대 (본문 ## 39) | 2026-11-09 | - |
 
 ---
 
@@ -1029,3 +1030,13 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **가독성**: 웹 전용 배경 패널 `VbSection` 으로 5개 구역(파일 선택·Exel Input·Selected RTP·측정 파라미터·저장 동작[브랜드 톤]) 구분 — 원본 좌표·동작은 그대로. 라벨·체크박스 font-weight 500, 원본 6.75pt 보조 문구를 7.5pt 로 확대.
 - **검증**: `npm run build` 성공, Production 재기동 HTTP 200, 팝업 스크린샷(라이트/다크) pageerror 0, Playwright 19 passed.
 - **교차 검증 생략 사유**: UI 레이아웃 전용 변경(백엔드·인증·API 계약 무관), 빌드·E2E·스크린샷으로 직접 확인.
+
+## 39. meassetinput에서 윗 카드박스는 왼쪽으로 배치하면 2,3,4번재 카드박스를 더 가독성있게 사용이 가능해 보인다.
+
+### 수행 결과
+
+- **파일 선택 카드 → 왼쪽 열**(x 6~252, 높이 680): Excel File Directory → 안내 문구 → 파일 목록(세로 516px로 확대) → Open Excel File 버튼 순으로 세로 배치.
+- **Exel Input·Selected RTP 카드**를 오른쪽 위로 올림(x 258~1374): 표 높이 217→278px, 219→284px로 늘어나 더 많은 행이 보임. Selected RTP 머리의 안내 문구·Purpose·Select All RTP·Update All Foc/Aper 버튼은 카드 폭에 맞춰 다시 배치.
+- 아래 파라미터 카드와 저장 동작 카드는 그대로 두고, 한 화면 맞춤(fitPage)도 유지. 동작·testId는 원본과 동일함.
+- **검증**: 빌드 성공, Production 재기동 후 HTTP 200, 3개 해상도에서 스크롤 없음, 라이트/다크 스크린샷 pageerror 0, Playwright 19 passed.
+- **교차 검증 생략 사유**: UI 좌표만 바꾼 변경이며 백엔드·인증·API 계약과 무관함.

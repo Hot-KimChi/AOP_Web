@@ -1,7 +1,8 @@
 'use client';
 
 // 레거시 msiReader(measSetInput.vb, "measSetInput", 1379x956) 이식 — "MSI Input From Excel".
-// 좌표·문구·버튼 순서는 measSetInput.designer.vb 그대로. DB 저장/계산은 /api/msi-excel/* 가 맡는다.
+// 좌표·문구·버튼 순서는 measSetInput.designer.vb 기준. 단, 사용자 요청으로 파일 선택 영역은 왼쪽 열로,
+// Exel Input·Selected RTP 표는 그 오른쪽 위로 옮겨 표 높이를 키웠다. DB 저장/계산은 /api/msi-excel/* 가 맡는다.
 
 import { useRef, useState } from 'react';
 import { API_BASE_URL } from '../../lib/apiBase';
@@ -536,9 +537,10 @@ export default function MsiExcelForm({ database, onClose }) {
 
   return (
     <VbForm title="measSetInput" width={1379} height={956} fill fitPage readable onClose={onClose} testId="msi-excel-form">
-      <VbSection x={36} y={6} w={1300} h={116} />
-      <VbSection x={36} y={126} w={1272} h={256} />
-      <VbSection x={36} y={386} w={1272} h={300} />
+      {/* 웹 레이아웃: 파일 선택을 왼쪽 열로 옮기고 Exel Input·Selected RTP 표를 위로 올려 표 높이를 키운다(동작은 원본과 동일). */}
+      <VbSection x={6} y={6} w={246} h={680} />
+      <VbSection x={258} y={6} w={1116} h={320} />
+      <VbSection x={258} y={332} w={1116} h={354} />
       <VbSection x={0} y={694} w={926} h={260} />
       <VbSection x={932} y={688} w={442} h={266} tone="action" />
       <input
@@ -551,35 +553,35 @@ export default function MsiExcelForm({ database, onClose }) {
         onChange={onPickFolder}
         data-testid="msi-excel-picker"
       />
-      <VbLabel x={53} y={23} font={F9}>Excel File Directory:</VbLabel>
+      <VbLabel x={20} y={18} font={F9B}>Excel File Directory:</VbLabel>
       <VbText
-        x={213} y={20} w={304} h={24} font={F9} value={txtDirectory} onChange={setTxtDirectory}
+        x={20} y={40} w={218} h={26} font={F9} value={txtDirectory} onChange={setTxtDirectory}
         onDoubleClick={() => pickerRef.current?.click()} title="더블클릭: 폴더 선택" testId="msi-excel-dir"
       />
-      <VbLabel x={57} y={52} color={MAROON}>(mouseDoubleClick for listing files)</VbLabel>
+      <VbLabel x={20} y={72} color={MAROON}>(mouseDoubleClick for listing files)</VbLabel>
       <VbList
-        x={563} y={15} w={555} h={100} items={fileItems} value={selFile} onChange={setSelFile} testId="msi-excel-files"
+        x={20} y={94} w={218} h={516} items={fileItems} value={selFile} onChange={setSelFile} testId="msi-excel-files"
       />
-      <VbButton x={1179} y={38} w={125} h={54} onClick={cmdOpen} busy={busy} variant="primary" testId="msi-excel-open">Open  Excel File</VbButton>
+      <VbButton x={20} y={620} w={218} h={54} onClick={cmdOpen} busy={busy} variant="primary" testId="msi-excel-open">Open  Excel File</VbButton>
 
-      <VbLabel x={55} y={134} font={F9B}>Exel Input </VbLabel>
-      <VbLabel x={241} y={137} color={DARK}>(Double click row-head to add the row to Selected RTP)</VbLabel>
+      <VbLabel x={274} y={16} font={F9B}>Exel Input </VbLabel>
+      <VbLabel x={370} y={18} color={DARK}>(Double click row-head to add the row to Selected RTP)</VbLabel>
       <VbGrid
-        x={57} y={159} w={1232} h={217} columns={out.columns} rows={out.rows} editable onCellChange={onOutCellChange}
+        x={274} y={40} w={1084} h={278} columns={out.columns} rows={out.rows} editable onCellChange={onOutCellChange}
         onRowAdd={onOutRowAdd} onRowDelete={onOutRowDelete}
         onRowHeaderDoubleClick={addRow} emptyText="Open Excel File 로 엑셀 파일을 불러오세요." testId="msi-excel-output"
       />
 
-      <VbLabel x={799} y={391} font={F9}>Purpose:</VbLabel>
-      <VbCombo x={803} y={414} w={160} h={24} value={purpose} onChange={setPurpose} editable options={['RTP', 'Sample', 'SSR', 'FDA', 'IEC']} testId="msi-excel-purpose" ariaLabel="Purpose" />
-      <VbButton x={976} y={401} w={125} h={41} onClick={cmdSelectAll} disabled={busy} testId="msi-excel-selectall">Select All RTP</VbButton>
-      <VbButton x={1116} y={401} w={153} h={41} onClick={cmdUpdateAll} disabled={busy} testId="msi-excel-updateall">Update All Foc/Aper</VbButton>
-      <VbLabel x={187} y={401} color={DARK}>(Double click row-head to remove the row from Selected RTP)</VbLabel>
-      <VbLabel x={51} y={411} font={F9B}>Selected RTP</VbLabel>
-      <VbLabel x={187} y={417} color={DARK}>(Modify cyan fields with double-click cell, selected either foci values or indices will fill in)</VbLabel>
-      <VbLabel x={187} y={433} color={DARK}>(Salmon color field data are estimated from fnumber and focus, please check it.)</VbLabel>
+      <VbLabel x={916} y={338} font={F9}>Purpose:</VbLabel>
+      <VbCombo x={916} y={358} w={140} h={24} value={purpose} onChange={setPurpose} editable options={['RTP', 'Sample', 'SSR', 'FDA', 'IEC']} testId="msi-excel-purpose" ariaLabel="Purpose" />
+      <VbButton x={1070} y={342} w={125} h={41} onClick={cmdSelectAll} disabled={busy} testId="msi-excel-selectall">Select All RTP</VbButton>
+      <VbButton x={1205} y={342} w={153} h={41} onClick={cmdUpdateAll} disabled={busy} testId="msi-excel-updateall">Update All Foc/Aper</VbButton>
+      <VbLabel x={384} y={340} color={DARK}>(Double click row-head to remove the row from Selected RTP)</VbLabel>
+      <VbLabel x={274} y={346} font={F9B}>Selected RTP</VbLabel>
+      <VbLabel x={384} y={356} color={DARK}>(Modify cyan fields with double-click cell, selected either foci values or indices will fill in)</VbLabel>
+      <VbLabel x={384} y={372} color={DARK}>(Salmon color field data are estimated from fnumber and focus, please check it.)</VbLabel>
       <VbGrid
-        x={55} y={465} w={1232} h={219} columns={selCols} rows={selRows.map((r) => r.v)} editable
+        x={274} y={394} w={1084} h={284} columns={selCols} rows={selRows.map((r) => r.v)} editable
         onCellChange={onSelCellChange} onCellDoubleClick={onSelCellDoubleClick}
         onRowAdd={onSelRowAdd} onRowDelete={onSelRowDelete}
         onRowHeaderDoubleClick={(ri) => setSelRows((prev) => prev.filter((_, i) => i !== ri))}
