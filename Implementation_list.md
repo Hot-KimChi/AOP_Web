@@ -43,6 +43,7 @@
 | 37 | measSetInput 새 창(/msi-input) 오픈·버튼/표 가독성 개선 (본문 ## 37) | 2026-11-09 | - |
 | 38 | measSetInput 새 창 한 화면 맞춤·구역 패널 가독성 개선 (본문 ## 38) | 2026-11-09 | - |
 | 39 | measSetInput 파일 선택 카드 왼쪽 열 배치·표 영역 확대 (본문 ## 39) | 2026-11-09 | - |
+| 40 | measSetInput BeamWidth Simulation 버튼 삭제 (본문 ## 40) | 2026-11-09 | - |
 
 ---
 
@@ -1040,3 +1041,11 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - 아래 파라미터 카드와 저장 동작 카드는 그대로 두고, 한 화면 맞춤(fitPage)도 유지. 동작·testId는 원본과 동일함.
 - **검증**: 빌드 성공, Production 재기동 후 HTTP 200, 3개 해상도에서 스크롤 없음, 라이트/다크 스크린샷 pageerror 0, Playwright 19 passed.
 - **교차 검증 생략 사유**: UI 좌표만 바꾼 변경이며 백엔드·인증·API 계약과 무관함.
+
+## 40. beamwidth simulation 단추는 더 이상 사용하지 않는다. 삭제해죠.
+
+### 수행 결과
+
+- `MsiExcelForm.js`에서 비활성 상태로 남아 있던 BeamWidth Simulation 버튼(원본은 MATLAB simMeasSettings 호출, testId `msi-excel-simu`)과 툴팁 래퍼를 삭제함. 다른 참조는 없음.
+- **검증**: 빌드 성공, Production 재기동 후 HTTP 200, 스크린샷 pageerror 0, Playwright 19 passed.
+- **교차 검증 생략 사유**: 이미 비활성이던 UI 요소만 삭제했고 백엔드·API와 무관함.

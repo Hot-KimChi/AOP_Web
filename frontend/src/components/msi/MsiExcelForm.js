@@ -600,9 +600,7 @@ export default function MsiExcelForm({ database, onClose }) {
       <VbButton x={940} y={699} w={129} h={58} font={F825B} onClick={cmdSaveDb} busy={busy} variant="primary" testId="msi-excel-savedb">Save Tank RTP to DB</VbButton>
       <VbLabel x={1095} y={699} font={F675}>SetId Range:</VbLabel>
       <VbText x={1175} y={692} w={156} h={23} value={txtSetRange} onChange={setTxtSetRange} ariaLabel="SetId Range" testId="msi-excel-setrange" />
-      <span title="사용하지 않는 기능(사용자 요청으로 비활성화): 원본은 MATLAB simMeasSettings 를 실행합니다." style={{ position: 'absolute', left: 1081, top: 724, width: 127, height: 44 }}>
-        <VbButton x={0} y={0} w={127} h={44} font={F825B} disabled testId="msi-excel-simu">BeamWidth Simulation</VbButton>
-      </span>
+      {/* 원본의 BeamWidth Simulation(MATLAB simMeasSettings) 버튼은 사용하지 않아 사용자 요청으로 삭제. */}
       <VbButton x={1216} y={722} w={116} h={60} font={F825B} onClick={cmdFillPwr} busy={busy} testId="msi-excel-fillpwr">Get matched Power MeasSetId</VbButton>
 
       <VbLabel x={60} y={754} font={F9}>Selected Foci:</VbLabel>
