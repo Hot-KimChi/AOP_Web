@@ -41,6 +41,7 @@
 | 35 | VB 이식 재감사·폼 모던 디자인 적용 (본문 ## 35) | 2026-11-08 | - |
 | 36 | MSI input 카드에 DB 선택 통합·measSetInput 전체 화면 (본문 ## 36) | 2026-11-09 | - |
 | 37 | measSetInput 새 창(/msi-input) 오픈·버튼/표 가독성 개선 (본문 ## 37) | 2026-11-09 | - |
+| 38 | measSetInput 새 창 한 화면 맞춤·구역 패널 가독성 개선 (본문 ## 38) | 2026-11-09 | - |
 
 ---
 
@@ -1019,3 +1020,12 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **정리**: 사용처가 없어진 `VbModal full`·`.vb-modal-full` 제거 → `.vb-standalone` 으로 대체.
 - **검증**: `npm run build` 성공, Production 재기동 HTTP 200, 팝업 스크린샷(라이트/다크) pageerror 0, Playwright 19 passed(`/msi-input` 테스트 1건 추가).
 - **교차 검증 생략 사유**: UI 전용 변경(새 라우트는 기존 AuthGate 적용, 백엔드·API 계약 무관), 빌드·E2E·스크린샷으로 직접 확인.
+
+## 38. 새창이 한페이지에 보여지도록 수정해죠. 그리고 해당 페이지의 가독성을 더 개선해죠.
+
+### 수행 결과
+
+- **한 화면 맞춤**: `VbForm fitPage` 추가 — 배율 = min(폭 맞춤, 창 높이/(폼 높이+타이틀바), 최대 1.6). `window.resize` 에도 재계산. `.vb-standalone` 은 100vh·overflow hidden 으로 스크롤 제거. 1600x1000(0.998배)·1366x700(0.698배)·1920x1040(1.038배) 모두 scrollHeight = innerHeight 확인.
+- **가독성**: 웹 전용 배경 패널 `VbSection` 으로 5개 구역(파일 선택·Exel Input·Selected RTP·측정 파라미터·저장 동작[브랜드 톤]) 구분 — 원본 좌표·동작은 그대로. 라벨·체크박스 font-weight 500, 원본 6.75pt 보조 문구를 7.5pt 로 확대.
+- **검증**: `npm run build` 성공, Production 재기동 HTTP 200, 팝업 스크린샷(라이트/다크) pageerror 0, Playwright 19 passed.
+- **교차 검증 생략 사유**: UI 레이아웃 전용 변경(백엔드·인증·API 계약 무관), 빌드·E2E·스크린샷으로 직접 확인.

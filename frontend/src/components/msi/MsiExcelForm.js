@@ -7,13 +7,14 @@ import { useRef, useState } from 'react';
 import { API_BASE_URL } from '../../lib/apiBase';
 import { apiJson } from '../../lib/apiJson';
 import {
-  VbButton, VbCheck, VbCombo, VbForm, VbGrid, VbLabel, VbList, VbModal, VbText, asGrid, cellText,
+  VbButton, VbCheck, VbCombo, VbForm, VbGrid, VbLabel, VbList, VbModal, VbSection, VbText, asGrid, cellText,
 } from '../vb/Vb';
 
 const F9 = { size: 9 };
 const F9B = { size: 9, bold: true };
 const F825B = { size: 8.25, bold: true };
-const F675 = { size: 6.75 };
+// 원본 6.75pt 는 웹에서 너무 작아 가독성을 위해 7.5pt 로 키운다(같은 좌표 안에 들어감).
+const F675 = { size: 7.5 };
 const DARK = 'var(--vb-disabled)';
 const MAROON = 'var(--vb-maroon)';
 const RED = 'var(--vb-red)';
@@ -534,7 +535,12 @@ export default function MsiExcelForm({ database, onClose }) {
   };
 
   return (
-    <VbForm title="measSetInput" width={1379} height={956} fill readable onClose={onClose} testId="msi-excel-form">
+    <VbForm title="measSetInput" width={1379} height={956} fill fitPage readable onClose={onClose} testId="msi-excel-form">
+      <VbSection x={36} y={6} w={1300} h={116} />
+      <VbSection x={36} y={126} w={1272} h={256} />
+      <VbSection x={36} y={386} w={1272} h={300} />
+      <VbSection x={0} y={694} w={926} h={260} />
+      <VbSection x={932} y={688} w={442} h={266} tone="action" />
       <input
         ref={pickerRef}
         type="file"

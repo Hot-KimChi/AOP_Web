@@ -1146,6 +1146,12 @@ select.vb-list option:checked { background: var(--vb-highlight); color: var(--vb
 .vb-standalone > .vb-outer { width: 100%; max-width: none; margin: 0; padding: 0; overflow: visible; }
 .vb-standalone .vb-window { border-radius: 0; border: 0; box-shadow: none; margin: 0 auto; overflow: visible; }
 .vb-standalone .vb-titlebar { position: sticky; top: 0; z-index: 2; }
+.vb-standalone:has(.vb-outer-page) { height: 100vh; overflow: hidden; }
+.vb-section {
+  z-index: 0; pointer-events: none; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+}
+.vb-section-action { background: color-mix(in srgb, var(--brand-light) 55%, var(--surface)); border-color: color-mix(in srgb, var(--brand) 25%, var(--border)); }
 .vb-grid-empty {
   position: sticky; left: 0; padding: 18px 12px; text-align: center;
   color: var(--text-muted); font-size: 12px; pointer-events: none;
@@ -1171,6 +1177,8 @@ select.vb-list option:checked { background: var(--vb-highlight); color: var(--vb
 .vb-readable .vb-grid tbody tr:nth-child(n) td.cur { background: var(--vb-highlight); color: var(--vb-highlight-text); }
 .vb-readable .vb-grid .vb-rowhead { width: 26px; min-width: 26px; font-size: 11px; }
 .vb-readable .vb-text, .vb-readable .vb-combo { font-size: 12px; }
+.vb-readable .vb-label { color: var(--text); font-weight: 500; }
+.vb-readable .vb-check { font-weight: 500; }
 .vb-dbbar > label { font-weight: 600; color: var(--text-sec); margin: 0; }
 .vb-dbbar select { min-width: 220px; width: auto; }
 .vb-msg { color: var(--vb-red); white-space: pre-wrap; }

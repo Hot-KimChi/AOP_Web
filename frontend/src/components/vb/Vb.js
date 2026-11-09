@@ -23,7 +23,9 @@ function box(x, y, w, h, font, extra) {
 // fill: 가용 폭에 맞춰 확대까지 허용(전체 화면용, 최대 maxZoom 배).
 // toolbar: 타이틀바 아래 카드 안에 들어가는 웹 전용 영역(DB 선택 등).
 // readable: 버튼·표를 더 크게/선명하게 보이는 스타일(.vb-readable) 적용.
-export function VbForm({ title, width, height, children, onClose, testId, zoom, fill = false, maxZoom = 1.6, toolbar, readable = false }) {
+// fitPage: 폭뿐 아니라 창 높이에도 맞춰 스크롤 없이 한 화면에 보이게 한다(별도 창용, fill 전제).
+const TITLE_H = 42;
+export function VbForm({ title, width, height, children, onClose, testId, zoom, fill = false, maxZoom = 1.6, toolbar, readable = false, fitPage = false }) {
   const outerRef = useRef(null);
   const [scale, setScale] = useState(zoom ?? 1);
 
@@ -31,18 +33,22 @@ export function VbForm({ title, width, height, children, onClose, testId, zoom, 
     if (zoom) return undefined;
     const el = outerRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(() => {
+    const update = () => {
       const avail = el.clientWidth;
       // fit-content 모달에서는 avail 이 자기 폭이므로 분모를 width+2 로 고정해야 배율이 수렴한다.
-      const fit = avail / (width + (fill ? 4 : 2));
+      let fit = avail / (width + (fill ? 4 : 2));
+      if (fitPage) fit = Math.min(fit, (window.innerHeight - 2) / (height + TITLE_H + 2));
       setScale(avail > 0 ? Math.min(fill ? maxZoom : 1, fit) : 1);
-    });
+    };
+    const ro = new ResizeObserver(update);
     ro.observe(el);
-    return () => ro.disconnect();
-  }, [width, zoom, fill, maxZoom]);
+    if (fitPage) window.addEventListener('resize', update);
+    return () => { ro.disconnect(); if (fitPage) window.removeEventListener('resize', update); };
+  }, [width, height, zoom, fill, maxZoom, fitPage]);
 
+  const outerCls = ['vb-outer', fill && 'vb-outer-fill', fitPage && 'vb-outer-page'].filter(Boolean).join(' ');
   return (
-    <div ref={outerRef} className={fill ? 'vb-outer vb-outer-fill' : 'vb-outer'} data-testid={testId}>
+    <div ref={outerRef} className={outerCls} data-testid={testId}>
       <div className={readable ? 'vb-window vb-readable' : 'vb-window'} style={{ width: width + 2, zoom: scale }}>
         <div className="vb-titlebar">
           <span className="vb-title-icon" aria-hidden="true" />
@@ -58,6 +64,11 @@ export function VbForm({ title, width, height, children, onClose, testId, zoom, 
       </div>
     </div>
   );
+}
+
+// 웹 전용 시각 구역(배경 패널). 원본 컨트롤보다 먼저 렌더링해 뒤에 깔린다 — 좌표·동작에는 영향 없음.
+export function VbSection({ x, y, w, h, tone }) {
+  return <div className={tone ? `vb-section vb-section-${tone}` : 'vb-section'} aria-hidden="true" style={{ left: x, top: y, width: w, height: h }} />;
 }
 
 export function VbLabel({ x, y, w, h, children, font, color, align, wrap, hidden, style, testId, className }) {
