@@ -1142,10 +1142,35 @@ select.vb-list option:checked { background: var(--vb-highlight); color: var(--vb
 }
 .vb-toolbar .vb-dbbar select { min-width: 0; flex: 1; }
 .vb-toolbar .vb-dbbar { flex: 1; }
-.vb-modal-full { padding: 0; background: var(--bg); backdrop-filter: none; }
-.vb-modal-full > .vb-outer { width: 100%; max-width: none; margin: 0; padding: 0; overflow: visible; }
-.vb-modal-full .vb-window { border-radius: 0; border: 0; box-shadow: none; margin: 0 auto; overflow: visible; }
-.vb-modal-full .vb-titlebar { position: sticky; top: 0; z-index: 2; }
+.vb-standalone { min-height: 100vh; background: var(--vb-face); }
+.vb-standalone > .vb-outer { width: 100%; max-width: none; margin: 0; padding: 0; overflow: visible; }
+.vb-standalone .vb-window { border-radius: 0; border: 0; box-shadow: none; margin: 0 auto; overflow: visible; }
+.vb-standalone .vb-titlebar { position: sticky; top: 0; z-index: 2; }
+.vb-grid-empty {
+  position: sticky; left: 0; padding: 18px 12px; text-align: center;
+  color: var(--text-muted); font-size: 12px; pointer-events: none;
+}
+/* ── readable: measSetInput 등 큰 폼의 버튼·표 가독성 강화 ── */
+.vb-readable .vb-button { font-weight: 600; letter-spacing: 0.01em; border-color: var(--vb-border); }
+.vb-readable .vb-button-primary:not(:disabled) {
+  background: var(--brand); border-color: var(--brand); color: #fff;
+}
+.vb-readable .vb-button-primary:hover:not(:disabled) {
+  background: var(--brand-dark); border-color: var(--brand-dark); color: #fff;
+}
+.vb-readable .vb-button-subtle:not(:disabled) { background: transparent; color: var(--text-sec); }
+.vb-readable .vb-grid { border-color: var(--vb-border); box-shadow: var(--shadow-sm); }
+.vb-readable .vb-grid table { font-size: 12px; }
+.vb-readable .vb-grid th, .vb-readable .vb-grid td { height: 26px; padding: 3px 10px; max-width: 260px; }
+.vb-readable .vb-grid thead th {
+  background: var(--brand-light); color: var(--brand-text); font-weight: 700;
+  border-bottom: 2px solid var(--brand);
+}
+.vb-readable .vb-grid tbody tr:nth-child(even) td { background-color: var(--bg); }
+.vb-readable .vb-grid tbody tr:hover td { background-color: var(--table-hover); }
+.vb-readable .vb-grid tbody tr:nth-child(n) td.cur { background: var(--vb-highlight); color: var(--vb-highlight-text); }
+.vb-readable .vb-grid .vb-rowhead { width: 26px; min-width: 26px; font-size: 11px; }
+.vb-readable .vb-text, .vb-readable .vb-combo { font-size: 12px; }
 .vb-dbbar > label { font-weight: 600; color: var(--text-sec); margin: 0; }
 .vb-dbbar select { min-width: 220px; width: auto; }
 .vb-msg { color: var(--vb-red); white-space: pre-wrap; }

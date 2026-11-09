@@ -40,6 +40,7 @@
 | 34 | MSI input·Interrogator VB 폼 완전 동일 이식(Python·웹) (본문 ## 34) | 2026-11-08 | - |
 | 35 | VB 이식 재감사·폼 모던 디자인 적용 (본문 ## 35) | 2026-11-08 | - |
 | 36 | MSI input 카드에 DB 선택 통합·measSetInput 전체 화면 (본문 ## 36) | 2026-11-09 | - |
+| 37 | measSetInput 새 창(/msi-input) 오픈·버튼/표 가독성 개선 (본문 ## 37) | 2026-11-09 | - |
 
 ---
 
@@ -1008,3 +1009,13 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **버그 예방**: fit-content 모달에서 배율 분모를 `width+2` 로 유지해야 배율이 수렴함(여유값을 넣으면 매 프레임 축소되어 요소가 흔들림) — fill 모드에만 여유값 적용.
 - **검증**: `npm run build` 성공, Production 재기동 HTTP 200, 모의 API 스크린샷 pageerror 0, Playwright 18 passed.
 - **교차 검증 생략 사유**: UI 레이아웃 전용 변경(인증·SQL·API 계약 무관), 빌드·E2E·스크린샷으로 직접 확인.
+
+## 37. meassetinput을 새로운 창으로 오픈되도록 수정해죠. 그리고 해당 안에 버튼이나 테이블을 더 가독성있게 변경해죠.
+
+### 수행 결과
+
+- **새 창 오픈**: Navbar 없는 최상위 라우트 `/msi-input?database=<DB>` 신설(`app/msi-input/{layout,page}.js`, `components/PopupLayout.js` — AuthProvider·AuthGate 적용). MsiChoice 의 Excel 버튼은 `window.open` 으로 화면 크기 새 창을 열고(DB별 창 이름 재사용), 팝업 차단 시 안내 alert. Exit 는 `window.close()`(닫히지 않으면 `/measset-generation` 으로 이동).
+- **가독성**: `VbForm readable` — 굵은 버튼, 주요 동작(Open Excel·Save Tank RTP/Power/Temp to DB) `VbButton variant="primary"`(브랜드색), Exit `subtle`; 표는 26px 행·12px 글꼴·브랜드 헤더·zebra 행·hover 강조. `VbGrid emptyText` 로 빈 표에 사용 안내 문구 표시.
+- **정리**: 사용처가 없어진 `VbModal full`·`.vb-modal-full` 제거 → `.vb-standalone` 으로 대체.
+- **검증**: `npm run build` 성공, Production 재기동 HTTP 200, 팝업 스크린샷(라이트/다크) pageerror 0, Playwright 19 passed(`/msi-input` 테스트 1건 추가).
+- **교차 검증 생략 사유**: UI 전용 변경(새 라우트는 기존 AuthGate 적용, 백엔드·API 계약 무관), 빌드·E2E·스크린샷으로 직접 확인.

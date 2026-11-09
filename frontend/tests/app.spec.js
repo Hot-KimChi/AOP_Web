@@ -149,6 +149,15 @@ test.describe('MSI input · Interrogator', () => {
     await expect(page.getByTestId('msi-choice')).toBeHidden();
   });
 
+  test('measSetInput 이 별도 창 라우트(/msi-input)에서 전체 폼으로 열린다', async ({ page }) => {
+    await page.goto('/msi-input?database=DemoDB');
+    await expect(page.getByTestId('msi-excel-open')).toBeVisible();
+    await expect(page.getByTestId('msi-excel-exit')).toBeVisible();
+    await expect(page.locator('.navbar')).toHaveCount(0);
+    await expect(page.locator('.vb-readable')).toHaveCount(1);
+    await expect(page.getByText('Open Excel File 로 엑셀 파일을 불러오세요.')).toBeVisible();
+  });
+
   test('Interrogator 메인 폼이 원본(intMain) 버튼·활성 규칙을 따른다', async ({ page }) => {
     await page.route('**/api/get_list_database', (route) => route.fulfill({
       status: 200, contentType: 'application/json', body: JSON.stringify({ databases: ['BizDb'] }),

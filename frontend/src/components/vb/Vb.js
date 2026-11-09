@@ -20,9 +20,10 @@ function box(x, y, w, h, font, extra) {
   return s;
 }
 
-// fill: 가용 폭에 맞춰 확대까지 허용(전체 화면 모달용, 최대 maxZoom 배).
+// fill: 가용 폭에 맞춰 확대까지 허용(전체 화면용, 최대 maxZoom 배).
 // toolbar: 타이틀바 아래 카드 안에 들어가는 웹 전용 영역(DB 선택 등).
-export function VbForm({ title, width, height, children, onClose, testId, zoom, fill = false, maxZoom = 1.6, toolbar }) {
+// readable: 버튼·표를 더 크게/선명하게 보이는 스타일(.vb-readable) 적용.
+export function VbForm({ title, width, height, children, onClose, testId, zoom, fill = false, maxZoom = 1.6, toolbar, readable = false }) {
   const outerRef = useRef(null);
   const [scale, setScale] = useState(zoom ?? 1);
 
@@ -42,7 +43,7 @@ export function VbForm({ title, width, height, children, onClose, testId, zoom, 
 
   return (
     <div ref={outerRef} className={fill ? 'vb-outer vb-outer-fill' : 'vb-outer'} data-testid={testId}>
-      <div className="vb-window" style={{ width: width + 2, zoom: scale }}>
+      <div className={readable ? 'vb-window vb-readable' : 'vb-window'} style={{ width: width + 2, zoom: scale }}>
         <div className="vb-titlebar">
           <span className="vb-title-icon" aria-hidden="true" />
           <span className="vb-title-text">{title}</span>
@@ -77,11 +78,12 @@ export function VbLabel({ x, y, w, h, children, font, color, align, wrap, hidden
   );
 }
 
-export function VbButton({ x, y, w, h, children, onClick, disabled, font, testId, busy, color }) {
+// variant: 'primary'(주요 저장·실행) | 'subtle'(닫기 등) — 원본 동작과 무관한 시각 강조만 바꾼다.
+export function VbButton({ x, y, w, h, children, onClick, disabled, font, testId, busy, color, variant }) {
   return (
     <button
       type="button"
-      className="vb-button"
+      className={variant ? `vb-button vb-button-${variant}` : 'vb-button'}
       data-testid={testId}
       style={box(x, y, w, h, font, disabled || busy ? undefined : { color })}
       onClick={onClick}
@@ -195,7 +197,7 @@ export function cellText(v) {
 export function VbGrid({
   x, y, w, h, columns, rows, testId,
   onRowHeaderDoubleClick, onCellDoubleClick, onCellChange, onRowAdd, onRowDelete,
-  headerColor, cellColor, editable, showNewRow = true, backColor, font, maxRows = 2000,
+  headerColor, cellColor, editable, showNewRow = true, backColor, font, maxRows = 2000, emptyText,
 }) {
   const [cur, setCur] = useState(null);
   const [edit, setEdit] = useState(null);
@@ -338,6 +340,7 @@ export function VbGrid({
       {data.length > maxRows && (
         <div className="vb-grid-more">{maxRows}행까지만 표시합니다(전체 {data.length}행).</div>
       )}
+      {emptyText && data.length === 0 && <div className="vb-grid-empty">{emptyText}</div>}
     </div>
   );
 }
@@ -360,7 +363,7 @@ const modalStack = [];
 
 // 하위 폼(ShowDialog)을 화면 위에 띄운다. closeOnEsc 이면 Esc 로 가장 위 폼만 닫는다
 // (WinForms 는 CancelButton 이 지정된 폼만 Esc 로 닫히므로 기본값은 false).
-export function VbModal({ children, onClose, testId, closeOnEsc = false, full = false }) {
+export function VbModal({ children, onClose, testId, closeOnEsc = false }) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
@@ -379,7 +382,7 @@ export function VbModal({ children, onClose, testId, closeOnEsc = false, full = 
     };
   }, [closeOnEsc]);
   return (
-    <div className={full ? 'vb-modal vb-modal-full' : 'vb-modal'} role="dialog" aria-modal="true" data-testid={testId}>
+    <div className="vb-modal" role="dialog" aria-modal="true" data-testid={testId}>
       {children}
     </div>
   );

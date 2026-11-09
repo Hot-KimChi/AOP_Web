@@ -129,7 +129,7 @@ export function aperSize(orgFocS, orgAperS, requiredFoc, breakPoint) {
 function NewRowsForm({ title, data, onClose }) {
   const g = asGrid(data);
   return (
-    <VbForm title={title} width={1100} height={520} onClose={onClose} testId="msi-excel-newrows">
+    <VbForm title={title} width={1100} height={520} readable onClose={onClose} testId="msi-excel-newrows">
       <VbLabel x={12} y={10} font={F9}>{`${g.rows.length} rows${data?.truncated ? ' (truncated)' : ''}`}</VbLabel>
       <VbGrid x={12} y={34} w={1076} h={420} columns={g.columns} rows={g.rows} showNewRow={false} testId="msi-excel-newrows-grid" />
       <VbButton x={972} y={464} w={116} h={44} font={F9B} onClick={onClose}>Close</VbButton>
@@ -534,7 +534,7 @@ export default function MsiExcelForm({ database, onClose }) {
   };
 
   return (
-    <VbForm title="measSetInput" width={1379} height={956} fill onClose={onClose} testId="msi-excel-form">
+    <VbForm title="measSetInput" width={1379} height={956} fill readable onClose={onClose} testId="msi-excel-form">
       <input
         ref={pickerRef}
         type="file"
@@ -554,14 +554,14 @@ export default function MsiExcelForm({ database, onClose }) {
       <VbList
         x={563} y={15} w={555} h={100} items={fileItems} value={selFile} onChange={setSelFile} testId="msi-excel-files"
       />
-      <VbButton x={1179} y={38} w={125} h={54} onClick={cmdOpen} busy={busy} testId="msi-excel-open">Open  Excel File</VbButton>
+      <VbButton x={1179} y={38} w={125} h={54} onClick={cmdOpen} busy={busy} variant="primary" testId="msi-excel-open">Open  Excel File</VbButton>
 
       <VbLabel x={55} y={134} font={F9B}>Exel Input </VbLabel>
       <VbLabel x={241} y={137} color={DARK}>(Double click row-head to add the row to Selected RTP)</VbLabel>
       <VbGrid
         x={57} y={159} w={1232} h={217} columns={out.columns} rows={out.rows} editable onCellChange={onOutCellChange}
         onRowAdd={onOutRowAdd} onRowDelete={onOutRowDelete}
-        onRowHeaderDoubleClick={addRow} testId="msi-excel-output"
+        onRowHeaderDoubleClick={addRow} emptyText="Open Excel File 로 엑셀 파일을 불러오세요." testId="msi-excel-output"
       />
 
       <VbLabel x={799} y={391} font={F9}>Purpose:</VbLabel>
@@ -578,7 +578,7 @@ export default function MsiExcelForm({ database, onClose }) {
         onRowAdd={onSelRowAdd} onRowDelete={onSelRowDelete}
         onRowHeaderDoubleClick={(ri) => setSelRows((prev) => prev.filter((_, i) => i !== ri))}
         headerColor={selHeaderColor} cellColor={(r, c) => (selRows[r]?.s.includes(c) ? SALMON : undefined)}
-        testId="msi-excel-selected"
+        emptyText="위 Exel Input 의 행 머리글을 더블클릭하거나 Select All RTP 로 추가하세요."
       />
 
       <VbLabel x={39} y={704} font={F9}>Max Sys TxGain:</VbLabel>
@@ -589,7 +589,7 @@ export default function MsiExcelForm({ database, onClose }) {
       <VbText x={644} y={702} w={45} h={24} font={F9} value={txtVpoints} onChange={setTxtVpoints} ariaLabel="Total TxGain points" />
       <VbLabel x={705} y={705} font={F9}>Meas TxGain Num:</VbLabel>
       <VbText x={867} y={702} w={45} h={24} font={F9} value={txtVoltNum} onChange={setTxtVoltNum} ariaLabel="Meas TxGain Num" />
-      <VbButton x={940} y={699} w={129} h={58} font={F825B} onClick={cmdSaveDb} busy={busy} testId="msi-excel-savedb">Save Tank RTP to DB</VbButton>
+      <VbButton x={940} y={699} w={129} h={58} font={F825B} onClick={cmdSaveDb} busy={busy} variant="primary" testId="msi-excel-savedb">Save Tank RTP to DB</VbButton>
       <VbLabel x={1095} y={699} font={F675}>SetId Range:</VbLabel>
       <VbText x={1175} y={692} w={156} h={23} value={txtSetRange} onChange={setTxtSetRange} ariaLabel="SetId Range" testId="msi-excel-setrange" />
       <span title="사용하지 않는 기능(사용자 요청으로 비활성화): 원본은 MATLAB simMeasSettings 를 실행합니다." style={{ position: 'absolute', left: 1081, top: 724, width: 127, height: 44 }}>
@@ -604,7 +604,7 @@ export default function MsiExcelForm({ database, onClose }) {
       />
       <VbLabel x={641} y={754} font={F675} color={RED}>If there is a similar record except pulseWidth,</VbLabel>
       <VbLabel x={641} y={769} font={F675} color={RED}>create a new or overwrite PulseString on exist one? </VbLabel>
-      <VbButton x={940} y={764} w={129} h={58} font={F825B} onClick={cmdSavePower} busy={busy} testId="msi-excel-savepower">Save Power to DB</VbButton>
+      <VbButton x={940} y={764} w={129} h={58} font={F825B} onClick={cmdSavePower} busy={busy} variant="primary" testId="msi-excel-savepower">Save Power to DB</VbButton>
       <VbButton x={1081} y={775} w={127} h={42} font={F825B} onClick={cmdSaveMat} busy={busy} testId="msi-excel-savemat">Save to Excel</VbButton>
       <VbLabel x={1216} y={786} font={F675}>File is in </VbLabel>
       <VbLabel x={1216} y={801} font={F675}>R:\Compass\Intensity\</VbLabel>
@@ -639,9 +639,9 @@ export default function MsiExcelForm({ database, onClose }) {
       <VbText x={340} y={869} w={353} h={24} font={F9} value={pulseVoltage} onChange={setPulseVoltage} ariaLabel="measTxGain" />
       <VbLabel x={712} y={871} font={F9}>PulseWidthUsec:</VbLabel>
       <VbText x={853} y={870} w={68} h={24} font={F9} value={pulseWidthUsec} onChange={setPulseWidthUsec} ariaLabel="PulseWidthUsec" />
-      <VbButton x={952} y={855} w={117} h={58} font={F9B} onClick={cmdSaveTemp} busy={busy} testId="msi-excel-savetemp">Save Temp to DB</VbButton>
+      <VbButton x={952} y={855} w={117} h={58} font={F9B} onClick={cmdSaveTemp} busy={busy} variant="primary" testId="msi-excel-savetemp">Save Temp to DB</VbButton>
       <VbButton x={1091} y={854} w={117} h={58} font={F9B} onClick={cmdUpdatePrf} busy={busy} testId="msi-excel-updateprf">Update Prf from Init</VbButton>
-      <VbButton x={1233} y={855} w={116} h={58} font={F9B} onClick={() => onClose?.()} testId="msi-excel-exit">Exit</VbButton>
+      <VbButton x={1233} y={855} w={116} h={58} font={F9B} onClick={() => onClose?.()} variant="subtle" testId="msi-excel-exit">Exit</VbButton>
 
       <VbLabel x={184} y={905} font={F9} hidden={!vis.sel} testId="msi-excel-sellabel">{lblSelectLabel}</VbLabel>
       <VbText x={340} y={905} w={353} h={22} value={txtSelectValue} onChange={setTxtSelectValue} hidden={!vis.sel} ariaLabel="Select value" testId="msi-excel-selvalue" />
