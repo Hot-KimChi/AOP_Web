@@ -44,6 +44,7 @@
 | 38 | measSetInput 새 창 한 화면 맞춤·구역 패널 가독성 개선 (본문 ## 38) | 2026-11-09 | - |
 | 39 | measSetInput 파일 선택 카드 왼쪽 열 배치·표 영역 확대 (본문 ## 39) | 2026-11-09 | - |
 | 40 | measSetInput BeamWidth Simulation 버튼 삭제 (본문 ## 40) | 2026-11-09 | - |
+| 41 | measSetInput TxGain points/Num 입력 삭제·Temperature 카드 통합 (본문 ## 41) | 2026-11-09 | - |
 
 ---
 
@@ -1049,3 +1050,45 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - `MsiExcelForm.js`에서 비활성 상태로 남아 있던 BeamWidth Simulation 버튼(원본은 MATLAB simMeasSettings 호출, testId `msi-excel-simu`)과 툴팁 래퍼를 삭제함. 다른 참조는 없음.
 - **검증**: 빌드 성공, Production 재기동 후 HTTP 200, 스크린샷 pageerror 0, Playwright 19 passed.
 - **교차 검증 생략 사유**: 이미 비활성이던 UI 요소만 삭제했고 백엔드·API와 무관함.
+
+## 41. 아래 2개의 입력하는 부분도 더이상 사용하지 않는다. 삭제해죠. 추가적으로 아래 그림의 온도 관련된 부분은 한개의 카드박스로 묶어서 가독성을 높여죠. 해당 부분을 agent 명세를 작성하고, 이를 기반으로 진행해죠.
+![alt text](image.png)
+![alt text](image-1.png)
+
+### Agent 명세 (#41)
+
+- **목표**: measSetInput(`frontend/src/components/msi/MsiExcelForm.js`) 하단 영역 정리.
+  1. `Total TxGain points`·`Meas TxGain Num` 입력 UI 삭제.
+  2. 온도 관련 컨트롤을 한 개의 카드(Temperature)로 묶어 가독성 향상.
+- **현황 진단**: 두 값은 `body()`의 `vPoints`/`voltNum`으로 전송되고, 백엔드 `excel_engine.py`에서 측정 파라미터 `p[25]`/`p[24]`로 저장됨(기본값 20/12). 온도 컨트롤은 파라미터 카드와 저장 동작 카드에 흩어져 있음.
+- **범위 In**
+  - 두 입력란과 라벨 삭제. 값은 원본 기본값 상수(`'20'`/`'12'`)로 계속 전송.
+  - 하단을 3개 영역으로 재배치: ① Tank/Power 파라미터 카드 ② Tank/Power 저장 동작 카드(브랜드 톤) ③ Temperature 카드(전체 폭).
+  - Temperature 카드에 넣을 항목: 카드 제목·옵션 설명(`lblOpt1`), Temp Options, measTxGain, PulseWidthUsec, 옵션별 Select 값 1·2, PwCwUseCode, 주석(`lblNotes`), Save Temp to DB, Update Prf from Init, TempLimit.
+  - Exit는 폼 공통 동작이라 온도 카드 밖 오른쪽 끝에 둠.
+- **범위 Out**: 백엔드·API 계약 변경, 온도 옵션별 표시 규칙(`onTempOpt`/`vis`), 상단 카드(파일·Exel Input·Selected RTP).
+- **불변식**
+  - API 요청 본문의 키와 값 의미는 그대로 유지(`vPoints=20`, `voltNum=12`).
+  - 모든 testId·핸들러 유지.
+  - 한 화면 맞춤(fitPage, 1379x956)과 컨트롤 간 겹침 없음.
+- **검증 기준**
+  - `npm run build` 성공.
+  - 라이트·다크 스크린샷에서 겹침 없음, pageerror 0.
+  - 3개 해상도에서 스크롤 없음.
+  - Playwright 전체 통과.
+  - 백엔드 `test_msi_excel` 통과(요청 계약 회귀 없음).
+
+### 수행 결과
+
+- **입력 삭제**: `Total TxGain points`와 `Meas TxGain Num` 입력란·라벨을 삭제함. 요청 본문의 `vPoints`/`voltNum`은 원본 기본값 상수 `'20'`/`'12'`로 계속 보내므로 백엔드 저장값(`p[25]`/`p[24]`)과 API 계약은 그대로임.
+- **하단 3개 영역으로 재배치**
+  1. Tank/Power 파라미터 카드(4줄): Max Sys·Profile TxGain·Speed of Sound·Elev / Selected Foci·경고 문구 / Selected Indices·Create New MSI / NumCycles·to MSI.
+  2. 저장 동작 카드: 위치 그대로.
+  3. **Temperature 카드**(전체 폭): 제목과 옵션 설명, Temp Options·measTxGain·PulseWidthUsec, 옵션별 PwCwUseCode·Select 값 1·2·주석, Save Temp to DB·Update Prf from Init·TempLimit을 한곳에 모음.
+  - Exit는 카드 밖 오른쪽 끝에 둠.
+- **불변식**: testId·핸들러·옵션별 표시 규칙(`onTempOpt`)은 바꾸지 않았고, 한 화면 맞춤도 유지됨.
+- **검증**
+  - `test_msi_excel` 20 passed, 빌드 성공, Production 재기동 후 HTTP 200.
+  - 3개 해상도 모두 스크롤 없음. 라이트/다크와 Temp 옵션 1·14 스크린샷에서 겹침 없음, pageerror 0.
+  - Playwright 19 passed.
+- **교차 검증 생략 사유**: UI 배치만 바꿨고, 요청 본문 키·값은 동일함(백엔드 테스트로 확인).

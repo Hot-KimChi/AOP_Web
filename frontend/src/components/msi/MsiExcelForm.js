@@ -177,8 +177,9 @@ export default function MsiExcelForm({ database, onClose }) {
   const [purpose, setPurpose] = useState('RTP');
   const [txtMaxVoltage, setTxtMaxVoltage] = useState('1');
   const [txtProfVoltage, setTxtProfVoltage] = useState('0.48329');
-  const [txtVpoints, setTxtVpoints] = useState('20');
-  const [txtVoltNum, setTxtVoltNum] = useState('12');
+  // Total TxGain points·Meas TxGain Num 입력은 사용하지 않아 삭제(#41) — 백엔드 저장값은 원본 기본값 유지.
+  const txtVpoints = '20';
+  const txtVoltNum = '12';
   const [measFocusList, setMeasFocusList] = useState('');
   const [measIndex, setMeasIndex] = useState('');
   const [txtSpeedSound, setTxtSpeedSound] = useState('1540');
@@ -541,8 +542,9 @@ export default function MsiExcelForm({ database, onClose }) {
       <VbSection x={6} y={6} w={246} h={680} />
       <VbSection x={258} y={6} w={1116} h={320} />
       <VbSection x={258} y={332} w={1116} h={354} />
-      <VbSection x={0} y={694} w={926} h={260} />
-      <VbSection x={932} y={688} w={442} h={266} tone="action" />
+      <VbSection x={0} y={692} w={926} h={138} />
+      <VbSection x={932} y={688} w={442} h={142} tone="action" />
+      <VbSection x={0} y={836} w={1240} h={118} />
       <input
         ref={pickerRef}
         type="file"
@@ -589,75 +591,77 @@ export default function MsiExcelForm({ database, onClose }) {
         emptyText="위 Exel Input 의 행 머리글을 더블클릭하거나 Select All RTP 로 추가하세요."
       />
 
+      {/* ① Tank/Power 파라미터 카드 */}
       <VbLabel x={39} y={704} font={F9}>Max Sys TxGain:</VbLabel>
       <VbText x={171} y={702} w={73} h={24} font={F9} value={txtMaxVoltage} onChange={setTxtMaxVoltage} ariaLabel="Max Sys TxGain" />
       <VbLabel x={265} y={704} font={F9}>Profile TxGain:</VbLabel>
       <VbText x={397} y={702} w={73} h={24} font={F9} value={txtProfVoltage} onChange={setTxtProfVoltage} ariaLabel="Profile TxGain" />
-      <VbLabel x={480} y={705} font={F9}>Total TxGain points:</VbLabel>
-      <VbText x={644} y={702} w={45} h={24} font={F9} value={txtVpoints} onChange={setTxtVpoints} ariaLabel="Total TxGain points" />
-      <VbLabel x={705} y={705} font={F9}>Meas TxGain Num:</VbLabel>
-      <VbText x={867} y={702} w={45} h={24} font={F9} value={txtVoltNum} onChange={setTxtVoltNum} ariaLabel="Meas TxGain Num" />
+      <VbLabel x={490} y={705} font={F9}>Speed of Sound (m/s)</VbLabel>
+      <VbText x={644} y={702} w={73} h={24} font={F9} value={txtSpeedSound} onChange={setTxtSpeedSound} ariaLabel="Speed of Sound" />
+      <VbCheck
+        x={754} y={704} w={122} h={21} checked={isElevReq} testId="msi-excel-elevreq"
+        onChange={(c) => { setIsElevReq(c); setElevTouched(true); }}
+      >
+        Elev data req?
+      </VbCheck>
+
+      <VbLabel x={60} y={737} font={F9}>Selected Foci:</VbLabel>
+      <VbText
+        x={231} y={734} w={387} h={22} value={measFocusList} ariaLabel="Selected Foci" testId="msi-excel-foci"
+        onChange={(t) => { setMeasFocusList(t); if (t !== '') setMeasIndex(''); }}
+      />
+      <VbLabel x={641} y={732} font={F675} color={RED}>If there is a similar record except pulseWidth,</VbLabel>
+      <VbLabel x={641} y={747} font={F675} color={RED}>create a new or overwrite PulseString on exist one? </VbLabel>
+
+      <VbLabel x={60} y={769} font={F9}>Selected Indices:</VbLabel>
+      <VbText
+        x={231} y={766} w={387} h={22} value={measIndex} ariaLabel="Selected Indices" testId="msi-excel-indices"
+        onChange={(t) => { setMeasIndex(t); if (t !== '') setMeasFocusList(''); }}
+      />
+      <VbCheck x={644} y={768} w={182} h={21} checked={isCreateNew} onChange={setIsCreateNew} testId="msi-excel-createnew">Create New from MSI =  </VbCheck>
+      <VbText x={823} y={765} w={68} h={24} font={F9} value={msi} onChange={setMsi} ariaLabel="MSI" testId="msi-excel-msi" />
+
+      <VbLabel x={63} y={801} font={F9}>NumCycles for Chirp:</VbLabel>
+      <VbText x={231} y={798} w={387} h={24} font={F9} value={numCycList} onChange={setNumCycList} ariaLabel="NumCycles for Chirp" />
+      <VbLabel x={751} y={801} font={F9}>to MSI =</VbLabel>
+      <VbText x={823} y={798} w={68} h={24} font={F9} value={msiEnd} onChange={setMsiEnd} ariaLabel="MSI End" testId="msi-excel-msiend" />
+
+      {/* ② Tank/Power 저장 동작 카드 */}
       <VbButton x={940} y={699} w={129} h={58} font={F825B} onClick={cmdSaveDb} busy={busy} variant="primary" testId="msi-excel-savedb">Save Tank RTP to DB</VbButton>
       <VbLabel x={1095} y={699} font={F675}>SetId Range:</VbLabel>
       <VbText x={1175} y={692} w={156} h={23} value={txtSetRange} onChange={setTxtSetRange} ariaLabel="SetId Range" testId="msi-excel-setrange" />
       {/* 원본의 BeamWidth Simulation(MATLAB simMeasSettings) 버튼은 사용하지 않아 사용자 요청으로 삭제. */}
       <VbButton x={1216} y={722} w={116} h={60} font={F825B} onClick={cmdFillPwr} busy={busy} testId="msi-excel-fillpwr">Get matched Power MeasSetId</VbButton>
-
-      <VbLabel x={60} y={754} font={F9}>Selected Foci:</VbLabel>
-      <VbText
-        x={231} y={754} w={387} h={22} value={measFocusList} ariaLabel="Selected Foci" testId="msi-excel-foci"
-        onChange={(t) => { setMeasFocusList(t); if (t !== '') setMeasIndex(''); }}
-      />
-      <VbLabel x={641} y={754} font={F675} color={RED}>If there is a similar record except pulseWidth,</VbLabel>
-      <VbLabel x={641} y={769} font={F675} color={RED}>create a new or overwrite PulseString on exist one? </VbLabel>
       <VbButton x={940} y={764} w={129} h={58} font={F825B} onClick={cmdSavePower} busy={busy} variant="primary" testId="msi-excel-savepower">Save Power to DB</VbButton>
       <VbButton x={1081} y={775} w={127} h={42} font={F825B} onClick={cmdSaveMat} busy={busy} testId="msi-excel-savemat">Save to Excel</VbButton>
       <VbLabel x={1216} y={786} font={F675}>File is in </VbLabel>
       <VbLabel x={1216} y={801} font={F675}>R:\Compass\Intensity\</VbLabel>
       <VbLabel x={1216} y={814} font={F675}>MeasInput_date.txt</VbLabel>
 
-      <VbLabel x={60} y={786} font={F9}>Selected Indices:</VbLabel>
-      <VbText
-        x={231} y={786} w={387} h={22} value={measIndex} ariaLabel="Selected Indices" testId="msi-excel-indices"
-        onChange={(t) => { setMeasIndex(t); if (t !== '') setMeasFocusList(''); }}
-      />
-      <VbCheck x={644} y={788} w={182} h={21} checked={isCreateNew} onChange={setIsCreateNew} testId="msi-excel-createnew">Create New from MSI =  </VbCheck>
-      <VbText x={823} y={783} w={68} h={24} font={F9} value={msi} onChange={setMsi} ariaLabel="MSI" testId="msi-excel-msi" />
-      <VbLabel x={751} y={817} font={F9}>to MSI =</VbLabel>
-      <VbText x={823} y={815} w={68} h={24} font={F9} value={msiEnd} onChange={setMsiEnd} ariaLabel="MSI End" testId="msi-excel-msiend" />
+      {/* ③ Temperature 카드 — 온도 관련 입력·저장을 한 곳에 묶음(#41) */}
+      <VbLabel x={14} y={845} font={F9B}>Temperature</VbLabel>
+      <VbLabel x={110} y={847} font={{ size: 7.2 }} color={MAROON} testId="msi-excel-opt1">{lblOpt1}</VbLabel>
+      <VbLabel x={14} y={872} font={F9}>Temp Options:</VbLabel>
+      <VbCombo x={110} y={868} w={60} h={24} value={cmbTempOpt} onChange={onTempOpt} editable options={TEMP_OPTS} testId="msi-excel-tempopt" ariaLabel="Temp Options" />
+      <VbLabel x={186} y={872} font={F9}>measTxGain:</VbLabel>
+      <VbText x={330} y={868} w={330} h={24} font={F9} value={pulseVoltage} onChange={setPulseVoltage} ariaLabel="measTxGain" />
+      <VbLabel x={680} y={872} font={F9}>PulseWidthUsec:</VbLabel>
+      <VbText x={810} y={868} w={68} h={24} font={F9} value={pulseWidthUsec} onChange={setPulseWidthUsec} ariaLabel="PulseWidthUsec" />
 
-      <VbLabel x={63} y={818} font={F9}>Speed of Sound (m/s)</VbLabel>
-      <VbText x={231} y={818} w={73} h={24} font={F9} value={txtSpeedSound} onChange={setTxtSpeedSound} ariaLabel="Speed of Sound" />
-      <VbLabel x={326} y={821} font={F9}>NumCycles for Chirp:</VbLabel>
-      <VbText x={494} y={821} w={224} h={24} font={F9} value={numCycList} onChange={setNumCycList} ariaLabel="NumCycles for Chirp" />
+      <VbLabel x={14} y={906} font={F9} hidden={!vis.cw}>PwCwUseCode:</VbLabel>
+      <VbCombo x={110} y={902} w={60} h={24} value={cwUseCode} onChange={setCwUseCode} editable options={['0', '1', '2']} hidden={!vis.cw} ariaLabel="PwCwUseCode" testId="msi-excel-cwcode" />
+      <VbLabel x={186} y={906} font={F9} hidden={!vis.sel} testId="msi-excel-sellabel">{lblSelectLabel}</VbLabel>
+      <VbText x={330} y={903} w={330} h={22} value={txtSelectValue} onChange={setTxtSelectValue} hidden={!vis.sel} ariaLabel="Select value" testId="msi-excel-selvalue" />
+      <VbLabel x={680} y={906} font={F9} hidden={!vis.sel2} testId="msi-excel-sellabel2">{lblSelectLabel2}</VbLabel>
+      <VbText x={810} y={903} w={68} h={22} value={txtSelectValue2} onChange={setTxtSelectValue2} hidden={!vis.sel2} ariaLabel="Select value 2" testId="msi-excel-selvalue2" />
+      <VbLabel x={330} y={931} font={F675} color={RED} hidden={!vis.notes}>{lblNotes}</VbLabel>
 
-      <VbLabel x={2} y={845} font={{ size: 7.2 }} color={MAROON} testId="msi-excel-opt1">{lblOpt1}</VbLabel>
-      <VbCheck
-        x={754} y={845} w={122} h={21} checked={isElevReq} testId="msi-excel-elevreq"
-        onChange={(c) => { setIsElevReq(c); setElevTouched(true); }}
-      >
-        Elev data req?
-      </VbCheck>
+      <VbButton x={892} y={860} w={117} h={58} font={F9B} onClick={cmdSaveTemp} busy={busy} variant="primary" testId="msi-excel-savetemp">Save Temp to DB</VbButton>
+      <VbButton x={1019} y={860} w={117} h={58} font={F9B} onClick={cmdUpdatePrf} busy={busy} testId="msi-excel-updateprf">Update Prf from Init</VbButton>
+      <VbLabel x={1150} y={864} font={F9}>TempLimit:</VbLabel>
+      <VbText x={1150} y={886} w={70} h={24} font={F9} value={tempLimit} onChange={setTempLimit} ariaLabel="TempLimit" />
 
-      <VbLabel x={5} y={874}>Temp Options:</VbLabel>
-      <VbCombo x={119} y={870} w={60} h={24} value={cmbTempOpt} onChange={onTempOpt} editable options={TEMP_OPTS} testId="msi-excel-tempopt" ariaLabel="Temp Options" />
-      <VbLabel x={187} y={870} font={F9}>measTxGain:</VbLabel>
-      <VbText x={340} y={869} w={353} h={24} font={F9} value={pulseVoltage} onChange={setPulseVoltage} ariaLabel="measTxGain" />
-      <VbLabel x={712} y={871} font={F9}>PulseWidthUsec:</VbLabel>
-      <VbText x={853} y={870} w={68} h={24} font={F9} value={pulseWidthUsec} onChange={setPulseWidthUsec} ariaLabel="PulseWidthUsec" />
-      <VbButton x={952} y={855} w={117} h={58} font={F9B} onClick={cmdSaveTemp} busy={busy} variant="primary" testId="msi-excel-savetemp">Save Temp to DB</VbButton>
-      <VbButton x={1091} y={854} w={117} h={58} font={F9B} onClick={cmdUpdatePrf} busy={busy} testId="msi-excel-updateprf">Update Prf from Init</VbButton>
-      <VbButton x={1233} y={855} w={116} h={58} font={F9B} onClick={() => onClose?.()} variant="subtle" testId="msi-excel-exit">Exit</VbButton>
-
-      <VbLabel x={184} y={905} font={F9} hidden={!vis.sel} testId="msi-excel-sellabel">{lblSelectLabel}</VbLabel>
-      <VbText x={340} y={905} w={353} h={22} value={txtSelectValue} onChange={setTxtSelectValue} hidden={!vis.sel} ariaLabel="Select value" testId="msi-excel-selvalue" />
-      <VbLabel x={720} y={906} font={F9} hidden={!vis.sel2} testId="msi-excel-sellabel2">{lblSelectLabel2}</VbLabel>
-      <VbText x={853} y={905} w={68} h={22} value={txtSelectValue2} onChange={setTxtSelectValue2} hidden={!vis.sel2} ariaLabel="Select value 2" testId="msi-excel-selvalue2" />
-      <VbLabel x={5} y={913} hidden={!vis.cw}>PwCwUseCode:</VbLabel>
-      <VbCombo x={119} y={906} w={60} h={24} value={cwUseCode} onChange={setCwUseCode} editable options={['0', '1', '2']} hidden={!vis.cw} ariaLabel="PwCwUseCode" testId="msi-excel-cwcode" />
-      <VbLabel x={169} y={927} font={F675} color={RED} hidden={!vis.notes}>{lblNotes}</VbLabel>
-      <VbLabel x={1087} y={927} font={F9}>TempLimit:</VbLabel>
-      <VbText x={1187} y={923} w={45} h={24} font={F9} value={tempLimit} onChange={setTempLimit} ariaLabel="TempLimit" />
+      <VbButton x={1252} y={860} w={116} h={58} font={F9B} onClick={() => onClose?.()} variant="subtle" testId="msi-excel-exit">Exit</VbButton>
 
       {modal && (
         <VbModal onClose={() => setModal(null)} testId="msi-excel-modal">
