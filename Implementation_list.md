@@ -46,6 +46,7 @@
 | 40 | measSetInput BeamWidth Simulation 버튼 삭제 (본문 ## 40) | 2026-11-09 | - |
 | 41 | measSetInput TxGain points/Num 입력 삭제·Temperature 카드 통합 (본문 ## 41) | 2026-11-09 | - |
 | 42 | measSetInput 버튼 위치·하단 UI 사용자 친화 재배치 (본문 ## 42) | 2026-11-10 | - |
+| 43 | measSetInput 파일 카드 높이 정렬·Selected RTP 전체 폭 확장 (본문 ## 43) | 2026-11-10 | - |
 
 ---
 
@@ -1135,3 +1136,31 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
   - 라이트·다크 모드와 온도 옵션 1·14 스크린샷에서 겹침 없음.
   - Playwright 19 passed.
 - **교차 검증 생략 사유**: 좌표만 재배치한 UI 변경이다. 핸들러와 API 계약이 바뀌지 않았음을 기계적 비교와 테스트로 확인했다.
+
+## 43. meassetinput 창에서 excel file directory 카드 창이 excel input 창과 높이과 같도록 수정해죠. 그럼 selected RTP가 가로창이 더 늘어날것 같다. 이를 agent 명세를 재작성하여 이를 기반으로 진행해죠.
+
+### Agent 명세 (#43)
+
+- **목표**: measSetInput에서 왼쪽 Excel File Directory 카드의 높이를 Excel Input 카드와 같게 줄인다. 비게 된 아래 공간만큼 Selected RTP 카드를 전체 폭으로 넓혀 표를 더 넓게 보이게 한다.
+- **현황 진단**: 왼쪽 카드 (6,6,246,680)가 두 표 카드 높이를 모두 차지한다. 그래서 Selected RTP 카드 (258,332,1116,354)와 표(폭 1084)가 오른쪽에 갇혀 있다.
+- **변경**
+  - 왼쪽 카드를 (6,6,246,320)으로 바꿔 Excel Input 카드 (258,6,1116,320)와 위·아래 끝을 맞춘다. 파일 목록 높이를 줄이고, Open Excel File 버튼을 카드 아래쪽에 둔다.
+  - Selected RTP 카드를 (6,332,1367,354)로 넓힌다. 제목과 설명 라벨은 왼쪽으로 옮기고, 표를 x=20, 폭 1338로 넓힌다. Purpose, Select All RTP, Update All은 오른쪽 위치를 그대로 둔다.
+- **범위 Out**: 하단 카드(#42), 백엔드와 API, 문구, 공용 Vb.js.
+- **불변식**: testId, 핸들러, ariaLabel, variant 집합은 바꾸지 않는다. 한 화면 맞춤(스크롤 없음)을 유지한다.
+- **검증 기준**
+  - 빌드 성공, `test_msi_excel` 통과, Playwright 전체 통과.
+  - 3개 해상도에서 스크롤 없음, pageerror 0.
+  - 라이트·다크 모드 스크린샷에서 겹침 없음.
+
+### 수행 결과 (#43)
+
+- **왼쪽 Excel File Directory 카드**: (6,6,246,320)으로 줄여 Excel Input 카드와 위·아래 끝을 맞췄다. 파일 목록 높이는 516에서 170으로, Open Excel File 버튼은 (20,272,218,44)로 바꿨다.
+- **Selected RTP 카드**: (6,332,1367,354)로 전체 폭이 되었다. 제목은 x20, 설명은 x130으로 옮겼고, 표는 x20·폭 1338로 이전보다 254px 넓어졌다. Purpose와 Select All/Update All 버튼 위치는 그대로다.
+- **불변식**: testId, onClick, ariaLabel, onChange, variant 집합이 변경 전과 같다.
+- **검증**
+  - `test_msi_excel` 20 passed, 빌드 성공, Production 재기동 후 HTTP 200.
+  - 3개 해상도에서 스크롤 없음, pageerror 0.
+  - 라이트·다크 모드 스크린샷에서 겹침 없음.
+  - Playwright 19 passed.
+- **교차 검증 생략 사유**: 좌표만 바꾼 UI 변경이며, 핸들러와 API 계약이 그대로임을 확인했다.
