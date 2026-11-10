@@ -542,9 +542,9 @@ export default function MsiExcelForm({ database, onClose }) {
       <VbSection x={6} y={6} w={246} h={680} />
       <VbSection x={258} y={6} w={1116} h={320} />
       <VbSection x={258} y={332} w={1116} h={354} />
-      <VbSection x={0} y={692} w={926} h={138} />
-      <VbSection x={932} y={688} w={442} h={142} tone="action" />
-      <VbSection x={0} y={836} w={1240} h={118} />
+      <VbSection x={6} y={692} w={894} h={140} />
+      <VbSection x={906} y={692} w={467} h={140} tone="action" />
+      <VbSection x={6} y={838} w={1241} h={112} />
       <input
         ref={pickerRef}
         type="file"
@@ -591,77 +591,78 @@ export default function MsiExcelForm({ database, onClose }) {
         emptyText="위 Exel Input 의 행 머리글을 더블클릭하거나 Select All RTP 로 추가하세요."
       />
 
+      {/* #42: 하단은 6px 그리드에 맞추고 라벨 열(x20)·입력 열(x168)을 통일. 저장은 대상별 한 줄, 왼쪽→오른쪽 = 준비→실행. */}
       {/* ① Tank/Power 파라미터 카드 */}
-      <VbLabel x={39} y={704} font={F9}>Max Sys TxGain:</VbLabel>
-      <VbText x={171} y={702} w={73} h={24} font={F9} value={txtMaxVoltage} onChange={setTxtMaxVoltage} ariaLabel="Max Sys TxGain" />
-      <VbLabel x={265} y={704} font={F9}>Profile TxGain:</VbLabel>
-      <VbText x={397} y={702} w={73} h={24} font={F9} value={txtProfVoltage} onChange={setTxtProfVoltage} ariaLabel="Profile TxGain" />
-      <VbLabel x={490} y={705} font={F9}>Speed of Sound (m/s)</VbLabel>
-      <VbText x={644} y={702} w={73} h={24} font={F9} value={txtSpeedSound} onChange={setTxtSpeedSound} ariaLabel="Speed of Sound" />
+      <VbLabel x={20} y={706} font={F9}>Max Sys TxGain:</VbLabel>
+      <VbText x={168} y={702} w={72} h={24} font={F9} value={txtMaxVoltage} onChange={setTxtMaxVoltage} ariaLabel="Max Sys TxGain" />
+      <VbLabel x={258} y={706} font={F9}>Profile TxGain:</VbLabel>
+      <VbText x={366} y={702} w={72} h={24} font={F9} value={txtProfVoltage} onChange={setTxtProfVoltage} ariaLabel="Profile TxGain" />
+      <VbLabel x={456} y={706} font={F9}>Speed of Sound (m/s)</VbLabel>
+      <VbText x={606} y={702} w={72} h={24} font={F9} value={txtSpeedSound} onChange={setTxtSpeedSound} ariaLabel="Speed of Sound" />
       <VbCheck
-        x={754} y={704} w={122} h={21} checked={isElevReq} testId="msi-excel-elevreq"
+        x={700} y={704} w={150} h={21} checked={isElevReq} testId="msi-excel-elevreq"
         onChange={(c) => { setIsElevReq(c); setElevTouched(true); }}
       >
         Elev data req?
       </VbCheck>
 
-      <VbLabel x={60} y={737} font={F9}>Selected Foci:</VbLabel>
+      <VbLabel x={20} y={738} font={F9}>Selected Foci:</VbLabel>
       <VbText
-        x={231} y={734} w={387} h={22} value={measFocusList} ariaLabel="Selected Foci" testId="msi-excel-foci"
+        x={168} y={735} w={432} h={24} value={measFocusList} ariaLabel="Selected Foci" testId="msi-excel-foci"
         onChange={(t) => { setMeasFocusList(t); if (t !== '') setMeasIndex(''); }}
       />
-      <VbLabel x={641} y={732} font={F675} color={RED}>If there is a similar record except pulseWidth,</VbLabel>
-      <VbLabel x={641} y={747} font={F675} color={RED}>create a new or overwrite PulseString on exist one? </VbLabel>
+      <VbLabel x={620} y={733} font={F675} color={RED}>If there is a similar record except pulseWidth,</VbLabel>
+      <VbLabel x={620} y={748} font={F675} color={RED}>create a new or overwrite PulseString on exist one? </VbLabel>
 
-      <VbLabel x={60} y={769} font={F9}>Selected Indices:</VbLabel>
+      <VbLabel x={20} y={771} font={F9}>Selected Indices:</VbLabel>
       <VbText
-        x={231} y={766} w={387} h={22} value={measIndex} ariaLabel="Selected Indices" testId="msi-excel-indices"
+        x={168} y={768} w={432} h={24} value={measIndex} ariaLabel="Selected Indices" testId="msi-excel-indices"
         onChange={(t) => { setMeasIndex(t); if (t !== '') setMeasFocusList(''); }}
       />
-      <VbCheck x={644} y={768} w={182} h={21} checked={isCreateNew} onChange={setIsCreateNew} testId="msi-excel-createnew">Create New from MSI =  </VbCheck>
-      <VbText x={823} y={765} w={68} h={24} font={F9} value={msi} onChange={setMsi} ariaLabel="MSI" testId="msi-excel-msi" />
+      <VbCheck x={620} y={770} w={186} h={21} checked={isCreateNew} onChange={setIsCreateNew} testId="msi-excel-createnew">Create New from MSI =  </VbCheck>
+      <VbText x={812} y={768} w={76} h={24} font={F9} value={msi} onChange={setMsi} ariaLabel="MSI" testId="msi-excel-msi" />
 
-      <VbLabel x={63} y={801} font={F9}>NumCycles for Chirp:</VbLabel>
-      <VbText x={231} y={798} w={387} h={24} font={F9} value={numCycList} onChange={setNumCycList} ariaLabel="NumCycles for Chirp" />
-      <VbLabel x={751} y={801} font={F9}>to MSI =</VbLabel>
-      <VbText x={823} y={798} w={68} h={24} font={F9} value={msiEnd} onChange={setMsiEnd} ariaLabel="MSI End" testId="msi-excel-msiend" />
+      <VbLabel x={20} y={804} font={F9}>NumCycles for Chirp:</VbLabel>
+      <VbText x={168} y={801} w={432} h={24} font={F9} value={numCycList} onChange={setNumCycList} ariaLabel="NumCycles for Chirp" />
+      <VbLabel x={740} y={804} font={F9}>to MSI =</VbLabel>
+      <VbText x={812} y={801} w={76} h={24} font={F9} value={msiEnd} onChange={setMsiEnd} ariaLabel="MSI End" testId="msi-excel-msiend" />
 
-      {/* ② Tank/Power 저장 동작 카드 */}
-      <VbButton x={940} y={699} w={129} h={58} font={F825B} onClick={cmdSaveDb} busy={busy} variant="primary" testId="msi-excel-savedb">Save Tank RTP to DB</VbButton>
-      <VbLabel x={1095} y={699} font={F675}>SetId Range:</VbLabel>
-      <VbText x={1175} y={692} w={156} h={23} value={txtSetRange} onChange={setTxtSetRange} ariaLabel="SetId Range" testId="msi-excel-setrange" />
+      {/* ② 저장 동작 카드 — Tank / Power / Excel 대상별 한 줄 */}
+      <VbButton x={918} y={702} w={218} h={36} font={F825B} onClick={cmdSaveDb} busy={busy} variant="primary" testId="msi-excel-savedb">Save Tank RTP to DB</VbButton>
+      <VbLabel x={1148} y={699} font={F675}>SetId Range:</VbLabel>
+      <VbText x={1148} y={714} w={213} h={24} value={txtSetRange} onChange={setTxtSetRange} ariaLabel="SetId Range" testId="msi-excel-setrange" />
       {/* 원본의 BeamWidth Simulation(MATLAB simMeasSettings) 버튼은 사용하지 않아 사용자 요청으로 삭제. */}
-      <VbButton x={1216} y={722} w={116} h={60} font={F825B} onClick={cmdFillPwr} busy={busy} testId="msi-excel-fillpwr">Get matched Power MeasSetId</VbButton>
-      <VbButton x={940} y={764} w={129} h={58} font={F825B} onClick={cmdSavePower} busy={busy} variant="primary" testId="msi-excel-savepower">Save Power to DB</VbButton>
-      <VbButton x={1081} y={775} w={127} h={42} font={F825B} onClick={cmdSaveMat} busy={busy} testId="msi-excel-savemat">Save to Excel</VbButton>
-      <VbLabel x={1216} y={786} font={F675}>File is in </VbLabel>
-      <VbLabel x={1216} y={801} font={F675}>R:\Compass\Intensity\</VbLabel>
-      <VbLabel x={1216} y={814} font={F675}>MeasInput_date.txt</VbLabel>
+      <VbButton x={918} y={746} w={218} h={36} font={F825B} onClick={cmdFillPwr} busy={busy} testId="msi-excel-fillpwr">Get matched Power MeasSetId</VbButton>
+      <VbButton x={1146} y={746} w={215} h={36} font={F825B} onClick={cmdSavePower} busy={busy} variant="primary" testId="msi-excel-savepower">Save Power to DB</VbButton>
+      <VbButton x={918} y={790} w={218} h={36} font={F825B} onClick={cmdSaveMat} busy={busy} testId="msi-excel-savemat">Save to Excel</VbButton>
+      <VbLabel x={1148} y={789} font={F675}>File is in </VbLabel>
+      <VbLabel x={1148} y={802} font={F675}>R:\Compass\Intensity\</VbLabel>
+      <VbLabel x={1148} y={815} font={F675}>MeasInput_date.txt</VbLabel>
 
-      {/* ③ Temperature 카드 — 온도 관련 입력·저장을 한 곳에 묶음(#41) */}
-      <VbLabel x={14} y={845} font={F9B}>Temperature</VbLabel>
-      <VbLabel x={110} y={847} font={{ size: 7.2 }} color={MAROON} testId="msi-excel-opt1">{lblOpt1}</VbLabel>
-      <VbLabel x={14} y={872} font={F9}>Temp Options:</VbLabel>
-      <VbCombo x={110} y={868} w={60} h={24} value={cmbTempOpt} onChange={onTempOpt} editable options={TEMP_OPTS} testId="msi-excel-tempopt" ariaLabel="Temp Options" />
-      <VbLabel x={186} y={872} font={F9}>measTxGain:</VbLabel>
-      <VbText x={330} y={868} w={330} h={24} font={F9} value={pulseVoltage} onChange={setPulseVoltage} ariaLabel="measTxGain" />
-      <VbLabel x={680} y={872} font={F9}>PulseWidthUsec:</VbLabel>
-      <VbText x={810} y={868} w={68} h={24} font={F9} value={pulseWidthUsec} onChange={setPulseWidthUsec} ariaLabel="PulseWidthUsec" />
+      {/* ③ Temperature 카드 — 입력(왼쪽) → TempLimit → 실행 버튼(오른쪽) 순서 */}
+      <VbLabel x={20} y={846} font={F9B}>Temperature</VbLabel>
+      <VbLabel x={120} y={848} font={{ size: 7.2 }} color={MAROON} testId="msi-excel-opt1">{lblOpt1}</VbLabel>
+      <VbLabel x={20} y={874} font={F9}>Temp Options:</VbLabel>
+      <VbCombo x={130} y={870} w={64} h={24} value={cmbTempOpt} onChange={onTempOpt} editable options={TEMP_OPTS} testId="msi-excel-tempopt" ariaLabel="Temp Options" />
+      <VbLabel x={210} y={874} font={F9}>measTxGain:</VbLabel>
+      <VbText x={350} y={870} w={300} h={24} font={F9} value={pulseVoltage} onChange={setPulseVoltage} ariaLabel="measTxGain" />
+      <VbLabel x={670} y={874} font={F9}>PulseWidthUsec:</VbLabel>
+      <VbText x={800} y={870} w={76} h={24} font={F9} value={pulseWidthUsec} onChange={setPulseWidthUsec} ariaLabel="PulseWidthUsec" />
 
-      <VbLabel x={14} y={906} font={F9} hidden={!vis.cw}>PwCwUseCode:</VbLabel>
-      <VbCombo x={110} y={902} w={60} h={24} value={cwUseCode} onChange={setCwUseCode} editable options={['0', '1', '2']} hidden={!vis.cw} ariaLabel="PwCwUseCode" testId="msi-excel-cwcode" />
-      <VbLabel x={186} y={906} font={F9} hidden={!vis.sel} testId="msi-excel-sellabel">{lblSelectLabel}</VbLabel>
-      <VbText x={330} y={903} w={330} h={22} value={txtSelectValue} onChange={setTxtSelectValue} hidden={!vis.sel} ariaLabel="Select value" testId="msi-excel-selvalue" />
-      <VbLabel x={680} y={906} font={F9} hidden={!vis.sel2} testId="msi-excel-sellabel2">{lblSelectLabel2}</VbLabel>
-      <VbText x={810} y={903} w={68} h={22} value={txtSelectValue2} onChange={setTxtSelectValue2} hidden={!vis.sel2} ariaLabel="Select value 2" testId="msi-excel-selvalue2" />
-      <VbLabel x={330} y={931} font={F675} color={RED} hidden={!vis.notes}>{lblNotes}</VbLabel>
+      <VbLabel x={20} y={907} font={F9} hidden={!vis.cw}>PwCwUseCode:</VbLabel>
+      <VbCombo x={130} y={903} w={64} h={24} value={cwUseCode} onChange={setCwUseCode} editable options={['0', '1', '2']} hidden={!vis.cw} ariaLabel="PwCwUseCode" testId="msi-excel-cwcode" />
+      <VbLabel x={210} y={907} font={F9} hidden={!vis.sel} testId="msi-excel-sellabel">{lblSelectLabel}</VbLabel>
+      <VbText x={350} y={903} w={300} h={24} value={txtSelectValue} onChange={setTxtSelectValue} hidden={!vis.sel} ariaLabel="Select value" testId="msi-excel-selvalue" />
+      <VbLabel x={670} y={907} font={F9} hidden={!vis.sel2} testId="msi-excel-sellabel2">{lblSelectLabel2}</VbLabel>
+      <VbText x={800} y={903} w={76} h={24} value={txtSelectValue2} onChange={setTxtSelectValue2} hidden={!vis.sel2} ariaLabel="Select value 2" testId="msi-excel-selvalue2" />
+      <VbLabel x={350} y={932} font={F675} color={RED} hidden={!vis.notes}>{lblNotes}</VbLabel>
 
-      <VbButton x={892} y={860} w={117} h={58} font={F9B} onClick={cmdSaveTemp} busy={busy} variant="primary" testId="msi-excel-savetemp">Save Temp to DB</VbButton>
-      <VbButton x={1019} y={860} w={117} h={58} font={F9B} onClick={cmdUpdatePrf} busy={busy} testId="msi-excel-updateprf">Update Prf from Init</VbButton>
-      <VbLabel x={1150} y={864} font={F9}>TempLimit:</VbLabel>
-      <VbText x={1150} y={886} w={70} h={24} font={F9} value={tempLimit} onChange={setTempLimit} ariaLabel="TempLimit" />
+      <VbLabel x={904} y={866} font={F9}>TempLimit:</VbLabel>
+      <VbText x={904} y={888} w={76} h={24} font={F9} value={tempLimit} onChange={setTempLimit} ariaLabel="TempLimit" />
+      <VbButton x={996} y={862} w={118} h={58} font={F9B} onClick={cmdSaveTemp} busy={busy} variant="primary" testId="msi-excel-savetemp">Save Temp to DB</VbButton>
+      <VbButton x={1120} y={862} w={118} h={58} font={F9B} onClick={cmdUpdatePrf} busy={busy} testId="msi-excel-updateprf">Update Prf from Init</VbButton>
 
-      <VbButton x={1252} y={860} w={116} h={58} font={F9B} onClick={() => onClose?.()} variant="subtle" testId="msi-excel-exit">Exit</VbButton>
+      <VbButton x={1259} y={862} w={114} h={58} font={F9B} onClick={() => onClose?.()} variant="subtle" testId="msi-excel-exit">Exit</VbButton>
 
       {modal && (
         <VbModal onClose={() => setModal(null)} testId="msi-excel-modal">
