@@ -47,6 +47,7 @@
 | 41 | measSetInput TxGain points/Num 입력 삭제·Temperature 카드 통합 (본문 ## 41) | 2026-11-09 | - |
 | 42 | measSetInput 버튼 위치·하단 UI 사용자 친화 재배치 (본문 ## 42) | 2026-11-10 | - |
 | 43 | measSetInput 파일 카드 높이 정렬·Selected RTP 전체 폭 확장 (본문 ## 43) | 2026-11-10 | - |
+| 44 | MSI input 사용자 설명서(HTML)·데이터 흐름 작성 (본문 ## 44) | 2026-11-11 | - |
 
 ---
 
@@ -1164,3 +1165,40 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
   - 라이트·다크 모드 스크린샷에서 겹침 없음.
   - Playwright 19 passed.
 - **교차 검증 생략 사유**: 좌표만 바꾼 UI 변경이며, 핸들러와 API 계약이 그대로임을 확인했다.
+
+## 44. MSI input을 어떻게 사용하는지 유저 instruction을 작성해죠. html로 가독성있게 그리고 쉽게 작성해죠. 추가적으로 데이터의 플로우가 어떻게 흐르는지 설명하는 부분도 넣어죠. 해당부분은 agent 명세를 재작성하여 이를 기반으로 진행해죠.
+
+### Agent 명세 (#44)
+
+- **목표**: MSI input 사용법을 처음 쓰는 사람도 따라 할 수 있도록 쉬운 한글 HTML 설명서로 만든다. 데이터가 어디서 와서 어디에 저장되는지 흐름도로 함께 설명한다.
+- **산출물**: `docs/MSI_Input_guide.html` 단일 파일. 외부 라이브러리와 네트워크 없이 열리고, 라이트·다크 모드(`prefers-color-scheme`)와 인쇄를 지원한다.
+- **구성**
+  1. 한눈에 보기: 무엇을 하는 화면인지, 준비물(로그인, DB, 엑셀 파일)
+  2. 여는 방법: MeasSet Generation → MSI input 탭 → Database 선택 → MSI Input From Excel(새 창)
+  3. 화면 구성: 5개 카드(파일, Exel Input, Selected RTP, 파라미터, 저장 동작, Temperature)
+  4. 단계별 사용법: 파일 열기 → RTP 선택 → Foci/Indices 수정 → 저장(Tank/Power/Temp) → 후속 작업
+  5. 버튼 사전: 버튼마다 하는 일, 호출 API, 결과
+  6. 데이터 흐름: 엑셀 → 브라우저 → `/api/msi-excel/*` → 엔진 → MSSQL(`meas_setting`, `temp_setting`, `probe_info`, `update_Prf_From_Init`). 다운로드(-Sel.xlsx, MeasInput_날짜.txt) 경로와 트랜잭션·잠금 포함
+  7. 색상 의미, 자주 묻는 질문, 오류 대처
+- **근거**: `MsiExcelForm.js`, `MsiChoice.js`, `routes/msi_excel.py`, `pkg_MsiInput/excel_engine.py`, `excel_store.py`의 실제 동작만 적는다. 추측은 적지 않는다.
+- **범위 Out**: 코드 변경. MSI Input From Dumped Data는 한 줄 소개만 한다.
+- **검증 기준**
+  - HTML 구문 검사(파서 오류 0)와 내부 앵커 링크가 모두 유효할 것.
+  - 브라우저에서 라이트·다크 모드로 렌더링한 스크린샷에서 가독성을 확인할 것.
+  - 문서에 적은 버튼 이름과 API 경로가 코드와 일치할 것(자동 대조).
+
+### 수행 결과 (#44)
+
+- **산출물**: `docs/MSI_Input_guide.html`(단일 파일, 외부 의존 없음)
+- **구성**(9개 장): 한눈에 보기, 화면 여는 방법, 화면 구성(미니맵), 단계별 사용법(Tank·Power 8단계), 온도 조건 저장(옵션 0/1/3/4/14 표), 버튼 한눈에 보기(버튼별 API·DB 기록 여부), 데이터 흐름, 표 색상의 의미, 자주 묻는 질문·오류
+- **데이터 흐름**
+  - 4단 흐름도: 내 PC 엑셀 → 브라우저 → `/api/msi-excel/*` → MSSQL
+  - 버튼별 흐름 8줄
+  - 저장할 때 서버에서 일어나는 일 6단계(인증·DB 확인, 입력 검사, `sp_getapplock`, ID 발급, 단일 트랜잭션과 rollback, 결과 반환)
+- **표현**: 라이트·다크 모드(`prefers-color-scheme`), 반응형(900px 이하 1열, 표는 가로 스크롤), 인쇄용 스타일, 포커스 링을 지원한다.
+- **검증**
+  - HTML 태그 짝 오류 0, 내부 앵커 9개 모두 유효.
+  - 문서의 API 경로 집합이 `routes/msi_excel.py`의 라우트 집합과 정확히 같다.
+  - 버튼·라벨 이름이 코드와 일치한다(총칭 `Save … to DB`만 예외).
+  - 1440px와 420px, 라이트·다크 모드에서 가로 넘침 0, pageerror 0.
+- **교차 검증 생략 사유**: 문서만 추가했고 코드 변경이 없다. 내용은 코드와 자동 대조로 확인했다.

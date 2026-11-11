@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="AOP Web MSI input(measSetInput) 사용 설명서와 데이터 흐름">
+  <title>MSI input 사용 설명서 · AOP Web</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f7fb; --surface: #fff; --text: #172033; --muted: #4f5a6d;
+      --brand: #2458d6; --brand-soft: #e8efff; --line: #d9e1ee;
+      --ok: #157347; --ok-soft: #e6f4ec; --warn: #9a5b00; --warn-soft: #fff4dc;
+      --db: #6b3fc4; --db-soft: #f0e9ff; --code-bg: #eef2f8;
+      --cyan: #bff4f4; --salmon: #fbc4b2; --gray: #d3d3d3;
+      --shadow: 0 10px 28px rgba(20, 42, 80, .08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1522; --surface: #172033; --text: #e7ecf5; --muted: #aab4c6;
+        --brand: #7ea2ff; --brand-soft: #1f2d4f; --line: #2c3850;
+        --ok: #6fd39b; --ok-soft: #15301f; --warn: #ffc966; --warn-soft: #36290f;
+        --db: #c3a6ff; --db-soft: #2a2145; --code-bg: #0c1220;
+        --shadow: 0 10px 28px rgba(0, 0, 0, .35);
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.7 "Segoe UI", "Malgun Gothic", sans-serif; }
+    a { color: var(--brand); }
+    a:focus-visible, summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+    .hero { background: linear-gradient(135deg, #173d9c, #2458d6 55%, #4b7bea); color: #fff; padding: 52px 24px 84px; }
+    .wrap { width: min(1160px, calc(100% - 40px)); margin: 0 auto; }
+    .hero h1 { margin: 0 0 10px; font-size: clamp(1.9rem, 4.5vw, 3.2rem); line-height: 1.15; }
+    .hero p { margin: 0; max-width: 760px; color: #e5edff; font-size: 1.08rem; }
+    .layout { display: grid; grid-template-columns: 220px 1fr; gap: 26px; align-items: start; margin-top: -40px; }
+    nav { position: sticky; top: 18px; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+    nav strong { display: block; margin-bottom: 8px; }
+    nav ol { margin: 0; padding-left: 20px; }
+    nav li { margin: 4px 0; }
+    nav a { text-decoration: none; }
+    main section { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 26px 30px; margin-bottom: 22px; }
+    h2 { margin: 0 0 14px; font-size: 1.45rem; }
+    h3 { margin: 22px 0 8px; font-size: 1.1rem; }
+    p { margin: 8px 0; }
+    .muted { color: var(--muted); }
+    code, kbd { font-family: Consolas, "Cascadia Mono", monospace; font-size: .9em; background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
+    .btn { display: inline-block; padding: 1px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--brand-soft); font-weight: 600; font-size: .92em; white-space: nowrap; }
+    .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+    .card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--bg); }
+    .card h4 { margin: 0 0 6px; font-size: 1rem; }
+    .note, .warn, .tip { border-radius: 10px; padding: 12px 16px; margin: 12px 0; border-left: 5px solid; }
+    .note { background: var(--brand-soft); border-color: var(--brand); }
+    .tip { background: var(--ok-soft); border-color: var(--ok); }
+    .warn { background: var(--warn-soft); border-color: var(--warn); }
+    ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 0; }
+    ol.steps > li { counter-increment: s; position: relative; padding: 4px 0 14px 50px; }
+    ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 2px; width: 34px; height: 34px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; display: grid; place-items: center; }
+    ol.steps > li h3 { margin: 4px 0 6px; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: .95rem; }
+    th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: var(--brand-soft); }
+    .swatch { display: inline-block; width: 18px; height: 18px; border-radius: 4px; border: 1px solid #8a94a6; vertical-align: -4px; margin-right: 6px; }
+    /* 화면 배치 미니맵 */
+    .minimap { display: grid; grid-template-columns: 1fr 4.5fr; grid-template-rows: 70px 80px 62px 52px; gap: 6px; max-width: 760px; margin: 12px 0; font-size: .85rem; font-weight: 600; }
+    .minimap div { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--bg); }
+    .mm-file { grid-column: 1; grid-row: 1; }
+    .mm-input { grid-column: 2; grid-row: 1; }
+    .mm-sel { grid-column: 1 / 3; grid-row: 2; }
+    .mm-bottom { grid-column: 1 / 3; grid-row: 3; display: grid; grid-template-columns: 2fr 1fr; gap: 6px; padding: 0 !important; border: 0 !important; background: none !important; }
+    .mm-temp { grid-column: 1 / 3; grid-row: 4; }
+    .mm-action { background: var(--brand-soft) !important; }
+    .mm-n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--brand); color: #fff; font-size: .75rem; margin-right: 4px; }
+    /* 데이터 흐름도 */
+    .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; align-items: stretch; gap: 8px; margin: 14px 0; }
+    .node { border: 2px solid var(--line); border-radius: 12px; padding: 12px; background: var(--bg); font-size: .9rem; }
+    .node b { display: block; font-size: 1rem; margin-bottom: 4px; }
+    .node.pc { border-color: #8a94a6; }
+    .node.web { border-color: var(--brand); }
+    .node.api { border-color: var(--ok); }
+    .node.db { border-color: var(--db); background: var(--db-soft); }
+    .arrow { align-self: center; font-size: 1.6rem; color: var(--muted); }
+    .lane { display: grid; grid-template-columns: 210px 1fr; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px dashed var(--line); }
+    .lane:first-of-type { border-top: 0; }
+    .lane .who { font-weight: 700; }
+    .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .chip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; background: var(--bg); font-size: .88rem; white-space: nowrap; }
+    .chip.api { border-color: var(--ok); }
+    .chip.db { border-color: var(--db); background: var(--db-soft); }
+    .chip.file { border-color: var(--warn); background: var(--warn-soft); }
+    .chain .to { color: var(--muted); }
+    details { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0; background: var(--bg); }
+    summary { cursor: pointer; font-weight: 600; }
+    footer { text-align: center; color: var(--muted); font-size: .9rem; padding: 10px 0 40px; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: minmax(0, 1fr); }
+      nav { position: static; }
+      .flow { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); justify-self: center; }
+      .lane { grid-template-columns: 1fr; }
+      main section { padding: 18px 16px; }
+      table { display: block; overflow-x: auto; }
+      .minimap { grid-template-columns: 1fr 2fr; grid-template-rows: auto; }
+      .mm-bottom { grid-template-columns: 1fr; }
+      .btn, .chip { white-space: normal; }
+      code { overflow-wrap: anywhere; }
+    }
+    @media print {
+      .hero { padding: 20px; background: none; color: #000; }
+      .hero p { color: #333; }
+      nav { display: none; }
+      .layout { grid-template-columns: 1fr; margin-top: 0; }
+      main section { box-shadow: none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <h1>MSI input 사용 설명서</h1>
+      <p>엑셀로 정리한 RTP 조건을 불러와 고르고 다듬은 뒤, 측정 조건(<code>meas_setting</code>)과 온도 조건(<code>temp_setting</code>)으로 데이터베이스에 저장하는 화면입니다. 이 문서는 처음 쓰는 사람도 순서대로 따라 할 수 있게 작성했습니다.</p>
+    </div>
+  </header>
+
+  <div class="wrap layout">
+    <nav aria-label="목차">
+      <strong>목차</strong>
+      <ol>
+        <li><a href="#overview">한눈에 보기</a></li>
+        <li><a href="#open">화면 여는 방법</a></li>
+        <li><a href="#layout">화면 구성</a></li>
+        <li><a href="#steps">단계별 사용법</a></li>
+        <li><a href="#temp">온도(Temp) 조건 저장</a></li>
+        <li><a href="#buttons">버튼 한눈에 보기</a></li>
+        <li><a href="#flow">데이터 흐름</a></li>
+        <li><a href="#colors">표 색상의 의미</a></li>
+        <li><a href="#faq">자주 묻는 질문·오류</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <section id="overview">
+        <h2>1. 한눈에 보기</h2>
+        <div class="cards">
+          <div class="card"><h4>무엇을 하나요?</h4>엑셀의 RTP 행을 골라 초점(Foci)·조리개 값을 다듬고, 측정 조건 ID(<code>measSetId</code>)를 만들어 DB에 저장합니다.</div>
+          <div class="card"><h4>준비물</h4>① AOP Web 로그인 ② 작업할 데이터베이스 ③ 내 PC에 있는 RTP 엑셀 파일(<code>.xlsx</code>·<code>.xls</code>·<code>.csv</code>, 20MB 이하)</div>
+          <div class="card"><h4>결과물</h4>DB의 <code>meas_setting</code>(Tank·Power), <code>temp_setting</code>(Temp) 행, 그리고 필요하면 내려받는 <code>-Sel.xlsx</code>·<code>MeasInput_날짜.txt</code> 파일</div>
+        </div>
+        <div class="note"><b>핵심 흐름</b> — 파일 열기 → 행 고르기 → 값 다듬기 → <span class="btn primary">Save … to DB</span>. 저장 버튼을 누르기 전까지는 DB에 아무것도 기록되지 않습니다.</div>
+      </section>
+
+      <section id="open">
+        <h2>2. 화면 여는 방법</h2>
+        <ol class="steps">
+          <li><h3>MeasSet Generation 메뉴 → <b>MSI input</b> 탭</h3>상단 메뉴에서 MeasSet Generation을 열고 MSI input 탭을 누릅니다.</li>
+          <li><h3>Database 선택</h3>MsiChoice 카드 안의 <b>Database</b> 목록에서 작업할 DB를 고릅니다. DB를 고르기 전에는 버튼이 비활성입니다.</li>
+          <li><h3><span class="btn">MSI Input From Excel</span> 클릭</h3><b>measSetInput</b> 화면이 <b>새 브라우저 창</b>으로 열립니다. 창 크기에 맞춰 화면 전체가 한 페이지에 보이도록 자동으로 확대·축소됩니다.</li>
+        </ol>
+        <div class="warn">창이 열리지 않으면 브라우저가 팝업을 막은 것입니다. 주소창 오른쪽의 팝업 차단 아이콘에서 이 사이트의 팝업을 허용해 주세요.</div>
+        <p class="muted">참고: 옆의 <span class="btn">MSI Input From Dumped Data</span>는 덤프된 검증 데이터에서 MSI를 만드는 별도 기능으로, 이 문서에서는 다루지 않습니다.</p>
+      </section>
+
+      <section id="layout">
+        <h2>3. 화면 구성</h2>
+        <p>measSetInput 창은 6개 카드로 나뉩니다. 작업은 대체로 <b>위에서 아래, 왼쪽에서 오른쪽</b> 순서로 진행합니다.</p>
+        <div class="minimap" aria-label="화면 배치 미니맵">
+          <div class="mm-file"><span class="mm-n">1</span>파일 선택</div>
+          <div class="mm-input"><span class="mm-n">2</span>Exel Input (엑셀 원본 표)</div>
+          <div class="mm-sel"><span class="mm-n">3</span>Selected RTP (저장할 행) · Purpose · Select All RTP · Update All Foc/Aper</div>
+          <div class="mm-bottom">
+            <div><span class="mm-n">4</span>파라미터 (TxGain · Foci · Indices · MSI)</div>
+            <div class="mm-action"><span class="mm-n">5</span>저장 동작 (Tank · Power · Excel)</div>
+          </div>
+          <div class="mm-temp"><span class="mm-n">6</span>Temperature (온도 조건 · TempLimit · 저장) &nbsp;|&nbsp; Exit</div>
+        </div>
+        <table>
+          <thead><tr><th style="width:190px">카드</th><th>들어 있는 것</th></tr></thead>
+          <tbody>
+            <tr><td>① 파일 선택</td><td>Excel File Directory 입력칸, 파일 목록, <span class="btn primary">Open Excel File</span></td></tr>
+            <tr><td>② Exel Input</td><td>열어 본 엑셀 내용 그대로. 여기서 행을 골라 ③으로 보냅니다.</td></tr>
+            <tr><td>③ Selected RTP</td><td>DB에 저장할 행 목록. Purpose(저장 용도), <span class="btn">Select All RTP</span>, <span class="btn">Update All Foc/Aper</span></td></tr>
+            <tr><td>④ 파라미터</td><td>Max Sys TxGain, Profile TxGain, Speed of Sound, Elev data req?, Selected Foci, Selected Indices, Create New from MSI ~ to MSI, NumCycles for Chirp</td></tr>
+            <tr><td>⑤ 저장 동작</td><td>Tank·Power·Excel 저장 버튼을 대상별 한 줄로 배치(왼쪽 준비 → 오른쪽 실행), SetId Range</td></tr>
+            <tr><td>⑥ Temperature</td><td>Temp Options와 옵션별 입력칸, TempLimit, <span class="btn primary">Save Temp to DB</span>, <span class="btn">Update Prf from Init</span></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="steps">
+        <h2>4. 단계별 사용법 (Tank·Power 저장)</h2>
+        <ol class="steps">
+          <li>
+            <h3>엑셀 파일 고르기</h3>
+            <b>Excel File Directory</b> 입력칸을 <b>더블클릭</b>하면 폴더 선택 창이 뜹니다. 엑셀이 들어 있는 폴더를 고르면 아래 목록에 파일 이름이 나타납니다. 목록에서 파일을 한 번 클릭해 선택합니다.
+            <div class="note">웹에서는 서버가 아니라 <b>지금 쓰는 PC의 폴더</b>를 읽습니다. 네트워크 드라이브(예: <code>R:\Compass\ExcelFile</code>)도 PC에 연결되어 있으면 고를 수 있습니다.</div>
+          </li>
+          <li>
+            <h3><span class="btn primary">Open Excel File</span></h3>
+            선택한 파일이 서버로 올라가 표로 변환되고, ② <b>Exel Input</b> 표에 표시됩니다. 이 단계에서는 DB에 아무것도 저장되지 않습니다.
+          </li>
+          <li>
+            <h3>저장할 행 고르기</h3>
+            <ul>
+              <li>한 행씩: Exel Input에서 행 맨 왼쪽 칸(행 머리글)을 <b>더블클릭</b>하면 ③ Selected RTP에 추가됩니다.</li>
+              <li>한꺼번에: <span class="btn">Select All RTP</span>를 누르면 두 번째 열(probeId)에 값이 있는 모든 행이 들어갑니다.</li>
+              <li>빼기: Selected RTP에서 행 머리글을 더블클릭하거나, 행을 선택하고 <kbd>Delete</kbd>를 누릅니다.</li>
+              <li>셀 고치기: 셀을 선택하고 다시 클릭하거나 <kbd>F2</kbd>, 또는 바로 타이핑합니다. <kbd>Enter</kbd> 확정, <kbd>Esc</kbd> 취소.</li>
+            </ul>
+          </li>
+          <li>
+            <h3>초점(Foci) 또는 인덱스(Indices) 다듬기 — 필요할 때만</h3>
+            <ul>
+              <li><b>Selected Foci</b>에 원하는 초점 목록을 입력한 뒤, Selected RTP의 하늘색 머리글 열(<code>azFocusMm</code>) 셀을 <b>더블클릭</b>하면 그 행의 초점이 바뀌고 조리개 크기(<code>azAperSizeMm</code>)와 <code>elevIndex</code>가 자동 계산됩니다. 모든 행에 한 번에 적용하려면 <span class="btn">Update All Foc/Aper</span>를 누릅니다.</li>
+              <li><b>Elev data req?</b>를 켜 두면 Elevation 조리개(<code>elAperSizeMm</code>)도 함께 계산됩니다.</li>
+              <li><b>Selected Indices</b>에 <code>0 2 4</code>처럼 순번을 입력하고 파라미터 셀을 더블클릭하면, 그 셀의 값 중 해당 순번 값만 남깁니다.</li>
+              <li>Foci와 Indices는 둘 중 하나만 씁니다. 한쪽에 입력하면 다른 쪽은 자동으로 비워집니다.</li>
+            </ul>
+            <div class="tip">자동 계산된 셀은 <span class="swatch" style="background:var(--salmon)"></span>연어색으로 표시됩니다. f-number와 초점에서 추정한 값이므로 저장 전에 한 번 확인하세요.</div>
+          </li>
+          <li>
+            <h3>파라미터 확인</h3>
+            ④ 카드의 <b>Max Sys TxGain</b>, <b>Profile TxGain</b>, <b>Speed of Sound (m/s)</b>(기본 1540)를 확인합니다. 비슷한 기존 레코드에 PulseString만 덧붙이지 않고 새로 만들려면 <b>Create New from MSI =</b>를 체크하고 MSI 범위(<b>to MSI =</b>)를 입력합니다. Chirp 펄스면 <b>NumCycles for Chirp</b>를 채웁니다.
+          </li>
+          <li>
+            <h3>Tank 조건 저장 — <span class="btn primary">Save Tank RTP to DB</span></h3>
+            ③ <b>Purpose</b>(기본 <code>RTP</code>; Sample·SSR·FDA·IEC 선택 가능)를 확인하고 누릅니다. 확인 창에서 <b>확인</b>을 누르면 <code>meas_setting</code>에 새 행이 저장됩니다.
+            <ul>
+              <li>새로 만든 <code>measSetId</code> 범위가 <b>SetId Range</b>에 자동으로 채워집니다(예: <code>3711:3713</code>).</li>
+              <li>새로 저장된 행이 팝업 표로 보여집니다. 내용을 확인하고 <span class="btn">Close</span>.</li>
+            </ul>
+          </li>
+          <li>
+            <h3>Power 조건 저장 — 준비 → 실행</h3>
+            <span class="btn">Get matched Power MeasSetId</span>: SetId Range의 Tank ID마다 짝이 되는 Power ID를 찾아 <code>MeasInput_YYYYMMDD.txt</code>로 내려받습니다(조회만, 저장 없음).<br>
+            <span class="btn primary">Save Power to DB</span>: Selected RTP를 <code>comments='Power'</code> 조건으로 <code>meas_setting</code>에 저장합니다.
+          </li>
+          <li>
+            <h3>(선택) 고른 행을 엑셀로 보관 — <span class="btn">Save to Excel</span></h3>
+            Selected RTP 표를 <code>원본파일명-Sel.xlsx</code>로 내려받습니다. DB에는 기록하지 않습니다.
+          </li>
+        </ol>
+      </section>
+
+      <section id="temp">
+        <h2>5. 온도(Temp) 조건 저장</h2>
+        <ol class="steps">
+          <li><h3>Selected RTP 준비</h3>4장 1~3단계처럼 저장할 행을 Selected RTP에 넣습니다.</li>
+          <li><h3>Temp Options 선택</h3>목록에서 옵션을 <b>고르면</b> 옵션 설명과 필요한 입력칸 이름이 바뀝니다(직접 타이핑하면 바뀌지 않으니 목록에서 고르세요).</li>
+          <li><h3>값 입력</h3><b>measTxGain</b>, <b>PulseWidthUsec</b>, 그리고 옵션에 따라 나타나는 칸(FmMHz, azAperElem, Multi-PulseWidthUs, PwCwUseCode 등)을 채웁니다.</li>
+          <li><h3><span class="btn primary">Save Temp to DB</span></h3>확인하면 <code>temp_setting</code>에 저장되고 새 행이 팝업으로 보여집니다.</li>
+          <li><h3>(선택) <span class="btn">Update Prf from Init</span></h3><b>TempLimit</b>(기본 20)을 확인하고 누르면, 선택한 RTP의 probe에 대해 저장 프로시저 <code>update_Prf_From_Init(probeId, TempLimit)</code>을 실행합니다. 해당 probe의 초기 온도 측정 데이터(<code>temperature</code>)가 있어야 합니다.</li>
+        </ol>
+        <table>
+          <thead><tr><th style="width:80px">옵션</th><th>설명</th><th style="width:270px">추가 입력칸</th></tr></thead>
+          <tbody>
+            <tr><td><b>0</b></td><td>전압·PulseWidthUs·조리개 조합마다 Freq 대비 초기 온도 시험 세트 생성</td><td>FmMHz, azAperElem</td></tr>
+            <tr><td><b>1</b></td><td>Freq·PulseWidthUs·조리개·measVoltage 조합마다 세트 생성</td><td>Multi-PulseWidthUs(측정한 값 제외), PwCwUseCode</td></tr>
+            <tr><td><b>3</b></td><td>선택한 Freq·PulseWidthUs·prof.Voltage 조합에 대해 조리개 소자 수별 세트 생성</td><td>azAperElem, FmMHz</td></tr>
+            <tr><td><b>4</b></td><td>선택한 PulseWidthUs·조리개·measVoltage 조합에 대해 Freq별 세트 생성</td><td>FmMHz, azAperElem, PwCwUseCode</td></tr>
+            <tr><td><b>14</b></td><td>선택한 measVoltage·PulseWidthUs·조리개 조합에 대해 Freq(시작/끝/간격)별 세트 생성</td><td>Fm: Start/end/step, azAperElem</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="buttons">
+        <h2>6. 버튼 한눈에 보기</h2>
+        <table>
+          <thead><tr><th style="width:220px">버튼</th><th>하는 일</th><th style="width:210px">서버 API</th><th style="width:150px">DB 기록</th></tr></thead>
+          <tbody>
+            <tr><td><span class="btn primary">Open Excel File</span></td><td>선택한 파일을 표로 변환해 Exel Input에 표시</td><td><code>POST /api/msi-excel/parse</code></td><td>없음</td></tr>
+            <tr><td><span class="btn">Select All RTP</span></td><td>probeId가 있는 모든 행을 Selected RTP로</td><td>— (브라우저)</td><td>없음</td></tr>
+            <tr><td><span class="btn">Update All Foc/Aper</span></td><td>Selected Foci로 모든 행의 초점·조리개 재계산</td><td>— (브라우저)</td><td>없음</td></tr>
+            <tr><td><span class="btn primary">Save Tank RTP to DB</span></td><td>Tank 측정 조건 저장, SetId Range 채움</td><td><code>POST /api/msi-excel/save-tank</code></td><td><code>meas_setting</code> 추가</td></tr>
+            <tr><td><span class="btn">Get matched Power MeasSetId</span></td><td>Tank ID ↔ Power ID 대응표 내려받기</td><td><code>POST /api/msi-excel/power-setids</code></td><td>없음(조회)</td></tr>
+            <tr><td><span class="btn primary">Save Power to DB</span></td><td>Power 측정 조건 저장</td><td><code>POST /api/msi-excel/save-power</code></td><td><code>meas_setting</code> 추가</td></tr>
+            <tr><td><span class="btn">Save to Excel</span></td><td>Selected RTP를 <code>-Sel.xlsx</code>로 내려받기</td><td><code>POST /api/msi-excel/export-xlsx</code></td><td>없음</td></tr>
+            <tr><td><span class="btn primary">Save Temp to DB</span></td><td>선택한 옵션으로 온도 조건 저장</td><td><code>POST /api/msi-excel/save-temp</code></td><td><code>temp_setting</code> 추가</td></tr>
+            <tr><td><span class="btn">Update Prf from Init</span></td><td>초기 온도 데이터로 PRF 갱신</td><td><code>POST /api/msi-excel/update-prf</code></td><td>프로시저 실행</td></tr>
+            <tr><td><span class="btn">Exit</span></td><td>창 닫기(저장하지 않은 내용은 사라짐)</td><td>—</td><td>없음</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="flow">
+        <h2>7. 데이터 흐름</h2>
+        <p>데이터는 <b>내 PC의 엑셀 → 브라우저 화면 → AOP Web 서버 → MS-SQL 데이터베이스</b> 순으로 흐릅니다. 화면에서 고르고 고치는 동안은 모두 브라우저 안에서만 바뀌고, 저장 버튼을 눌러야 서버를 거쳐 DB에 기록됩니다.</p>
+
+        <div class="flow" role="img" aria-label="내 PC 엑셀에서 브라우저, 서버, 데이터베이스로 이어지는 흐름도">
+          <div class="node pc"><b>① 내 PC</b>RTP 엑셀 파일<br><span class="muted">.xlsx · .xls · .csv</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node web"><b>② 브라우저 (measSetInput 창)</b>Exel Input 표 → Selected RTP 표<br>Foci·Indices 계산, 파라미터 입력</div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node api"><b>③ AOP Web 서버</b><code>/api/msi-excel/*</code><br>입력 검사 → 계산 엔진<br><span class="muted">(pkg_MsiInput)</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node db"><b>④ MS-SQL DB</b><code>meas_setting</code><br><code>temp_setting</code><br><code>probe_info</code> · <code>temperature</code></div>
+        </div>
+
+        <h3>버튼별 흐름</h3>
+        <div class="lane"><div class="who">파일 열기</div><div class="chain"><span class="chip file">PC 엑셀</span><span class="to">→</span><span class="chip api">parse</span><span class="to">→</span><span class="chip">표(columns·rows)</span><span class="to">→</span><span class="chip">Exel Input</span></div></div>
+        <div class="lane"><div class="who">행 고르기·값 다듬기</div><div class="chain"><span class="chip">Exel Input</span><span class="to">→</span><span class="chip">Selected RTP</span><span class="to">↺</span><span class="chip">Foci/Indices 계산</span><span class="muted">(브라우저 안에서만)</span></div></div>
+        <div class="lane"><div class="who">Save Tank RTP to DB</div><div class="chain"><span class="chip">Selected RTP + 파라미터</span><span class="to">→</span><span class="chip api">save-tank</span><span class="to">→</span><span class="chip db">meas_setting INSERT</span><span class="to">→</span><span class="chip">SetId Range · 새 행 팝업</span></div></div>
+        <div class="lane"><div class="who">Get matched Power MeasSetId</div><div class="chain"><span class="chip">SetId Range</span><span class="to">→</span><span class="chip api">power-setids</span><span class="to">→</span><span class="chip db">meas_setting 조회</span><span class="to">→</span><span class="chip file">MeasInput_날짜.txt</span></div></div>
+        <div class="lane"><div class="who">Save Power to DB</div><div class="chain"><span class="chip">Selected RTP + 파라미터</span><span class="to">→</span><span class="chip api">save-power</span><span class="to">→</span><span class="chip db">meas_setting INSERT (Power)</span></div></div>
+        <div class="lane"><div class="who">Save to Excel</div><div class="chain"><span class="chip">Selected RTP</span><span class="to">→</span><span class="chip api">export-xlsx</span><span class="to">→</span><span class="chip file">원본-Sel.xlsx</span></div></div>
+        <div class="lane"><div class="who">Save Temp to DB</div><div class="chain"><span class="chip">Selected RTP + Temp 입력</span><span class="to">→</span><span class="chip api">save-temp</span><span class="to">→</span><span class="chip db">temp_setting INSERT</span><span class="to">→</span><span class="chip">새 행 팝업</span></div></div>
+        <div class="lane"><div class="who">Update Prf from Init</div><div class="chain"><span class="chip">probeId + TempLimit</span><span class="to">→</span><span class="chip api">update-prf</span><span class="to">→</span><span class="chip db">temperature 확인</span><span class="to">→</span><span class="chip db">EXEC update_Prf_From_Init</span></div></div>
+
+        <h3>저장할 때 서버에서 일어나는 일</h3>
+        <ol>
+          <li><b>로그인·DB 확인</b> — 로그인한 사용자인지, 선택한 DB가 허용된 업무 DB인지 검사합니다.</li>
+          <li><b>입력 검사</b> — 표와 입력값의 형식을 확인합니다. 잘못되면 화면에 오류 메시지가 뜨고 아무것도 저장되지 않습니다.</li>
+          <li><b>잠금</b> — 같은 저장 작업이 동시에 실행되지 않도록 DB 잠금(<code>sp_getapplock</code>)을 겁니다. 다른 사람이 저장 중이면 잠시 기다립니다.</li>
+          <li><b>ID 발급·계산</b> — 현재 최대 <code>measSetId</code>/<code>tempSetId</code> 다음 번호부터 새 행을 계산합니다(<code>probe_info</code>의 소자 정보 사용).</li>
+          <li><b>한 번에 저장</b> — 모든 행을 하나의 트랜잭션으로 저장합니다. 중간에 오류가 나면 <b>전부 취소(rollback)</b>되어 일부만 저장되는 일이 없습니다.</li>
+          <li><b>결과 반환</b> — 새 ID 범위와 새로 저장된 행을 화면으로 돌려줍니다.</li>
+        </ol>
+        <div class="note">화면에 보이지 않는 값: <code>Total TxGain points</code>(20)와 <code>Meas TxGain Num</code>(12)은 입력칸을 없앴지만, 원본과 같은 기본값으로 계속 함께 저장됩니다.</div>
+      </section>
+
+      <section id="colors">
+        <h2>8. 표 색상의 의미 (Selected RTP)</h2>
+        <table>
+          <thead><tr><th style="width:200px">색</th><th>의미</th></tr></thead>
+          <tbody>
+            <tr><td><span class="swatch" style="background:var(--cyan)"></span>하늘색 머리글</td><td>더블클릭으로 고칠 수 있는 열(<code>azFocusMm</code>, <code>azAperSizeMm</code>, <code>elevIndex</code>, Elev data req? 체크 시 <code>elAperSizeMm</code>)</td></tr>
+            <tr><td><span class="swatch" style="background:var(--salmon)"></span>연어색 셀</td><td>f-number와 초점으로 추정한 값 — 저장 전에 확인 필요</td></tr>
+            <tr><td><span class="swatch" style="background:var(--gray)"></span>회색 머리글</td><td>Elev data req?를 껐을 때의 <code>elAperSizeMm</code>(계산 대상 아님)</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="faq">
+        <h2>9. 자주 묻는 질문·오류</h2>
+        <details><summary>파일 목록이 비어 있어요.</summary><p>Excel File Directory 입력칸을 <b>더블클릭</b>해 폴더를 고르세요. 폴더 바로 아래에 있는 파일만 목록에 나타납니다.</p></details>
+        <details><summary>“Could not find file” 메시지가 나와요.</summary><p>목록에서 파일을 클릭해 선택한 뒤 Open Excel File을 누르세요. 창을 새로 열었다면 폴더를 다시 골라야 합니다.</p></details>
+        <details><summary>“Please fill in SetId Range!” 메시지가 나와요.</summary><p>Get matched Power MeasSetId는 SetId Range가 필요합니다. 먼저 Save Tank RTP to DB를 실행하거나 <code>3711:3720</code> 형식으로 직접 입력하세요.</p></details>
+        <details><summary>“Please Select Options or add values…” 메시지가 나와요.</summary><p>Save Temp to DB 전에 Temp Options를 <b>목록에서</b> 고르고, 옵션에 따라 나타나는 입력칸을 채우세요. 지원 옵션은 0·1·3·4·14입니다.</p></details>
+        <details><summary>“No initial temp data in database.” 메시지가 나와요.</summary><p>Update Prf from Init은 해당 probe의 초기 온도 측정 데이터가 DB에 있어야 실행됩니다. Selected RTP에 해당 probe 행이 있는지도 확인하세요(“Please select one RTP!”).</p></details>
+        <details><summary>저장 중 오류가 났는데 일부만 저장됐을까요?</summary><p>아닙니다. 저장은 하나의 트랜잭션이라 오류가 나면 전체가 취소됩니다. 메시지를 확인하고 고친 뒤 다시 저장하세요.</p></details>
+        <details><summary>창을 닫으면 작업 내용은요?</summary><p>Exel Input과 Selected RTP는 저장되지 않습니다. 필요하면 닫기 전에 Save to Excel로 내려받아 두세요.</p></details>
+      </section>
+    </main>
+  </div>
+
+  <footer>AOP Web · MSI input(measSetInput) 사용 설명서 · 화면 기준: Implementation_list #44</footer>
+</body>
+</html>
