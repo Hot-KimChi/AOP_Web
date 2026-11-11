@@ -51,6 +51,7 @@
 | 45 | Selected RTP azFocusMm 더블클릭 미반영 수정, Foci·Indices 하위 카드, MSI·Interrogator 기능 전수 확인 (본문 ## 45) | 2026-11-11 | - |
 | 46 | Selected RTP 왼쪽 위 모서리 더블클릭 시 전체 행 삭제 | 2026-11-11 | - |
 | 47 | Save Tank RTP to DB 미반영(트랜잭션 이중 카운트) 수정, 저장 결과 요약 | 2026-11-11 | - |
+| 48 | Create New from MSI 원본 VB 동등성 확인·테스트·사용 안내 보강 | 2026-11-11 | - |
 
 ---
 
@@ -1304,3 +1305,25 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
   - 실제 DB에서 측정하지 못했다(자격증명 없음). 사용자가 Save Tank를 다시 실행해 DB 반영 여부를 확인해야 한다.
   - 같은 결함 때문에 MSI Interrogator 생성(Create)·RTP Analysis도 그동안 커밋되지 않았을 가능성이 있다.
   - `RtpAnalysis` 등 저장 프로시저 내부의 트랜잭션 처리는 확인하지 못했다.
+
+  ## 48. create New from MSI를 클릭하면, 조건이 중복이어도 데이터베이스에 입력이 되도록 원래 VB 코드도 동작하는 것으로 이해한다. 그런데 현재 그렇게 동작하지 않는다. Agent 명세를 재작성하고 이를 기반으로 진행해죠.
+
+### Agent 명세 (#48)
+
+- **요구**: Create New from MSI를 체크하면 같은 조건이 있어도 DB에 입력되어야 하는데(사용자 이해) 그렇게 동작하지 않는다. VB와 같은지 확인한다.
+- **원본 VB 분석**
+  - Tank: `measSetInput.vb` 443~445·517·528·546행. 체크하면 중복 검사 조건에 `measSetId >= MSI`와 `<= MSIEnd`(입력 시)를 붙인다.
+  - Power: 1019~1021·1071행. `measSetId > MSI`(초과) 조건이다.
+  - '체크하면 무조건 추가'하던 코드(`Or isCreateNew.Checked`)는 원본에서도 주석 처리돼 있다(609·1076행). MSI 기본값은 "0"이다(designer 753행).
+  - 원본 연결은 `adUseClient`(frmLogin.vb 51·59행)라 RecordCount가 정확하므로, 원본도 실제로 중복을 검사한다.
+  - 결론: 체크 + MSI=0이면 체크하지 않은 것과 같다. 기존 행을 무시하고 새로 만들려면 MSI를 기존 중복 measSetId보다 크게 넣어야 한다. Temp는 이 옵션을 쓰지 않는다.
+- **웹 대조**: `excel_engine._msi_range`·`_tank_criteria`(>=)·`save_power` crit(>)가 원본과 같다. 기존 테스트(Chirp 뒤 일반 행)는 원래 중복이 아니어서 이 옵션을 검증하지 못했다.
+- **조치**: 동작은 원본 그대로 유지한다. 범위별 동등성 테스트를 추가하고, 사용 안내(MSI 툴팁, 0건 저장 시 MSI=0 힌트, 설명서 8장)를 보강한다.
+- **교차 검증**: 저장 로직 변경이 없고(테스트·안내 문구만) 위험 조건에 해당하지 않아 생략한다.
+
+### 수행 결과 (#48)
+
+- 테스트: `test_tank_create_new_from_msi_window`(체크 해제/MSI=0/MSI=1 → 추가 0, MSI=2 → 추가 1, MSI=0+MSIEnd=0 → 추가 1)와 `test_power_create_new_from_msi_is_strict_greater`(MSI=1 → 추가). 웹 엔진이 원본과 같음을 실행으로 확인했다.
+- `MsiExcelForm.js`: MSI 입력칸에 툴팁을 넣었다. Tank·Power 저장 결과가 0건이고 체크 + MSI=0이면 'MSI에 최대 measSetId + 1' 힌트를 보여준다.
+- `docs/MSI_Input_guide.html` 8장: MSI=0이면 효과가 없다는 점, 모두 새로 만드는 방법, Tank ≥ / Power > 비교를 추가했다.
+- 참고: #47(트랜잭션 미커밋) 수정 전에는 체크·MSI와 무관하게 아무것도 저장되지 않았으므로, 이전에 확인한 현상은 #47 때문이었을 수 있다.

@@ -493,7 +493,10 @@ export default function MsiExcelForm({ database, onClose }) {
       const upd = data.updated ? `, 기존 행 갱신 ${data.updated}건` : '';
       window.alert(data.inserted > 0
         ? `${title} 저장 완료: 새로 추가 ${data.inserted}건${upd}${data.setRange ? ` (Set ID 범위 ${data.setRange})` : ''}`
-        : `${title}: 새로 추가된 행이 없습니다${upd}. 같은 조건이 이미 DB에 있으면 추가하지 않습니다.`);
+        : `${title}: 새로 추가된 행이 없습니다${upd}. 같은 조건이 이미 DB에 있으면 추가하지 않습니다.`
+          + (isCreateNew && Number(msi || 0) === 0 && path !== 'save-temp'
+            ? ' (Create New from MSI 가 체크되어 있지만 MSI=0 이라 전체 범위와 비교했습니다. 새로 만들려면 MSI 에 현재 최대 measSetId + 1 을 넣으세요.)'
+            : ''));
     }
   });
 
@@ -641,7 +644,8 @@ export default function MsiExcelForm({ database, onClose }) {
         onChange={(t) => { setMeasIndex(t); if (t !== '') setMeasFocusList(''); }}
       />
       <VbCheck x={620} y={770} w={186} h={21} checked={isCreateNew} onChange={setIsCreateNew} testId="msi-excel-createnew">Create New from MSI =  </VbCheck>
-      <VbText x={812} y={768} w={76} h={24} font={F9} value={msi} onChange={setMsi} ariaLabel="MSI" testId="msi-excel-msi" />
+      <VbText x={812} y={768} w={76} h={24} font={F9} value={msi} onChange={setMsi} ariaLabel="MSI" testId="msi-excel-msi"
+        title="체크 시 중복 검사 범위의 시작 measSetId(Tank ≥, Power >). 0이면 전체 범위 검사(체크 안 한 것과 같음). 모두 새로 만들려면 현재 최대 measSetId + 1" />
 
       <VbLabel x={20} y={804} font={F9}>NumCycles for Chirp:</VbLabel>
       <VbText x={168} y={801} w={432} h={24} font={F9} value={numCycList} onChange={setNumCycList} ariaLabel="NumCycles for Chirp" />

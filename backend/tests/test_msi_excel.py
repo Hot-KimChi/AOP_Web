@@ -467,3 +467,35 @@ def test_run_write_rolls_back_on_error(monkeypatch):
     with pytest.raises(MsiExcelError):
         xs.run_write(object(), work)
     assert conn.durable == 0 and conn.closed
+
+
+# ---------------------------------------------------------------- #48 Create New from MSI(원본 VB 중복 검사 범위)
+
+
+def test_tank_create_new_from_msi_window():
+    row = lambda: _row(azFocusMm="20", azAperSizeMm="10", elevIndex="0")
+    repo = FakeRepo()
+    eng.save_tank(_body([row()]), repo)
+    assert len(repo.meas) == 1
+    # 체크 해제: MSI 값과 무관하게 전체 범위에서 중복 → 추가 안 함
+    assert eng.save_tank(_body([row()], isCreateNew=False, msi="2"), repo)["inserted"] == 0
+    # 체크 + MSI=0(기본값): 체크 해제와 같다
+    assert eng.save_tank(_body([row()], isCreateNew=True, msi="0"), repo)["inserted"] == 0
+    # 체크 + MSI=1: measSetId >= 1 이므로 기존 1번이 중복
+    assert eng.save_tank(_body([row()], isCreateNew=True, msi="1"), repo)["inserted"] == 0
+    # 체크 + MSI=2: 기존 1번은 범위 밖 → 새로 추가
+    assert eng.save_tank(_body([row()], isCreateNew=True, msi="2"), repo)["inserted"] == 1
+    assert len(repo.meas) == 2
+    # 체크 + MSI=0, MSIEnd=0: 모든 기존 행이 범위 밖 → 새로 추가
+    assert eng.save_tank(_body([row()], isCreateNew=True, msi="0", msiEnd="0"), repo)["inserted"] == 1
+
+
+def test_power_create_new_from_msi_is_strict_greater():
+    cols = COLS + ["NumCycles"]
+    body = lambda **kw: _body([_row(FractionalBandwidth=None) + [2]], columns=cols, **kw)
+    repo = FakeRepo()
+    eng.save_power(body(), repo)
+    assert len(repo.meas) == 1
+    assert eng.save_power(body(isCreateNew=True, msi="0"), repo)["inserted"] == 0
+    # Power 는 measSetId > MSI(원본 1071행) — MSI=1 이면 기존 1번이 범위 밖
+    assert eng.save_power(body(isCreateNew=True, msi="1"), repo)["inserted"] == 1
