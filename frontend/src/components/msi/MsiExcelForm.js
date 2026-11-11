@@ -140,23 +140,29 @@ function NewRowsForm({ title, data, onClose }) {
 }
 
 // #49: 저장 전 중복 확인 창 — 어떤 행·조건이 DB 의 어느 measSetId 와 겹치는지 보여 주고 처리 방법을 고른다.
-const DUP_HEAD = { row: 'Selected RTP 행', ids: '기존 measSetId', action: '일반 저장 시 처리(원본 동작)' };
+// #50: 저장할 모든 조합을 보여 주고 맨 왼쪽 '중복 여부' 열에 중복/신규를 표시한다(중복 행은 강조).
+const DUP_HEAD = { status: '중복 여부', row: 'Selected RTP 행', ids: '기존 measSetId', action: '일반 저장 시 처리(원본 동작)' };
+const DUP_MARK = { dup: '● 중복', fresh: '신규' };
 
 function DupForm({ title, data, onSave, onForce, onCancel }) {
-  const list = data?.duplicates || [];
+  const list = data?.combos || data?.duplicates || [];
   const keys = [];
   list.forEach((d) => Object.keys(d.cond || {}).forEach((k) => { if (!keys.includes(k)) keys.push(k); }));
-  const columns = [DUP_HEAD.row, ...keys, DUP_HEAD.ids, DUP_HEAD.action];
-  const rows = list.map((d) => [d.row, ...keys.map((k) => d.cond?.[k] ?? ''), (d.ids || []).join(', ') || '-', d.action]);
-  const total = data?.dupTotal ?? list.length;
-  const more = total > list.length ? ` (앞 ${list.length}건만 표시)` : '';
+  const columns = [DUP_HEAD.status, DUP_HEAD.row, ...keys, DUP_HEAD.ids, DUP_HEAD.action];
+  const isDup = (d) => d.dup !== false;
+  const rows = list.map((d) => [isDup(d) ? DUP_MARK.dup : DUP_MARK.fresh, d.row, ...keys.map((k) => d.cond?.[k] ?? ''),
+    (d.ids || []).join(', ') || '-', d.action]);
+  const total = data?.dupTotal ?? list.filter(isDup).length;
+  const all = data?.comboTotal ?? list.length;
+  const more = all > list.length ? ` (앞 ${list.length}건만 표시)` : '';
   return (
     <VbForm title={`중복 조건 확인 — ${title}`} width={1180} height={600} readable onClose={onCancel} testId="msi-excel-dup">
       <VbLabel x={12} y={8} w={1150} h={48} font={F9} wrap testId="msi-excel-dup-summary">
-        {`DB 에 같은 조건이 이미 있는 조합이 ${total}건 있습니다${more}. 새로 추가될 조합은 ${data?.inserted ?? 0}건입니다. `
+        {`전체 ${all}개 조합 중 DB 에 같은 조건이 이미 있는 조합이 ${total}건(● 중복, 강조), 새로 추가될 조합이 ${data?.inserted ?? 0}건(신규)입니다${more}. `
           + '열 머리글이 비교한 조건이고, 오른쪽 열이 일반 저장 때의 처리 방법입니다(검사 시점 기준).'}
       </VbLabel>
-      <VbGrid x={12} y={60} w={1156} h={420} columns={columns} rows={rows} showNewRow={false} testId="msi-excel-dup-grid" />
+      <VbGrid x={12} y={60} w={1156} h={420} columns={columns} rows={rows} showNewRow={false} testId="msi-excel-dup-grid"
+        cellColor={(r) => (isDup(list[r] || {}) ? SALMON : undefined)} />
       <VbLabel x={12} y={488} w={760} h={60} font={F9} wrap>
         {'원본대로 저장: 중복 조합은 위 처리(병합·건너뜀)만 하고 나머지만 추가합니다. '
           + '중복도 새로 입력: 중복 검사 없이 모든 조합을 새 행으로 추가합니다(기존 행은 바꾸지 않음).'}

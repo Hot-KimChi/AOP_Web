@@ -346,17 +346,31 @@ class _Ctx:
         self.updated = 0
         self.duplicates: list[dict] = []
         self.dup_total = 0
+        self.combos: list[dict] = []
+        self.combo_total = 0
+
+    def _combo(self, entry: dict) -> None:
+        self.combo_total += 1
+        if len(self.combos) < DUP_LIMIT:
+            self.combos.append(entry)
 
     def dup(self, row_no: int, cond: dict, ids: list, action: str) -> None:
         """#49: 원본 규칙으로 '이미 있는 조건'이라 새로 추가하지 않은 조합을 기록한다."""
         self.dup_total += 1
+        entry = {"row": row_no, "cond": dict(cond), "ids": [int(i) for i in ids if i is not None][:20],
+                 "action": action, "dup": True}
         if len(self.duplicates) < DUP_LIMIT:
-            self.duplicates.append({"row": row_no, "cond": dict(cond),
-                                    "ids": [int(i) for i in ids if i is not None][:20], "action": action})
+            self.duplicates.append(entry)
+        self._combo(entry)
+
+    def new(self, row_no: int, cond: dict) -> None:
+        """#50: 새 행으로 추가될 조합(중복 아님)도 확인 창에 함께 보여 주기 위해 기록한다."""
+        self._combo({"row": row_no, "cond": dict(cond), "ids": [], "action": "새 행 추가", "dup": False})
 
     def result(self, **extra) -> dict:
         out = {"messages": self.messages, "inserted": self.inserted, "updated": self.updated,
-               "duplicates": self.duplicates, "dupTotal": self.dup_total}
+               "duplicates": self.duplicates, "dupTotal": self.dup_total,
+               "combos": self.combos, "comboTotal": self.combo_total}
         out.update(extra)
         return out
 
@@ -621,6 +635,7 @@ def save_tank(form: FormInput, repo) -> dict:
                     values["pulseRateHz"] = 100
                     repo.insert_meas(values)
                     ctx.inserted += 1
+                    ctx.new(row_no, cond)
 
     mn, mx = repo.new_set_range(max_id, sel_probe)
     set_range = vb_str(mn if mn is not None else 0) + ":" + vb_str(mx if mn is not None and mx is not None else 0)
@@ -799,6 +814,7 @@ def save_power(form: FormInput, repo) -> dict:
                     if len(recs) == 0:
                         repo.insert_meas(_insert_values(p, MEAS_TERMS, MEAS_TEXT_IDX, frozenset({7, 14, 20})))
                         ctx.inserted += 1
+                        ctx.new(i + 1, cond)
                     elif len(recs) > 1:
                         ctx.dup(i + 1, cond, [r["measSetId"] for r in recs],
                                 f"건너뜀: 같은 조건 행이 {len(recs)}건 있어 변경하지 않음(원본 동작)")
@@ -1014,13 +1030,14 @@ def save_temp(form: FormInput, repo) -> dict:
                         ("elevIndex", "=", sql_num(p[14], "elevIndex")),
                     ]
                     n_dup = 0 if form.force_new else repo.count_temp(crit)
+                    cond = {"PMPulseType": p[3], "FmMhz": p[4], "azAperSizeMm": p[10],
+                            "measVoltage": p[12], "measSetNum": p[15], "elevIndex": p[14]}
                     if n_dup == 0:
                         repo.insert_temp(_insert_values(p, TEMP_TERMS, TEMP_TEXT_IDX, frozenset()))
                         ctx.inserted += 1
+                        ctx.new(row_no, cond)
                     else:
-                        ctx.dup(row_no, {"PMPulseType": p[3], "FmMhz": p[4], "azAperSizeMm": p[10],
-                                         "measVoltage": p[12], "measSetNum": p[15], "elevIndex": p[14]}, [],
-                                f"건너뜀: temp_setting 에 같은 조건 {n_dup}건이 이미 있음")
+                        ctx.dup(row_no, cond, [], f"건너뜀: temp_setting 에 같은 조건 {n_dup}건이 이미 있음")
 
     new_rows = repo.new_temp_grid(sel_probe, max_id)
     return ctx.result(newRows=new_rows if new_rows and new_rows.get("rows") else None)
@@ -1078,7 +1095,8 @@ def check_duplicates(kind: str, form: FormInput, repo) -> dict:
     form.force_new = False
     fn = {"tank": save_tank, "power": save_power, "temp": save_temp}[kind]
     r = fn(form, PreviewRepo(repo))
-    return {"kind": kind, "duplicates": r["duplicates"], "dupTotal": r["dupTotal"], "inserted": r["inserted"]}
+    return {"kind": kind, "duplicates": r["duplicates"], "dupTotal": r["dupTotal"], "inserted": r["inserted"],
+            "combos": r["combos"], "comboTotal": r["comboTotal"]}
 
 
 # ---------------------------------------------------------------- 기타 버튼

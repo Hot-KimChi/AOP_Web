@@ -218,8 +218,12 @@ test.describe('MSI input · Interrogator', () => {
     await page.route('**/api/msi-excel/check-dup', (route) => {
       checks += 1;
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: {
-        kind: 'tank', dupTotal: 1, inserted: 2,
-        duplicates: [{ row: 1, cond: { PMpulseType: 'Bipolar', FocusPMm: '20' }, ids: [3712], action: '병합: 기존 measSetId 3712 의 pulseWidth·ePulseString 보완' }],
+        kind: 'tank', dupTotal: 1, inserted: 1, comboTotal: 2,
+        duplicates: [{ row: 1, cond: { PMpulseType: 'Bipolar', FocusPMm: '20' }, ids: [3712], action: '병합: 기존 measSetId 3712 의 pulseWidth·ePulseString 보완', dup: true }],
+        combos: [
+          { row: 1, cond: { PMpulseType: 'Bipolar', FocusPMm: '20' }, ids: [3712], action: '병합: 기존 measSetId 3712 의 pulseWidth·ePulseString 보완', dup: true },
+          { row: 1, cond: { PMpulseType: 'Bipolar', FocusPMm: '40' }, ids: [], action: '새 행 추가', dup: false },
+        ],
       } }) });
     });
     const saves = [];
@@ -242,6 +246,10 @@ test.describe('MSI input · Interrogator', () => {
     await expect(grid).toContainText('FocusPMm');
     await expect(grid).toContainText('3712');
     await expect(page.getByTestId('msi-excel-dup-summary')).toContainText('1건');
+    const dupRows = grid.locator('tbody tr:not(.vb-newrow)');
+    await expect(grid.locator('thead th').nth(1)).toHaveText('중복 여부');
+    await expect(dupRows.nth(0).locator('td').first()).toHaveText('● 중복');
+    await expect(dupRows.nth(1).locator('td').first()).toHaveText('신규');
     await page.getByTestId('msi-excel-dup-cancel').click();
     await expect(page.getByTestId('msi-excel-dup')).toHaveCount(0);
     expect(saves).toHaveLength(0);

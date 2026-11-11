@@ -53,6 +53,7 @@
 | 47 | Save Tank RTP to DB 미반영(트랜잭션 이중 카운트) 수정, 저장 결과 요약 | 2026-11-11 | - |
 | 48 | Create New from MSI 원본 VB 동등성 확인·테스트·사용 안내 보강 | 2026-11-11 | - |
 | 49 | 저장 전 중복 조건 확인 창·중복도 새로 입력(forceNew) | 2026-11-11 | - |
+| 50 | 중복 조건 확인 창 첫 열에 중복/신규 표시 | 2026-11-11 | - |
 
 ---
 
@@ -1350,3 +1351,20 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - `docs/MSI_Input_guide.html`: '중복 조건 확인 창' 절 추가.
 - 테스트: pytest #49 5건(사전 검사 무쓰기, 위상 반전 경로, force tank/power/temp, PreviewRepo 차단) → 전체 186 통과. e2e #49(창 표시·취소 시 미저장·강제 입력 forceNew 전송) → 22 통과.
 - Verify: Blocker 0 / Major 0 / Minor 4. V-002(위상 0→1 병합 시 사전 검사 ids에 대상 행 포함), V-003(원본대로 저장 e2e 추가, ID 없음 '-'), V-004(검사 시점 기준 문구)를 반영했다. V-001(무관한 cfg·pyc)은 커밋에서 제외했다.
+
+## 50. 중복 조건 확인 창에 조합별 중복 여부 표시
+
+> 요청: 중복 조건 확인 창 제일 왼쪽에 각 행이 중복인지 아닌지 표시한다.
+
+### Agent 명세 (#50)
+
+- **Tier S~M**: #49 확인 창 확장. 저장 동작은 바꾸지 않고, 엔진이 신규 조합도 기록(`_Ctx.new`)해 `combos/comboTotal`로 돌려준다.
+- **프런트**: 표에 모든 조합을 보이고 맨 왼쪽 '중복 여부' 열에 '● 중복'/'신규'를 표시한다. 중복 행은 테마 대응 `--vb-salmon`으로 강조한다.
+- **교차 검증 생략 사유**: DB 호출은 그대로이고 응답에 표시용 키만 더한다(#49 Verify 범위 안).
+
+### 수행 결과 (#50)
+
+- `excel_engine.py`: `_Ctx.combos/combo_total/new()`, tank·power·temp INSERT 지점에서 신규 기록, `check_duplicates`가 combos 반환.
+- `MsiExcelForm.js`: DupForm에 '중복 여부' 첫 열, 중복 행 강조, 요약 문구(전체/중복/신규 건수).
+- `docs/MSI_Input_guide.html`: 확인 창 설명 갱신.
+- 테스트: pytest `test_check_duplicates_lists_all_combos_with_status` 추가 → 187 통과. e2e #49에 첫 열 머리글·'● 중복'/'신규' 검증 추가 → 22 통과.

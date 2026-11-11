@@ -571,3 +571,19 @@ def test_preview_repo_blocks_writes_and_unknown_calls():
         pv.run_update_prf(1, 20)
     with pytest.raises(MsiExcelError, match="kind"):
         eng.check_duplicates("bad", _body([_one()]), inner)
+
+def test_check_duplicates_lists_all_combos_with_status():
+    repo = FakeRepo()
+    eng.save_tank(_body([_one()]), repo)
+    res = eng.check_duplicates("tank", _body([_row(azFocusMm="20 40", azAperSizeMm="10 20", elevIndex="0 0")]), repo)
+    assert res["comboTotal"] == 2 and [c["dup"] for c in res["combos"]] == [True, False]
+    assert res["combos"][1]["cond"]["FocusPMm"] == "40" and res["combos"][1]["action"] == "새 행 추가"
+    cols = COLS + ["NumCycles"]
+    pr = FakeRepo()
+    chk = eng.check_duplicates("power", _body([_row(FractionalBandwidth=None) + [2]], columns=cols), pr)
+    assert chk["comboTotal"] == 1 and chk["combos"][0]["dup"] is False
+    tbody = _body([_row()], tempOpt="0", selectLabel="Volt:", selectValue="2 3", selectValue2="64",
+                  pulseVoltage="0.392157", pulseWidthUsec="0.5", cwUseCode="0")
+    tr = FakeRepo()
+    eng.save_temp(tbody, tr)
+    assert [c["dup"] for c in eng.check_duplicates("temp", tbody, tr)["combos"]] == [True, True]
