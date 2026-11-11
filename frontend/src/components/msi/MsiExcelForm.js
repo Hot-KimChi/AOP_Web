@@ -139,6 +139,35 @@ function NewRowsForm({ title, data, onClose }) {
   );
 }
 
+// #49: 저장 전 중복 확인 창 — 어떤 행·조건이 DB 의 어느 measSetId 와 겹치는지 보여 주고 처리 방법을 고른다.
+const DUP_HEAD = { row: 'Selected RTP 행', ids: '기존 measSetId', action: '일반 저장 시 처리(원본 동작)' };
+
+function DupForm({ title, data, onSave, onForce, onCancel }) {
+  const list = data?.duplicates || [];
+  const keys = [];
+  list.forEach((d) => Object.keys(d.cond || {}).forEach((k) => { if (!keys.includes(k)) keys.push(k); }));
+  const columns = [DUP_HEAD.row, ...keys, DUP_HEAD.ids, DUP_HEAD.action];
+  const rows = list.map((d) => [d.row, ...keys.map((k) => d.cond?.[k] ?? ''), (d.ids || []).join(', ') || '-', d.action]);
+  const total = data?.dupTotal ?? list.length;
+  const more = total > list.length ? ` (앞 ${list.length}건만 표시)` : '';
+  return (
+    <VbForm title={`중복 조건 확인 — ${title}`} width={1180} height={600} readable onClose={onCancel} testId="msi-excel-dup">
+      <VbLabel x={12} y={8} w={1150} h={48} font={F9} wrap testId="msi-excel-dup-summary">
+        {`DB 에 같은 조건이 이미 있는 조합이 ${total}건 있습니다${more}. 새로 추가될 조합은 ${data?.inserted ?? 0}건입니다. `
+          + '열 머리글이 비교한 조건이고, 오른쪽 열이 일반 저장 때의 처리 방법입니다(검사 시점 기준).'}
+      </VbLabel>
+      <VbGrid x={12} y={60} w={1156} h={420} columns={columns} rows={rows} showNewRow={false} testId="msi-excel-dup-grid" />
+      <VbLabel x={12} y={488} w={760} h={60} font={F9} wrap>
+        {'원본대로 저장: 중복 조합은 위 처리(병합·건너뜀)만 하고 나머지만 추가합니다. '
+          + '중복도 새로 입력: 중복 검사 없이 모든 조합을 새 행으로 추가합니다(기존 행은 바꾸지 않음).'}
+      </VbLabel>
+      <VbButton x={784} y={492} w={140} h={52} font={F9B} onClick={onSave} variant="primary" testId="msi-excel-dup-save">원본대로 저장</VbButton>
+      <VbButton x={930} y={492} w={140} h={52} font={F9B} onClick={onForce} testId="msi-excel-dup-force">중복도 새로 입력</VbButton>
+      <VbButton x={1076} y={492} w={92} h={52} font={F9B} onClick={onCancel} variant="subtle" testId="msi-excel-dup-cancel">취소</VbButton>
+    </VbForm>
+  );
+}
+
 // ---------------------------------------------------------------- 본 폼
 
 const TEMP_OPTS = ['0', '1', '3', '4', '14'];
@@ -205,6 +234,7 @@ export default function MsiExcelForm({ database, onClose }) {
   const [lblNotes, setLblNotes] = useState('');
 
   const [modal, setModal] = useState(null);
+  const [dupModal, setDupModal] = useState(null);
 
   const needDb = () => {
     if (!database) { window.alert('데이터베이스를 선택하십시오.'); return false; }
@@ -481,10 +511,10 @@ export default function MsiExcelForm({ database, onClose }) {
     outputName,
   });
 
-  const save = (path, title, confirmText) => run(async () => {
-    if (!needDb()) return;
-    if (selRows.length > 0 && !window.confirm(confirmText)) return;
-    const data = await apiJson(`/api/msi-excel/${path}`, { method: 'POST', body: body() });
+  const SAVE_KIND = { 'save-tank': 'tank', 'save-power': 'power', 'save-temp': 'temp' };
+
+  const doSave = async (path, title, forceNew) => {
+    const data = await apiJson(`/api/msi-excel/${path}`, { method: 'POST', body: { ...body(), forceNew } });
     if (data?.setRange !== undefined) setTxtSetRange(data.setRange);
     if (data?.newRows) setModal({ title, data: data.newRows });
     alertAll(data?.messages);
@@ -494,11 +524,28 @@ export default function MsiExcelForm({ database, onClose }) {
       window.alert(data.inserted > 0
         ? `${title} 저장 완료: 새로 추가 ${data.inserted}건${upd}${data.setRange ? ` (Set ID 범위 ${data.setRange})` : ''}`
         : `${title}: 새로 추가된 행이 없습니다${upd}. 같은 조건이 이미 DB에 있으면 추가하지 않습니다.`
-          + (isCreateNew && Number(msi || 0) === 0 && path !== 'save-temp'
+          + (isCreateNew && Number(msi || 0) === 0 && path !== 'save-temp' && !forceNew
             ? ' (Create New from MSI 가 체크되어 있지만 MSI=0 이라 전체 범위와 비교했습니다. 새로 만들려면 MSI 에 현재 최대 measSetId + 1 을 넣으세요.)'
             : ''));
     }
+  };
+
+  // #49: 저장 전에 중복 조건을 읽기 전용으로 검사하고, 있으면 확인 창에서 처리 방법을 고르게 한다.
+  const save = (path, title, confirmText) => run(async () => {
+    if (!needDb()) return;
+    if (selRows.length > 0 && !window.confirm(confirmText)) return;
+    const chk = await apiJson('/api/msi-excel/check-dup', { method: 'POST', body: { ...body(), kind: SAVE_KIND[path] } });
+    if (chk?.dupTotal > 0) { setDupModal({ path, title, data: chk }); return; }
+    await doSave(path, title, false);
   });
+
+  const resolveDup = (forceNew) => {
+    const d = dupModal;
+    if (!d) return;
+    if (forceNew && !window.confirm(`중복 ${d.data.dupTotal}건을 포함해 모든 조합을 새 행으로 ${d.title} 에 입력합니다. 계속할까요?`)) return;
+    setDupModal(null);
+    run(() => doSave(d.path, d.title, forceNew));
+  };
 
   const cmdSaveDb = () => save('save-tank', 'meas_setting (Tank)', `meas_setting 에 Tank RTP 조건을 저장합니다(comments=${purpose || 'RTP'}). 계속할까요?`);
   const cmdSavePower = () => save('save-power', 'meas_setting (Power)', "meas_setting 에 Power 조건을 저장합니다(comments='Power'). 계속할까요?");
@@ -692,6 +739,12 @@ export default function MsiExcelForm({ database, onClose }) {
       {modal && (
         <VbModal onClose={() => setModal(null)} testId="msi-excel-modal">
           <NewRowsForm title={modal.title} data={modal.data} onClose={() => setModal(null)} />
+        </VbModal>
+      )}
+      {dupModal && (
+        <VbModal onClose={() => setDupModal(null)} testId="msi-excel-dup-modal">
+          <DupForm title={dupModal.title} data={dupModal.data} onSave={() => resolveDup(false)}
+            onForce={() => resolveDup(true)} onCancel={() => setDupModal(null)} />
         </VbModal>
       )}
     </VbForm>

@@ -499,3 +499,75 @@ def test_power_create_new_from_msi_is_strict_greater():
     assert eng.save_power(body(isCreateNew=True, msi="0"), repo)["inserted"] == 0
     # Power 는 measSetId > MSI(원본 1071행) — MSI=1 이면 기존 1번이 범위 밖
     assert eng.save_power(body(isCreateNew=True, msi="1"), repo)["inserted"] == 1
+
+
+# ---------------------------------------------------------------- #49 중복 사전 검사·강제 입력
+
+
+def _one(**kw):
+    return _row(azFocusMm="20", azAperSizeMm="10", elevIndex="0", **kw)
+
+
+def test_check_duplicates_tank_reports_without_writing():
+    repo = FakeRepo()
+    eng.save_tank(_body([_one()]), repo)
+    snap = [dict(r) for r in repo.meas]
+    repo.apex = None
+    res = eng.check_duplicates("tank", _body([_row(azFocusMm="20 40", azAperSizeMm="10 20", elevIndex="0 0",
+                                                    FractionalBandwidth=0.25)]), repo)
+    assert res["dupTotal"] == 1 and res["inserted"] == 1
+    d = res["duplicates"][0]
+    assert d["row"] == 1 and d["ids"] == [1] and d["action"].startswith("병합")
+    assert d["cond"]["FocusPMm"] == "20" and d["cond"]["PMpulseType"] == "Bipolar"
+    assert repo.meas == snap and repo.updates == [] and repo.apex is None
+
+
+def test_check_duplicates_tank_phase_inverse_paths():
+    repo = FakeRepo()
+    eng.save_tank(_body([_one()]), repo)
+    cols = COLS + ["isPhaseInverse"]
+    res = eng.check_duplicates("tank", _body([_one() + [True]], columns=cols), repo)
+    assert res["dupTotal"] == 1 and "0→1" in res["duplicates"][0]["action"] and repo.updates == []
+    repo.meas[0]["isPhaseInverse"] = 1
+    res = eng.check_duplicates("tank", _body([_one()]), repo)
+    assert res["dupTotal"] == 1 and res["duplicates"][0]["action"].startswith("건너뜀") and res["inserted"] == 0
+
+
+def test_force_new_inserts_duplicates_without_merge():
+    repo = FakeRepo()
+    eng.save_tank(_body([_one()]), repo)
+    res = eng.save_tank(_body([_one(FractionalBandwidth=0.25)], forceNew=True), repo)
+    assert res["inserted"] == 1 and res["dupTotal"] == 0 and repo.updates == [] and len(repo.meas) == 2
+    # 일반 저장은 같은 조건을 병합하고 중복 목록으로 알려준다
+    res = eng.save_tank(_body([_one()]), repo)
+    assert res["inserted"] == 0 and res["dupTotal"] == 1
+
+
+def test_force_new_power_and_temp():
+    cols = COLS + ["NumCycles"]
+    pbody = lambda **kw: _body([_row(FractionalBandwidth=None) + [2]], columns=cols, **kw)
+    repo = FakeRepo()
+    eng.save_power(pbody(), repo)
+    chk = eng.check_duplicates("power", pbody(), repo)
+    assert chk["dupTotal"] == 1 and chk["duplicates"][0]["ids"] == [1] and len(repo.meas) == 1
+    assert eng.save_power(pbody(forceNew=True), repo)["inserted"] == 1
+    chk = eng.check_duplicates("power", pbody(), repo)
+    assert chk["duplicates"][0]["action"].startswith("건너뜀") and "2건" in chk["duplicates"][0]["action"]
+
+    tbody = lambda **kw: _body([_row()], tempOpt="0", selectLabel="Volt:", selectValue="2 3", selectValue2="64",
+                               pulseVoltage="0.392157", pulseWidthUsec="0.5", cwUseCode="0", **kw)
+    repo = FakeRepo()
+    eng.save_temp(tbody(), repo)
+    chk = eng.check_duplicates("temp", tbody(), repo)
+    assert chk["dupTotal"] == 2 and chk["inserted"] == 0 and len(repo.temp) == 2
+    assert eng.save_temp(tbody(forceNew=True), repo)["inserted"] == 2 and len(repo.temp) == 4
+
+
+def test_preview_repo_blocks_writes_and_unknown_calls():
+    inner = FakeRepo()
+    pv = eng.PreviewRepo(inner)
+    assert pv.insert_meas({"probeId": 1}) is None and inner.meas == []
+    with pytest.raises(AttributeError):
+        pv.run_update_prf(1, 20)
+    with pytest.raises(MsiExcelError, match="kind"):
+        eng.check_duplicates("bad", _body([_one()]), inner)

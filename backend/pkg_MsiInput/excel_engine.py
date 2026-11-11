@@ -94,6 +94,7 @@ class FormInput:
     is_create_new: bool = False
     is_elev_req: bool = False
     text: dict = field(default_factory=dict)
+    force_new: bool = False
 
     def t(self, key: str) -> str:
         return self.text.get(key, "")
@@ -141,6 +142,7 @@ def form_from_body(body: dict) -> FormInput:
         is_create_new=body.get("isCreateNew") is True,
         is_elev_req=body.get("isElevReq") is True,
         text=text,
+        force_new=body.get("forceNew") is True,
     )
 
 
@@ -332,6 +334,9 @@ def _nn_slot(fract_bw: float) -> int:
 _EPULSE_MUL = (1.0, 1.5, 2.0, 3.0)
 
 
+DUP_LIMIT = 500
+
+
 class _Ctx:
     """원본 폼 수준/프로시저 수준 상태."""
 
@@ -339,6 +344,21 @@ class _Ctx:
         self.messages: list[str] = []
         self.inserted = 0
         self.updated = 0
+        self.duplicates: list[dict] = []
+        self.dup_total = 0
+
+    def dup(self, row_no: int, cond: dict, ids: list, action: str) -> None:
+        """#49: 원본 규칙으로 '이미 있는 조건'이라 새로 추가하지 않은 조합을 기록한다."""
+        self.dup_total += 1
+        if len(self.duplicates) < DUP_LIMIT:
+            self.duplicates.append({"row": row_no, "cond": dict(cond),
+                                    "ids": [int(i) for i in ids if i is not None][:20], "action": action})
+
+    def result(self, **extra) -> dict:
+        out = {"messages": self.messages, "inserted": self.inserted, "updated": self.updated,
+               "duplicates": self.duplicates, "dupTotal": self.dup_total}
+        out.update(extra)
+        return out
 
 
 # ---------------------------------------------------------------- cmdSaveDb_Click (Tank)
@@ -391,7 +411,7 @@ def save_tank(form: FormInput, repo) -> dict:
     pitchx = pitchy0 = pitchy1 = mech0 = mech1 = 0.0
     cols = form.columns
 
-    for row in form.rows:
+    for row_no, row in enumerate(form.rows, start=1):
         for j in range(1, 21):
             p[j] = ""
         focus = freq = tx = elev = elev_aper = None
@@ -520,23 +540,42 @@ def save_tank(form: FormInput, repo) -> dict:
                     p[5] = "1"
                     p[6] = "1"
 
+                phase_zero = cdbl(p[11], "isPhaseInverse") == 0
+                cond = {"PMpulseType": p[3], "FmMHz": p[4], "FocusPMm": p[9], "azAperSizeMm": p[10],
+                        "elevIndex": p[18], "isPhaseInverse": p[11], "azApodType": p[8], "elAperType": p[15],
+                        "comments": p[29]}
                 pha_num = 0
-                if cdbl(p[11], "isPhaseInverse") == 0:
-                    pha_num = repo.count_meas(_tank_criteria(p, 1, speed, pitchx, msi_init, msie))
+                phase_rec = None
+                if form.force_new:
+                    recs = []   # #49: 사용자가 중복 확인 창에서 강제 입력을 고른 경우 — 중복 검사 없이 INSERT
                 else:
-                    recs = repo.find_meas(_tank_criteria(p, 0, speed, pitchx, msi_init, msie))
-                    if recs:
-                        mid = recs[0]["measSetId"]
-                        repo.update_meas(mid, {"isPhaseInverse": 1})
-                        ctx.updated += 1
-                        display_p.append(vb_str(mid))
+                    if phase_zero:
+                        pha_num = repo.count_meas(_tank_criteria(p, 1, speed, pitchx, msi_init, msie))
+                    else:
+                        recs = repo.find_meas(_tank_criteria(p, 0, speed, pitchx, msi_init, msie))
+                        if recs:
+                            phase_rec = recs[0]
+                            mid = recs[0]["measSetId"]
+                            repo.update_meas(mid, {"isPhaseInverse": 1})
+                            ctx.updated += 1
+                            display_p.append(vb_str(mid))
 
-                if pha_num != 0:
-                    continue
-                recs = repo.find_meas(_tank_criteria(p, sql_num(p[11], "isPhaseInverse"), speed, pitchx, msi_init, msie))
+                    if pha_num != 0:
+                        ids = [r["measSetId"] for r in repo.find_meas(_tank_criteria(p, 1, speed, pitchx, msi_init, msie))]
+                        ctx.dup(row_no, cond, ids, "건너뜀: 같은 조건의 위상 반전(isPhaseInverse=1) 행이 이미 있음")
+                        continue
+                    recs = repo.find_meas(_tank_criteria(p, sql_num(p[11], "isPhaseInverse"), speed, pitchx, msi_init, msie))
+                    if not recs and phase_rec is not None and getattr(repo, "preview", False):
+                        recs = [phase_rec]   # 사전 검사는 위 UPDATE 를 실행하지 않으므로 갱신될 행을 그대로 쓴다
                 if recs and not is_mmx and p[3] != "Cw" and not is_chirp:
                     rec = recs[0]
                     mid = rec["measSetId"]
+                    ids = [r["measSetId"] for r in recs]
+                    if phase_rec is not None and phase_rec["measSetId"] not in ids:
+                        ids = sorted(ids + [phase_rec["measSetId"]])   # 사전 검사에서도 실제 저장과 같은 후보 목록
+                    ctx.dup(row_no, cond, ids,
+                            f"병합: 기존 measSetId {vb_str(mid)} 의 pulseWidth·ePulseString 보완"
+                            + (" (isPhaseInverse 0→1 갱신)" if phase_rec is not None else ""))
                     if rec.get("pulseWidthUsec") is None:
                         raise MsiExcelError(f"measSetId {mid} 의 pulseWidthUsec 가 NULL 입니다.")
                     pulse_width = float(rec["pulseWidthUsec"])
@@ -593,8 +632,7 @@ def save_tank(form: FormInput, repo) -> dict:
     if new_rows and new_rows.get("rows") and is_gchirp:
         ctx.messages.append("Please manually update Gaussian Chirp ePulseString based on cycle and frequency!!!")
     repo.update_probe_apex(db_number(vb_val(p[20])), sql_num(p[1], "probeId"))
-    return {"messages": ctx.messages, "setRange": set_range, "newRows": new_rows if new_rows and new_rows.get("rows") else None,
-            "inserted": ctx.inserted, "updated": ctx.updated}
+    return ctx.result(setRange=set_range, newRows=new_rows if new_rows and new_rows.get("rows") else None)
 
 
 # ---------------------------------------------------------------- cmdSavePower_Click
@@ -755,12 +793,18 @@ def save_power(form: FormInput, repo) -> dict:
                     ]
                     if msie != "":
                         crit.append(("measSetId", "<=", sql_num(msie, "MSIEnd")))
-                    recs = repo.find_meas(crit)
+                    recs = [] if form.force_new else repo.find_meas(crit)
+                    cond = {"PMpulseType": p[3], "FmMHz": p[4], "elevIndex": p[18], "azApodType": "Rectangle",
+                            "comments": "Power"}
                     if len(recs) == 0:
                         repo.insert_meas(_insert_values(p, MEAS_TERMS, MEAS_TEXT_IDX, frozenset({7, 14, 20})))
                         ctx.inserted += 1
+                    elif len(recs) > 1:
+                        ctx.dup(i + 1, cond, [r["measSetId"] for r in recs],
+                                f"건너뜀: 같은 조건 행이 {len(recs)}건 있어 변경하지 않음(원본 동작)")
                     elif len(recs) == 1:
                         mid = recs[0]["measSetId"]
+                        ctx.dup(i + 1, cond, [mid], f"병합: 기존 measSetId {vb_str(mid)} 의 pulseWidth 보완(더 길 때만)")
                         if recs[0].get("pulseWidthUsec") is None:
                             raise MsiExcelError(f"measSetId {mid} 의 pulseWidthUsec 가 NULL 입니다.")
                         if vb_val(p[5]) > float(recs[0]["pulseWidthUsec"]):
@@ -776,8 +820,7 @@ def save_power(form: FormInput, repo) -> dict:
     if display_s:
         ctx.messages.append("The following measSetId are modified based on pulseWidth: " + ", ".join(display_s))
     new_rows = repo.new_meas_grid(sel_probe, max_id)
-    return {"messages": ctx.messages, "newRows": new_rows if new_rows and new_rows.get("rows") else None,
-            "inserted": ctx.inserted, "updated": ctx.updated}
+    return ctx.result(newRows=new_rows if new_rows and new_rows.get("rows") else None)
 
 
 # ---------------------------------------------------------------- cmdSaveTemp_Click
@@ -831,7 +874,7 @@ def save_temp(form: FormInput, repo) -> dict:
     cols = form.columns
     sv, sv2 = form.t("selectValue"), form.t("selectValue2")
 
-    for row in form.rows:
+    for row_no, row in enumerate(form.rows, start=1):
         for j, h in enumerate(cols):
             v = row[j]
             if vb_instr(h, "probeId") > 0:
@@ -970,13 +1013,72 @@ def save_temp(form: FormInput, repo) -> dict:
                         ("measSetNum", "=", sql_num(p[15], "measSetNum")),
                         ("elevIndex", "=", sql_num(p[14], "elevIndex")),
                     ]
-                    if repo.count_temp(crit) == 0:
+                    n_dup = 0 if form.force_new else repo.count_temp(crit)
+                    if n_dup == 0:
                         repo.insert_temp(_insert_values(p, TEMP_TERMS, TEMP_TEXT_IDX, frozenset()))
                         ctx.inserted += 1
+                    else:
+                        ctx.dup(row_no, {"PMPulseType": p[3], "FmMhz": p[4], "azAperSizeMm": p[10],
+                                         "measVoltage": p[12], "measSetNum": p[15], "elevIndex": p[14]}, [],
+                                f"건너뜀: temp_setting 에 같은 조건 {n_dup}건이 이미 있음")
 
     new_rows = repo.new_temp_grid(sel_probe, max_id)
-    return {"messages": ctx.messages, "newRows": new_rows if new_rows and new_rows.get("rows") else None,
-            "inserted": ctx.inserted, "updated": 0}
+    return ctx.result(newRows=new_rows if new_rows and new_rows.get("rows") else None)
+
+
+# ---------------------------------------------------------------- #49 중복 사전 검사
+
+
+class PreviewRepo:
+    """쓰기를 실행하지 않는 저장소 래퍼 — 원본 저장 루틴을 그대로 돌려 중복 판정만 얻는다.
+
+    허용 목록 밖의 메서드는 막아(AttributeError) 새 쓰기 메서드가 생겨도 사전 검사에서 실행되지 않게 한다.
+    """
+
+    preview = True
+    _READS = frozenset({"max_meas_set_id", "max_temp_set_id", "probe_info", "find_meas", "count_meas", "count_temp"})
+
+    def __init__(self, inner) -> None:
+        self._inner = inner
+
+    def __getattr__(self, name):
+        if name in PreviewRepo._READS:
+            return getattr(self._inner, name)
+        raise AttributeError(f"사전 검사에서 허용되지 않은 저장소 호출: {name}")
+
+    def update_meas(self, meas_set_id, values: dict) -> None:
+        return None
+
+    def insert_meas(self, values: dict) -> None:
+        return None
+
+    def insert_temp(self, values: dict) -> None:
+        return None
+
+    def update_probe_apex(self, apex, probe_id) -> None:
+        return None
+
+    def new_set_range(self, max_id: int, probe_id) -> tuple:
+        return (None, None)
+
+    def new_meas_grid(self, probe_id, max_id: int):
+        return None
+
+    def new_temp_grid(self, probe_id, max_id: int):
+        return None
+
+
+SAVE_KINDS = ("tank", "power", "temp")
+
+
+def check_duplicates(kind: str, form: FormInput, repo) -> dict:
+    """저장 전에 '이미 DB에 있는 조건'을 찾는다(쓰기 없음). 같은 저장 안에서 앞 행이 새로 만들 행과의 중복은 포함하지 않는다."""
+    if kind not in SAVE_KINDS:
+        raise MsiExcelError("kind 는 tank/power/temp 중 하나여야 합니다.")
+    form.force_new = False
+    fn = {"tank": save_tank, "power": save_power, "temp": save_temp}[kind]
+    r = fn(form, PreviewRepo(repo))
+    return {"kind": kind, "duplicates": r["duplicates"], "dupTotal": r["dupTotal"], "inserted": r["inserted"]}
 
 
 # ---------------------------------------------------------------- 기타 버튼

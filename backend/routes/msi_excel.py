@@ -100,6 +100,24 @@ def save_temp():
     return _save("temp")
 
 
+@msi_excel_bp.route("/check-dup", methods=["POST"])
+@handle_exceptions
+@require_auth
+@with_db_connection()
+def check_dup():
+    """#49: 저장 전 중복 조건 사전 검사(읽기 전용 — 쓰기 메서드는 PreviewRepo 가 막는다)."""
+    def run():
+        require_business_db()
+        body = json_body()
+        kind = body.get("kind")
+        if kind not in eng.SAVE_KINDS:
+            raise RouteInputError("kind 는 tank/power/temp 중 하나여야 합니다.")
+        form = eng.form_from_body(body)
+        return _ok(xstore.run_read(g.current_db, lambda repo: eng.check_duplicates(kind, form, repo)))
+
+    return _guard(run)
+
+
 @msi_excel_bp.route("/update-prf", methods=["POST"])
 @handle_exceptions
 @require_auth

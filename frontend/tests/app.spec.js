@@ -209,6 +209,55 @@ test.describe('MSI input · Interrogator', () => {
     await expect(rows).toHaveCount(0);
   });
 
+  test('#49 저장 전 중복 확인 창에서 중복 조건을 보여 주고 강제 입력(forceNew)을 보낸다', async ({ page }) => {
+    await page.route('**/api/msi-excel/parse', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 'success', data: { columns: ['probeName', 'probeId', 'x'], rows: [['P', 7, 'a']] } }),
+    }));
+    let checks = 0;
+    await page.route('**/api/msi-excel/check-dup', (route) => {
+      checks += 1;
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: {
+        kind: 'tank', dupTotal: 1, inserted: 2,
+        duplicates: [{ row: 1, cond: { PMpulseType: 'Bipolar', FocusPMm: '20' }, ids: [3712], action: '병합: 기존 measSetId 3712 의 pulseWidth·ePulseString 보완' }],
+      } }) });
+    });
+    const saves = [];
+    await page.route('**/api/msi-excel/save-tank', (route) => {
+      saves.push(route.request().postDataJSON());
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: {
+        messages: [], inserted: 3, updated: 0, duplicates: [], dupTotal: 0, setRange: '3713:3715' } }) });
+    });
+    page.on('dialog', (d) => d.accept());
+    await page.goto('/msi-input?database=DemoDB');
+    const dir = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'msi49-'));
+    require('fs').writeFileSync(require('path').join(dir, 'a.xlsx'), 'x');
+    await page.getByTestId('msi-excel-picker').setInputFiles(dir);
+    await page.getByTestId('msi-excel-files').getByText('a.xlsx').click();
+    await page.getByTestId('msi-excel-open').click();
+    await page.getByTestId('msi-excel-selectall').click();
+
+    await page.getByTestId('msi-excel-savedb').click();
+    const grid = page.getByTestId('msi-excel-dup-grid');
+    await expect(grid).toContainText('FocusPMm');
+    await expect(grid).toContainText('3712');
+    await expect(page.getByTestId('msi-excel-dup-summary')).toContainText('1건');
+    await page.getByTestId('msi-excel-dup-cancel').click();
+    await expect(page.getByTestId('msi-excel-dup')).toHaveCount(0);
+    expect(saves).toHaveLength(0);
+
+    await page.getByTestId('msi-excel-savedb').click();
+    await page.getByTestId('msi-excel-dup-save').click();
+    await expect.poll(() => saves.length).toBe(1);
+    expect(saves[0].forceNew).toBe(false);
+
+    await page.getByTestId('msi-excel-savedb').click();
+    await page.getByTestId('msi-excel-dup-force').click();
+    await expect.poll(() => saves.length).toBe(2);
+    expect(saves[1].forceNew).toBe(true);
+    expect(checks).toBe(3);
+  });
+
   test('Interrogator 메인 폼이 원본(intMain) 버튼·활성 규칙을 따른다', async ({ page }) => {
     await page.route('**/api/get_list_database', (route) => route.fulfill({
       status: 200, contentType: 'application/json', body: JSON.stringify({ databases: ['BizDb'] }),

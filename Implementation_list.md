@@ -52,6 +52,7 @@
 | 46 | Selected RTP 왼쪽 위 모서리 더블클릭 시 전체 행 삭제 | 2026-11-11 | - |
 | 47 | Save Tank RTP to DB 미반영(트랜잭션 이중 카운트) 수정, 저장 결과 요약 | 2026-11-11 | - |
 | 48 | Create New from MSI 원본 VB 동등성 확인·테스트·사용 안내 보강 | 2026-11-11 | - |
+| 49 | 저장 전 중복 조건 확인 창·중복도 새로 입력(forceNew) | 2026-11-11 | - |
 
 ---
 
@@ -1327,3 +1328,25 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - `MsiExcelForm.js`: MSI 입력칸에 툴팁을 넣었다. Tank·Power 저장 결과가 0건이고 체크 + MSI=0이면 'MSI에 최대 measSetId + 1' 힌트를 보여준다.
 - `docs/MSI_Input_guide.html` 8장: MSI=0이면 효과가 없다는 점, 모두 새로 만드는 방법, Tank ≥ / Power > 비교를 추가했다.
 - 참고: #47(트랜잭션 미커밋) 수정 전에는 체크·MSI와 무관하게 아무것도 저장되지 않았으므로, 이전에 확인한 현상은 #47 때문이었을 수 있다.
+
+## 49. 저장 전 중복 조건 확인 창과 강제 입력
+
+> 요청: 중복이 있으면 새 창에서 어떤 행·조건이 중복인지 쉽게 보여 주고, 그래도 입력을 원하면 DB에 입력하는 버튼을 둔다.
+
+### Agent 명세 (#49)
+
+- **Tier M / 위험**: DB 쓰기 경로와 API 계약(새 엔드포인트, forceNew)이 바뀌므로 Verify 필수(§4.1).
+- **설계**: 중복 판정 규칙이 갈라지지 않도록 원본 저장 루틴(save_tank/power/temp) 안에서 중복을 기록한다(`_Ctx.dup`). 사전 검사는 쓰기를 막은 `PreviewRepo`(읽기 허용 목록 외 호출은 AttributeError)로 같은 루틴을 `run_read`에서 실행한다.
+- **API**: `POST /api/msi-excel/check-dup`(kind=tank/power/temp) → `{duplicates[≤500], dupTotal, inserted}`. 저장 응답에도 `duplicates/dupTotal`을 더한다. 저장 본문에 `forceNew: true`면 중복 검사 없이 모두 INSERT한다(기존 행 UPDATE 없음).
+- **불변식**: forceNew=false 경로는 원본 동작과 같다(중복 기록과 tank 건너뜀 시 measSetId 조회 1회만 추가).
+- **프런트**: 저장 → 확인 → check-dup → 중복이 있으면 DupForm(행·조건·기존 measSetId·처리 방법)에서 [원본대로 저장]/[중복도 새로 입력(재확인)]/[취소]를 고른다.
+- **한계**: 사전 검사는 DB에 이미 있는 행과만 비교한다(같은 저장 안의 앞 행과의 중복은 미표시).
+
+### 수행 결과 (#49)
+
+- `excel_engine.py`: FormInput.force_new, `_Ctx.dup/result`, 3개 저장의 중복 기록·force 분기, `PreviewRepo`, `check_duplicates`.
+- `routes/msi_excel.py`: `/check-dup` 라우트(require_auth·with_db_connection·업무 DB 검증).
+- `MsiExcelForm.js`: `DupForm` 창, `save`(사전 검사) / `doSave(forceNew)` / `resolveDup`.
+- `docs/MSI_Input_guide.html`: '중복 조건 확인 창' 절 추가.
+- 테스트: pytest #49 5건(사전 검사 무쓰기, 위상 반전 경로, force tank/power/temp, PreviewRepo 차단) → 전체 186 통과. e2e #49(창 표시·취소 시 미저장·강제 입력 forceNew 전송) → 22 통과.
+- Verify: Blocker 0 / Major 0 / Minor 4. V-002(위상 0→1 병합 시 사전 검사 ids에 대상 행 포함), V-003(원본대로 저장 e2e 추가, ID 없음 '-'), V-004(검사 시점 기준 문구)를 반영했다. V-001(무관한 cfg·pyc)은 커밋에서 제외했다.
