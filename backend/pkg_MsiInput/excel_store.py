@@ -11,7 +11,7 @@ from typing import Callable
 
 from .excel_engine import MEAS_INSERT_COLUMNS, MEAS_UPDATE_COLUMNS, TEMP_INSERT_COLUMNS
 from .excel_vb import MsiExcelError
-from .store import APPLOCK_RESOURCE, APPLOCK_TIMEOUT_MS, grid, open_raw_connection, records
+from .store import APPLOCK_RESOURCE, APPLOCK_TIMEOUT_MS, commit_all, grid, open_raw_connection, records
 
 TEMP_APPLOCK_RESOURCE = "AOP_Web_MsiExcel_temp_setting"
 PRF_TIMEOUT_S = 2000
@@ -192,7 +192,7 @@ def run_write(sql_obj, fn: Callable[[ExcelRepo], dict], resource: str = APPLOCK_
         if rc is None or rc[0] is None or int(rc[0]) < 0:
             raise MsiExcelError("다른 사용자가 저장 중입니다. 잠시 후 다시 시도하십시오.")
         result = fn(ExcelRepo(cur))
-        conn.commit()
+        commit_all(conn, cur)
         committed = True
         return result
     finally:

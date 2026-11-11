@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 
-from pkg_MsiInput.store import MAX_LIST_ROWS, grid, open_raw_connection, records
+from pkg_MsiInput.store import MAX_LIST_ROWS, commit_all, grid, open_raw_connection, records
 
 from .temperature_fit import _PENALTY, fit_temp10
 
@@ -138,7 +138,7 @@ def rtp_analysis(sql_obj, rtp_name: str) -> dict:
         while cur.nextset():
             pass
         result = grid(cur, "SELECT * FROM RTP_analysis")
-        conn.commit()
+        commit_all(conn, cur)
         committed = True
         return result
     finally:

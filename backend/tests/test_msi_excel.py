@@ -380,3 +380,90 @@ def test_store_where_rejects_unknown_column():
         _where([("probeId; DROP", "=", 1)], _MEAS_CRITERIA)
     sql, params = _where([("ABS_AZAPER", "<=", (Decimal("10"), Decimal("0.03")))], _MEAS_CRITERIA)
     assert sql == "ABS(azAperSizeMm - ?) <= ?" and params == [Decimal("10"), Decimal("0.03")]
+
+
+# ---------------------------------------------------------------- #47 트랜잭션 커밋(IMPLICIT_TRANSACTIONS ON)
+
+
+class _ImplicitTxConn:
+    """ODBC 수동 커밋 모드(IMPLICIT_TRANSACTIONS ON)의 @@TRANCOUNT 동작을 흉내 낸다.
+
+    - @@TRANCOUNT = 0 에서 BEGIN TRANSACTION → 암시적 + 명시적 = 2
+    - conn.commit() 은 ``IF @@TRANCOUNT > 0 COMMIT`` 한 번(한 단계만 감소)
+    - 커밋되지 않은 채 닫히면 작업은 사라진다.
+    """
+
+    def __init__(self):
+        self.trancount = 0
+        self.pending = 0
+        self.durable = 0
+        self.closed = False
+
+    def _commit_one(self):
+        if self.trancount > 0:
+            self.trancount -= 1
+            if self.trancount == 0:
+                self.durable += self.pending
+                self.pending = 0
+
+    def cursor(self):
+        conn = self
+
+        class _Cur:
+            def execute(self, sql, params=()):
+                if "BEGIN TRANSACTION" in sql and conn.trancount == 0:
+                    conn.trancount = 2
+                elif "BEGIN TRANSACTION" in sql:
+                    conn.trancount += 1
+                if "WHILE @@TRANCOUNT > 0 COMMIT" in sql:
+                    while conn.trancount > 0:
+                        conn._commit_one()
+                if sql.startswith("INSERT"):
+                    conn.trancount = conn.trancount or 1
+                    conn.pending += 1
+                return self
+
+            def fetchone(self):
+                return (0,)
+
+        return _Cur()
+
+    def commit(self):
+        self._commit_one()
+
+    def rollback(self):
+        self.trancount = 0
+        self.pending = 0
+
+    def close(self):
+        self.pending = 0
+        self.closed = True
+
+
+def test_run_write_commits_all_nesting_levels(monkeypatch):
+    from pkg_MsiInput import excel_store as xs
+
+    conn = _ImplicitTxConn()
+    monkeypatch.setattr(xs, "open_raw_connection", lambda sql_obj: conn)
+
+    def work(repo):
+        repo.cur.execute("INSERT INTO dbo.meas_setting (x) VALUES (?)", [1])
+        return {"ok": True}
+
+    assert xs.run_write(object(), work) == {"ok": True}
+    assert conn.durable == 1 and conn.trancount == 0 and conn.closed
+
+
+def test_run_write_rolls_back_on_error(monkeypatch):
+    from pkg_MsiInput import excel_store as xs
+
+    conn = _ImplicitTxConn()
+    monkeypatch.setattr(xs, "open_raw_connection", lambda sql_obj: conn)
+
+    def work(repo):
+        repo.cur.execute("INSERT INTO dbo.meas_setting (x) VALUES (?)", [1])
+        raise MsiExcelError("stop")
+
+    with pytest.raises(MsiExcelError):
+        xs.run_write(object(), work)
+    assert conn.durable == 0 and conn.closed

@@ -240,6 +240,17 @@ def open_raw_connection(sql_obj):
     return conn
 
 
+def commit_all(conn, cur) -> None:
+    """``IF @@TRANCOUNT = 0 BEGIN TRANSACTION`` 으로 연 트랜잭션을 끝까지 커밋한다.
+
+    ODBC 수동 커밋 모드는 IMPLICIT_TRANSACTIONS ON 이라 이때의 BEGIN TRANSACTION 은
+    @@TRANCOUNT 를 2로 만든다. ``conn.commit()`` 은 한 단계만 커밋하므로, 그대로 두면
+    연결 반환 시 롤백되어 쓴 데이터가 사라진다(#47).
+    """
+    cur.execute("WHILE @@TRANCOUNT > 0 COMMIT TRANSACTION;")
+    conn.commit()
+
+
 def list_probes(sql_obj) -> list[dict]:
     conn = open_raw_connection(sql_obj)
     try:
@@ -320,7 +331,7 @@ def create(sql_obj, probe_id: int, sub_verif_ids, purpose_mode: str, min_meas_se
         if plan.fingerprint() != expected_hash:
             # 확인받은 계획과 실제 실행이 다르면 커밋하지 않는다(finally 에서 롤백).
             raise RuntimeError("미리보기와 실제 실행 계획이 달라 생성을 취소했습니다.")
-        conn.commit()
+        commit_all(conn, cur)
         committed = True
         return plan
     finally:

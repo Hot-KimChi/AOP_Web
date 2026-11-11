@@ -50,6 +50,7 @@
 | 44 | MSI input 사용자 설명서(HTML)·데이터 흐름 작성, 대비·중복 처리 보완 (본문 ## 44) | 2026-11-11 | - |
 | 45 | Selected RTP azFocusMm 더블클릭 미반영 수정, Foci·Indices 하위 카드, MSI·Interrogator 기능 전수 확인 (본문 ## 45) | 2026-11-11 | - |
 | 46 | Selected RTP 왼쪽 위 모서리 더블클릭 시 전체 행 삭제 | 2026-11-11 | - |
+| 47 | Save Tank RTP to DB 미반영(트랜잭션 이중 카운트) 수정, 저장 결과 요약 | 2026-11-11 | - |
 
 ---
 
@@ -1275,3 +1276,31 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - `MsiExcelForm.js`: `clearSelected`(행 0개면 무시, confirm 후 selRows·SelectedProbeId 비움), 안내 문구에 모서리 기능 추가.
 - `globals.css`: `.vb-corner-action` 포인터 커서·hover 강조. `docs/MSI_Input_guide.html` 빼기 항목에 '모두 빼기' 설명 추가.
 - 검증: e2e #46(취소 시 2행 유지 → 확인 시 0행) 추가, 빌드 성공, 서버 재기동 후 e2e 21/21 통과. 교차 검증은 UI 상태만 다루어 생략.
+
+## 47. Save Tank RTP to DB 기능이 제대로 동작하지 않는다. 데이터베이스에 데이터가 들어가 있지 않다. 이를 확인해죠. Agent 명세를 재작성하고 이를 기반으로 진행해죠.
+
+### Agent 명세 (#47)
+
+- **증상**: Save Tank RTP to DB 요청(POST /api/msi-excel/save-tank)이 200으로 끝나지만 meas_setting에 행이 남지 않는다(서버 로그 12:59~13:01 3건 확인).
+- **원인(진단)**
+  - `run_write`는 `IF @@TRANCOUNT = 0 BEGIN TRANSACTION` + `sp_getapplock`으로 시작해 `conn.commit()`으로 끝난다.
+  - pyodbc 수동 커밋 모드는 IMPLICIT_TRANSACTIONS ON이다. 이때 BEGIN TRANSACTION을 실행하면 @@TRANCOUNT가 2가 된다(MS 문서 SET IMPLICIT_TRANSACTIONS의 Test C).
+  - `commit()`은 한 단계만 커밋한다. 연결이 풀로 돌아갈 때 롤백되어 INSERT가 사라진다. 응답의 새 행 표는 같은 트랜잭션 안에서 조회했기 때문에 성공처럼 보였다.
+- **범위**: 같은 패턴을 쓰는 3곳 — `excel_store.run_write`(Tank·Power·Temp·Update Prf), `store.create`(MSI Interrogator 생성), `queries.rtp_analysis`.
+- **수정**: 공용 `commit_all(conn, cur)`(`WHILE @@TRANCOUNT > 0 COMMIT` 후 `conn.commit()`)로 교체한다. 실패 경로의 rollback은 전체를 되돌리므로 유지한다.
+- **보조**: 저장 후 '새로 추가 N건 / 갱신 M건' 요약을 띄운다. 추가가 0건이면 같은 조건이 이미 DB에 있어 추가하지 않았다고 안내한다.
+- **검증**
+  - IMPLICIT_TRANSACTIONS 동작을 흉내 내는 가짜 연결로 재현 테스트를 만든다(수정 전 실패 → 수정 후 통과). 전체 pytest와 빌드·e2e를 실행한다.
+  - 실제 DB에는 접속할 수 없어(사용자 자격증명 필요) 사용자 화면에서 최종 확인을 요청한다.
+- **교차 검증**: 트랜잭션·SQL 경로이므로 필수다(Verify).
+
+### 수행 결과 (#47)
+
+- `pkg_MsiInput/store.py`: `commit_all(conn, cur)`를 추가했다. `excel_store.run_write`·`store.create`·`pkg_Interrogator/queries.rtp_analysis`의 `conn.commit()`을 이것으로 교체했다.
+- `MsiExcelForm.js`: 저장 후 '새로 추가 N건 / 갱신 M건' 요약을 띄운다. 0건이면 이미 있는 조건이라 추가하지 않았다고 안내한다. 제목은 Tank·Power를 구분한다(V-003 반영).
+- 테스트: `test_msi_excel.py`에 `_ImplicitTxConn` 재현 테스트 2건(커밋 반영·오류 시 롤백)을 추가했다. 수정 전 1건 실패 → 수정 후 pytest 179건 통과. 빌드 성공, 서버 재기동 후 e2e 21건 통과.
+- Verify: Blocker 0 / Major 0 / Minor 3(V-001 무관 변경 분리 — 커밋에서 제외 / V-002 store.create·rtp_analysis 전용 테스트 없음 / V-003 반영).
+- RESIDUAL
+  - 실제 DB에서 측정하지 못했다(자격증명 없음). 사용자가 Save Tank를 다시 실행해 DB 반영 여부를 확인해야 한다.
+  - 같은 결함 때문에 MSI Interrogator 생성(Create)·RTP Analysis도 그동안 커밋되지 않았을 가능성이 있다.
+  - `RtpAnalysis` 등 저장 프로시저 내부의 트랜잭션 처리는 확인하지 못했다.

@@ -488,10 +488,17 @@ export default function MsiExcelForm({ database, onClose }) {
     if (data?.setRange !== undefined) setTxtSetRange(data.setRange);
     if (data?.newRows) setModal({ title, data: data.newRows });
     alertAll(data?.messages);
+    // #47: 저장 결과 요약 — 중복 조건으로 추가되지 않은 경우도 사용자가 알 수 있게 한다.
+    if (data && typeof data.inserted === 'number') {
+      const upd = data.updated ? `, 기존 행 갱신 ${data.updated}건` : '';
+      window.alert(data.inserted > 0
+        ? `${title} 저장 완료: 새로 추가 ${data.inserted}건${upd}${data.setRange ? ` (Set ID 범위 ${data.setRange})` : ''}`
+        : `${title}: 새로 추가된 행이 없습니다${upd}. 같은 조건이 이미 DB에 있으면 추가하지 않습니다.`);
+    }
   });
 
-  const cmdSaveDb = () => save('save-tank', 'meas_setting', `meas_setting 에 Tank RTP 조건을 저장합니다(comments=${purpose || 'RTP'}). 계속할까요?`);
-  const cmdSavePower = () => save('save-power', 'meas_setting', "meas_setting 에 Power 조건을 저장합니다(comments='Power'). 계속할까요?");
+  const cmdSaveDb = () => save('save-tank', 'meas_setting (Tank)', `meas_setting 에 Tank RTP 조건을 저장합니다(comments=${purpose || 'RTP'}). 계속할까요?`);
+  const cmdSavePower = () => save('save-power', 'meas_setting (Power)', "meas_setting 에 Power 조건을 저장합니다(comments='Power'). 계속할까요?");
   const cmdSaveTemp = () => save('save-temp', 'temp_setting', `temp_setting 에 Temp 조건(옵션 ${cmbTempOpt})을 저장합니다. 계속할까요?`);
 
   // ---- cmdSaveMat_Click
