@@ -357,7 +357,7 @@ export default function MsiExcelForm({ database, onClose }) {
         }
         setSelRows((prev) => prev.map((x, i) => (i === ri ? { v, s } : x)));
         if (msg) alertAll(msg);
-        return;
+        return true;
       }
       // 보정: 원본은 Selected Indices 가 비어 있으면 셀을 빈 문자열로 지웠다 → 비어 있으면 아무것도 하지 않음.
       if (col >= 11 && v[col] !== null && v[col] !== undefined && measIndex !== '') {
@@ -374,6 +374,7 @@ export default function MsiExcelForm({ database, onClose }) {
           });
           v[col] = term;
           setSelRows((prev) => prev.map((x, i) => (i === ri ? { v, s } : x)));
+          return true;
         }
       }
     } catch (e) {
@@ -382,6 +383,7 @@ export default function MsiExcelForm({ database, onClose }) {
   };
 
   const onSelCellChange = (ri, ci, value) => {
+    if (ci === 1 && value !== '') setSelectedProbeId(value);
     setSelRows((prev) => prev.map((x, i) => {
       if (i !== ri) return x;
       const v = [...x.v];
@@ -403,6 +405,7 @@ export default function MsiExcelForm({ database, onClose }) {
   };
   const onSelRowAdd = (ci, value) => {
     setSelRows((prev) => [...prev, { v: selCols.map((_, j) => (j === ci ? value : null)), s: [] }]);
+    if (ci === 1 && value !== '') setSelectedProbeId(value);
   };
   const onSelRowDelete = (ri) => setSelRows((prev) => prev.filter((_, i) => i !== ri));
 
@@ -606,9 +609,12 @@ export default function MsiExcelForm({ database, onClose }) {
         Elev data req?
       </VbCheck>
 
+      <VbSection x={12} y={729} w={598} h={68} tone="sub" />
+      <VbLabel x={512} y={744} font={F675} className="vb-legend" testId="msi-excel-foci-legend">초점 지정은</VbLabel>
+      <VbLabel x={512} y={760} font={F675} className="vb-legend">둘 중 하나만 입력</VbLabel>
       <VbLabel x={20} y={738} font={F9}>Selected Foci:</VbLabel>
       <VbText
-        x={168} y={735} w={432} h={24} value={measFocusList} ariaLabel="Selected Foci" testId="msi-excel-foci"
+        x={168} y={735} w={332} h={24} value={measFocusList} ariaLabel="Selected Foci" testId="msi-excel-foci"
         onChange={(t) => { setMeasFocusList(t); if (t !== '') setMeasIndex(''); }}
       />
       <VbLabel x={620} y={733} font={F675} color={RED}>If there is a similar record except pulseWidth,</VbLabel>
@@ -616,7 +622,7 @@ export default function MsiExcelForm({ database, onClose }) {
 
       <VbLabel x={20} y={771} font={F9}>Selected Indices:</VbLabel>
       <VbText
-        x={168} y={768} w={432} h={24} value={measIndex} ariaLabel="Selected Indices" testId="msi-excel-indices"
+        x={168} y={768} w={332} h={24} value={measIndex} ariaLabel="Selected Indices" testId="msi-excel-indices"
         onChange={(t) => { setMeasIndex(t); if (t !== '') setMeasFocusList(''); }}
       />
       <VbCheck x={620} y={770} w={186} h={21} checked={isCreateNew} onChange={setIsCreateNew} testId="msi-excel-createnew">Create New from MSI =  </VbCheck>

@@ -31,10 +31,12 @@ export default function MsiDumpForm({ database, onClose }) {
   const [createNew, setCreateNew] = useState(false);
   const [msi, setMsi] = useState('0');
   const [busy, setBusy] = useState('');
-
+  const [loadedProbe, setLoadedProbe] = useState('');
   useEffect(() => {
     setProbeIds([]);
     setProbeId('');
+    setSelected([]);
+    setLoadedProbe('');
     if (!database) return undefined;
     const ctrl = new AbortController();
     apiJson(`/api/msi/probe-ids?${query({ database })}`, { signal: ctrl.signal })
@@ -44,6 +46,11 @@ export default function MsiDumpForm({ database, onClose }) {
   }, [database]);
 
   // 원본: 처음 추가할 때 imag_subverif 열을 복제해 Selected 열을 만든다(selectedInit).
+  // 프로브를 바꾸면 이전 프로브의 Selected 행이 새 probeId 로 전송되지 않게 비운다.
+  const changeProbe = (v) => {
+    if (String(v) !== String(probeId)) { setSelected([]); setLoadedProbe(''); }
+    setProbeId(v);
+  };
   const ensureSelectedCols = () => {
     if (!selectedCols.length) setSelectedCols(sub.columns);
   };
@@ -56,6 +63,9 @@ export default function MsiDumpForm({ database, onClose }) {
       const data = await apiJson(`/api/msi/dump-records?${query({ database, probeId, verifFilter: verifId })}`);
       setVerif(data.verification || EMPTY);
       setSub(data.subVerification || EMPTY);
+      // 다른 프로브를 불러오면 이전 프로브의 Selected 행은 비운다(새 probeId 로 옛 subVerifId 가 전송되지 않게).
+      if (loadedProbe !== String(probeId)) setSelected([]);
+      setLoadedProbe(String(probeId));
     } catch (e) {
       window.alert(e.message);
     } finally {
@@ -119,7 +129,7 @@ export default function MsiDumpForm({ database, onClose }) {
   return (
     <VbForm title="msiFromDump" width={1094} height={728} onClose={onClose} testId="msi-dump-form">
       <VbLabel x={35} y={38}>Probe ID:</VbLabel>
-      <VbCombo x={88} y={35} w={261} h={22} font={{ size: 8 }} value={probeId} onChange={setProbeId}
+      <VbCombo x={88} y={35} w={261} h={22} font={{ size: 8 }} value={probeId} onChange={changeProbe}
         options={probeIds} testId="msi-dump-probe" ariaLabel="Probe ID" />
       <VbLabel x={488} y={9} w={319} h={24} wrap font={{ size: 6.75 }} color={DARK} style={{ whiteSpace: 'pre-line' }}>
         {'Multiple Id sperated by ","; or using "~" for a range. No more than 5 segments.\nFor example: 1764, 1234~1256, 1861, 1900'}

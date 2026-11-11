@@ -212,6 +212,8 @@ export function VbGrid({
 }) {
   const [cur, setCur] = useState(null);
   const [edit, setEdit] = useState(null);
+  // 더블클릭 핸들러가 값을 바꾸면, 두 번째 클릭으로 열린 편집(옛 값)이 blur 시 덮어쓰지 않도록 커밋을 건너뛴다.
+  const skipCommitRef = useRef(false);
   const cols = columns || [];
   const data = rows || [];
   const shown = data.length > maxRows ? data.slice(0, maxRows) : data;
@@ -225,7 +227,7 @@ export function VbGrid({
   }, [data.length, cols.length, cur, edit, canAdd]);
 
   const commit = () => {
-    if (edit) {
+    if (edit && !skipCommitRef.current) {
       if (edit.r === newRowIndex) {
         if (edit.value !== '') onRowAdd?.(edit.c, edit.value);
       } else {
@@ -238,6 +240,7 @@ export function VbGrid({
   const startEdit = (r, c, initial) => {
     if (!editable) return;
     if (r === newRowIndex ? !canAdd : !onCellChange) return;
+    skipCommitRef.current = false;
     setEdit({ r, c, value: initial ?? cellText(data[r]?.[c]) });
   };
 
@@ -291,7 +294,14 @@ export function VbGrid({
                       if (isCur && !isEdit) startEdit(ri, ci);
                       else setCur({ r: ri, c: ci });
                     }}
-                    onDoubleClick={() => { setCur({ r: ri, c: ci }); onCellDoubleClick?.(ri, ci); }}
+                    onDoubleClick={() => {
+                      setCur({ r: ri, c: ci });
+                      if (!onCellDoubleClick) return;
+                      // 핸들러 안의 alert 가 편집 input 을 blur 시켜도 옛 값이 커밋되지 않게 먼저 막는다.
+                      skipCommitRef.current = true;
+                      if (onCellDoubleClick(ri, ci) === true) setEdit(null);
+                      else skipCommitRef.current = false;
+                    }}
                   >
                     {isEdit ? (
                       <input

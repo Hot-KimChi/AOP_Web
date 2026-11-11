@@ -48,6 +48,7 @@
 | 42 | measSetInput 버튼 위치·하단 UI 사용자 친화 재배치 (본문 ## 42) | 2026-11-10 | - |
 | 43 | measSetInput 파일 카드 높이 정렬·Selected RTP 전체 폭 확장 (본문 ## 43) | 2026-11-10 | - |
 | 44 | MSI input 사용자 설명서(HTML)·데이터 흐름 작성, 대비·중복 처리 보완 (본문 ## 44) | 2026-11-11 | - |
+| 45 | Selected RTP azFocusMm 더블클릭 미반영 수정, Foci·Indices 하위 카드, MSI·Interrogator 기능 전수 확인 (본문 ## 45) | 2026-11-11 | - |
 
 ---
 
@@ -1221,3 +1222,36 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
   - 흐름도·서버 처리 단계·5단계 결과·FAQ에도 중복 확인을 반영했다. 장 번호는 9·10으로 밀렸다.
 - **검증**: 대비 위반 0(라이트·다크), 태그 오류 0, 앵커 13개 유효, API 경로 일치, 1440/420px 가로 넘침 0.
 - **교차 검증 생략 사유**: 문서만 수정했고 중복 규칙은 코드 해당 줄과 직접 대조했다.
+
+## 45. Selected Foci에 원하는 초점 목록을 입력한 뒤, Selected RTP의 하늘색 머리글 열(azFocusMm) 셀을 더블클릭하면 그 행의 초점이 바뀌고 조리개 크기(azAperSizeMm)와 elevIndex가 자동 계산됩니다. 그 행의 초점(azFocusMm)이 더블클릭하면 변경되지 않는다. MSI input과 interrogator의 기능적인 부분에서 문제가 없는 지 완벽하게 확인을 다시 진행해죠. 해당 부분을 agnet 명세를 재작성하고 이를 기반으로 진행해죠.
+
+### Agent 명세 (#45)
+
+- **증상**: Selected Foci를 입력하고 Selected RTP의 azFocusMm 셀을 더블클릭하면 azAperSizeMm·elevIndex는 바뀌지만 azFocusMm은 원래 값으로 남는다.
+- **가설(코드 확인)**: `VbGrid`에서 더블클릭의 두 번째 클릭이 현재 셀 재클릭으로 처리되어 **옛 값으로 편집 입력칸**이 열린다. 더블클릭 핸들러가 값을 바꾼 뒤 입력칸 blur 시 `commit`이 옛 값을 다시 써서 초점만 되돌아간다.
+- **수정 방침**
+  - `onCellDoubleClick`이 셀 값을 바꿨다고 알리면(true 반환) `VbGrid`가 열린 편집을 커밋하지 않고 취소한다. 값을 바꾸지 않은 셀은 기존처럼 편집할 수 있다.
+  - MSI input의 Foci 분기와 Indices 분기 모두 true를 반환한다.
+- **재현 우선(TDD)**: Playwright e2e로 파일 열기(파싱 API 모킹) → 행 추가 → Foci 입력 → azFocusMm 더블클릭 → 다른 곳 클릭 후 세 열 값을 확인한다. 수정 전 실패, 수정 후 통과.
+- **전수 확인 범위**: MSI input(Excel·Dump)과 Interrogator 각 폼의 기능 경로
+  - 같은 그리드 편집 충돌이 있는 다른 더블클릭 핸들러(Interrogator TempForm 등)
+  - 백엔드 pytest(MSI·Interrogator) 전체, 프런트 build, e2e 전체
+  - 독립 리뷰 에이전트가 VB 원본 대비 기능 회귀를 점검한다.
+- **완료 조건**: 재현 테스트 통과, 기존 테스트 전부 통과, 리뷰의 Blocker·Major 0.
+
+### 수행 결과 (#45)
+
+- **원인 확정·수정**(`components/vb/Vb.js`): 더블클릭의 두 번째 클릭이 옛 값으로 편집 input을 열고, blur 시 commit이 초점만 되돌렸다.
+  - `onCellDoubleClick` 호출 전에 `skipCommitRef`로 커밋을 막는다. 핸들러가 true를 반환하면 편집을 취소하고, 아니면 원래대로 둔다(핸들러 안 alert의 blur도 차단).
+  - `MsiExcelForm`의 Foci·Indices 더블클릭 분기는 값을 바꾸면 true를 반환한다.
+- **재현 테스트**(`tests/app.spec.js` #45): 수정 전 azFocusMm이 `10 20 30 40` 그대로라 실패했고, 수정 후 `15 25`·`7.5 12.5`·`0 0`으로 통과.
+- **UI(추가 요청)**: Selected Foci·Selected Indices를 ① 카드 안의 하위 카드(점선, `vb-section-sub`)로 묶고 "초점 지정은 둘 중 하나만 입력" 안내를 넣었다. 입력칸 폭 432→332.
+- **전수 확인**(Verify 2회, pytest 177 통과, e2e 20 통과) 후 고친 결함
+  - Temp10: 프로브 변경 확인을 취소하면 probeId만 바뀌어 이전 tempSetId와 섞이던 문제 → 성공 시에만 반영. 처리 중 세트·스테이션 머리글 클릭은 무시.
+  - MSI Dump: 프로브·DB를 바꾸면 이전 Selected 행을 비운다(옛 subVerifId가 새 probeId로 전송되던 문제).
+  - MSI Excel: '*' 새 행이나 셀 편집으로 probeId 열을 입력하면 SelectedProbeId를 설정.
+- **원본 VB 동작이라 유지(사용자 결정 필요)**
+  - 더블클릭 시 azFocusMm에 입력 원문을 넣음(범위 밖 초점이 있으면 개수 불일치 가능)
+  - 열 이름 결함: frmTemp `trRef  azAperSizeCm` 쉼표 누락
+  - TankVoltageS 저장 후 피드백 없음, Dump Selected 그리드 편집값 미전송, Tank·Power 편집값을 저장 전에 화면에 반영
+- **잔여**: alert blur는 headless에서 재현되지 않아 코드 근거로만 확인했다. Wobbler 반올림 허용오차와 2D aperture elevIndex 중복 검사는 원본과 비교하지 못했다.

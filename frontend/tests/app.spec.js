@@ -158,6 +158,33 @@ test.describe('MSI input · Interrogator', () => {
     await expect(page.getByText('Open Excel File 로 엑셀 파일을 불러오세요.')).toBeVisible();
   });
 
+  test('#45 Selected Foci 입력 후 azFocusMm 셀 더블클릭 시 초점·조리개·elevIndex 가 함께 바뀐다', async ({ page }) => {
+    const filler = Array.from({ length: 11 }, (_, i) => `c${i}`);
+    filler[1] = 'probeId';
+    await page.route('**/api/msi-excel/parse', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 'success', data: {
+        columns: [...filler, 'azFocusMm', 'azAperSizeMm', 'elevIndex'],
+        rows: [[...filler.map((_, i) => (i === 1 ? 7 : 'x')), '10 20 30 40', '5 10 15 20', '0 0 0 0']],
+      } }),
+    }));
+    await page.goto('/msi-input?database=DemoDB');
+    const dir = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'msi45-'));
+    require('fs').writeFileSync(require('path').join(dir, 'a.xlsx'), 'x');
+    await page.getByTestId('msi-excel-picker').setInputFiles(dir);
+    await page.getByTestId('msi-excel-files').getByText('a.xlsx').click();
+    await page.getByTestId('msi-excel-open').click();
+    await page.getByTestId('msi-excel-output-rowhead-0').dblclick();
+    await page.locator('input[aria-label="Selected Foci"]').fill('15 25');
+
+    const cells = page.locator('.vb-grid').nth(1).locator('tbody tr').first().locator('td');
+    await cells.nth(11).dblclick();
+    await page.getByText('Selected RTP', { exact: true }).click();
+    await expect(cells.nth(11)).toHaveText('15 25');
+    await expect(cells.nth(12)).toHaveText(/^\s*7\.5\s+12\.5$/);
+    await expect(cells.nth(13)).toHaveText('0 0');
+  });
+
   test('Interrogator 메인 폼이 원본(intMain) 버튼·활성 규칙을 따른다', async ({ page }) => {
     await page.route('**/api/get_list_database', (route) => route.fulfill({
       status: 200, contentType: 'application/json', body: JSON.stringify({ databases: ['BizDb'] }),

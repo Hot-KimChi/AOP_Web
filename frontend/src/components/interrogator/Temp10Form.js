@@ -64,12 +64,14 @@ export default function Temp10Form({ database, onClose }) {
   const ids = () => ({ probeId: Number(probeId), tempSSId, tempSetId });
 
   const onProbe = (v) => {
-    setProbeId(v);
-    if (!v) return;
+    if (!v) { setProbeId(v); return; }
+    // 취소하면 프로브 선택을 바꾸지 않는다(이전 프로브의 tempSSId·tempSetId 와 섞이지 않게).
     if (!window.confirm('get10TempSetId 프로시저를 실행합니다. 계속할까요?')) return;
+    if (busyRef.current) return;
     gen.current += 1;
     call('/probe', { probeId: Number(v), confirm: true }, (d) => {
       const s = asGrid(d.sets);
+      setProbeId(v);
       setSs(asGrid(d.stations));
       setSets(s);
       setSelectSet(new Array(s.rows.length).fill(false));
@@ -84,12 +86,14 @@ export default function Temp10Form({ database, onClose }) {
   };
 
   const onSsHeader = (r) => {
+    if (busyRef.current) return;
     setTempSSId(ss.rows[r]?.[0] ?? null);
     setSsRow(r);
     setEn((e) => ({ ...e, save: false }));
   };
 
   const onSetHeader = (r) => {
+    if (busyRef.current) return;
     const ts = sets.rows[r]?.[0];
     setTempSetId(ts);
     setSetRow(r);
