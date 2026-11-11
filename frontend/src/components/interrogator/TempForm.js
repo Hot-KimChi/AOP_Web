@@ -8,6 +8,7 @@ import { apiJson } from '../../lib/apiJson';
 import TempChart, { ChgBox, ITEM_COLORS, PopupMenu, useEditPoint } from './tempChart';
 import Temp10Form from './Temp10Form';
 import WobblerForm from './WobblerForm';
+import { showAlert, showAlerts, showConfirm, showError } from '../../lib/dialog';
 
 const API = '/api/interrogator/temp';
 const EMPTY = { columns: [], rows: [] };
@@ -19,7 +20,7 @@ const MS_GRAPH = { 1: 'Spectrum', 4: 'Voltage', 3: 'HPSF', 14: 'TrSpectrum' };
 const EDITABLE = new Set(['Voltage']);
 
 function alertAll(msgs) {
-  (msgs || []).forEach((m) => window.alert(m));
+  return showAlerts(msgs);
 }
 
 function parse(item) {
@@ -79,7 +80,7 @@ export default function TempForm({ database, probeId, onClose }) {
     try {
       await fn(() => my === gen.current);
     } catch (e) {
-      window.alert(e.message || String(e));
+      showError(e);
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -109,11 +110,12 @@ export default function TempForm({ database, probeId, onClose }) {
         if (my !== gen.current) return;
         setSwVersions(d.swVersions || []);
         setGridData(asGrid(d.grid));
-        if (!window.confirm('pre_RTP_temp 프로시저를 실행해 trtp_temp 를 다시 만듭니다. 계속할까요?')) return;
+        if (!await showConfirm('pre_RTP_temp 프로시저를 실행해 trtp_temp 를 다시 만듭니다. 계속할까요?')) return;
+        if (my !== gen.current) return;
         const f = await post('/focus', { confirm: true });
         if (my === gen.current) resetItems(f.items);
       } catch (e) {
-        if (my === gen.current) window.alert(e.message || String(e));
+        if (my === gen.current) showError(e);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,14 +127,14 @@ export default function TempForm({ database, probeId, onClose }) {
   const onSwChange = (e) => {
     const sel = Array.from(e.target.selectedOptions).map((o) => o.value);
     if (sel.length > 3) {
-      window.alert("Please limit your selection of 'measImgSwVersion' values to a maximum of three (3).");
+      showAlert("Please limit your selection of 'measImgSwVersion' values to a maximum of three (3).");
       return;
     }
     setSwSel(sel);
   };
 
-  const onGetRecords = () => {
-    if (!window.confirm('pre_RTP_temp 프로시저를 실행합니다. 계속할까요?')) return;
+  const onGetRecords = async () => {
+    if (!await showConfirm('pre_RTP_temp 프로시저를 실행합니다. 계속할까요?')) return;
     gen.current += 1;
     call('/records', { swVersions: swSel, confirm: true }, (d) => {
       resetItems(d.items);
@@ -152,18 +154,18 @@ export default function TempForm({ database, probeId, onClose }) {
     setEn((e) => ({ ...e, plot: next.some(Boolean) }));
   };
 
-  const onMark = (k) => {
+  const onMark = async (k) => {
     const idx = top + k;
     if (idx >= items.length) return;
-    if (!window.confirm('trtp_temp 의 mark 값을 변경합니다. 계속할까요?')) return;
+    if (!await showConfirm('trtp_temp 의 mark 값을 변경합니다. 계속할까요?')) return;
     call('/mark', { item: items[idx], confirm: true }, (d) => {
       setItems((list) => list.map((it, j) => (j === idx ? d.item : it)));
       setGridData(asGrid(d.grid));
     });
   };
 
-  const onMarkAll = () => {
-    if (!window.confirm("trtp_temp 전체의 mark 를 'checked' 로 변경합니다. 계속할까요?")) return;
+  const onMarkAll = async () => {
+    if (!await showConfirm("trtp_temp 전체의 mark 를 'checked' 로 변경합니다. 계속할까요?")) return;
     call('/mark-all', { confirm: true }, (d) => {
       setItems((list) => list.map((it) => { const p = it.split('\t'); p[7] = 'checked'; return p.join('\t'); }));
       setGridData(asGrid(d.grid));
@@ -186,7 +188,7 @@ export default function TempForm({ database, probeId, onClose }) {
     const list = checkedItems();
     const flags = new Set(list.map((it) => MS_GRAPH[Number(parse(it)[2])]).filter(Boolean));
     if ((flags.has('HPSF') || flags.has('TrSpectrum')) && list.length > 1) {
-      window.alert('Please select one for plot!');
+      showAlert('Please select one for plot!');
       return;
     }
     run(async (alive) => {
@@ -199,8 +201,8 @@ export default function TempForm({ database, probeId, onClose }) {
     });
   };
 
-  const onAperRun = () => {
-    if (!window.confirm('Aperture 계수를 fitting 해 temp_coeff 에 저장합니다. 계속할까요?')) return;
+  const onAperRun = async () => {
+    if (!await showConfirm('Aperture 계수를 fitting 해 temp_coeff 에 저장합니다. 계속할까요?')) return;
     call('/aper-run', { material, confirm: true }, (d) => {
       alertAll(d.messages);
       if (d.isTwoD !== null && d.isTwoD !== undefined) setIsTwoD(d.isTwoD);
@@ -208,8 +210,8 @@ export default function TempForm({ database, probeId, onClose }) {
     });
   };
 
-  const onTrSpec = () => {
-    if (!window.confirm('TR Spectrum 을 계산해 dbo.trSpectrum 에 저장합니다. 계속할까요?')) return;
+  const onTrSpec = async () => {
+    if (!await showConfirm('TR Spectrum 을 계산해 dbo.trSpectrum 에 저장합니다. 계속할까요?')) return;
     call('/tr-spec', { confirm: true }, async (d) => {
       alertAll(d.messages);
       await drawGraph('TrSpectrum', checkedItems());
@@ -221,9 +223,9 @@ export default function TempForm({ database, probeId, onClose }) {
     if (!d.exit) setCharts((c) => ({ ...c, Voltage: { ...d, xLabel: 'Freq (MHz)', yLabel: 'Error (dB)' } }));
   });
 
-  const onGridDbl = (r, c) => {
+  const onGridDbl = async (r, c) => {
     if (!String(gridData.columns[c] || '').includes('isDataUsable')) return;
-    if (!window.confirm('isDataUsable 값을 변경합니다(trtp_temp, ws_temperature). 계속할까요?')) return;
+    if (!await showConfirm('isDataUsable 값을 변경합니다(trtp_temp, ws_temperature). 계속할까요?')) return;
     call('/usable', { tempId: gridData.rows[r][0], value: String(gridData.rows[r][c] ?? ''), confirm: true }, (d) => {
       setGridData((g) => ({ ...g, rows: g.rows.map((row, ri) => (ri === r ? row.map((v, ci) => (ci === c ? d.value : v)) : row)) }));
     });
@@ -245,8 +247,8 @@ export default function TempForm({ database, probeId, onClose }) {
     });
   };
 
-  const save = (i, x, y) => {
-    if (!window.confirm('trtp_temp 데이터를 수정합니다. 계속할까요?')) return;
+  const save = async (i, x, y) => {
+    if (!await showConfirm('trtp_temp 데이터를 수정합니다. 계속할까요?')) return;
     const p = edit.points[i];
     const { graph } = edit;
     call('/save-edit', { graph, dataset: edit.dataset, material, tempId: p[0], oldX: p[1], x, y, confirm: true },
@@ -263,8 +265,8 @@ export default function TempForm({ database, probeId, onClose }) {
       });
   };
 
-  const onDragEnd = (i, x, y) => {
-    if (window.confirm('The dataset has been modified. Do you want to save your changes?')) {
+  const onDragEnd = async (i, x, y) => {
+    if (await showConfirm('The dataset has been modified. Do you want to save your changes?')) {
       save(i, ep.s.allowX ? x : edit.points[i][1], y);
     } else {
       ep.off();

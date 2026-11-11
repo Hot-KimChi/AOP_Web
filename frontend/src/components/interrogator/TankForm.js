@@ -8,6 +8,7 @@ import { apiJson, query } from '../../lib/apiJson';
 import TankGraph, { GEO_LARGE, GEO_SMALL, hitTest, plotColorVar, vbFormatE, yFromPixel } from './tankChart';
 import TankDetailForm from './TankDetailForm';
 import TankVoltageSForm from './TankVoltageSForm';
+import { showAlert, showAlerts, showConfirm, showError } from '../../lib/dialog';
 
 const API = '/api/interrogator/tank';
 const PT = 96 / 72;
@@ -122,7 +123,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
     if (!database || blankFlag(probeId)) return;
     apiJson(`${API}/sw-versions?${query({ database, probeId })}`)
       .then((d) => { if (my === gen.current) setSwList(d || []); })
-      .catch((e) => window.alert(e.message || String(e)));
+      .catch((e) => showError(e));
   }, [database, probeId]);
 
   const get = (path, params) => apiJson(`${API}${path}?${query({ database, ...params })}`);
@@ -136,7 +137,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
     try {
       await fn(() => my === gen.current);
     } catch (e) {
-      window.alert(e.message || String(e));
+      showError(e);
     } finally {
       busyRef.current = false;
       setBusy('');
@@ -236,12 +237,12 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
     manualEditOff();
   };
 
-  const onGraphUp = (graph) => (button) => {
+  const onGraphUp = (graph) => async (button) => {
     const e = S.current.edit;
     const s = S.current.sel;
     if (!e || e.graph !== graph || !s?.dragging || button !== 'left') return;
     setSel({ idx: s.idx, dragging: false });
-    if (window.confirm('The dataset has been modified. Do you want to save your changes?')) {
+    if (await showConfirm('The dataset has been modified. Do you want to save your changes?')) {
       run('SaveEdit', () => saveEdit(e, s.idx, e.points));
     } else {
       cancelEdit();
@@ -256,7 +257,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
     const nx = Number(f.newX);
     const ny = Number(f.newY);
     if (f.newX.trim() === '' || f.newY.trim() === '' || !Number.isFinite(nx) || !Number.isFinite(ny)) {
-      window.alert('Type mismatch');
+      showAlert('Type mismatch');
       return;
     }
     const points = e.points.map((p, i) => (i === s.idx ? [nx, ny] : p));
@@ -325,11 +326,11 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
       if (r.corrected) lines.push({ color: 'purple', points: r.corrected });
       setGraphs((g) => ({ ...g, [graph]: { range: r.range, lines } }));
     }
-    if (r.multiDipMessage) window.alert(r.multiDipMessage);
+    if (r.multiDipMessage) showAlert(r.multiDipMessage);
     setEdit(null);
     setSel(null);
     manualEditClear();
-    if (r.dip > 0 && window.confirm(`Dips are found In ${prompt} vs. Voltage at z=${key}. Do you want To save fixes?`)) {
+    if (r.dip > 0 && await showConfirm(`Dips are found In ${prompt} vs. Voltage at z=${key}. Do you want To save fixes?`)) {
       await post('/auto-check/save', { graph, resId: Number(ge.mri), key, confirm: true });
     }
     await drawGraph([graph]);
@@ -346,7 +347,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
         const z = await get('/zdis', { resId: ge.mri, kind, zloc: S.current.zloc });
         if (!alive()) return;
         if (blankFlag(z)) {
-          window.alert(`No specified zDistance is found for resId =${ge.mri}`);
+          showAlert(`No specified zDistance is found for resId =${ge.mri}`);
           continue;
         }
         ge.zloc = z;
@@ -360,7 +361,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
 
   const cmdAutoCheckAll = () => {
     const ge = gEdit.current;
-    if (ge.mri === '') { window.alert('Please select an edit MRI'); return; }
+    if (ge.mri === '') { showAlert('Please select an edit MRI'); return; }
     run('Auto Editing', async (alive) => {
       const zRequest = await get('/zdis', { resId: ge.mri, kind: 'zloc', zloc: S.current.zloc });
       const zs = await get('/z-locations', { resId: ge.mri });
@@ -377,12 +378,12 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
     });
   };
 
-  const cmdAutoCheckAllMri = () => {
-    if (!window.confirm('모든 MRI 의 Voltage/MI dip 을 자동 보정해 ws_voltage_dep 에 저장합니다. 계속할까요?')) return;
+  const cmdAutoCheckAllMri = async () => {
+    if (!await showConfirm('모든 MRI 의 Voltage/MI dip 을 자동 보정해 ws_voltage_dep 에 저장합니다. 계속할까요?')) return;
     run('AutoEdit all MRI Volt-dep', async (alive) => {
       const r = await post('/auto-check-all-mri', { zloc: S.current.zloc, zmin: S.current.zmin, confirm: true });
       if (!alive()) return;
-      (r.messages || []).forEach((m) => window.alert(m));
+      await showAlerts(r.messages);
       await drawGraph(NAMES);
     });
   };
@@ -432,7 +433,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
       const pulse = list[i].fields[1];
       get('/voltage-grid', { probeId, pulseType: pulse })
         .then((exists) => { if (!exists) setModal({ kind: 'voltage', pulseType: pulse }); })
-        .catch((e) => window.alert(e.message || String(e)));
+        .catch((e) => showError(e));
     }
   };
 
@@ -464,8 +465,8 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
     });
   };
 
-  const cmdMarkAll = () => {
-    if (!window.confirm("trtp_measurement 의 모든 mark 를 'checked' 로 바꿉니다. 계속할까요?")) return;
+  const cmdMarkAll = async () => {
+    if (!await showConfirm("trtp_measurement 의 모든 mark 를 'checked' 로 바꿉니다. 계속할까요?")) return;
     run('Mark All', async () => {
       await post('/mark-all', { confirm: true });
       remark(S.current.items.map((_, i) => i), 'c');
@@ -476,7 +477,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
   const onSwClick = (v) => {
     if (swSel.includes(v)) { setSwSel(swSel.filter((x) => x !== v)); return; }
     if (swSel.length >= 3) {
-      window.alert("Please limit your selection of 'measImgSwVersion' values to a maximum of three (3).");
+      showAlert("Please limit your selection of 'measImgSwVersion' values to a maximum of three (3).");
       return;
     }
     setSwSel([...swSel, v]);
@@ -490,8 +491,8 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
     setGraphs({});
   };
 
-  const cmdGetRecords = () => {
-    if (!window.confirm('pre_RTP_tank 프로시저로 작업 테이블을 다시 만듭니다. 계속할까요?')) return;
+  const cmdGetRecords = async () => {
+    if (!await showConfirm('pre_RTP_tank 프로시저로 작업 테이블을 다시 만듭니다. 계속할까요?')) return;
     run('Pre_RTP_tank\nRetrieving records ...', async (alive) => {
       const d = await post('/records', { probeId, rtpName, swVersions: swSel, zloc, confirm: true });
       if (!alive()) return;

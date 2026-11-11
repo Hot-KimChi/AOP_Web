@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { VbButton, VbDbBar, VbForm, VbModal } from '../vb/Vb';
 import MsiDumpForm from './MsiDumpForm';
+import { showAlert } from '../../lib/dialog';
 
 const BOLD = { size: 9.75, bold: true };
 
@@ -18,7 +19,7 @@ function openExcelWindow(database) {
     `width=${w},height=${h},left=0,top=0,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`,
   );
   if (win) win.focus();
-  else window.alert('팝업이 차단되었습니다. 브라우저에서 이 사이트의 팝업을 허용해 주세요.');
+  else showAlert('팝업이 차단되었습니다. 브라우저에서 이 사이트의 팝업을 허용해 주세요.');
 }
 
 export default function MsiChoice() {

@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { VbButton, VbCheck, VbCombo, VbForm, VbGrid, VbLabel, VbText } from '../vb/Vb';
 import { apiJson, query } from '../../lib/apiJson';
+import { showAlert, showConfirm, showError } from '../../lib/dialog';
 
 const PURPOSES = ['Auto Detect', 'RTP', 'Sample', 'SSR', 'FDA', 'IEC', 'Power'];
 const TABLES = ['meas_setting', 'temp_setting'];
@@ -41,7 +42,7 @@ export default function MsiDumpForm({ database, onClose }) {
     const ctrl = new AbortController();
     apiJson(`/api/msi/probe-ids?${query({ database })}`, { signal: ctrl.signal })
       .then((d) => setProbeIds(d || []))
-      .catch((e) => { if (e.name !== 'AbortError') window.alert(e.message); });
+      .catch((e) => { if (e.name !== 'AbortError') showError(e); });
     return () => ctrl.abort();
   }, [database]);
 
@@ -56,8 +57,8 @@ export default function MsiDumpForm({ database, onClose }) {
   };
 
   const getRecords = async () => {
-    if (!database) { window.alert('Database 를 선택하세요.'); return; }
-    if (!probeId) { window.alert('Probe ID 를 선택하세요.'); return; }
+    if (!database) { showAlert('Database 를 선택하세요.'); return; }
+    if (!probeId) { showAlert('Probe ID 를 선택하세요.'); return; }
     setBusy('get');
     try {
       const data = await apiJson(`/api/msi/dump-records?${query({ database, probeId, verifFilter: verifId })}`);
@@ -67,7 +68,7 @@ export default function MsiDumpForm({ database, onClose }) {
       if (loadedProbe !== String(probeId)) setSelected([]);
       setLoadedProbe(String(probeId));
     } catch (e) {
-      window.alert(e.message);
+      showError(e);
     } finally {
       setBusy('');
     }
@@ -87,16 +88,16 @@ export default function MsiDumpForm({ database, onClose }) {
 
   const createMsi = async () => {
     if (!selected.length) {
-      window.alert('Nothing in Selected table. No data is saved in database.');
+      showAlert('Nothing in Selected table. No data is saved in database.');
       return;
     }
     const cols = selectedCols.length ? selectedCols : sub.columns;
-    if (!String(cols[1] || '').includes('verifId')) { window.alert('Second Element is not verifId'); return; }
-    if (!String(cols[0] || '').includes('subVerifId')) { window.alert('First Element is not subVerifId'); return; }
+    if (!String(cols[1] || '').includes('verifId')) { showAlert('Second Element is not verifId'); return; }
+    if (!String(cols[0] || '').includes('subVerifId')) { showAlert('First Element is not subVerifId'); return; }
     if (table !== 'meas_setting') {
       // 원본도 temp_setting 저장(saveDataToTemp)은 주석 처리되어 아무것도 저장하지 않는다.
       setCreated(EMPTY);
-      window.alert('temp_setting 저장은 원본에서도 지원하지 않습니다. 저장된 데이터가 없습니다.');
+      showAlert('temp_setting 저장은 원본에서도 지원하지 않습니다. 저장된 데이터가 없습니다.');
       return;
     }
     const minMeasSetId = createNew ? Math.max(0, Math.trunc(Number(msi) || 0)) : 0;
@@ -114,13 +115,13 @@ export default function MsiDumpForm({ database, onClose }) {
       const lines = Object.entries(ACTION_LABEL).map(([k, label]) => `${label}: ${s[k] || 0}`).join('\n');
       const skipped = (plan.actions || []).filter((a) => a.action === 'skip')
         .slice(0, 10).map((a) => `subVerifId ${a.subVerifId}: ${a.message}`).join('\n');
-      if (!window.confirm(`meas_setting 에 저장합니다.\n\n${lines}${skipped ? `\n\n${skipped}` : ''}\n\n진행할까요?`)) return;
+      if (!await showConfirm(`meas_setting 에 저장합니다.\n\n${lines}${skipped ? `\n\n${skipped}` : ''}\n\n진행할까요?`)) return;
       const res = await apiJson('/api/msi/create', {
         method: 'POST', body: { ...body, planHash: plan.planHash, confirm: true },
       });
       setCreated(res.created || EMPTY);
     } catch (e) {
-      window.alert(e.message);
+      showError(e);
     } finally {
       setBusy('');
     }

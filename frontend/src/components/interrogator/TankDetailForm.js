@@ -7,6 +7,7 @@ import { VbButton, VbForm, VbLabel, VbText, asGrid, cellText } from '../vb/Vb';
 import { apiJson } from '../../lib/apiJson';
 import { API_BASE_URL } from '../../lib/apiBase';
 import TankGraph, { GEO_DETAIL } from './tankChart';
+import { showAlert, showError } from '../../lib/dialog';
 
 const API = '/api/interrogator/tank';
 const B = { size: 9, bold: true };
@@ -29,7 +30,7 @@ export default function TankDetailForm({ database, resIds, selectAll, onClose })
     const my = gen.current;
     apiJson(`${API}/details`, { method: 'POST', body: { database, resIds, selectAll } })
       .then((d) => { if (my === gen.current) setGrid(asGrid(d)); })
-      .catch((e) => window.alert(e.message || String(e)));
+      .catch((e) => showError(e));
     return () => { gen.current += 1; };
   }, [database, resIds, selectAll]);
 
@@ -57,7 +58,7 @@ export default function TankDetailForm({ database, resIds, selectAll, onClose })
   };
 
   const cmdPlot = async () => {
-    if (z1 === '' || (z2 === '' && numOfCases > 1)) { window.alert('Please input 1st and 2nd zLocations'); return; }
+    if (z1 === '' || (z2 === '' && numOfCases > 1)) { showAlert('Please input 1st and 2nd zLocations'); return; }
     setBusy(true);
     try {
       const d = await apiJson(`${API}/waveform`, { method: 'POST', body: { database, cases: cases(), delay } });
@@ -66,7 +67,7 @@ export default function TankDetailForm({ database, resIds, selectAll, onClose })
         lines: d.lines.map((l, i) => ({ color: i === 0 ? 1 : 4, points: l.points || [] })),
       });
     } catch (e) {
-      window.alert(e.message || String(e));
+      showError(e);
     } finally {
       setBusy(false);
     }
@@ -74,7 +75,7 @@ export default function TankDetailForm({ database, resIds, selectAll, onClose })
 
   const cmdSave = async () => {
     if (z1 === '' || (z2 === '' && numOfCases > 1) || excel === '') {
-      window.alert('Please input 1st, 2nd zLocations and excel file name. ');
+      showAlert('Please input 1st, 2nd zLocations and excel file name. ');
       return;
     }
     setBusy(true);
@@ -97,7 +98,7 @@ export default function TankDetailForm({ database, resIds, selectAll, onClose })
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (e) {
-      window.alert(e.message || String(e));
+      showError(e);
     } finally {
       setBusy(false);
     }

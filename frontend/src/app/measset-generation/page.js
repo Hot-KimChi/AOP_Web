@@ -5,6 +5,7 @@ import { Play, ExternalLink, Database, Table2, RotateCw, Settings2 } from 'lucid
 import DataPreviewModal from '../../components/DataPreviewModal';
 import { API_BASE_URL } from '../../lib/apiBase';
 import MsiChoice from '../../components/msi/MsiChoice';
+import { showAlert } from '../../lib/dialog';
 
 function CondorMeasSetGen() {
   // 기본 상태 변수 선언
@@ -365,7 +366,7 @@ function CondorMeasSetGen() {
   // CSV 파일 업로드 및 처리
   const handleFileUpload = async () => {
     if (!file || !selectedDatabase || !selectedProbe) {
-      alert('파일 업로드 전에 데이터베이스, 프로브, 파일을 선택해주세요.');
+      showAlert('파일 업로드 전에 데이터베이스, 프로브, 파일을 선택해주세요.');
       return;
     }
 
@@ -421,7 +422,7 @@ function CondorMeasSetGen() {
   // SQL 데이터를 데이터베이스에 삽입
   const saveToDatabase = async () => {
     if (!selectedDatabase || !selectedProbe) {
-      alert('데이터베이스와 프로브를 선택해주세요.');
+      showAlert('데이터베이스와 프로브를 선택해주세요.');
       return;
     }
 
@@ -460,21 +461,21 @@ function CondorMeasSetGen() {
       }
     } catch (err) {
       console.error('세션 스토리지 데이터 파싱 오류:', err);
-      alert('데이터 파싱 중 오류가 발생했습니다.');
+      showAlert('데이터 파싱 중 오류가 발생했습니다.');
       return;
     }
 
     // 4. 데이터 체크 및 필요시 파일 업로드
     if (!latestFilteredData || !latestFullData) {
       if (!file) {
-        alert('파일을 업로드하거나 데이터를 먼저 생성해주세요.');
+        showAlert('파일을 업로드하거나 데이터를 먼저 생성해주세요.');
         return;
       }
       
       // 파일 업로드 처리
       const uploadedData = await handleFileUpload();
       if (!uploadedData) {
-        alert('데이터 생성에 실패했습니다.');
+        showAlert('데이터 생성에 실패했습니다.');
         return;
       }
       
@@ -624,11 +625,11 @@ function CondorMeasSetGen() {
       const result = await sqlResponse.json();
       setError(null);
       setDataModified(false);
-      alert('SQL 데이터가 성공적으로 삽입되었습니다!');
+      showAlert('SQL 데이터가 성공적으로 삽입되었습니다!');
     } catch (err) {
       console.error('SQL 삽입 오류:', err);
       setError(err.message);
-      alert(`SQL 삽입 오류: ${err.message}`);
+      showAlert(`SQL 삽입 오류: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -647,7 +648,7 @@ function CondorMeasSetGen() {
                            (latestSessionData ? JSON.parse(latestSessionData) : filterCsvData);
                            
     if (!filteredDataToUse || filteredDataToUse.length === 0) {
-      alert('표시할 CSV 데이터가 없습니다.');
+      showAlert('표시할 CSV 데이터가 없습니다.');
       return;
     }
 
@@ -670,7 +671,7 @@ function CondorMeasSetGen() {
     // 새 창 열기
     const newWindow = window.open('/data-view', '측정 데이터', 'width=2000,height=800');
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-      alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
+      showAlert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
       return;
     }
 
@@ -736,13 +737,13 @@ function CondorMeasSetGen() {
         setFilterCsvData(parsedData);
         setFullCsvData(parsedFullData);
         
-        alert(`데이터가 새로고침되었습니다. ${updatedCount}개의 데이터가 수정되었습니다.`);
+        showAlert(`데이터가 새로고침되었습니다. ${updatedCount}개의 데이터가 수정되었습니다.`);
       } catch (err) {
         console.error('데이터 새로고침 오류:', err);
-        alert('데이터 새로고침 중 오류가 발생했습니다.');
+        showAlert('데이터 새로고침 중 오류가 발생했습니다.');
       }
     } else {
-      alert('새로고침할 데이터가 없습니다.');
+      showAlert('새로고침할 데이터가 없습니다.');
     }
   };
 

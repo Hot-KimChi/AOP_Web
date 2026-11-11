@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { VbButton, VbCombo, VbForm, VbGrid, VbLabel, VbList, asGrid } from '../vb/Vb';
 import { apiJson } from '../../lib/apiJson';
 import TempChart from './tempChart';
+import { showAlert, showAlerts, showConfirm, showError } from '../../lib/dialog';
 
 const API = '/api/interrogator/temp/t10';
 const B9 = 'bold 9pt "Microsoft Sans Serif"';
@@ -15,7 +16,7 @@ const CAPTION = { font: 'bold 9.75pt Arial', align: 'center', style: { border: '
 const EMPTY = { columns: [], rows: [] };
 
 function alertAll(msgs) {
-  (msgs || []).forEach((m) => window.alert(m));
+  return showAlerts(msgs);
 }
 
 export default function Temp10Form({ database, onClose }) {
@@ -46,7 +47,7 @@ export default function Temp10Form({ database, onClose }) {
       const data = await apiJson(`${API}${path}`, { method: 'POST', body: { database, ...body } });
       if (my === gen.current) await fn(data);
     } catch (e) {
-      window.alert(e.message || String(e));
+      showError(e);
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -58,15 +59,15 @@ export default function Temp10Form({ database, onClose }) {
     const my = gen.current;
     apiJson(`${API}/probes`, { method: 'POST', body: { database } })
       .then((d) => { if (my === gen.current) setProbes(d.probes || []); })
-      .catch((e) => window.alert(e.message || String(e)));
+      .catch((e) => showError(e));
   }, [database]);
 
   const ids = () => ({ probeId: Number(probeId), tempSSId, tempSetId });
 
-  const onProbe = (v) => {
+  const onProbe = async (v) => {
     if (!v) { setProbeId(v); return; }
     // 취소하면 프로브 선택을 바꾸지 않는다(이전 프로브의 tempSSId·tempSetId 와 섞이지 않게).
-    if (!window.confirm('get10TempSetId 프로시저를 실행합니다. 계속할까요?')) return;
+    if (!await showConfirm('get10TempSetId 프로시저를 실행합니다. 계속할까요?')) return;
     if (busyRef.current) return;
     gen.current += 1;
     call('/probe', { probeId: Number(v), confirm: true }, (d) => {
@@ -113,20 +114,20 @@ export default function Temp10Form({ database, onClose }) {
     if (!d.exit) setChart(d);
   });
 
-  const onConvert = () => {
+  const onConvert = async () => {
     if (material === '') {
-      window.alert('Please select material Air or Tmm!');
+      showAlert('Please select material Air or Tmm!');
       return;
     }
-    if (!window.confirm('10분 온도 fitting 후 temp10_fit_coeff 에 저장합니다. 계속할까요?')) return;
+    if (!await showConfirm('10분 온도 fitting 후 temp10_fit_coeff 에 저장합니다. 계속할까요?')) return;
     call('/convert', { ...ids(), material, confirm: true }, (d) => {
       alertAll(d.messages);
       if (d.ok) setEn((e) => ({ ...e, save: true, plot: true }));
     });
   };
 
-  const onSave = () => {
-    if (!window.confirm('30분 온도를 dbo.temperature 에 저장합니다. 계속할까요?')) return;
+  const onSave = async () => {
+    if (!await showConfirm('30분 온도를 dbo.temperature 에 저장합니다. 계속할까요?')) return;
     call('/save30', { ...ids(), confirm: true }, (d) => {
       alertAll(d.messages);
       setEn((e) => ({ ...e, save: false }));
@@ -147,8 +148,8 @@ export default function Temp10Form({ database, onClose }) {
     getRecords(all);
   };
 
-  const onMulti = () => {
-    if (!window.confirm('선택된 세트마다 fitting 후 30분 온도를 저장합니다. 계속할까요?')) return;
+  const onMulti = async () => {
+    if (!await showConfirm('선택된 세트마다 fitting 후 30분 온도를 저장합니다. 계속할까요?')) return;
     call('/multi-convert', { probeId: Number(probeId), tempSSId, tempSetIds: selectedSetIds(selectSet),
       confirm: true }, (d) => alertAll(d.messages));
   };

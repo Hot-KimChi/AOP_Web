@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileInput, ClipboardList, Upload, Table2 } from 'lucide-react';
 import Layout from '../../components/Layout';
 import { API_BASE_URL } from '../../lib/apiBase';
+import { showAlert } from '../../lib/dialog';
 
 export default function VerificationReport() {
 
@@ -461,11 +462,11 @@ export default function VerificationReport() {
     // 업로드 중 재클릭으로 같은 파일이 두 번 INSERT 되지 않도록 즉시 잠근다.
     if (txUploadingRef.current) return;
     if (!txDatabase || !txProbe || !txSoftwareVersion || !txFile) {
-      alert('Database, Probe, Software version, Input file을 모두 선택하세요.');
+      showAlert('Database, Probe, Software version, Input file을 모두 선택하세요.');
       return;
     }
     if (!txValidationOk) {
-      alert('파일 파라미터 검증이 완료되지 않았습니다. 검증 결과를 확인하세요.');
+      showAlert('파일 파라미터 검증이 완료되지 않았습니다. 검증 결과를 확인하세요.');
       return;
     }
     txUploadingRef.current = true;
@@ -490,7 +491,7 @@ export default function VerificationReport() {
       if (!response.ok || data.status !== 'success') {
         throw new Error(data.message || 'TX Summary 업로드 실패');
       }
-      alert(data.message || 'TX Summary 업로드가 완료되었습니다.');
+      showAlert(data.message || 'TX Summary 업로드가 완료되었습니다.');
       const probeGen = txProbeGenRef.current;
       const swGen = txSwGenRef.current;
       await Promise.all([
@@ -507,7 +508,7 @@ export default function VerificationReport() {
 
   const extractReportData = async () => {
     if (!reportDatabase || !reportProbe || !reportSoftwareVersion || !reportWcsSoftware) {
-      alert('Database, Probe, TX Software, WCS S/W를 선택하세요.');
+      showAlert('Database, Probe, TX Software, WCS S/W를 선택하세요.');
       return;
     }
     const tasks = [];
@@ -554,7 +555,7 @@ export default function VerificationReport() {
       });
     }
     if (tasks.length === 0) {
-      alert('SSid 값을 최소 1개 입력하세요.');
+      showAlert('SSid 값을 최소 1개 입력하세요.');
       return;
     }
     setReportLoading(true);
@@ -619,10 +620,10 @@ export default function VerificationReport() {
         setReportError(`리포트 추출 실패: ${failedLabels.join(', ')}`);
       }
       if (missingLabels.length > 0) {
-        alert(`데이터 없음: ${missingLabels.join(', ')}`);
+        showAlert(`데이터 없음: ${missingLabels.join(', ')}`);
       }
       if (popupBlocked) {
-        alert('브라우저가 새 창을 차단했습니다. 팝업 차단을 해제한 뒤 다시 시도하세요.');
+        showAlert('브라우저가 새 창을 차단했습니다. 팝업 차단을 해제한 뒤 다시 시도하세요.');
       }
     } catch (err) {
       setReportError(err.message || '리포트 추출 실패');

@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { VbButton, VbCombo, VbForm, VbGrid, VbLabel } from '../vb/Vb';
 import { apiJson, query } from '../../lib/apiJson';
+import { showError } from '../../lib/dialog';
 
 const A8 = { size: 8, family: 'Arial' };
 const EMPTY = { columns: [], rows: [] };
@@ -21,7 +22,7 @@ export default function RtpAnalysisForm({ database, onClose }) {
     const ctrl = new AbortController();
     apiJson(`/api/interrogator/rtp-names-all?${query({ database })}`, { signal: ctrl.signal })
       .then((d) => setNames(d || []))
-      .catch((e) => { if (e.name !== 'AbortError') window.alert(e.message); });
+      .catch((e) => { if (e.name !== 'AbortError') showError(e); });
     return () => ctrl.abort();
   }, [database]);
 
@@ -33,7 +34,7 @@ export default function RtpAnalysisForm({ database, onClose }) {
       setResult(await apiJson('/api/interrogator/rtp-analysis', { method: 'POST', body: { database, rtpName: name } }));
     } catch (e) {
       setResult(EMPTY);
-      window.alert(e.message);
+      showError(e);
     } finally {
       setBusy(false);
     }

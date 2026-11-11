@@ -6,6 +6,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { apiJson, query } from '../../lib/apiJson';
 import { VbButton, VbCombo, VbForm, VbGrid, VbLabel, VbText, asGrid } from '../vb/Vb';
+import { showAlert, showConfirm } from '../../lib/dialog';
 
 const F8 = { size: 8, family: 'Arial' };
 const F975 = { size: 9.75, family: 'Arial' };
@@ -97,7 +98,7 @@ export default function ExportForm({ database, probeId, rtpName, onClose }) {
 
   const onGet = async () => {
     if (busy) return;
-    if (!prb) { alert('ProbeId 를 선택하세요.'); return; }
+    if (!prb) { showAlert('ProbeId 를 선택하세요.'); return; }
     const my = ++gen.current;
     setSelected({ probeId: prb, rtpName: rtp });
     setBusy('get');
@@ -117,8 +118,8 @@ export default function ExportForm({ database, probeId, rtpName, onClose }) {
 
   const onCopy = async () => {
     if (busy) return;
-    if (!prb) { alert('ProbeId 를 선택하세요.'); return; }
-    if (!confirm(`rtp_M_duplicate 를 실행합니다.\nProbeId: ${prb}, RTP Name: ${rtp}\n계속하시겠습니까?`)) return;
+    if (!prb) { showAlert('ProbeId 를 선택하세요.'); return; }
+    if (!await showConfirm(`rtp_M_duplicate 를 실행합니다.\nProbeId: ${prb}, RTP Name: ${rtp}\n계속하시겠습니까?`)) return;
     const my = ++gen.current;
     setSelected({ probeId: prb, rtpName: rtp });
     setBusy('copy');
@@ -138,7 +139,7 @@ export default function ExportForm({ database, probeId, rtpName, onClose }) {
 
   const onConvert = async () => {
     if (busy) return;
-    if (!selected.probeId) { alert('ProbeId 를 선택하세요.'); return; }
+    if (!selected.probeId) { showAlert('ProbeId 를 선택하세요.'); return; }
     const my = ++gen.current;
     setBusy('convert');
     setError('');

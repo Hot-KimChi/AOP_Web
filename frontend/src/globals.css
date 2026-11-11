@@ -1229,3 +1229,106 @@ select.vb-list option:checked { background: var(--vb-highlight); color: var(--vb
 .vb-checklist-item.selected { background: var(--vb-highlight); color: var(--vb-highlight-text); }
 .vb-checklist-item input { margin: 0; accent-color: var(--brand); }
 .vb-tab-strip { color: var(--text); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+
+/* ─── 앱 공용 알림/확인 창 (lib/dialog.js) ───────────────────── */
+:root {
+  --dlg-info: #2563eb;
+  --dlg-success: #15803d;
+  --dlg-warning: #b45309;
+  --dlg-error: #dc2626;
+  --dlg-question: #4f46e5;
+  --dlg-danger-btn: #dc2626;
+  --dlg-danger-btn-hover: #b91c1c;
+  --dlg-backdrop: rgba(15, 23, 42, 0.42);
+  --dlg-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.35), 0 2px 6px rgba(15, 23, 42, 0.12);
+  --dlg-ghost-border: #64748b;
+}
+[data-theme="dark"] {
+  --dlg-info: #60a5fa;
+  --dlg-success: #4ade80;
+  --dlg-warning: #fbbf24;
+  --dlg-error: #f87171;
+  --dlg-question: #a5b4fc;
+  --dlg-danger-btn: #dc2626;
+  --dlg-danger-btn-hover: #b91c1c;
+  --dlg-backdrop: rgba(2, 6, 23, 0.62);
+  --dlg-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --dlg-ghost-border: #94a3b8;
+}
+.aop-dlg-backdrop {
+  position: fixed; inset: 0; z-index: 100000;
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  background: var(--dlg-backdrop);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  animation: aopDlgFade 0.16s var(--ease);
+}
+.aop-dlg {
+  --tone: var(--dlg-info);
+  width: min(440px, 100%); max-height: min(80vh, 640px);
+  display: flex; flex-direction: column;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-top: 4px solid var(--tone);
+  border-radius: 14px;
+  box-shadow: var(--dlg-shadow);
+  font-family: var(--font-sans);
+  animation: aopDlgPop 0.2s var(--ease);
+  overflow: hidden;
+}
+.aop-dlg--success  { --tone: var(--dlg-success); }
+.aop-dlg--warning  { --tone: var(--dlg-warning); }
+.aop-dlg--error    { --tone: var(--dlg-error); }
+.aop-dlg--question { --tone: var(--dlg-question); }
+.aop-dlg--danger   { --tone: var(--dlg-error); }
+.aop-dlg__head {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 1.1rem 1.25rem 0.5rem;
+}
+.aop-dlg__icon {
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+}
+.aop-dlg__title {
+  margin: 0; flex: 1 1 auto; min-width: 0;
+  font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text);
+}
+.aop-dlg__badge {
+  flex: 0 0 auto; padding: 0.1rem 0.55rem; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600;
+  color: var(--text-sec); background: var(--bg); border: 1px solid var(--border);
+}
+.aop-dlg__msg {
+  padding: 0.25rem 1.25rem 1.1rem calc(1.25rem + 40px + 0.75rem);
+  font-size: 0.925rem; line-height: 1.6; color: var(--text-sec);
+  white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; overflow-y: auto;
+}
+.aop-dlg__actions {
+  display: flex; justify-content: flex-end; gap: 0.5rem;
+  padding: 0.85rem 1.25rem; background: var(--bg); border-top: 1px solid var(--border);
+}
+.aop-dlg__btn {
+  min-width: 84px; padding: 0.5rem 1.1rem; border-radius: var(--radius);
+  font-size: 0.875rem; font-weight: 600; line-height: 1.2; cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.08s var(--ease);
+}
+.aop-dlg__btn:active { transform: translateY(1px); }
+.aop-dlg__btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.aop-dlg__btn--primary { background: var(--brand); color: var(--on-brand); box-shadow: var(--shadow-btn); }
+.aop-dlg__btn--primary:hover { background: var(--brand-dark); }
+.aop-dlg__btn--danger { background: var(--dlg-danger-btn); color: var(--on-brand); box-shadow: var(--shadow-btn); }
+.aop-dlg__btn--danger:hover { background: var(--dlg-danger-btn-hover); }
+.aop-dlg__btn--ghost { background: var(--surface); color: var(--text); border-color: var(--dlg-ghost-border); }
+.aop-dlg__btn--ghost:hover { background: var(--table-hover); }
+@keyframes aopDlgFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes aopDlgPop {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aop-dlg-backdrop, .aop-dlg { animation: none; }
+}
+@media (max-width: 480px) {
+  .aop-dlg__msg { padding-left: 1.25rem; }
+}

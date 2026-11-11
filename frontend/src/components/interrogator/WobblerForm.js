@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { VbButton, VbCheck, VbForm, VbGrid, VbLabel, VbText, asGrid } from '../vb/Vb';
 import { apiJson } from '../../lib/apiJson';
 import TempChart, { ChgBox, ITEM_COLORS, PopupMenu, useEditPoint } from './tempChart';
+import { showAlerts, showConfirm, showError } from '../../lib/dialog';
 
 const API = '/api/interrogator/temp/wob';
 const A9 = '9pt Arial';
@@ -13,7 +14,7 @@ const F975 = '9.75pt Arial';
 const EMPTY = { columns: [], rows: [] };
 
 function alertAll(msgs) {
-  (msgs || []).forEach((m) => window.alert(m));
+  return showAlerts(msgs);
 }
 
 function parseItem(item) {
@@ -52,7 +53,7 @@ export default function WobblerForm({ database, probeId, onClose }) {
       const data = await apiJson(`${API}${path}`, { method: 'POST', body: { database, probeId, ...body } });
       if (my === gen.current) await fn(data);
     } catch (e) {
-      window.alert(e.message || String(e));
+      showError(e);
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -61,8 +62,8 @@ export default function WobblerForm({ database, probeId, onClose }) {
 
   const checkedItems = () => items.filter((_, i) => checked[i]);
 
-  const onGetRecords = () => {
-    if (!window.confirm('pre_RTP_wobbler 프로시저를 실행합니다. 계속할까요?')) return;
+  const onGetRecords = async () => {
+    if (!await showConfirm('pre_RTP_wobbler 프로시저를 실행합니다. 계속할까요?')) return;
     gen.current += 1;
     call('/records', { confirm: true }, (d) => {
       setItems(d.items || []);
@@ -73,8 +74,8 @@ export default function WobblerForm({ database, probeId, onClose }) {
     });
   };
 
-  const onRun = () => {
-    if (!window.confirm('wobbling 계수를 fitting 해 temp_wobbler_coeff 에 저장합니다. 계속할까요?')) return;
+  const onRun = async () => {
+    if (!await showConfirm('wobbling 계수를 fitting 해 temp_wobbler_coeff 에 저장합니다. 계속할까요?')) return;
     call('/run', { confirm: true }, (d) => {
       alertAll(d.messages);
       if (d.coefficients) setCoeffs(d.coefficients);
@@ -118,8 +119,8 @@ export default function WobblerForm({ database, probeId, onClose }) {
     ep.reset();
   };
 
-  const save = (i, x, y) => {
-    if (!window.confirm('trtp_wobbler 데이터를 수정합니다. 계속할까요?')) return;
+  const save = async (i, x, y) => {
+    if (!await showConfirm('trtp_wobbler 데이터를 수정합니다. 계속할까요?')) return;
     call('/save-edit', { tempWobbId: edit.points[i][0], x, y, confirm: true }, (d) => {
       setGridData(asGrid(d.grid));
       setEdit((e) => (e ? { ...e, points: e.points.map((p, j) => (j === i ? [p[0], x, y] : p)) } : e));
@@ -127,8 +128,8 @@ export default function WobblerForm({ database, probeId, onClose }) {
     });
   };
 
-  const onDragEnd = (i, x, y) => {
-    if (window.confirm('The dataset has been modified. Do you want to save your changes?')) {
+  const onDragEnd = async (i, x, y) => {
+    if (await showConfirm('The dataset has been modified. Do you want to save your changes?')) {
       save(i, ep.s.allowX ? x : edit.points[i][1], y);
     } else {
       ep.off();

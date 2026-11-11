@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiJson, query } from '../../lib/apiJson';
 import { VbButton, VbCheck, VbCombo, VbForm, VbGrid, VbLabel, VbText, asGrid } from '../vb/Vb';
 import PowerGraph, { CONTAINER, hitTest, plotColorVar, scaleOf, vbFormatE, yFromPixel } from './powerChart';
+import { showAlert, showConfirm } from '../../lib/dialog';
 
 const F8 = { size: 8, family: 'Arial' };
 const F6 = { size: 6, family: 'Arial' };
@@ -145,7 +146,7 @@ export default function PowerForm({ database, probeId, onClose }) {
   const onSwClick = (i) => {
     if (swSel.includes(i)) { setSwSel(swSel.filter((s) => s !== i)); return; }
     if (swSel.length + 1 > 3) {
-      alert("Please limit your selection of 'measImgSwVersion' values to a maximum of three (3).");
+      showAlert("Please limit your selection of 'measImgSwVersion' values to a maximum of three (3).");
       return;
     }
     setSwSel([...swSel, i].sort((a, b) => a - b));
@@ -221,7 +222,7 @@ export default function PowerForm({ database, probeId, onClose }) {
     const it = modelRef.current.items[idx];
     if (!it || busy) return;
     const mark = it.mark === 'checked' ? 'unchecked' : 'checked';
-    if (!confirm(`trtp_power 의 mark 를 '${mark}' 로 변경합니다.\n${datasetText(it)}\n계속할까요?`)) return;
+    if (!await showConfirm(`trtp_power 의 mark 를 '${mark}' 로 변경합니다.\n${datasetText(it)}\n계속할까요?`)) return;
     const my = ++gen.current;
     setBusy('mark');
     setError('');
@@ -239,7 +240,7 @@ export default function PowerForm({ database, probeId, onClose }) {
   };
 
   const onMarkAll = async () => {
-    if (!confirm("trtp_power 의 모든 mark 를 'checked' 로 변경합니다. 계속할까요?")) return;
+    if (!await showConfirm("trtp_power 의 모든 mark 를 'checked' 로 변경합니다. 계속할까요?")) return;
     const my = ++gen.current;
     setBusy('markAll');
     setError('');
@@ -329,7 +330,7 @@ export default function PowerForm({ database, probeId, onClose }) {
     if (!pt || powerId == null) return;
     setEdit(false);
     if (multiEdit) setEdit(true);
-    if (askConfirm && !confirm(`trtp_power(PowerId=${powerId}) 값을 저장합니다.\npulseVoltageVolt=${pt[0]}, PowerData=${pt[1]}`)) return;
+    if (askConfirm && !await showConfirm(`trtp_power(PowerId=${powerId}) 값을 저장합니다.\npulseVoltageVolt=${pt[0]}, PowerData=${pt[1]}`)) return;
     try {
       await apiJson(`${API}/point`, { method: 'POST', body: { database, powerId, x: pt[0], y: pt[1], confirm: true } });
     } catch (e) {
@@ -369,7 +370,7 @@ export default function PowerForm({ database, probeId, onClose }) {
       const r = await apiJson(`${API}/auto-check`, { method: 'POST', body: { database, dataset: datasetBody(it) } });
       if (my !== gen.current) return;
       dip = r.dip;
-      if (dip > 2) alert(`There are multiple dips found in (${ds}). Please check the results carefully`);
+      if (dip > 2) showAlert(`There are multiple dips found in (${ds}). Please check the results carefully`);
       if (r.range) {
         const range = { ...r.range };
         const lines = [{ color: it.color, points: r.points.map((p) => [Number(p[1]), Number(p[2])]) }];
@@ -393,7 +394,7 @@ export default function PowerForm({ database, probeId, onClose }) {
       if (my === gen.current) setBusy('');
     }
     if (dip > 0) {
-      if (confirm(`Dips are found In Power vs. Voltage with (${ds}). Do you want To save fixes?`)) {
+      if (await showConfirm(`Dips are found In Power vs. Voltage with (${ds}). Do you want To save fixes?`)) {
         try {
           await apiJson(`${API}/auto-save`, { method: 'POST', body: { database, dataset: datasetBody(it), confirm: true } });
         } catch (e) {
@@ -409,7 +410,7 @@ export default function PowerForm({ database, probeId, onClose }) {
     const x = csng(meRef.current.newX);
     const y = csng(meRef.current.newY);
     if (Number.isNaN(x) || Number.isNaN(y) || !myDataRef.current[0]?.points[pos]) {
-      alert('New X / New Y 값이 숫자가 아닙니다.');
+      showAlert('New X / New Y 값이 숫자가 아닙니다.');
       return;
     }
     myDataRef.current[0].points[pos] = [x, y];
@@ -501,8 +502,8 @@ export default function PowerForm({ database, probeId, onClose }) {
     commitGraph({ ...graphRef.current, lines });
     setSelDraw({ x: lines[0].points[pos][0], y: lines[0].points[pos][1], prev: null, next: null, dragging: false });
     // vbPowerGraph_DataChanged
-    setTimeout(() => {
-      if (confirm('The dataset has been modified. Do you want to save your changes?')) {
+    setTimeout(async () => {
+      if (await showConfirm('The dataset has been modified. Do you want to save your changes?')) {
         saveEdit(pos, lines, false);
       } else {
         setEdit(false);

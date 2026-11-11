@@ -200,13 +200,56 @@ test.describe('MSI input · Interrogator', () => {
     const rows = page.locator('[data-testid="msi-excel-selected"] tbody tr:not(.vb-newrow)');
     await expect(rows).toHaveCount(2);
 
-    page.once('dialog', (d) => d.dismiss());
+    const dlg = page.getByTestId('app-dialog');
     await page.getByTestId('msi-excel-selected-corner').dblclick();
+    await expect(dlg).toHaveAttribute('data-tone', 'danger');
+    await page.getByTestId('app-dialog-cancel').click();
+    await expect(dlg).toHaveCount(0);
     await expect(rows).toHaveCount(2);
 
-    page.once('dialog', (d) => d.accept());
     await page.getByTestId('msi-excel-selected-corner').dblclick();
+    await page.getByTestId('app-dialog-ok').click();
     await expect(rows).toHaveCount(0);
+  });
+
+  test('#51 공용 알림/확인 창: 톤·Esc 닫기·포커스 복귀·Enter 확인·순차 표시', async ({ page }) => {
+    let prf = 0;
+    await page.route('**/api/msi-excel/update-prf', (route) => {
+      prf += 1;
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: { messages: ['첫 번째 메시지', '두 번째 메시지'] } }) });
+    });
+    let nativeDialogs = 0;
+    page.on('dialog', (d) => { nativeDialogs += 1; d.dismiss(); });
+    await page.goto('/msi-input?database=DemoDB');
+    const dlg = page.getByTestId('app-dialog');
+    const msg = page.getByTestId('app-dialog-message');
+
+    const saveMat = page.getByTestId('msi-excel-savemat');
+    await saveMat.click();
+    await expect(dlg).toHaveAttribute('data-tone', 'warning');
+    await expect(msg).toContainText('Nothing in Selected RTP');
+    await expect(page.getByTestId('app-dialog-ok')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(dlg).toHaveCount(0);
+    await expect(saveMat).toBeFocused();
+
+    await page.getByTestId('msi-excel-updateprf').click();
+    await expect(dlg).toHaveAttribute('data-kind', 'confirm');
+    await page.getByTestId('app-dialog-cancel').click();
+    await expect(dlg).toHaveCount(0);
+    expect(prf).toBe(0);
+
+    await page.getByTestId('msi-excel-updateprf').click();
+    await expect(dlg).toHaveAttribute('data-kind', 'confirm');
+    await page.keyboard.press('Enter');
+    await expect(msg).toHaveText('첫 번째 메시지');
+    expect(prf).toBe(1);
+    await page.getByTestId('app-dialog-ok').click();
+    await expect(msg).toHaveText('두 번째 메시지');
+    await page.getByTestId('app-dialog-ok').click();
+    await expect(dlg).toHaveCount(0);
+    await expect(page.getByTestId('msi-excel-updateprf')).toBeFocused();
+    expect(nativeDialogs).toBe(0);
   });
 
   test('#49 저장 전 중복 확인 창에서 중복 조건을 보여 주고 강제 입력(forceNew)을 보낸다', async ({ page }) => {
@@ -232,8 +275,8 @@ test.describe('MSI input · Interrogator', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: {
         messages: [], inserted: 3, updated: 0, duplicates: [], dupTotal: 0, setRange: '3713:3715' } }) });
     });
-    page.on('dialog', (d) => d.accept());
     await page.goto('/msi-input?database=DemoDB');
+    const ok = page.getByTestId('app-dialog-ok');
     const dir = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'msi49-'));
     require('fs').writeFileSync(require('path').join(dir, 'a.xlsx'), 'x');
     await page.getByTestId('msi-excel-picker').setInputFiles(dir);
@@ -242,6 +285,7 @@ test.describe('MSI input · Interrogator', () => {
     await page.getByTestId('msi-excel-selectall').click();
 
     await page.getByTestId('msi-excel-savedb').click();
+    await ok.click();
     const grid = page.getByTestId('msi-excel-dup-grid');
     await expect(grid).toContainText('FocusPMm');
     await expect(grid).toContainText('3712');
@@ -255,13 +299,20 @@ test.describe('MSI input · Interrogator', () => {
     expect(saves).toHaveLength(0);
 
     await page.getByTestId('msi-excel-savedb').click();
+    await ok.click();
     await page.getByTestId('msi-excel-dup-save').click();
     await expect.poll(() => saves.length).toBe(1);
     expect(saves[0].forceNew).toBe(false);
+    await expect(page.getByTestId('app-dialog')).toHaveAttribute('data-tone', 'success');
+    await ok.click();
 
     await page.getByTestId('msi-excel-savedb').click();
+    await ok.click();
     await page.getByTestId('msi-excel-dup-force').click();
+    await expect(page.getByTestId('app-dialog-message')).toContainText('중복 1건');
+    await ok.click();
     await expect.poll(() => saves.length).toBe(2);
+    await ok.click();
     expect(saves[1].forceNew).toBe(true);
     expect(checks).toBe(3);
   });

@@ -9,6 +9,7 @@ import { useState, useCallback } from 'react';
 import { MESSAGES } from '../constants/messages';
 import { buildNormalizedFilterSets, isRowMatchingFilters } from '../utils/filterHelpers';
 import { getRowId } from '../utils/rowIdentity';
+import { showConfirm } from '../../../lib/dialog';
 
 export const useRowOperations = (
   csvData,
@@ -36,8 +37,8 @@ export const useRowOperations = (
    * 복원 후 "수정됨" 표시가 사라져 저장 버튼이 비활성화되고, 편집된 값이
    * 저장 스냅샷과 다른데도 변경 없음으로 취급된다.
    */
-  const handleDeleteRow = useCallback((rowId) => {
-    if (confirm(MESSAGES.DELETE_CONFIRM)) {
+  const handleDeleteRow = useCallback(async (rowId) => {
+    if (await showConfirm(MESSAGES.DELETE_CONFIRM)) {
       const prefix = `${rowId}-`;
       const removedEdits = {};
       const removedErrors = {};
@@ -88,10 +89,10 @@ export const useRowOperations = (
   /**
    * 삭제된 행 복원
    */
-  const restoreDeletedRows = useCallback(() => {
+  const restoreDeletedRows = useCallback(async () => {
     if (deletedRows.length === 0) return;
 
-    if (confirm(MESSAGES.RESTORE_CONFIRM)) {
+    if (await showConfirm(MESSAGES.RESTORE_CONFIRM)) {
       // 각 index 는 "그 삭제 직전 배열" 기준이므로, 삭제의 역순으로 되돌려야
       // 원래 순서가 정확히 복구된다(오름차순 삽입은 순서를 뒤바꾼다).
       const restored = [...csvData];

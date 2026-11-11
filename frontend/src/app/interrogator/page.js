@@ -15,6 +15,7 @@ import PowerForm from '../../components/interrogator/PowerForm';
 import TempForm from '../../components/interrogator/TempForm';
 import ExportForm from '../../components/interrogator/ExportForm';
 import { apiJson, query } from '../../lib/apiJson';
+import { showAlert, showConfirm, showError } from '../../lib/dialog';
 
 const NEW = '<New...>';
 const A975 = { size: 9.75, family: 'Arial' };
@@ -41,7 +42,7 @@ export default function InterrogatorPage() {
     const ctrl = new AbortController();
     apiJson(`/api/interrogator/probes?${query({ database })}`, { signal: ctrl.signal })
       .then((d) => setProbes(d || []))
-      .catch((e) => { if (e.name !== 'AbortError') window.alert(e.message); });
+      .catch((e) => { if (e.name !== 'AbortError') showError(e); });
     return () => ctrl.abort();
   }, [database]);
 
@@ -54,7 +55,7 @@ export default function InterrogatorPage() {
     const ctrl = new AbortController();
     apiJson(`/api/interrogator/rtp-names?${query({ database, probeId })}`, { signal: ctrl.signal })
       .then((d) => { setRtpNames(d || []); setProbeReady(true); })
-      .catch((e) => { if (e.name !== 'AbortError') window.alert(e.message); });
+      .catch((e) => { if (e.name !== 'AbortError') showError(e); });
     return () => ctrl.abort();
   }, [database, probeId]);
 
@@ -73,9 +74,9 @@ export default function InterrogatorPage() {
   };
 
   const generate = async (variant) => {
-    if (!probeId) { window.alert('Probe ID 를 선택하세요.'); return; }
+    if (!probeId) { showAlert('Probe ID 를 선택하세요.'); return; }
     const label = variant === 'modified' ? 'RTP_main_modified' : 'RTP_main';
-    if (!window.confirm(`ProbeId ${probeId} 에 대해 ${label} 를 실행합니다. 진행할까요?`)) return;
+    if (!await showConfirm(`ProbeId ${probeId} 에 대해 ${label} 를 실행합니다. 진행할까요?`)) return;
     setBusy(variant);
     try {
       await apiJson('/api/interrogator/rtp-generate', {
@@ -83,7 +84,7 @@ export default function InterrogatorPage() {
       });
       setOpen('display');
     } catch (e) {
-      window.alert(e.message);
+      showError(e);
     } finally {
       setBusy('');
     }

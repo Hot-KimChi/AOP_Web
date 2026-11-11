@@ -10,6 +10,7 @@ import { apiJson } from '../../lib/apiJson';
 import {
   VbButton, VbCheck, VbCombo, VbForm, VbGrid, VbLabel, VbList, VbModal, VbSection, VbText, asGrid, cellText,
 } from '../vb/Vb';
+import { showAlert, showAlerts, showConfirm, showError } from '../../lib/dialog';
 
 const F9 = { size: 9 };
 const F9B = { size: 9, bold: true };
@@ -190,7 +191,7 @@ function download(blob, name) {
 }
 
 function alertAll(messages) {
-  (messages || []).forEach((m) => window.alert(m));
+  return showAlerts(messages);
 }
 
 export default function MsiExcelForm({ database, onClose }) {
@@ -243,7 +244,7 @@ export default function MsiExcelForm({ database, onClose }) {
   const [dupModal, setDupModal] = useState(null);
 
   const needDb = () => {
-    if (!database) { window.alert('데이터베이스를 선택하십시오.'); return false; }
+    if (!database) { showAlert('데이터베이스를 선택하십시오.'); return false; }
     return true;
   };
 
@@ -253,7 +254,7 @@ export default function MsiExcelForm({ database, onClose }) {
     try {
       await fn();
     } catch (e) {
-      window.alert(e?.message || String(e));
+      showError(e);
     } finally {
       setBusy(false);
     }
@@ -329,7 +330,7 @@ export default function MsiExcelForm({ database, onClose }) {
     let bpCol = selCols.findIndex((h) => has(h, 'breakPoint'));
     if (bpCol < 0) bpCol = 0;
     const col = selCols.findIndex((h) => has(h, 'azFocusMm'));
-    if (col < 0 || col + 2 >= selCols.length) { window.alert('azFocusMm 열이 없습니다.'); return; }
+    if (col < 0 || col + 2 >= selCols.length) { showAlert('azFocusMm 열이 없습니다.'); return; }
     const msgs = [];
     try {
       const next = selRows.map((row, ri) => {
@@ -414,7 +415,7 @@ export default function MsiExcelForm({ database, onClose }) {
         }
       }
     } catch (e) {
-      window.alert(e.message);
+      showError(e);
     }
   };
 
@@ -445,9 +446,9 @@ export default function MsiExcelForm({ database, onClose }) {
   };
   const onSelRowDelete = (ri) => setSelRows((prev) => prev.filter((_, i) => i !== ri));
   // #46: 왼쪽 위 모서리 더블클릭 → Selected RTP 의 모든 행 삭제(화면 상태만, 열 머리글은 유지)
-  const clearSelected = () => {
+  const clearSelected = async () => {
     if (selRows.length === 0) return;
-    if (!window.confirm(`Selected RTP 의 ${selRows.length}개 행을 모두 삭제할까요?`)) return;
+    if (!await showConfirm(`Selected RTP 의 ${selRows.length}개 행을 모두 삭제할까요?`)) return;
     setSelRows([]);
     setSelectedProbeId(null);
   };
@@ -527,7 +528,7 @@ export default function MsiExcelForm({ database, onClose }) {
     // #47: 저장 결과 요약 — 중복 조건으로 추가되지 않은 경우도 사용자가 알 수 있게 한다.
     if (data && typeof data.inserted === 'number') {
       const upd = data.updated ? `, 기존 행 갱신 ${data.updated}건` : '';
-      window.alert(data.inserted > 0
+      showAlert(data.inserted > 0
         ? `${title} 저장 완료: 새로 추가 ${data.inserted}건${upd}${data.setRange ? ` (Set ID 범위 ${data.setRange})` : ''}`
         : `${title}: 새로 추가된 행이 없습니다${upd}. 같은 조건이 이미 DB에 있으면 추가하지 않습니다.`
           + (isCreateNew && Number(msi || 0) === 0 && path !== 'save-temp' && !forceNew
@@ -539,16 +540,16 @@ export default function MsiExcelForm({ database, onClose }) {
   // #49: 저장 전에 중복 조건을 읽기 전용으로 검사하고, 있으면 확인 창에서 처리 방법을 고르게 한다.
   const save = (path, title, confirmText) => run(async () => {
     if (!needDb()) return;
-    if (selRows.length > 0 && !window.confirm(confirmText)) return;
+    if (selRows.length > 0 && !await showConfirm(confirmText)) return;
     const chk = await apiJson('/api/msi-excel/check-dup', { method: 'POST', body: { ...body(), kind: SAVE_KIND[path] } });
     if (chk?.dupTotal > 0) { setDupModal({ path, title, data: chk }); return; }
     await doSave(path, title, false);
   });
 
-  const resolveDup = (forceNew) => {
+  const resolveDup = async (forceNew) => {
     const d = dupModal;
     if (!d) return;
-    if (forceNew && !window.confirm(`중복 ${d.data.dupTotal}건을 포함해 모든 조합을 새 행으로 ${d.title} 에 입력합니다. 계속할까요?`)) return;
+    if (forceNew && !await showConfirm(`중복 ${d.data.dupTotal}건을 포함해 모든 조합을 새 행으로 ${d.title} 에 입력합니다. 계속할까요?`)) return;
     setDupModal(null);
     run(() => doSave(d.path, d.title, forceNew));
   };
@@ -559,7 +560,7 @@ export default function MsiExcelForm({ database, onClose }) {
 
   // ---- cmdSaveMat_Click
   const cmdSaveMat = () => run(async () => {
-    if (selRows.length === 0) { window.alert('Nothing in Selected RTP table. No new Excel file.'); return; }
+    if (selRows.length === 0) { showAlert('Nothing in Selected RTP table. No new Excel file.'); return; }
     const parts = outputName.split('.');
     if (parts.length < 2) throw new Error('Index was outside the bounds of the array. (먼저 Open Excel File 로 파일을 여십시오)');
     let base = parts[0];
@@ -583,7 +584,7 @@ export default function MsiExcelForm({ database, onClose }) {
 
   // ---- FillPwrSetId_Click
   const cmdFillPwr = () => run(async () => {
-    if (txtSetRange === '') { window.alert('Please fill in SetId Range! ex: 3711:3720'); return; }
+    if (txtSetRange === '') { showAlert('Please fill in SetId Range! ex: 3711:3720'); return; }
     if (!needDb()) return;
     const data = await apiJson('/api/msi-excel/power-setids', { method: 'POST', body: { database, setRange: txtSetRange } });
     download(new Blob([data.content], { type: 'text/plain' }), data.fileName);
@@ -592,7 +593,7 @@ export default function MsiExcelForm({ database, onClose }) {
   // ---- cmdUpdatePrf_Click
   const cmdUpdatePrf = () => run(async () => {
     if (!needDb()) return;
-    if (!window.confirm(`update_Prf_From_Init(ProbeId=${cellText(selectedProbeId)}, TempLimit=${tempLimit}) 을 실행합니다. 계속할까요?`)) return;
+    if (!await showConfirm(`update_Prf_From_Init(ProbeId=${cellText(selectedProbeId)}, TempLimit=${tempLimit}) 을 실행합니다. 계속할까요?`)) return;
     const data = await apiJson('/api/msi-excel/update-prf', {
       method: 'POST', body: { database, selectedProbeId, tempLimit },
     });

@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { VbButton, VbForm, VbLabel, VbText } from '../vb/Vb';
 import { apiJson } from '../../lib/apiJson';
+import { showAlert, showError } from '../../lib/dialog';
 
 export default function TankVoltageSForm({ database, probeId, pulseType, onClose }) {
   const [pulse, setPulse] = useState(pulseType ?? '');
@@ -13,7 +14,7 @@ export default function TankVoltageSForm({ database, probeId, pulseType, onClose
 
   const cmdSaveOk = async () => {
     if (voltage === '') {
-      window.alert('Please input Voltage String befor save.');
+      showAlert('Please input Voltage String befor save.');
       return;
     }
     setBusy(true);
@@ -23,7 +24,7 @@ export default function TankVoltageSForm({ database, probeId, pulseType, onClose
         method: 'POST', body: { database, probeId, pulseType, voltageString: voltage, confirm: true },
       });
     } catch (e) {
-      window.alert(e.message || String(e));
+      showError(e);
     } finally {
       setBusy(false);
     }

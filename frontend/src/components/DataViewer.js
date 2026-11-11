@@ -9,6 +9,7 @@ import {
   buildCascadedOptions,
   normalizeFilterValue,
 } from '../app/data-view/utils/filterHelpers';
+import { showAlert } from '../lib/dialog';
 
 export default function DataViewer({
   data = [],
@@ -134,7 +135,7 @@ export default function DataViewer({
       URL.revokeObjectURL(url);
       onExport?.();
     } catch (err) {
-      alert('내보내기 실패: ' + err.message);
+      showAlert('내보내기 실패: ' + err.message);
     }
   }, [displayData, columnList, title, onExport]);
 

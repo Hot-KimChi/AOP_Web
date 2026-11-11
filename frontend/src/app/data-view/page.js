@@ -20,6 +20,7 @@ import { ErrorMessage } from './components/ErrorMessage';
 import { ChangeSummary } from './components/ChangeSummary';
 import { ActionButtons } from './components/ActionButtons';
 import { DataTable } from './components/DataTable';
+import { showAlert } from '../../lib/dialog';
 
 /**
  * 데이터 뷰 메인 컴포넌트
@@ -115,7 +116,7 @@ function DataViewContent() {
       downloadCSVFile(displayData, '측정_데이터');
     } catch (error) {
       console.error('내보내기 실패:', error);
-      alert(MESSAGES.ERROR_DOWNLOAD);
+      showAlert(MESSAGES.ERROR_DOWNLOAD);
     }
   }, [displayData]);
 
@@ -127,8 +128,8 @@ function DataViewContent() {
   }, [saveEditedData, setDeletedRows]);
 
   // 되돌리기 핸들러 — 복원 성공 시 삭제 대기 목록도 함께 비운다.
-  const handleRevert = useCallback(() => {
-    if (revertChanges()) {
+  const handleRevert = useCallback(async () => {
+    if (await revertChanges()) {
       setDeletedRows([]);
     }
   }, [revertChanges, setDeletedRows]);

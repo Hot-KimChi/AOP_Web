@@ -10,6 +10,7 @@ import { MESSAGES } from '../constants/messages';
 import { validateCellData as validateCell } from '../utils/dataValidation';
 import { buildNormalizedFilterSets, isRowMatchingFilters } from '../utils/filterHelpers';
 import { assignRowIds, cloneRows, findRowIndexById, getRowId } from '../utils/rowIdentity';
+import { showAlert, showConfirm } from '../../../lib/dialog';
 
 export const useDataEdit = (
   csvData,
@@ -98,7 +99,7 @@ export const useDataEdit = (
   const saveEditedData = useCallback(() => {
     // 유효성 검사 오류 확인
     if (Object.keys(validationErrors).length > 0) {
-      alert(MESSAGES.ERROR_VALIDATION);
+      showAlert(MESSAGES.ERROR_VALIDATION);
       return false;
     }
 
@@ -120,15 +121,15 @@ export const useDataEdit = (
       updatedCsvData.filter(row => isRowMatchingFilters(row, normalizedFilterSets))
     );
 
-    alert(MESSAGES.SAVE_SUCCESS);
+    showAlert(MESSAGES.SAVE_SUCCESS);
     return true;
   }, [validationErrors, csvData, setCsvData, setOriginalData, saveData, filters, setDisplayData]);
 
   /**
    * 변경사항 취소 (복원)
    */
-  const revertChanges = useCallback(() => {
-    if (confirm(MESSAGES.REVERT_CONFIRM)) {
+  const revertChanges = useCallback(async () => {
+    if (await showConfirm(MESSAGES.REVERT_CONFIRM)) {
       const originalDataCopy = assignRowIds(cloneRows(originalData));
       setCsvData(originalDataCopy);
       // 현재 필터 조건을 유지한 채 복원한다(필터가 걸린 상태에서 전체가
