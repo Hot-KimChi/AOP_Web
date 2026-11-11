@@ -408,6 +408,13 @@ export default function MsiExcelForm({ database, onClose }) {
     if (ci === 1 && value !== '') setSelectedProbeId(value);
   };
   const onSelRowDelete = (ri) => setSelRows((prev) => prev.filter((_, i) => i !== ri));
+  // #46: 왼쪽 위 모서리 더블클릭 → Selected RTP 의 모든 행 삭제(화면 상태만, 열 머리글은 유지)
+  const clearSelected = () => {
+    if (selRows.length === 0) return;
+    if (!window.confirm(`Selected RTP 의 ${selRows.length}개 행을 모두 삭제할까요?`)) return;
+    setSelRows([]);
+    setSelectedProbeId(null);
+  };
 
   // ---- cmbTempOpt_SelectedIndexChanged (목록 항목을 고를 때만 동작 — 직접 입력은 이벤트 없음)
   const onTempOpt = (value) => {
@@ -581,7 +588,7 @@ export default function MsiExcelForm({ database, onClose }) {
       <VbCombo x={916} y={358} w={140} h={24} value={purpose} onChange={setPurpose} editable options={['RTP', 'Sample', 'SSR', 'FDA', 'IEC']} testId="msi-excel-purpose" ariaLabel="Purpose" />
       <VbButton x={1070} y={342} w={125} h={41} onClick={cmdSelectAll} disabled={busy} testId="msi-excel-selectall">Select All RTP</VbButton>
       <VbButton x={1205} y={342} w={153} h={41} onClick={cmdUpdateAll} disabled={busy} testId="msi-excel-updateall">Update All Foc/Aper</VbButton>
-      <VbLabel x={130} y={340} color={DARK}>(Double click row-head to remove the row from Selected RTP)</VbLabel>
+      <VbLabel x={130} y={340} color={DARK}>(Double click row-head to remove the row from Selected RTP, top-left corner to remove all rows)</VbLabel>
       <VbLabel x={20} y={346} font={F9B}>Selected RTP</VbLabel>
       <VbLabel x={130} y={356} color={DARK}>(Modify cyan fields with double-click cell, selected either foci values or indices will fill in)</VbLabel>
       <VbLabel x={130} y={372} color={DARK}>(Salmon color field data are estimated from fnumber and focus, please check it.)</VbLabel>
@@ -590,6 +597,7 @@ export default function MsiExcelForm({ database, onClose }) {
         onCellChange={onSelCellChange} onCellDoubleClick={onSelCellDoubleClick}
         onRowAdd={onSelRowAdd} onRowDelete={onSelRowDelete}
         onRowHeaderDoubleClick={(ri) => setSelRows((prev) => prev.filter((_, i) => i !== ri))}
+        onCornerDoubleClick={clearSelected} cornerTitle="더블클릭: Selected RTP 의 모든 행 삭제" testId="msi-excel-selected"
         headerColor={selHeaderColor} cellColor={(r, c) => (selRows[r]?.s.includes(c) ? SALMON : undefined)}
         emptyText="위 Exel Input 의 행 머리글을 더블클릭하거나 Select All RTP 로 추가하세요."
       />

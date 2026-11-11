@@ -49,6 +49,7 @@
 | 43 | measSetInput 파일 카드 높이 정렬·Selected RTP 전체 폭 확장 (본문 ## 43) | 2026-11-10 | - |
 | 44 | MSI input 사용자 설명서(HTML)·데이터 흐름 작성, 대비·중복 처리 보완 (본문 ## 44) | 2026-11-11 | - |
 | 45 | Selected RTP azFocusMm 더블클릭 미반영 수정, Foci·Indices 하위 카드, MSI·Interrogator 기능 전수 확인 (본문 ## 45) | 2026-11-11 | - |
+| 46 | Selected RTP 왼쪽 위 모서리 더블클릭 시 전체 행 삭제 | 2026-11-11 | - |
 
 ---
 
@@ -1255,3 +1256,22 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
   - 열 이름 결함: frmTemp `trRef  azAperSizeCm` 쉼표 누락
   - TankVoltageS 저장 후 피드백 없음, Dump Selected 그리드 편집값 미전송, Tank·Power 편집값을 저장 전에 화면에 반영
 - **잔여**: alert blur는 headless에서 재현되지 않아 코드 근거로만 확인했다. Wobbler 반올림 허용오차와 2D aperture elevIndex 중복 검사는 원본과 비교하지 못했다.
+
+## 46. meassetinput창에서 selected RTP 테이블 왼쪽 위(빈공간, probe Name 왼쪽 셀)를 더블클릭하면, 테이블의 모든 데이터가 삭제되도록 기능을 추가해죠. 해당 부분을 Agent 명세를 재작성하고 이를 기반으로 진행해죠.
+
+### Agent 명세 (#46)
+
+- **요구**: measSetInput의 Selected RTP 표 왼쪽 위 모서리 칸(행 머리글 열 × 열 머리글 행, probeId 왼쪽)을 더블클릭하면 표의 모든 행을 지운다.
+- **범위**: 화면 상태만 비운다(DB·엑셀 파일은 건드리지 않음). 열 머리글은 남겨 다시 행을 추가할 수 있게 하고, SelectedProbeId도 비운다.
+- **구현**
+  - `VbGrid`에 `onCornerDoubleClick` prop을 추가한다(모서리 `th`). prop이 없는 다른 그리드는 동작이 바뀌지 않는다.
+  - 실수로 지우는 것을 막기 위해 행이 있을 때 확인창(`window.confirm`)을 띄운다. 모서리에 툴팁과 커서를 표시하고, 표 위 안내 문구에 기능을 적는다.
+- **검증**: e2e로 행 2개 추가 → 모서리 더블클릭 → 확인 → 행 0개와 빈 표 안내 표시를 확인한다. 취소하면 그대로 남는지도 확인한다. 전체 e2e와 빌드가 통과할 것.
+- **교차 검증**: 화면 상태만 다루는 UI 기능이고 위험 조건에 해당하지 않아 생략한다.
+
+### 수행 결과 (#46)
+
+- `Vb.js` VbGrid: `onCornerDoubleClick`·`cornerTitle` prop 추가(모서리 th, 편집·현재셀 해제 후 호출). prop 없는 그리드는 기존과 동일.
+- `MsiExcelForm.js`: `clearSelected`(행 0개면 무시, confirm 후 selRows·SelectedProbeId 비움), 안내 문구에 모서리 기능 추가.
+- `globals.css`: `.vb-corner-action` 포인터 커서·hover 강조. `docs/MSI_Input_guide.html` 빼기 항목에 '모두 빼기' 설명 추가.
+- 검증: e2e #46(취소 시 2행 유지 → 확인 시 0행) 추가, 빌드 성공, 서버 재기동 후 e2e 21/21 통과. 교차 검증은 UI 상태만 다루어 생략.

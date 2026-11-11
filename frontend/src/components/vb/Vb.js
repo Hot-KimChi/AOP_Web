@@ -207,7 +207,7 @@ export function cellText(v) {
 // 셀 편집(F2·타이핑·현재 셀 재클릭, Enter 확정·Esc 취소).
 export function VbGrid({
   x, y, w, h, columns, rows, testId,
-  onRowHeaderDoubleClick, onCellDoubleClick, onCellChange, onRowAdd, onRowDelete,
+  onRowHeaderDoubleClick, onCellDoubleClick, onCellChange, onRowAdd, onRowDelete, onCornerDoubleClick, cornerTitle,
   headerColor, cellColor, editable, showNewRow = true, backColor, font, maxRows = 2000, emptyText,
 }) {
   const [cur, setCur] = useState(null);
@@ -265,7 +265,12 @@ export function VbGrid({
       <table>
         <thead>
           <tr>
-            <th className="vb-rowhead" />
+            <th
+              className={onCornerDoubleClick ? 'vb-rowhead vb-corner-action' : 'vb-rowhead'}
+              title={onCornerDoubleClick ? cornerTitle : undefined}
+              data-testid={testId && onCornerDoubleClick ? `${testId}-corner` : undefined}
+              onDoubleClick={onCornerDoubleClick ? () => { setEdit(null); setCur(null); onCornerDoubleClick(); } : undefined}
+            />
             {cols.map((c, ci) => (
               <th key={`${c}-${ci}`} style={{ background: headerColor?.(c, ci) }}>{c}</th>
             ))}

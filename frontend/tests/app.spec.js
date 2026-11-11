@@ -185,6 +185,30 @@ test.describe('MSI input · Interrogator', () => {
     await expect(cells.nth(13)).toHaveText('0 0');
   });
 
+  test('#46 Selected RTP 왼쪽 위 모서리 더블클릭으로 모든 행을 삭제한다(취소 시 유지)', async ({ page }) => {
+    await page.route('**/api/msi-excel/parse', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 'success', data: { columns: ['probeName', 'probeId', 'x'], rows: [['P', 7, 'a'], ['P', 7, 'b']] } }),
+    }));
+    await page.goto('/msi-input?database=DemoDB');
+    const dir = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'msi46-'));
+    require('fs').writeFileSync(require('path').join(dir, 'a.xlsx'), 'x');
+    await page.getByTestId('msi-excel-picker').setInputFiles(dir);
+    await page.getByTestId('msi-excel-files').getByText('a.xlsx').click();
+    await page.getByTestId('msi-excel-open').click();
+    await page.getByTestId('msi-excel-selectall').click();
+    const rows = page.locator('[data-testid="msi-excel-selected"] tbody tr:not(.vb-newrow)');
+    await expect(rows).toHaveCount(2);
+
+    page.once('dialog', (d) => d.dismiss());
+    await page.getByTestId('msi-excel-selected-corner').dblclick();
+    await expect(rows).toHaveCount(2);
+
+    page.once('dialog', (d) => d.accept());
+    await page.getByTestId('msi-excel-selected-corner').dblclick();
+    await expect(rows).toHaveCount(0);
+  });
+
   test('Interrogator 메인 폼이 원본(intMain) 버튼·활성 규칙을 따른다', async ({ page }) => {
     await page.route('**/api/get_list_database', (route) => route.fulfill({
       status: 200, contentType: 'application/json', body: JSON.stringify({ databases: ['BizDb'] }),

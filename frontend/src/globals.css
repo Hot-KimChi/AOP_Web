@@ -1154,6 +1154,8 @@ select.vb-list option:checked { background: var(--vb-highlight); color: var(--vb
 .vb-section-action { background: color-mix(in srgb, var(--brand-light) 55%, var(--surface)); border-color: color-mix(in srgb, var(--brand) 25%, var(--border)); }
 .vb-section-sub { border-radius: 8px; box-shadow: none; background: color-mix(in srgb, var(--brand-light) 30%, var(--surface)); border: 1px dashed color-mix(in srgb, var(--brand) 45%, var(--border)); }
 .vb-label.vb-legend { z-index: 1; color: var(--text); font-weight: 600; }
+.vb-grid th.vb-corner-action { cursor: pointer; }
+.vb-grid th.vb-corner-action:hover { background: color-mix(in srgb, var(--danger, #dc2626) 18%, var(--surface)); }
 .vb-grid-empty {
   position: sticky; left: 0; padding: 18px 12px; text-align: center;
   color: var(--text-muted); font-size: 12px; pointer-events: none;
