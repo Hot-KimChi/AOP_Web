@@ -55,6 +55,7 @@
 | 49 | 저장 전 중복 조건 확인 창·중복도 새로 입력(forceNew) | 2026-11-11 | - |
 | 50 | 중복 조건 확인 창 첫 열에 중복/신규 표시 | 2026-11-11 | - |
 | 51 | 브라우저 기본 alert/confirm → 모던 공용 알림 창 전면 교체 | 2026-11-11 | - |
+| 52 | React + Vite 비교용 프런트엔드(frontend-vite) 생성 — 브랜치 feature/react-vite | 2026-11-13 | - |
 
 ---
 
@@ -1389,3 +1390,24 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - 남은 `alert(`/`confirm(`/`prompt(` 0건.
 - e2e: #46·#49를 커스텀 창 버튼 클릭으로 수정, #51 신규(톤·Esc·포커스 복귀·Enter 확인·순차 표시·기본 대화상자 0건) → 23 통과. 빌드 성공, 라이트/다크 스크린샷 확인.
 - Verify: Blocker 0 / Major 0 / Minor 5. V-001(연속 창 포커스), V-002(keyup·Enter 반복), V-004(TempForm 확인 뒤 오래된 요청 차단), V-005(하드코딩 색·취소 버튼 테두리 대비 3:1 미달) 반영. V-003(data-view 훅 오래된 클로저)은 `REFRESH_DATA` 송신부가 없어 현재 영향 없음 → 보류.
+
+## 52. React + Vite 비교용 프런트엔드 생성 (브랜치 feature/react-vite)
+
+> 요청: 코드를 브랜치로 나누어 React + Vite 로 작업한 프로젝트를 하나 더 만들고, 기존 코드와 비교하고 싶다.
+
+### Agent 명세 (#52)
+
+- **Tier L**: 새 브랜치 `feature/react-vite` 에 기존 `frontend/` 는 그대로 두고 `frontend-vite/` 를 새로 만든다(3000·3001 동시 실행으로 나란히 비교).
+- **원칙**: 화면 코드(page·component·lib)는 그대로 두고 껍데기만 바꾼다 — 라우팅(layout.js 13개 → `App.jsx` 라우트 표), 진입점(`index.html`·`main.jsx`), Next import 7곳, 환경변수(`NEXT_PUBLIC_` → `VITE_`).
+- **API 호출**: 같은 출처 `/api` 를 Vite 서버가 백엔드로 프록시 → 백엔드 CORS(ALLOWED_ORIGINS)·구동 스크립트를 바꾸지 않고 3001 에서 동작.
+- **범위 밖**: `scripts/AOP_Web.ps1`·백엔드는 변경하지 않는다(정식 채택 시 별도 작업).
+- **교차 검증 필수**: 인증 쿠키 경로(API 주소·프록시) 변경 → Verify + security-review.
+
+### 수행 결과 (#52)
+
+- `frontend-vite/`: Vite 8 + react-router-dom 7. `src/**/*.js` → `.jsx`(Vite 8/oxc 는 .js 안 JSX 미지원), `App.jsx` ROUTES(13 경로·탭 제목·Layout/PopupLayout/Standalone 감싸기), `apiBase.jsx` 기본값 `window.location.origin`, `vite.config.mjs` `/api` 프록시·포트 3001.
+- 전환 중 발견: 로그인 페이지 `useCallback` 의존성 배열의 `router` 잔존 → `navigate` 로 수정.
+- 검증: `vite build` 성공, e2e 23건 dev·preview 모두 통과, `/msi-input` 직접 접근 200, 프록시 경유 `/api/auth/status` 확인.
+- 비교 실측: 빌드 Next 약 34초 / Vite 약 4.5초, 결과물 JS+CSS 약 1.5MB / 0.9MB. 6화면×라이트/다크 픽셀 비교 — Viewer select 외 동일(Next 쪽 라우트별 CSS 로드 순서 차이). 상세는 `frontend-vite/README.md`.
+- Verify: Blocker 0 / Major 1 / Minor 5 → 모두 반영. V-001(백엔드 다운 시 프록시 502 를 '로그인 필요'로 오판 → `AuthContext` 가 502~504 를 offline 처리, 3011 임시 preview 로 재현·확인), V-003(없는 주소 → 404 화면), V-004·V-005(README 사실 정정), V-006(프록시 키 `^/api/`). V-002(라우트별 CSS 순서)는 일관성을 위해 Vite 쪽 동작 유지·README 기록.
+- security-review: High 이상 0건. Low — 프록시 키 축소·개발 서버 localhost 한정 반영, `vite preview` 운영 사용·COOKIE_SECURE 는 README '정식 채택 시 할 일'에 기록.

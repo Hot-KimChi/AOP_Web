@@ -1,0 +1,201 @@
+'use client';
+
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Settings, Eye, ClipboardCheck, FileOutput, Brain, Activity, User, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
+import '../globals.css';
+import { API_BASE_URL } from '../lib/apiBase';
+import { openLoginPopup } from '../lib/loginPopup';
+import { useAuth } from './AuthContext';
+
+const menuItems = [
+  { href: '/measset-generation',  icon: Settings,       text: 'MeasSet Generation' },
+  { href: '/viewer',              icon: Eye,            text: 'Viewer' },
+  { href: '/verification-report', icon: ClipboardCheck, text: 'Verification Report' },
+  { href: '/SSR_DocOut',          icon: FileOutput,     text: 'SSR DocOut' },
+  { href: '/machine-learning',    icon: Brain,          text: 'Machine Learning' },
+  { href: '/interrogator',        icon: Activity,       text: 'Interrogator' },
+];
+
+const Navbar = () => {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const { status, username, markLoggedOut } = useAuth();
+  const isAuthenticated = status === 'authenticated';
+  const [menuOpen,        setMenuOpen]        = useState(false);
+  const [isDark,          setIsDark]          = useState(false);
+
+  // ThemeInit에서 이미 data-theme을 설정하므로, DOM 상태만 읽어서 동기화
+  useEffect(() => {
+    const current = document.documentElement.getAttribute('data-theme');
+    setIsDark(current === 'dark');
+  }, []);
+
+  // 페이지 이동 시 모바일 메뉴 닫기
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+
+  // 창 크기 변경 시 모바일 메뉴 닫기 (데스크톱으로 전환 시)
+  useEffect(() => {
+    const handleResize = () => { if (window.innerWidth > 900) setMenuOpen(false); };
+    if (window.innerWidth > 900) setMenuOpen(false);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+      if (res.ok) {
+        markLoggedOut();
+        navigate('/');
+      }
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    if (next) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('aop-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('aop-theme', 'light');
+    }
+  };
+
+  const handleLogin = () => {
+    openLoginPopup();
+    setMenuOpen(false);
+  };
+
+  return (
+    <header className="navbar-root">
+      {/* ── 메인 바 ── */}
+      <div className="navbar-inner">
+
+        {/* 로고 — 항상 맨 왼쪽 */}
+        <Link to="/" className="navbar-logo">
+          <div className="navbar-logo-icon">A</div>
+          <span className="navbar-logo-text">AOP Web</span>
+        </Link>
+
+        <div className="navbar-divider" />
+
+        {/* 메뉴 링크 — 중앙 (남은 공간 차지) */}
+        <nav className="navbar-links">
+          {menuItems.map((item) => {
+            const Icon     = item.icon;
+            const isActive = pathname?.startsWith(item.href);
+            const disabled = !isAuthenticated;
+            const cls      = ['navbar-link', isActive ? 'active' : '', disabled ? 'disabled' : ''].join(' ').trim();
+            return (
+              <Link
+                key={item.href}
+                to={disabled ? '#' : item.href}
+                className={cls}
+                onClick={(e) => disabled && e.preventDefault()}
+                aria-disabled={disabled}
+                title={item.text}
+              >
+                <Icon size={14} />
+                <span className="navbar-link-text">{item.text}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Auth + 테마 토글 — 항상 맨 오른쪽 */}
+        <div className="navbar-auth">
+          {/* 데스크톱 전용: 테마 토글 + 로그인/로그아웃 (모바일에서는 햄버거 메뉴 안으로 이동) */}
+          <div className="navbar-auth-buttons">
+            <button
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={isDark ? 'Light mode' : 'Dark mode'}
+            >
+              {isDark ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+            {isAuthenticated ? (
+              <>
+                <span className="navbar-username">
+                  <span className="navbar-username-prefix">as </span>
+                  <strong>{username}</strong>
+                </span>
+                <button onClick={handleLogout} className="navbar-logout-btn">
+                  <LogOut size={13} />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button onClick={handleLogin} className="navbar-login-btn">
+                <User size={13} />
+                Login
+              </button>
+            )}
+          </div>
+
+          {/* 햄버거 — 모바일 전용 (CSS로 표시/숨김) */}
+          <button
+            className="navbar-toggle"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Toggle navigation menu"
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        </div>
+      </div>
+
+      {/* ── 모바일 드롭다운 ── */}
+      <nav className={`navbar-mobile-menu${menuOpen ? ' open' : ''}`}>
+        {menuItems.map((item) => {
+          const Icon     = item.icon;
+          const isActive = pathname?.startsWith(item.href);
+          const disabled = !isAuthenticated;
+          const cls      = ['navbar-mobile-link', isActive ? 'active' : '', disabled ? 'disabled' : ''].join(' ').trim();
+          return (
+            <Link
+              key={item.href}
+              to={disabled ? '#' : item.href}
+              className={cls}
+              onClick={(e) => { if (disabled) e.preventDefault(); }}
+            >
+              <Icon size={15} />
+              {item.text}
+            </Link>
+          );
+        })}
+
+        {/* ── 모바일 전용: 테마·인증 ── */}
+        <div className="navbar-mobile-divider" />
+        <button className="navbar-mobile-link" onClick={toggleTheme}>
+          {isDark ? <Sun size={15} /> : <Moon size={15} />}
+          {isDark ? 'Light Mode' : 'Dark Mode'}
+        </button>
+        {isAuthenticated ? (
+          <>
+            <div className="navbar-mobile-user-info">
+              <User size={15} />
+              <span>as <strong>{username}</strong></span>
+            </div>
+            <button className="navbar-mobile-link navbar-mobile-logout" onClick={handleLogout}>
+              <LogOut size={15} />
+              Logout
+            </button>
+          </>
+        ) : (
+          <button className="navbar-mobile-link navbar-mobile-login" onClick={handleLogin}>
+            <User size={15} />
+            Login
+          </button>
+        )}
+      </nav>
+    </header>
+  );
+};
+
+export default Navbar;

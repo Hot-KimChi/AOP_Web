@@ -1,0 +1,56 @@
+/**
+ * 윈도우 동기화 Custom Hook
+ * 
+ * @description
+ * 부모 창과의 메시지 통신 및 창 닫기 이벤트를 관리합니다.
+ */
+
+import { useEffect, useCallback } from 'react';
+import { MESSAGES } from '../constants/messages';
+import { showConfirm } from '../../../lib/dialog';
+
+export const useWindowSync = (refreshData, syncDataBeforeUnload, editedData, deletedRows) => {
+  /**
+   * 메시지 수신 핸들러 (origin 검증 포함)
+   */
+  const receiveMessage = useCallback(async (event) => {
+    // 신뢰할 수 있는 origin만 허용
+    if (event.origin !== window.location.origin) return;
+
+    if (event.data && event.data.type === 'REFRESH_DATA') {
+      const freshData = event.data.data;
+      if (!freshData) return;
+
+      // 저장하지 않은 편집/삭제가 있으면 덮어쓰기 전에 확인을 받는다.
+      const hasUnsavedChanges =
+        Object.keys(editedData || {}).length > 0 || (deletedRows || []).length > 0;
+      if (hasUnsavedChanges && !await showConfirm(MESSAGES.REFRESH_DISCARD_CONFIRM)) {
+        return;
+      }
+
+      refreshData(freshData);
+    }
+  }, [refreshData, editedData, deletedRows]);
+
+  /**
+   * 창 닫기 전 핸들러
+   */
+  const handleBeforeUnload = useCallback(() => {
+    syncDataBeforeUnload(editedData, deletedRows);
+  }, [syncDataBeforeUnload, editedData, deletedRows]);
+
+  /**
+   * 이벤트 리스너 등록
+   */
+  useEffect(() => {
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('message', receiveMessage);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('message', receiveMessage);
+    };
+  }, [handleBeforeUnload, receiveMessage]);
+
+  return null;
+};
