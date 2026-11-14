@@ -1,8 +1,18 @@
 // 레거시 VB WinForms 화면을 원본 좌표(px) 그대로 재현하기 위한 공용 컨트롤.
 // 좌표·크기는 VB Designer 의 Location/Size 값을 그대로 넘긴다.
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState } from 'react';
 import { API_BASE_URL } from '../../lib/apiBase';
+
+// 최대창 모달 안의 폼인지(VbModal maximized) · 조상 폼까지 곱한 실제 CSS zoom 배율.
+const VbModalCtx = createContext({ maximized: false });
+const VbZoomCtx = createContext(1);
+// 캔버스 그래프가 CSS zoom 으로 흐려지지 않도록 Chart.js devicePixelRatio 에 곱할 값.
+export function useVbPixelRatio() {
+  const zoom = useContext(VbZoomCtx);
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  return Math.round(dpr * zoom * 100) / 100;
+}
 
 const PT = 96 / 72;
 // 폭이 다른 글꼴(좁은·고정폭)만 원본 그대로 두고, 나머지는 사이트 글꼴(--font-sans)을 상속한다.
@@ -22,43 +32,75 @@ function box(x, y, w, h, font, extra) {
 // toolbar: 타이틀바 아래 카드 안에 들어가는 웹 전용 영역(DB 선택 등).
 // readable: 버튼·표를 더 크게/선명하게 보이는 스타일(.vb-readable) 적용.
 // fitPage: 폭뿐 아니라 창 높이에도 맞춰 스크롤 없이 한 화면에 보이게 한다(별도 창용, fill 전제).
+// title·onClose 가 모두 없으면 타이틀바를 그리지 않는다(페이지 헤더와 중복될 때).
+// VbModal maximized 안에서는 타이틀바에서 보기 크기(화면 맞춤 / 폭 맞춤 / 100%)를 고를 수 있다(기본 화면 맞춤).
 const TITLE_H = 42;
+const MAX_FIT_ZOOM = 3;
+const VIEW_MODES = [
+  ['page', '화면 맞춤', '스크롤 없이 창 하나에 모두 보이도록 맞춤'],
+  ['width', '폭 맞춤', '창 폭에 맞춰 크게 보기(세로 스크롤)'],
+  ['actual', '100%', '원본 크기로 보기(스크롤)'],
+];
 export function VbForm({ title, width, height, children, onClose, testId, zoom, fill = false, maxZoom = 1.6, toolbar, readable = false, fitPage = false }) {
   const outerRef = useRef(null);
-  const [scale, setScale] = useState(zoom ?? 1);
+  const { maximized } = useContext(VbModalCtx);
+  const parentZoom = useContext(VbZoomCtx);
+  const [viewMode, setViewMode] = useState('page');
+  const actual = maximized && viewMode === 'actual' ? 1 : zoom;
+  const isFill = fill || (maximized && viewMode !== 'actual');
+  const isFitPage = fitPage || (maximized && viewMode === 'page');
+  const zoomCap = maximized ? MAX_FIT_ZOOM : maxZoom;
+  const showTitle = !!(title || onClose);
+  const [scale, setScale] = useState(actual ?? 1);
 
   useEffect(() => {
-    if (zoom) return undefined;
+    if (actual) { setScale(actual); return undefined; }
     const el = outerRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
     const update = () => {
       const avail = el.clientWidth;
       // fit-content 모달에서는 avail 이 자기 폭이므로 분모를 width+2 로 고정해야 배율이 수렴한다.
-      let fit = avail / (width + (fill ? 4 : 2));
-      if (fitPage) fit = Math.min(fit, (window.innerHeight - 2) / (height + TITLE_H + 2));
-      setScale(avail > 0 ? Math.min(fill ? maxZoom : 1, fit) : 1);
+      let fit = avail / (width + (isFill ? 4 : 2));
+      if (isFitPage) fit = Math.min(fit, (window.innerHeight - 2) / (height + (showTitle ? TITLE_H : 0) + 2));
+      setScale(avail > 0 ? Math.min(isFill ? zoomCap : 1, fit) : 1);
     };
+    update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    if (fitPage) window.addEventListener('resize', update);
-    return () => { ro.disconnect(); if (fitPage) window.removeEventListener('resize', update); };
-  }, [width, height, zoom, fill, maxZoom, fitPage]);
+    if (isFitPage) window.addEventListener('resize', update);
+    return () => { ro.disconnect(); if (isFitPage) window.removeEventListener('resize', update); };
+  }, [width, height, actual, isFill, zoomCap, isFitPage, showTitle]);
 
-  const outerCls = ['vb-outer', fill && 'vb-outer-fill', fitPage && 'vb-outer-page'].filter(Boolean).join(' ');
+  const outerCls = ['vb-outer', isFill && 'vb-outer-fill', isFitPage && 'vb-outer-page'].filter(Boolean).join(' ');
   return (
-    <div ref={outerRef} className={outerCls} data-testid={testId}>
+    <div ref={outerRef} className={outerCls} data-testid={testId} data-zoom={scale.toFixed(2)}>
       <div className={readable ? 'vb-window vb-readable' : 'vb-window'} style={{ width: width + 2, zoom: scale }}>
-        <div className="vb-titlebar">
-          <span className="vb-title-icon" aria-hidden="true" />
-          <span className="vb-title-text">{title}</span>
-          {onClose && (
-            <button type="button" className="vb-title-close" onClick={onClose} aria-label="닫기">✕</button>
-          )}
-        </div>
+        {showTitle && (
+          <div className="vb-titlebar">
+            <span className="vb-title-icon" aria-hidden="true" />
+            <span className="vb-title-text">{title}</span>
+            {maximized && (
+              <>
+                <span className="vb-title-zoom" aria-live="polite">{Math.round(scale * 100)}%</span>
+                <div className="vb-title-seg" role="group" aria-label="보기 크기">
+                  {VIEW_MODES.map(([mode, label, tip]) => (
+                    <button key={mode} type="button" className="vb-title-btn" aria-pressed={viewMode === mode} title={tip}
+                      onClick={() => setViewMode(mode)} data-testid={testId ? `${testId}-view-${mode}` : undefined}>{label}</button>
+                  ))}
+                </div>
+              </>
+            )}
+            {onClose && (
+              <button type="button" className="vb-title-close" onClick={onClose} aria-label="닫기" title={maximized ? '닫기 (Esc)' : '닫기'}>✕</button>
+            )}
+          </div>
+        )}
         {toolbar && <div className="vb-toolbar">{toolbar}</div>}
-        <div className="vb-client" style={{ width, height }}>
-          {children}
-        </div>
+        <VbZoomCtx.Provider value={parentZoom * scale}>
+          <div className="vb-client" style={{ width, height }}>
+            {children}
+          </div>
+        </VbZoomCtx.Provider>
       </div>
     </div>
   );
@@ -387,7 +429,12 @@ const modalStack = [];
 
 // 하위 폼(ShowDialog)을 화면 위에 띄운다. closeOnEsc 이면 Esc 로 가장 위 폼만 닫는다
 // (WinForms 는 CancelButton 이 지정된 폼만 Esc 로 닫히므로 기본값은 false).
-export function VbModal({ children, onClose, testId, closeOnEsc = false }) {
+// maximized: 화면 전체를 쓰는 최대창(안의 VbForm 이 화면에 맞춰 확대됨). 배경 페이지 스크롤을 잠그고,
+// 입력 칸에서 누른 Esc 는 창을 닫지 않는다(편집 중 실수로 닫히는 것 방지).
+const EDITABLE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
+const MAXIMIZED = { maximized: true };
+const NORMAL = { maximized: false };
+export function VbModal({ children, onClose, testId, closeOnEsc = false, maximized = false }) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
@@ -395,19 +442,25 @@ export function VbModal({ children, onClose, testId, closeOnEsc = false }) {
     modalStack.push(token);
     const onKey = (e) => {
       if (!closeOnEsc || e.key !== 'Escape' || e.defaultPrevented || modalStack[modalStack.length - 1] !== token) return;
+      if (maximized && (EDITABLE_TAGS.has(e.target?.tagName) || e.target?.isContentEditable)) return;
       e.preventDefault();
       closeRef.current?.();
     };
     window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    if (maximized) document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', onKey);
+      if (maximized) document.body.style.overflow = prevOverflow;
       const i = modalStack.indexOf(token);
       if (i >= 0) modalStack.splice(i, 1);
     };
-  }, [closeOnEsc]);
+  }, [closeOnEsc, maximized]);
   return (
-    <div className="vb-modal" role="dialog" aria-modal="true" data-testid={testId}>
-      {children}
+    <div className={maximized ? 'vb-modal vb-modal-max' : 'vb-modal'} role="dialog" aria-modal="true" data-testid={testId}>
+      <VbModalCtx.Provider value={maximized ? MAXIMIZED : NORMAL}>
+        {children}
+      </VbModalCtx.Provider>
     </div>
   );
 }

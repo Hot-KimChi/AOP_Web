@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chart as ChartJS, LinearScale, LineElement, PointElement } from 'chart.js';
 import { Scatter } from 'react-chartjs-2';
+import { useVbPixelRatio } from '../vb/Vb';
 
 ChartJS.register(LinearScale, PointElement, LineElement);
 
@@ -207,6 +208,7 @@ export default function TankGraph({
   title = '', xLabel = '', yLabel = '', testId,
 }) {
   const wrapRef = useRef(null);
+  const pixelRatio = useVbPixelRatio();
   const [colorsReady, setColorsReady] = useState(false);
   useEffect(() => { setColorsReady(true); }, []);
   const radius = radiusOf(geo);
@@ -234,6 +236,7 @@ export default function TankGraph({
   const options = useMemo(() => ({
     responsive: false,
     maintainAspectRatio: false,
+    devicePixelRatio: pixelRatio,
     animation: false,
     events: [],
     layout: {
@@ -250,7 +253,7 @@ export default function TankGraph({
         geo, grid, range: valid ? range : null, showNumbers: showNumbers && valid, selection, title, xLabel, yLabel,
       },
     },
-  }), [geo, grid, range, valid, showNumbers, selection, title, xLabel, yLabel]);
+  }), [geo, grid, range, valid, showNumbers, selection, title, xLabel, yLabel, pixelRatio]);
 
   const toPic = (e) => {
     const rect = wrapRef.current.getBoundingClientRect();
@@ -291,7 +294,7 @@ export default function TankGraph({
           if (inPic(p)) onContextMenu?.(p.cx, p.cy, p.px, p.py);
         }}
       >
-        <Scatter key={`${geo.cw}x${geo.ch}`} data={data} options={options} plugins={[vbPlotPlugin]} width={geo.cw - 2} height={geo.ch - 2} />
+        <Scatter key={`${geo.cw}x${geo.ch}@${pixelRatio}`} data={data} options={options} plugins={[vbPlotPlugin]} width={geo.cw - 2} height={geo.ch - 2} />
       </div>
       {editLabel}
     </div>

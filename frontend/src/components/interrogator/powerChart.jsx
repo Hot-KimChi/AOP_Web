@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chart as ChartJS, LinearScale, LineElement, PointElement } from 'chart.js';
 import { Scatter } from 'react-chartjs-2';
+import { useVbPixelRatio } from '../vb/Vb';
 
 ChartJS.register(LinearScale, PointElement, LineElement);
 
@@ -191,6 +192,7 @@ export default function PowerGraph({
   title = 'Power', xLabel = 'Voltage', yLabel = 'PowerData', testId = 'power-graph',
 }) {
   const wrapRef = useRef(null);
+  const pixelRatio = useVbPixelRatio();
   const [colorsReady, setColorsReady] = useState(false);
   useEffect(() => { setColorsReady(true); }, []);
 
@@ -217,6 +219,7 @@ export default function PowerGraph({
   const options = useMemo(() => ({
     responsive: false,
     maintainAspectRatio: false,
+    devicePixelRatio: pixelRatio,
     animation: false,
     events: [],
     layout: { padding: { left: PIC.left, top: PIC.top, right: CONTAINER.w - 2 - PIC.left - PIC.w, bottom: CONTAINER.h - 2 - PIC.top - PIC.h } },
@@ -231,7 +234,7 @@ export default function PowerGraph({
         grid: true, range: valid ? range : null, showNumbers: showNumbers && valid, selection, title, xLabel, yLabel,
       },
     },
-  }), [range, valid, showNumbers, selection, title, xLabel, yLabel]);
+  }), [range, valid, showNumbers, selection, title, xLabel, yLabel, pixelRatio]);
 
   const toPic = (e) => {
     const rect = wrapRef.current.getBoundingClientRect();
@@ -275,7 +278,8 @@ export default function PowerGraph({
           }
         }}
       >
-        <Scatter data={data} options={options} plugins={[vbPlotPlugin]} width={CONTAINER.w - 2} height={CONTAINER.h - 2} />
+        {/* 배율이 바뀌면 캔버스 해상도(devicePixelRatio)를 다시 잡도록 새로 만든다 */}
+        <Scatter key={pixelRatio} data={data} options={options} plugins={[vbPlotPlugin]} width={CONTAINER.w - 2} height={CONTAINER.h - 2} />
       </div>
       {editLabel}
     </div>

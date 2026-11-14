@@ -1483,3 +1483,22 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - `model-routing` §2.1 표·§4 흐름, `agent-orchestration` 소유권·`[CONTEXT]`에 명세 위치 포함.
 - `plan`·`principal-software-engineer`·`web-designer`·`verify` 에이전트: 착수/판정 전 명세(#N) 확인, 명세 위반은 Verify 최소 Major.
 - Verify(Blocker 0 / Major 1 / Minor 6) 전건 반영: `agent-orchestration` 역할 표의 Leader 쓰기 권한 "없음" → "Agent 명세만"(Major), `model-routing` §2.1 산출물에 명세 추가, `verification` 흐름도에 명세·수행 결과 단계, `ms-sql-dba`·`playwright-tester`에도 명세 확인, Leader 작성 주체 단일화·`[SPEC]` 회신 후 위임 게이트, Verify는 명세와 원문이 충돌하면 원문 우선, 본 #56 명세에 하위작업 줄 추가. 재검증 Minor 3건(읽기 전용 분류·라우터 "계획·명세 담당" 표현, 오케스트레이션 예시의 작성 주체·`[SPEC]` 게이트, Verify의 Leader 단계 diff 확인)도 반영 → Blocker 0 / Major 0. 훅 통과.
+
+## 57. interrogator 메뉴에서 아래부분을 제거해죠. 중복이다. 그리고 database 선택하는 부분은 아래 카드블록하고 합쳐죠. 추가적으로 아래 intensity, temperature, power선택했을 때 새로운창이 오픈되는데 최대창으로 설정되어 가독성을 우수하게 해죠. 추가적으로 새로운창이 더 가독성이 우수하게 성능 및 유저의 제어가 편하도록 완벽하게 개선해죠.
+
+### Agent 명세 (#57)
+
+- **Tier·예산**: M | 프런트엔드 UI 3곳(메인 폼·공용 VbForm/VbModal·차트 2종) 수정, API·백엔드 변경 없음 | 예산 40콜
+- **목표·완료 조건**: AC1 Interrogator 메인 카드에서 중복 타이틀바("Interrogator")와 큰 글자 히어로 라벨이 사라지고, 아래 컨트롤이 그만큼 위로 붙는다. AC2 Database 선택이 별도 카드가 아니라 메인 카드 상단(toolbar)에 합쳐진다(`int-db` 유지). AC3 Tank(Intensity)·Power·Temp 분석 창은 화면 전체를 쓰는 최대창으로 열리고, 창 크기에 맞춰 확대(스크롤 없이 한 화면)된다. AC4 확대해도 그래프(canvas)가 흐려지지 않는다(devicePixelRatio 보정). AC5 사용자 제어: 타이틀바의 "화면 맞춤 ↔ 원본 크기(100%·스크롤)" 전환 버튼, Esc 로 닫기(가장 위 창만), 닫기 버튼 유지. AC6 기존 e2e 통과 + 최대창 동작 e2e 추가, 빌드 통과.
+- **불변식**: 하위 폼 내부 좌표·버튼·데이터 흐름·API 계약 불변. 차트 클릭·드래그 좌표 변환(getBoundingClientRect 기반) 정확성 유지. 다른 화면의 VbForm/VbModal 동작(기본값) 불변. 다크 테마 CSS 변수만 사용.
+- **범위 밖**: 하위 폼 레이아웃 재설계, 백엔드, 다른 메뉴의 창.
+- **하위작업**: T1 | 메인(Implement) | `frontend/src/app/interrogator/page.jsx`, `frontend/src/components/vb/Vb.jsx`, `frontend/src/components/interrogator/{tankChart,powerChart}.jsx`, `frontend/src/globals.css`, `frontend/tests/app.spec.js` | - | AC1~AC6
+- **검증 계획**: `npm run build`, Playwright e2e, 최대창 스크린샷 육안 확인(라이트·다크). §4.1 위험 조건(인증·SQL·API 계약·스크립트) 미해당 → Verify 생략, 실행 체크로 확인.
+- **가정·모호성**: "아래부분" = 첨부 이미지의 카드 타이틀바 + 히어로 라벨(페이지 헤더와 중복). "intensity" = Tank Data Analysis(Acoustic Graphs). "새로운창" = 현재 화면 위에 뜨는 폼 창(모달)으로 보고, 별도 브라우저 창 대신 화면 전체 최대창으로 띄운다.
+
+### 수행 결과 (#57)
+
+- 메인(`interrogator/page.jsx`): 페이지 헤더와 중복되던 카드 타이틀바·큰 제목 라벨 제거, 컨트롤을 150px 위로 정렬(카드 높이 744→594). Database 선택을 별도 카드에서 메인 카드 상단(toolbar)으로 통합.
+- 공용 `VbModal maximized`(Vb.jsx): 화면 전체 최대창, 배경 스크롤 잠금, Esc 닫기(가장 위 창만·입력 칸에서는 무시). 안의 `VbForm` 타이틀바에 배율 표시와 보기 크기 선택(**화면 맞춤**: 스크롤 없이 한 화면 / **폭 맞춤**: 창 폭 기준 확대·세로 스크롤 / **100%**). title·onClose 없는 VbForm은 타이틀바 생략. Tank·Power·Temp 분석 창에 적용.
+- 그래프 선명도: 조상 폼 배율을 곱한 값으로 Chart.js `devicePixelRatio` 보정(tankChart·powerChart) → 확대해도 캔버스가 흐려지지 않음(1920×960에서 화면 맞춤 1.09배·폭 맞춤 1.65배, 캔버스 해상도 동일 배율 확인). 미사용 `.vb-hero` CSS 제거.
+- 검증: `npm run build` 통과, e2e 23 passed(최대창 크기=뷰포트, 보기 모드 전환, Esc 닫기, 스크롤 잠금 해제 단언 추가), 1920×960 라이트·다크 스크린샷 확인(콘솔 오류 0). §4.1 위험 조건 미해당으로 Verify 생략.

@@ -1,5 +1,6 @@
-// 레거시 intMain(frmMain.vb, "Interrogator", 922x744) 화면을 원본 좌표·버튼·활성 규칙 그대로 재현한다.
-// 하위 폼(Tank/Power/Temp/RTP Display/Export/RTP Analysis/NewName)은 원본처럼 창(모달)으로 띄운다.
+// 레거시 intMain(frmMain.vb, "Interrogator", 922x744) 화면의 버튼·활성 규칙을 재현한다. 페이지 헤더와 중복되는
+// 타이틀바·큰 제목 라벨은 빼고(원본 y 에서 150 위로), DB 선택은 카드 상단(toolbar)에 둔다.
+// 하위 폼은 원본처럼 창(모달)으로 띄우고, Tank/Power/Temp 분석 창은 화면 전체 최대창으로 연다.
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -101,36 +102,35 @@ export default function InterrogatorPage() {
           <p>RTP 데이터 점검 · 생성 · 내보내기</p>
         </div>
       </div>
-      <VbDbBar value={database} onChange={setDatabase} testId="int-db" />
-      <VbForm title="Interrogator" width={922} height={744} testId="int-main">
-        <VbLabel x={122} y={19} w={749} h={139} font={{ size: 72, bold: true }} className="vb-hero">Interrogator</VbLabel>
+      <VbForm width={922} height={594} testId="int-main"
+        toolbar={<VbDbBar inline value={database} onChange={setDatabase} testId="int-db" />}>
 
-        <VbLabel x={138} y={176} w={103} h={23} font={A975}>Probe ID</VbLabel>
-        <VbCombo x={256} y={176} w={153} h={26} font={A975} value={probeId} onChange={setProbeId}
+        <VbLabel x={138} y={26} w={103} h={23} font={A975}>Probe ID</VbLabel>
+        <VbCombo x={256} y={26} w={153} h={26} font={A975} value={probeId} onChange={setProbeId}
           options={probes.map((p) => String(p.probeId))} disabled={!database} testId="int-probe" ariaLabel="Probe ID" />
-        <VbLabel x={512} y={176} w={98} h={23} font={A975}>ProbeName</VbLabel>
-        <VbText x={616} y={176} w={153} h={23} font={A8} value={probeName} readOnly testId="int-probe-name" ariaLabel="ProbeName" />
+        <VbLabel x={512} y={26} w={98} h={23} font={A975}>ProbeName</VbLabel>
+        <VbText x={616} y={26} w={153} h={23} font={A8} value={probeName} readOnly testId="int-probe-name" ariaLabel="ProbeName" />
 
-        <VbLabel x={138} y={224} w={103} h={25} font={A975}>RTP Name</VbLabel>
-        <VbCombo x={256} y={224} w={153} h={24} font={A8} value={rtpName} onChange={onRtpName}
+        <VbLabel x={138} y={74} w={103} h={25} font={A975}>RTP Name</VbLabel>
+        <VbCombo x={256} y={74} w={153} h={24} font={A8} value={rtpName} onChange={onRtpName}
           options={probeId ? [NEW, ...rtpNames] : []} disabled={!probeReady} testId="int-rtp-name" ariaLabel="RTP Name" />
 
-        <VbLabel x={40} y={336} w={137} h={33} font={A975}>RTP data check-up:</VbLabel>
-        <VbButton x={216} y={328} {...B} disabled={!ready} onClick={() => setOpen('tank')} testId="int-btn-tank">Tank Data Analysis</VbButton>
-        <VbButton x={392} y={328} {...B} disabled={!ready} onClick={() => setOpen('power')} testId="int-btn-power">Power Data Analysis</VbButton>
-        <VbButton x={568} y={328} {...B} disabled={!ready} onClick={() => setOpen('temp')} testId="int-btn-temp">Temp Data Analysis</VbButton>
+        <VbLabel x={40} y={186} w={137} h={33} font={A975}>RTP data check-up:</VbLabel>
+        <VbButton x={216} y={178} {...B} disabled={!ready} onClick={() => setOpen('tank')} testId="int-btn-tank">Tank Data Analysis</VbButton>
+        <VbButton x={392} y={178} {...B} disabled={!ready} onClick={() => setOpen('power')} testId="int-btn-power">Power Data Analysis</VbButton>
+        <VbButton x={568} y={178} {...B} disabled={!ready} onClick={() => setOpen('temp')} testId="int-btn-temp">Temp Data Analysis</VbButton>
 
-        <VbLabel x={40} y={424} w={121} h={33} font={A975}>RTP Generation:</VbLabel>
-        <VbButton x={216} y={424} {...B} disabled testId="int-btn-simu">RTP Simulation</VbButton>
-        <VbButton x={392} y={424} {...B} disabled={!ready} busy={busy === 'standard'} onClick={() => generate('standard')} testId="int-btn-run">RTP Generation</VbButton>
-        <VbButton x={568} y={424} {...B} color={ACTIVE_CAPTION} disabled={!!busy} busy={busy === 'modified'} onClick={() => generate('modified')} testId="int-btn-runaper">RTP Generation (Aperture Interp)</VbButton>
+        <VbLabel x={40} y={274} w={121} h={33} font={A975}>RTP Generation:</VbLabel>
+        <VbButton x={216} y={274} {...B} disabled testId="int-btn-simu">RTP Simulation</VbButton>
+        <VbButton x={392} y={274} {...B} disabled={!ready} busy={busy === 'standard'} onClick={() => generate('standard')} testId="int-btn-run">RTP Generation</VbButton>
+        <VbButton x={568} y={274} {...B} color={ACTIVE_CAPTION} disabled={!!busy} busy={busy === 'modified'} onClick={() => generate('modified')} testId="int-btn-runaper">RTP Generation (Aperture Interp)</VbButton>
 
-        <VbLabel x={40} y={520} w={121} h={33} font={A975}>RTP Export:</VbLabel>
-        <VbButton x={216} y={520} {...B} disabled={!ready} onClick={() => setOpen('display')} testId="int-btn-display">RTP Display</VbButton>
-        <VbButton x={392} y={520} {...B} disabled={!ready} onClick={() => setOpen('export')} testId="int-btn-export">RTP  Export</VbButton>
-        <VbButton x={568} y={520} {...B} disabled={!!busy || !database} onClick={() => setOpen('analysis')} testId="int-btn-analysis">RTP Analysis</VbButton>
+        <VbLabel x={40} y={370} w={121} h={33} font={A975}>RTP Export:</VbLabel>
+        <VbButton x={216} y={370} {...B} disabled={!ready} onClick={() => setOpen('display')} testId="int-btn-display">RTP Display</VbButton>
+        <VbButton x={392} y={370} {...B} disabled={!ready} onClick={() => setOpen('export')} testId="int-btn-export">RTP  Export</VbButton>
+        <VbButton x={568} y={370} {...B} disabled={!!busy || !database} onClick={() => setOpen('analysis')} testId="int-btn-analysis">RTP Analysis</VbButton>
 
-        <VbButton x={707} y={630} {...B} onClick={() => navigate('/')} testId="int-btn-return">Return To Home</VbButton>
+        <VbButton x={707} y={480} {...B} onClick={() => navigate('/')} testId="int-btn-return">Return To Home</VbButton>
       </VbForm>
 
       {open === 'newname' && (
@@ -140,9 +140,9 @@ export default function InterrogatorPage() {
       )}
       {open === 'display' && <VbModal onClose={close}><RtpDisplayForm {...common} /></VbModal>}
       {open === 'analysis' && <VbModal onClose={close}><RtpAnalysisForm {...common} /></VbModal>}
-      {open === 'tank' && <VbModal onClose={close}><TankForm {...common} /></VbModal>}
-      {open === 'power' && <VbModal onClose={close}><PowerForm {...common} /></VbModal>}
-      {open === 'temp' && <VbModal onClose={close}><TempForm {...common} /></VbModal>}
+      {open === 'tank' && <VbModal maximized closeOnEsc onClose={close} testId="int-tank-modal"><TankForm {...common} /></VbModal>}
+      {open === 'power' && <VbModal maximized closeOnEsc onClose={close} testId="int-power-modal"><PowerForm {...common} /></VbModal>}
+      {open === 'temp' && <VbModal maximized closeOnEsc onClose={close} testId="int-temp-modal"><TempForm {...common} /></VbModal>}
       {open === 'export' && <VbModal onClose={close}><ExportForm {...common} /></VbModal>}
     </div>
   );

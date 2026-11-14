@@ -361,5 +361,36 @@ test.describe('MSI input · Interrogator', () => {
     await expect(page.getByTestId('int-rtp-problem')).toBeVisible();
     await page.getByTestId('int-rtp-close').click();
     await expect(page.getByTestId('int-rtp-display')).toBeHidden();
+
+    // 중복 타이틀바·히어로 제거, DB 선택은 카드 상단(toolbar)에 통합
+    await expect(page.getByTestId('int-main').locator('.vb-titlebar')).toHaveCount(0);
+    await expect(page.getByTestId('int-main').locator('.vb-toolbar').getByTestId('int-db')).toBeVisible();
+
+    // Power 분석 창: 화면 전체 최대창 + 화면 맞춤 ↔ 원본 크기 전환 + Esc 닫기 + 배경 스크롤 잠금
+    await page.route('**/api/interrogator/power/sw-versions?*', (route) => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: ['1.0'] }),
+    }));
+    await page.getByTestId('int-btn-power').click();
+    const modal = page.getByTestId('int-power-modal');
+    await expect(modal).toBeVisible();
+    const vp = page.viewportSize();
+    const box = await modal.boundingBox();
+    expect(Math.round(box.width)).toBe(vp.width);
+    expect(Math.round(box.height)).toBe(vp.height);
+    await expect(page.locator('body')).toHaveCSS('overflow', 'hidden');
+    const win = await page.getByTestId('int-power').locator('.vb-window').boundingBox();
+    expect(win.height).toBeLessThanOrEqual(vp.height + 1);
+    await page.getByTestId('int-power-view-actual').click();
+    await expect(page.getByTestId('int-power-view-actual')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('int-power')).toHaveAttribute('data-zoom', '1.00');
+    await page.getByTestId('int-power-view-width').click();
+    await expect.poll(async () => (await page.getByTestId('int-power').locator('.vb-window').boundingBox()).width)
+      .toBeGreaterThan(vp.width - 40);
+    await page.getByTestId('int-power-view-page').click();
+    await expect.poll(async () => (await page.getByTestId('int-power').locator('.vb-window').boundingBox()).height)
+      .toBeLessThanOrEqual(vp.height + 1);
+    await page.keyboard.press('Escape');
+    await expect(modal).toBeHidden();
+    await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
   });
 });
