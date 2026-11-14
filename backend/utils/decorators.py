@@ -6,6 +6,7 @@ from werkzeug.exceptions import HTTPException
 from config import Config
 from utils.database_manager import db_manager
 from .error_handler import error_response, CredentialsRequired
+from .credential_store import is_jwt_session_alive
 from .logger import logger
 
 
@@ -68,6 +69,9 @@ def require_auth(f):
                 "This account is not allowed to use AOP Web. Please contact the administrator.",
                 403,
             )
+        # exp 없는 JWT 가 로그아웃·재시작 후에도 재사용되지 않도록 세션 생존을 확인한다.
+        if not is_jwt_session_alive(payload):
+            return error_response("Session ended. Please log in again.", 401)
         return f(*args, **kwargs)
 
     return decorated_function

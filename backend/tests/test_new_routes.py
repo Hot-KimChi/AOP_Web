@@ -15,7 +15,7 @@ def client(monkeypatch):
 
     monkeypatch.setattr(decorators.db_manager, "get_connection", lambda name: object())
     c = app.test_client()
-    token = jwt.encode({"username": "tester"}, Config.SECRET_KEY, algorithm="HS256")
+    token = jwt.encode({"username": "tester", "exp": 4102444800}, Config.SECRET_KEY, algorithm="HS256")
     c.set_cookie("auth_token", token)
     return c
 
@@ -138,3 +138,80 @@ def test_tx_compare_rejects_bad_probe_id(client):
         "database": "BizDb", "probeId": "abc", "TxSumSoftware": "a", "wcsSoftware": "b", "measSSId_MI": 1,
     })
     assert res.status_code == 400
+
+# ── 로그인 시간 만료 없음(AUTH_EXPIRE_TIME=0) ──────────────────────────
+def test_credential_store_no_expiry_and_lru_cap(monkeypatch):
+    from config import Config
+    from utils import credential_store as cs
+
+    monkeypatch.setattr(Config, "EXPIRE_TIME", 0)
+    monkeypatch.setattr(cs, "_store", cs.OrderedDict())
+    clock = [1000.0]
+    monkeypatch.setattr(cs.time, "monotonic", lambda: clock[0])
+
+    tok = cs.store_credentials("u1", "p1")
+    clock[0] += 10 * 365 * 24 * 3600  # 10년 경과
+    assert cs.resolve(tok) == ("u1", "p1")
+
+    # 상한 초과 시 가장 오래 사용하지 않은 항목부터 제거
+    monkeypatch.setattr(cs, "MAX_ENTRIES", 2)
+    a = cs.store_credentials("a", "x")
+    cs.resolve(tok)  # tok 을 최근 사용으로 갱신
+    cs.store_credentials("b", "y")
+    assert cs.resolve(a) == (None, None)
+    assert cs.resolve(tok) == ("u1", "p1")
+
+
+def test_credential_store_positive_ttl_still_expires(monkeypatch):
+    from config import Config
+    from utils import credential_store as cs
+
+    monkeypatch.setattr(Config, "EXPIRE_TIME", 60)
+    monkeypatch.setattr(cs, "_store", cs.OrderedDict())
+    clock = [0.0]
+    monkeypatch.setattr(cs.time, "monotonic", lambda: clock[0])
+    tok = cs.store_credentials("u", "p")
+    clock[0] += 61
+    assert cs.resolve(tok) == (None, None)
+
+
+def test_jwt_bound_to_session_is_revoked_on_logout(monkeypatch):
+    """exp 없는 JWT 도 로그아웃(세션 폐기) 후에는 재사용할 수 없어야 한다."""
+    from utils import credential_store as cs
+
+    monkeypatch.setattr(Config, "EXPIRE_TIME", 0)
+    monkeypatch.setattr(Config, "ALLOWED_USERS", [])
+    monkeypatch.setattr(cs, "_store", cs.OrderedDict())
+    app = create_app()
+    app.config["TESTING"] = True
+    assert app.config["PERMANENT_SESSION_LIFETIME"].days >= 3650  # 숨은 31일 만료 없음
+
+    c = app.test_client()
+    cred = cs.store_credentials("tester", "pw")
+    with c.session_transaction() as s:
+        s[cs.CREDENTIAL_TOKEN_KEY] = cred
+    token = jwt.encode({"username": "tester", cs.JWT_BINDING_CLAIM: cs._digest(cred)},
+                       Config.SECRET_KEY, algorithm="HS256")
+    c.set_cookie("auth_token", token)
+
+    st = c.get("/api/auth/status").get_json()
+    assert st["authenticated"] is True and st["has_credentials"] is True
+    assert c.get("/api/get_list_database").status_code == 200
+
+    # 다른 세션 토큰에 묶인 JWT 는 거부
+    other = app.test_client()
+    other.set_cookie("auth_token", token)
+    assert other.get("/api/get_list_database").status_code == 401
+
+    # 로그아웃 후 같은 JWT 재사용 → 거부
+    assert c.post("/api/auth/logout").status_code == 200
+    c.set_cookie("auth_token", token)
+    assert c.get("/api/get_list_database").status_code == 401
+    assert c.get("/api/auth/status").get_json()["authenticated"] is False
+
+
+def test_token_without_cid_and_exp_is_rejected(anon):
+    """폐기 수단이 없는 영구 토큰(cid·exp 모두 없음)은 거부한다."""
+    anon.set_cookie("auth_token", jwt.encode({"username": "tester"}, Config.SECRET_KEY, algorithm="HS256"))
+    assert anon.get("/api/get_list_database").status_code == 401
+    assert anon.get("/api/auth/status").get_json()["authenticated"] is False

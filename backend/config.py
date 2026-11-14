@@ -60,7 +60,8 @@ class Config:
     UPLOADS_ROOT = UPLOADS_ROOT
     # JWT 서명 키
     SECRET_KEY = os.environ.get("AUTH_SECRET_KEY", DEFAULT_AUTH_SECRET)
-    EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME", 7200))
+    # 로그인 유지 시간(초). 0 이하면 시간 만료 없음(브라우저 종료·로그아웃·서버 재시작 시에만 해제)
+    EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME", 0))
     # Flask 세션 서명 키 (운영 환경에서는 반드시 환경변수로 지정)
     FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", DEFAULT_FLASK_SECRET)
     # CORS 허용 Origins (쉼표 구분)
@@ -165,7 +166,7 @@ class Config:
 
         # 클래스 속성은 import 시점에 평가되므로, CFG 로드 후 재적용
         Config.SECRET_KEY = os.environ.get("AUTH_SECRET_KEY", DEFAULT_AUTH_SECRET)
-        Config.EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME", 7200))
+        Config.EXPIRE_TIME = int(os.environ.get("AUTH_EXPIRE_TIME", 0))
         Config.FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", DEFAULT_FLASK_SECRET)
         Config.COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
         Config.ALLOWED_ORIGINS = _parse_origins(os.environ.get("ALLOWED_ORIGINS", ""))

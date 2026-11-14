@@ -1446,3 +1446,14 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **수정 1건 — 운영 서버 오탐 로그**: 브라우저가 `/api` 요청을 중도 취소하면 백엔드 요청 취소(ECONNRESET)가 "백엔드 연결 실패"로 기록되던 것을, 클라이언트가 먼저 끊은 경우는 기록하지 않도록 수정(실제 백엔드 다운은 502 + 로그 유지). Werkzeug 응답은 `Connection: close` 라 keep-alive 재사용 문제 없음(30/30).
 - **실행 스크립트 실측**: `AOP_Web.ps1 -Action Start -Production -Unattended`(작업 스케줄러 경로)로 백엔드·프런트 전체 재기동 16초, 설치 마커 일치로 `npm ci` 생략, 빌드→`npm start`→3000 수신, stderr 0바이트. `AOP_Web.bat status` 정상(자동 시작 작업 MISCONFIGURED 는 이번 변경과 무관한 기존 등록 상태).
 - **회귀**: 백엔드 pytest 187/187, 전체 `.py` 컴파일 오류 0, e2e 23/23(dev·운영·스크립트 기동 서버 3회), 서버 점검 27/27, Verify 지적 재현 15/15, PC 이름·IP 접속 200.
+
+
+## 54. 로그인 후 해제되는 시간이 없도록 해죠. 즉 로그인하면 계속 사용할 수 있도록 수정해죠.
+
+### 수행 결과 (#54)
+- `AUTH_EXPIRE_TIME`(cfg `EXPIRE_TIME`) 기본값을 7200 → **0(=시간 만료 없음)** 으로 변경. 0 이하면 JWT 에 `exp` 를 넣지 않고, 서버 메모리 자격증명도 시간 만료 없이 유지(`credential_store._expiry` = inf). 양수 지정 시 기존 동작 유지.
+- 숨은 31일 만료 제거: Flask 는 permanent 여부와 무관하게 세션 서명 검증에 `PERMANENT_SESSION_LIFETIME`(31일)을 쓰므로 무만료일 때 3650일로 설정(`app.py`). 쿠키는 여전히 브라우저 종료 시 삭제.
+- 보안 보완(security-review MEDIUM·Verify Major): exp 없는 JWT 가 로그아웃·재시작 후에도 재사용되지 않도록 JWT 에 세션 토큰 해시(`cid`)를 넣어 세션과 묶음 → `require_auth` 401, `/auth/status` 비인증. 저장소는 LRU 상한 2000개(메모리 누적 방지).
+- 로그인 해제 조건: 로그아웃, 브라우저 완전 종료, 백엔드 재시작(메모리 저장소 초기화)만 남음.
+- Verify 재검증 Minor 3건 반영: cid·exp 모두 없는 토큰 거부(테스트 fixture 에 exp 추가), 31일 초과 TTL 도 세션 서명 수명이 잘리지 않게 조정, `backend/AGENTS.md` 401(세션 소멸) 규약 추가.
+- 검증: pytest 191 passed(신규 4건: 무만료+LRU, 양수 TTL 만료 유지, 로그아웃 후 JWT 재사용 거부, cid·exp 없는 토큰 거부), 운영 재기동 후 서버 점검 27·e2e 23 PASS, Verify(Blocker 0·Major 0)·security-review 반영.

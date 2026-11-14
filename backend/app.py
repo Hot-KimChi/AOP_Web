@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 from flask import Flask
 from flask_cors import CORS
@@ -29,6 +30,16 @@ def create_app():
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = Config.COOKIE_SECURE
+    # Flask 는 permanent 여부와 무관하게 세션 서명 검증에 PERMANENT_SESSION_LIFETIME
+    # (기본 31일)을 max_age 로 쓴다. 로그인 무만료(EXPIRE_TIME<=0)면 이 숨은 만료도 없앤다.
+    # 쿠키 자체는 permanent=False 라 여전히 브라우저 종료 시 삭제된다.
+    # 31일보다 긴 TTL 도 잘리지 않도록 최소 그 값 이상으로 맞춘다.
+    if Config.EXPIRE_TIME <= 0:
+        app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=3650)
+    else:
+        app.config["PERMANENT_SESSION_LIFETIME"] = max(
+            app.permanent_session_lifetime, timedelta(seconds=Config.EXPIRE_TIME)
+        )
 
     # 업로드 요청 본문 크기 제한(기본 100MB). 제한이 없으면 대용량 업로드가
     # 요청 스레드/메모리를 장시간 점유하거나 서비스 거부(DoS)로 이어질 수 있다.

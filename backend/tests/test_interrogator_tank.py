@@ -283,7 +283,7 @@ def client(monkeypatch):
 
     monkeypatch.setattr(decorators.db_manager, "get_connection", lambda name: object())
     c = app.test_client()
-    c.set_cookie("auth_token", jwt.encode({"username": "tester"}, Config.SECRET_KEY, algorithm="HS256"))
+    c.set_cookie("auth_token", jwt.encode({"username": "tester", "exp": 4102444800}, Config.SECRET_KEY, algorithm="HS256"))
     return c
 
 

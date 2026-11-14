@@ -69,7 +69,7 @@ g.current_db.execute_query(f"SELECT * FROM {user_input}")
 ## Response Format & Critical Invariants
 
 - Success: `{"status": "success", "data": [...]}` · Error: `error_response(msg, code)`
-- Codes: 400 (bad input) · 401 (no token) · 403 (invalid) · 422 (no credentials) · 500 (server)
+- Codes: 400 (bad input) · 401 (no token / 세션 소멸 — `cid` 바인딩 JWT 의 세션이 로그아웃·재시작으로 사라짐) · 403 (invalid) · 422 (no credentials) · 500 (server)
 - `CORS supports_credentials=True` · `SESSION_COOKIE_HTTPONLY=True` · `SAMESITE="Lax"`
 - `Config.load_config()` before `create_app()`
 - `logger.error(msg, exc_info=True)` — always include traceback

@@ -10,6 +10,9 @@ from utils.credential_store import (
     bind_to_session,
     clear_session,
     has_session_credentials,
+    is_jwt_session_alive,
+    session_binding,
+    JWT_BINDING_CLAIM,
 )
 from utils.decorators import handle_exceptions
 from utils.error_handler import error_response
@@ -78,16 +81,19 @@ def login():
                         "This account is not allowed to use AOP Web. Please contact the administrator.",
                         403,
                     )
-                payload = {
-                    "username": user_info["username"],
-                    "id": str(user_info["sid"]),
-                    "exp": datetime.now(timezone.utc) + timedelta(seconds=Config.EXPIRE_TIME),
-                }
-                token = jwt.encode(payload, Config.SECRET_KEY, algorithm="HS256")
                 # 자격증명은 서버 메모리에 보관하고 세션에는 불투명 토큰만 저장한다.
                 # (Flask 기본 세션은 서명만 될 뿐 암호화되지 않아 평문 비밀번호가 노출된다)
                 bind_to_session(username, password)
                 session.permanent = False  # 브라우저 종료 시 세션 만료
+                payload = {
+                    "username": user_info["username"],
+                    "id": str(user_info["sid"]),
+                    # 세션과 묶어 로그아웃·재시작 시 JWT 도 무효가 되게 한다.
+                    JWT_BINDING_CLAIM: session_binding(),
+                }
+                if Config.EXPIRE_TIME > 0:
+                    payload["exp"] = datetime.now(timezone.utc) + timedelta(seconds=Config.EXPIRE_TIME)
+                token = jwt.encode(payload, Config.SECRET_KEY, algorithm="HS256")
                 response = jsonify({"status": "success", "message": "Login successful"})
                 response.set_cookie(
                     "auth_token",
@@ -139,10 +145,14 @@ def auth_status():
     try:
         decoded_token = jwt.decode(token, Config.SECRET_KEY, algorithms=["HS256"])
         # 허용 목록에서 빠진 계정의 기존 토큰은 즉시 무효로 본다.
-        # (토큰은 발급 후 EXPIRE_TIME 동안 살아 있으므로 여기서 확인하지 않으면
+        # (토큰은 만료 없이(또는 EXPIRE_TIME 동안) 살아 있으므로 여기서 확인하지 않으면
         #  권한을 회수해도 기존 세션이 그대로 유지된다)
-        if not Config.is_login_allowed(decoded_token.get("username")):
-            response = jsonify({"authenticated": False, "message": "Access revoked"})
+        revoked = not Config.is_login_allowed(decoded_token.get("username"))
+        if revoked or not is_jwt_session_alive(decoded_token):
+            response = jsonify({
+                "authenticated": False,
+                "message": "Access revoked" if revoked else "Session ended",
+            })
             response.set_cookie(
                 "auth_token",
                 "",
