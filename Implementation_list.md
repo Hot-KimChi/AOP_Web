@@ -1457,3 +1457,9 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - 로그인 해제 조건: 로그아웃, 브라우저 완전 종료, 백엔드 재시작(메모리 저장소 초기화)만 남음.
 - Verify 재검증 Minor 3건 반영: cid·exp 모두 없는 토큰 거부(테스트 fixture 에 exp 추가), 31일 초과 TTL 도 세션 서명 수명이 잘리지 않게 조정, `backend/AGENTS.md` 401(세션 소멸) 규약 추가.
 - 검증: pytest 191 passed(신규 4건: 무만료+LRU, 양수 TTL 만료 유지, 로그아웃 후 JWT 재사용 거부, cid·exp 없는 토큰 거부), 운영 재기동 후 서버 점검 27·e2e 23 PASS, Verify(Blocker 0·Major 0)·security-review 반영.
+
+## 55. DB목록도 커밋을 진행해죠. 그리고 전체적으로 github에 체크인해죠.
+
+### 수행 결과 (#55)
+- `backend/AOP_config.cfg` DB 목록에 `Silverstone` 추가분 커밋.
+- 저장소가 추적하던 `__pycache__`/`*.pyc` 59개를 `git rm --cached`로 추적 해제(로컬 파일 유지, `.gitignore`에 이미 등록). 실행할 때마다 바뀌어 작업 트리를 더럽히던 문제 해소.
