@@ -46,10 +46,11 @@ Leader는 요청을 **계획으로 변환**하고, 결과를 **계획과 대조*
 
 ### 2.1 Leader 역할 — 무엇을 하고, 무엇을 하지 않는가
 
-**Leader는 코드를 쓰지 않는다.** Leader의 산출물은 **분배 계획(Routing Plan)**과 **최종 통합 보고**다.
+**Leader는 코드를 쓰지 않는다.** Leader의 산출물은 **Agent 명세**(`Implementation_list.md`), **분배 계획(Routing Plan)**, **최종 통합 보고**다.
 
 | Leader가 하는 일 | Leader가 하지 않는 일 |
 |------------------|----------------------|
+| **착수 전 `Implementation_list.md`에 Agent 명세 작성**(양식: `leader.agent.md`) | 명세 외 파일 편집 |
 | 요청 해석 · 범위 확정 · 모호성 해소 | 설계 세부·코드 작성 (→ Opus) |
 | Tier(S/M/L) 판정 · 도구 호출 예산 배정 | 검증 판정 (→ Verify 에이전트) |
 | 교차 검증 승격 여부 판정(§3 위험도) | 자기 계획을 자기가 검증 |
@@ -147,8 +148,9 @@ Leader는 요청을 **계획으로 변환**하고, 결과를 **계획과 대조*
 
 ```
 [Leader]   요청 해석 · Tier 판정 · §3 위험도 판정 · 작업 분해 · 담당 모델 배정
+             ↓  Agent 명세를 `Implementation_list.md`에 먼저 기록 → 이후 모든 단계의 기준
              ↓  분배 계획(Routing Plan) + 각 하위작업의 기대 결과(예측)를 메인이 보관
-[Design]   범위 확정 · 불변식 목록화 · 검증 기준(Acceptance Criteria)
+[Design]   명세 기반 범위 확정 · 불변식 목록화 · 검증 기준(Acceptance Criteria)
              ↓  (비자명하면 rubber-duck으로 설계 사전 검증)
 [Implement] 최소·정확 구현 + 스모크 테스트 실행 로그 확보
              ↓  (§3 승격 기준 미해당이면 Leader 통합으로 직행)
@@ -158,7 +160,7 @@ Leader는 요청을 **계획으로 변환**하고, 결과를 **계획과 대조*
              ├─ Blocker·Major 있음 → Implement 복귀 (iteration)
              └─ Blocker 0 AND Major 0 → Leader 통합
              ↓
-[Leader]   [PRIOR] 대비 실제 결과 대조(보정 오차 기록) · 작업 기록(`Implementation_list.md`) · 커밋 · 사용자 보고
+[Leader]   [PRIOR] 대비 실제 결과 대조(보정 오차 기록) · `Implementation_list.md` 해당 명세 아래 `### 수행 결과 (#N)` 기록 · 커밋 · 사용자 보고
 ```
 
 - **Leader의 분배 계획은 산문이 아니라 타입 질문(`[ASK]`)과 사전확률(`[PRIOR]`)로 적는다.** `[PRIOR]`는 메인이 보관하고 하위 위임 프롬프트에는 넣지 않는다(앵커링 방지).

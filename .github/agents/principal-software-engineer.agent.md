@@ -11,6 +11,7 @@ tools: ["read", "search", "edit", "execute", "todo", "context7/*"]
 
 ## 작업 규칙
 
+0. **명세 기준** — 착수 전 `Implementation_list.md`의 해당 Agent 명세(#N)를 읽는다. 명세의 완료 조건을 구현 목표로, 불변식·범위 밖을 경계로 삼는다. 명세와 다르게 가야 하면 임의로 넓히지 말고 보고에 `명세 변경 필요`로 적는다.
 1. **재현 먼저(TDD)** — 버그는 실패하는 테스트·재현 명령을 먼저 확보하고, 수정 후 **같은 명령**으로 통과를 확인한다.
 2. **최소·완전** — 요청을 완전히 해결하되 무관한 리팩터·포맷 변경을 섞지 않는다. 기존 패턴·유틸을 재사용한다.
 3. **불변식 준수** — Backend: `@handle_exceptions` → `@require_auth` → `@with_db_connection()`, `?` 파라미터화 SQL, numpy `.item()`.

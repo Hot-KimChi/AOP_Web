@@ -107,7 +107,7 @@ description: '완료 전 검증 체크리스트(백엔드·프론트엔드·실�
 ## 검증 흐름 (교차 모델)
 
 ```
-[Leader: Tier·위험도 판정 · 검증 예산 배정 · 타입 질문([ASK]) 선정 · 사전확률([PRIOR]) 메모(위임 프롬프트에는 넣지 않음)]  ← GPT (대행 조건은 `model-routing` §2.1)
+[Leader: Agent 명세 기록(`Implementation_list.md`) · Tier·위험도 판정 · 검증 예산 배정 · 타입 질문([ASK]) 선정 · 사전확률([PRIOR]) 메모(명세·위임 프롬프트에는 넣지 않음)]  ← GPT (대행 조건은 `model-routing` §2.1)
    ↓
 [Implement 완료 · 스모크 테스트 실행 로그 확보]  ← Claude Opus
    ↓  (위험도 승격 기준 미해당이면 여기서 종료 — 생략 사실을 응답에 명시)
@@ -123,7 +123,7 @@ description: '완료 전 검증 체크리스트(백엔드·프론트엔드·실�
    ├─ 확률이 낮은 항목 → [RESIDUAL]로 분리 (임계값 기준: `agent-orchestration` §JEV)
    └─ Minor → 기록만, 요청 범위 밖이면 수정하지 않음
    ↓
-[Blocker 0 AND Major 0] → Leader 통합(보정 오차 기록) → 작업 기록(`Implementation_list.md`) → 자동 커밋
+[Blocker 0 AND Major 0] → Leader 통합(보정 오차 기록) → 명세 아래 `### 수행 결과 (#N)` 기록(`Implementation_list.md`) → 자동 커밋
 ```
 
 > 승격 기준·모델 선택·iteration 상한·이견 해소: `.github/instructions/model-routing.instructions.md`

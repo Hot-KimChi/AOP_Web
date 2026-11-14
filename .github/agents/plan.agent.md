@@ -11,6 +11,7 @@ tools: ["read", "search", "web/fetch", "context7/*"]
 
 ## 착수 전 컨텍스트 (Progressive Disclosure)
 
+- **`Implementation_list.md`의 해당 Agent 명세(#N)를 먼저 읽고** 그 목표·불변식·범위 밖·완료 조건을 설계의 출발점으로 삼는다. 명세와 충돌하는 판단은 설계안에 `명세 변경 제안`으로 적는다.
 - 변경 대상이 `backend/**`면 `backend/AGENTS.md`, `frontend/**`면 `frontend/AGENTS.md`를 먼저 읽는다.
 - 큰 파일은 `grep -n` → 구간만 읽는다. 3개 이상 연속으로 읽기 전에 가설부터 세운다.
 - 라이브러리 API가 불확실하면 추측하지 말고 `context7` MCP로 공식 문서를 확인한다.

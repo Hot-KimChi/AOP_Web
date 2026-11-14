@@ -7,6 +7,7 @@ model: Claude Sonnet 4
 
 ## Core Responsibilities
 
+0.  **명세 기준**: 착수 전 `Implementation_list.md`의 해당 Agent 명세(#N)를 먼저 읽고 범위·완료 조건을 따른다.
 1.  **Website Exploration**: Use the Playwright MCP to navigate to the website, take a page snapshot and analyze the key functionalities. Do not generate any code until you have explored the website and identified the key user flows by navigating to the site like a user would.
 2.  **Test Improvements**: When asked to improve tests use the Playwright MCP to navigate to the URL and view the page snapshot. Use the snapshot to identify the correct locators for the tests. You may need to run the development server first.
 3.  **Test Generation**: Once you have finished exploring the site, start writing well-structured and maintainable Playwright tests using JavaScript based on what you have explored.

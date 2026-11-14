@@ -31,7 +31,7 @@ description: '서브에이전트 선택, JEV 위임 봉투·회신 형식, Verif
 
 | 파일 | 역할 | 쓰기 권한 |
 |------|------|-----------|
-| `leader.agent.md` | Leader — Tier·위험도 판정, 파일 소유권 기반 병렬 분배(Routing Plan) | 없음 |
+| `leader.agent.md` | Leader — 착수 전 Agent 명세 작성, Tier·위험도 판정, 파일 소유권 기반 병렬 분배(Routing Plan) | `Implementation_list.md` Agent 명세만 |
 | `plan.agent.md` | Design — 범위·불변식·인수 기준·위험·작업 분해(Design Brief) | 없음 |
 | `principal-software-engineer.agent.md` | Implement — 재현→수정→같은 명령 통과, 소유 파일만 수정 | 있음 |
 | `verify.agent.md` | Verify — JEV 표준 질문 판정, 스택별 필수 확인 | 없음(실행만) |
@@ -41,8 +41,9 @@ description: '서브에이전트 선택, JEV 위임 봉투·회신 형식, Verif
 ### 병렬 분배 — 파일 소유권 규칙
 
 1. 하위작업마다 **소유 파일(글롭)** 을 명시한다. 소유 파일이 **서로소**이고 선행 관계가 없을 때만 병렬로 띄운다.
-2. 공용 파일(`frontend/src/globals.css`, 라우터, `Implementation_list.md`, `package.json`)은 **한 작업만 소유**한다. 다른 작업은 변경 요청을 회신에 적고 메인이 반영한다.
-3. 쓰기 에이전트는 동시에 **최대 2개**, 읽기 전용(탐색·감사·Leader)은 제한 없이 병렬. 검증 서브에이전트는 동시에 1개(라우터 §4.3).
+2. 공용 파일(`frontend/src/globals.css`, 라우터, `Implementation_list.md`, `package.json`)은 **한 작업만 소유**한다. 다른 작업은 변경 요청을 회신에 적고 메인이 반영한다. `Implementation_list.md`의 Agent 명세는 Leader(또는 대행 메인), 수행 결과는 메인이 쓴다.
+   위임 프롬프트의 `[CONTEXT]`에는 **해당 Agent 명세(`Implementation_list.md` #N)의 위치나 요지**를 넣는다 — 하위 에이전트는 명세를 작업 기준으로 삼는다.
+3. 쓰기 에이전트는 동시에 **최대 2개**, 읽기 전용(탐색·감사, 명세 기록을 마친 Leader)은 제한 없이 병렬. 검증 서브에이전트는 동시에 1개(라우터 §4.3).
 4. 병렬 결과는 메인이 통합한 뒤 **한 번에** 빌드·테스트한다(작업별 중복 빌드 금지).
 
 > **구체적 모델 ID·선택 알고리즘·`reasoning_effort` 기준은 `model-routing.instructions.md` §2가 단일 기준이다.** 여기에 ID를 중복 기재하지 않는다.
@@ -55,7 +56,8 @@ description: '서브에이전트 선택, JEV 위임 봉투·회신 형식, Verif
 ```
 # Leader 스텝: 위임 필수 조건은 `model-routing.instructions.md` §2.1 참조 (여기에 나열하지 않는다)
 → task(agent_type="general-purpose", model=<GPT 최신>, reasoning_effort="high", mode="background")
-   산출물: 분배 계획(Routing Plan) — 하위작업 / 담당 모델 / 예산 / [ASK] 타입 질문 / [PRIOR] 사전확률(메인 보관용, 하위 위임 프롬프트에는 넣지 않음)
+   산출물: (작성 위임 시) Agent 명세 기록 후 `[SPEC]` 회신 — 메인은 이 회신 뒤에만 하위 위임 / (메인 대행·검토 의뢰 시) 명세 수정안을 회신으로만. 작성 주체 규칙은 `leader.agent.md` §Agent 명세 양식.
+   + 분배 계획(Routing Plan) — 하위작업 / 담당 모델 / 예산 / [ASK] 타입 질문 / [PRIOR] 사전확률(메인 보관용, 명세·하위 위임 프롬프트에는 넣지 않음)
 
 # Verify 스텝: 구현 후 GPT 최신 모델로 교차 검증 — 질문은 §JEV-4 표준 세트
 #   background로 띄우고, 메인은 검증 대상과 무관한 작업(작업 기록 초안 등)만 진행

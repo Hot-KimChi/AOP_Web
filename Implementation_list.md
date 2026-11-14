@@ -1463,3 +1463,23 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 ### 수행 결과 (#55)
 - `backend/AOP_config.cfg` DB 목록에 `Silverstone` 추가분 커밋.
 - 저장소가 추적하던 `__pycache__`/`*.pyc` 59개를 `git rm --cached`로 추적 해제(로컬 파일 유지, `.gitignore`에 이미 등록). 실행할 때마다 바뀌어 작업 트리를 더럽히던 문제 해소.
+
+## 56. leader agent가 앞으로는 implementation_list.md에 agent 명세를 재작성을 진행한 다음에 이를 기반으로 다른 agent가 나의 요구사항을 진행하도록 md파일에 업데이트해죠.
+
+### Agent 명세 (#56)
+
+- **Tier·예산**: M | 에이전트·지침 md 다수 수정(상시 로드 라우터 포함) | 예산 40콜
+- **목표·완료 조건**: AC1 Leader가 착수 전 `Implementation_list.md`에 Agent 명세를 쓰는 절차·양식이 `leader.agent.md`에 단일 원천으로 존재. AC2 Plan·Implement·Web Designer·Verify가 명세를 기준으로 진행·판정하도록 명시. AC3 라우터·model-routing·agent-orchestration 흐름에 "명세 먼저"가 반영되고 서로 모순이 없음.
+- **불변식**: 기존 Tier·Verify 승격 규칙, `[PRIOR]` 앵커링 방지(명세에 사전확률 금지), Leader는 코드를 쓰지 않음.
+- **범위 밖**: 과거 항목(#1~#55) 소급 수정, 훅·스크립트 변경.
+- **하위작업**: T1 | 메인(Leader 대행·Implement) | `.github/**`, `Implementation_list.md` | - | AC1~AC3
+- **검증 계획**: 지침 간 교차 참조·모순 정적 점검, 훅 통과. 상시 로드 지침 변경 → Verify 필수(security-review 불필요).
+- **가정**: 파일을 변경하는 모든 요청에 적용(Tier S는 3줄 축약), 조회·질문은 제외. Leader에 `edit` 도구를 주되 명세 작성 전용.
+
+### 수행 결과 (#56)
+
+- `leader.agent.md`: 절차 0단계 "Agent 명세 작성(필수·최우선)", **Agent 명세 양식(단일 원천)** 신설(Tier·예산 / 목표·완료 조건 / 불변식 / 범위 밖 / 하위작업 / 검증 계획 / 가정), 적용 범위·번호 규칙·명세 변경 방식·수행 결과 기록 규칙 명시, `tools`에 `edit`(명세 전용), Routing Plan에 `[SPEC]` 줄.
+- 라우터 `copilot-instructions.md` §4 "명세 먼저", §6 기록 순서(요청 원문 → 명세 → 수행 결과).
+- `model-routing` §2.1 표·§4 흐름, `agent-orchestration` 소유권·`[CONTEXT]`에 명세 위치 포함.
+- `plan`·`principal-software-engineer`·`web-designer`·`verify` 에이전트: 착수/판정 전 명세(#N) 확인, 명세 위반은 Verify 최소 Major.
+- Verify(Blocker 0 / Major 1 / Minor 6) 전건 반영: `agent-orchestration` 역할 표의 Leader 쓰기 권한 "없음" → "Agent 명세만"(Major), `model-routing` §2.1 산출물에 명세 추가, `verification` 흐름도에 명세·수행 결과 단계, `ms-sql-dba`·`playwright-tester`에도 명세 확인, Leader 작성 주체 단일화·`[SPEC]` 회신 후 위임 게이트, Verify는 명세와 원문이 충돌하면 원문 우선, 본 #56 명세에 하위작업 줄 추가. 재검증 Minor 3건(읽기 전용 분류·라우터 "계획·명세 담당" 표현, 오케스트레이션 예시의 작성 주체·`[SPEC]` 게이트, Verify의 Leader 단계 diff 확인)도 반영 → Blocker 0 / Major 0. 훅 통과.
