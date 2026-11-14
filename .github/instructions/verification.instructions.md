@@ -27,7 +27,7 @@ description: '완료 전 검증 체크리스트(백엔드·프론트엔드·실�
 
 | 훅 | 이벤트 | 동작 |
 |----|--------|------|
-| `.github/hooks/quality-gate.json` → `stop_gate.py` | `agentStop` | 변경·신규 파일만 검사: `.py` 구문 오류 / `frontend/src/app/**`의 `page`·`layout`·`template`가 React 훅을 쓰며 `'use client'` 누락 / 따옴표로 시작하는 `http(s)://localhost:5000` 리터럴(주석 줄 제외) / `.css`의 `.dark` 선택자 → 위반 시 `block`으로 한 턴 더 수정 강제. 연속 강제(`stop_hook_active`)는 막지 않음, 훅 자체 오류는 통과(fail-open) |
+| `.github/hooks/quality-gate.json` → `stop_gate.py` | `agentStop` | 변경·신규 파일만 검사: `.py` 구문 오류 / `frontend/src/**/*.js` 안의 JSX(Vite 8 빌드 에러 → `.jsx`) / 따옴표로 시작하는 `http(s)://localhost:5000` 리터럴(주석 줄 제외) / `.css`의 `.dark` 선택자 → 위반 시 `block`으로 한 턴 더 수정 강제. 연속 강제(`stop_hook_active`)는 막지 않음, 훅 자체 오류는 통과(fail-open) |
 
 - 훅 추가 기준: **빠르고(수 초 이내) 오탐이 없는** 체크만. 빌드·E2E처럼 느린 체크는 훅에 넣지 않는다(매 턴 지연).
 - 훅 스크립트·설정 변경은 매 세션 동작에 영향을 주므로 **교차 검증 필수**(구동 스크립트와 동급).
@@ -70,11 +70,12 @@ description: '완료 전 검증 체크리스트(백엔드·프론트엔드·실�
 
 ---
 
-## Frontend (Next.js) 체크 항목
+## Frontend (React + Vite) 체크 항목
 
 > 상세 규칙·코드 예시: `frontend/AGENTS.md`
 
-- [ ] `'use client'` 선언 확인
+- [ ] JSX 파일은 `.jsx` 확장자, 새 페이지는 `App.jsx`의 `ROUTES`에 등록
+- [ ] `npm run build` 통과(Vite, 수 초)
 - [ ] `credentials: 'include'` 포함 확인
 - [ ] CSS 변수만 사용 (하드코딩 색상 금지)
 - [ ] `[data-theme="dark"]` 선택자 사용 (`.dark` 금지)
@@ -84,7 +85,8 @@ description: '완료 전 검증 체크리스트(백엔드·프론트엔드·실�
 
 | 변경 대상 | 반드시 확인 |
 |-----------|------------|
-| root `layout.js` / `Layout.js` / `Navbar.js` | `frontend/AGENTS.md`의 Layout Stack · Do Not Simplify Away 불변식 재확인 |
+| `index.html` / `App.jsx` / `Layout.jsx` / `Navbar.jsx` | 테마 선적용 스크립트·AuthProvider 유지 구조 · `frontend/AGENTS.md` Do Not Simplify Away 재확인 |
+| `server.mjs` / `vite.config.mjs` | 정적 경로 이탈 차단·`/api/` 프록시·보안 헤더, `npm run build` + `npm start` 실측 |
 | `globals.css` | `:root` + `[data-theme="dark"]` 양쪽 변수 정의 |
 | API 호출 추가 | `API_BASE_URL` + `credentials: 'include'` |
 

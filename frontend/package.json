@@ -1,31 +1,27 @@
 {
   "name": "frontend",
   "version": "1.0.0",
-  "main": "index.js",
+  "private": true,
+  "description": "AOP Web 프런트엔드 — React + Vite (운영: server.mjs 가 dist 서빙 + /api 프록시)",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "vite",
+    "build": "vite build",
+    "start": "node server.mjs",
     "test": "playwright test"
   },
-  "keywords": [],
-  "author": "",
   "license": "MIT",
-  "description": "",
   "dependencies": {
-    "bootstrap": "^5.3.3",
-    "chart.js": "^4.5.1",
+    "bootstrap": "^5.3.9",
+    "chart.js": "^4.6.1",
     "lucide-react": "^0.473.0",
-    "next": "^15.1.4",
-    "process": "^0.11.10",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "@types/node": "^22.9.0",
-    "@types/react": "^18.3.12",
-    "typescript": "^5.6.3"
+    "@vitejs/plugin-react": "^6.3.0",
+    "vite": "^8.3.8"
   }
 }

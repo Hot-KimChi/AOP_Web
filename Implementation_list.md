@@ -56,6 +56,7 @@
 | 50 | 중복 조건 확인 창 첫 열에 중복/신규 표시 | 2026-11-11 | - |
 | 51 | 브라우저 기본 alert/confirm → 모던 공용 알림 창 전면 교체 | 2026-11-11 | - |
 | 52 | React + Vite 비교용 프런트엔드(frontend-vite) 생성 — 브랜치 feature/react-vite | 2026-11-13 | - |
+| 53 | 프로젝트 전체 React + Vite 전환(frontend 교체·운영 서버·최적화) | 2026-11-14 | - |
 
 ---
 
@@ -1411,3 +1412,28 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - 비교 실측: 빌드 Next 약 34초 / Vite 약 4.5초, 결과물 JS+CSS 약 1.5MB / 0.9MB. 6화면×라이트/다크 픽셀 비교 — Viewer select 외 동일(Next 쪽 라우트별 CSS 로드 순서 차이). 상세는 `frontend-vite/README.md`.
 - Verify: Blocker 0 / Major 1 / Minor 5 → 모두 반영. V-001(백엔드 다운 시 프록시 502 를 '로그인 필요'로 오판 → `AuthContext` 가 502~504 를 offline 처리, 3011 임시 preview 로 재현·확인), V-003(없는 주소 → 404 화면), V-004·V-005(README 사실 정정), V-006(프록시 키 `^/api/`). V-002(라우트별 CSS 순서)는 일관성을 위해 Vite 쪽 동작 유지·README 기록.
 - security-review: High 이상 0건. Low — 프록시 키 축소·개발 서버 localhost 한정 반영, `vite preview` 운영 사용·COOKIE_SECURE 는 README '정식 채택 시 할 일'에 기록.
+
+## 53. React + Vite 체제로 나의 프로젝트 전체를 변경해죠. 진행하면서 성능 및 병목현상등 최적화를 진행해죠. 기능적으로도 문제가 없는지 다시 한번 확인해죠. 해당 부분을 agent명세를 재작성하고, 이를 기반으로 진행해죠.
+
+### Agent 명세 (#53)
+
+- **Tier L**: #52 의 `frontend-vite/` 를 정식 `frontend/` 로 승격하고 Next.js 버전을 제거한다. 브랜치 `feature/react-vite` 에서 작업·검증 후 `main` 에 병합한다. 마지막 Next.js 코드는 태그 `nextjs-final`(bba1996)로 보존한다.
+- **불변식**: 사용자 접속 주소(포트 3000)·실행 명령(`AOP_Web.bat start|prod|stop`)·백엔드 API·인증 쿠키 동작은 바꾸지 않는다. 화면 기능은 #52 와 동일해야 한다.
+- **운영 서빙**: `vite preview` 는 운영용이 아니므로(#52 security-review) 의존성 없는 Node 정적 서버 `frontend/server.mjs` 를 둔다 — `dist/` 서빙, SPA fallback(`index.html`), `/api/` 스트리밍 프록시(업로드·장시간 ML 요청 타임아웃 없음), 해시 자산 `immutable` 캐시·`index.html` `no-cache`, gzip 압축, 경로 이탈 차단, 기본 보안 헤더, 백엔드 다운 시 502. `npm start` 가 이를 실행하므로 `scripts/AOP_Web.ps1` 의 호출 구조는 유지한다.
+- **개발 서버**: 기본 무인 기동(`AOP_Web.bat`)은 dev 모드라 다른 PC 에서도 접속하므로 포트 3000·LAN 수신을 유지하되, `allowedHosts` 는 이 PC 이름만 추가한다(DNS rebinding 방지).
+- **성능·병목**: 번들 분할(React·차트 등 vendor 청크 분리로 화면 코드 변경 시 캐시 유지), 라우트 지연 로딩 유지, 운영 서버 압축·캐시, 빌드 실측 비교.
+- **문서·지침**: README, `frontend/AGENTS.md`, 라우터(`copilot-instructions.md`) 기술 스택, `verification.instructions.md` 프런트 체크 항목, 관련 에이전트·스킬의 Next.js 표기를 갱신한다.
+- **검증**: `npm ci`·`npm run build`, e2e 전체(dev·운영 서버), 13개 경로 직접 접근, 프록시·백엔드 다운 시 표시, 운영 서버 헤더·경로 이탈·압축 확인. 실행 스크립트·인증 경로·상시 지침 변경 → **Verify + security-review 필수**.
+
+### 수행 결과 (#53)
+
+- **교체**: Next.js `frontend/`(추적 103개) 삭제 → `frontend-vite/` 를 `frontend/` 로 이동. `'use client'` 50개 제거, `package.json` start=`node server.mjs`, Playwright 포트 3000.
+- **운영 서버 `server.mjs`**(Node 기본 모듈만): 시작 시 dist 의 일반 파일만 매니페스트로 만들어 대소문자 정확 일치만 서빙(심볼릭 링크·정션·대소문자 별칭 차단, 서빙 직전 realpath 로 dist 경계 재확인, 미스 시 2초 간격 재스캔), SPA fallback, `/assets/*` 1년 immutable·나머지 no-cache, 약한 ETag 304, gzip(q값 협상, 파일당 1개 캐시·재스캔 시 삭제 파일 정리), `/api/` 스트리밍 프록시(hop-by-hop·Forwarded·X-Forwarded-*·X-Real-IP 제거 후 서버 값만 설정, 응답 보안 헤더 병합, 타임아웃 없음, 백엔드 다운 시 502).
+- **`vite.config.mjs`**: dev 3000·strictPort·LAN 수신, `allowedHosts`=PC 이름, `^/api/` 프록시, vendor-react/vendor-chart/vendor 청크 분리.
+- **`scripts/AOP_Web.ps1`**: 포트 3000 정리를 frontend setup 앞으로 이동, `package-lock.json` SHA256 을 `node_modules\.aop-lock.sha256` 과 비교해 다르면 `npm ci`(git pull 후 자동 재설치), lock 부재·`npm ci` 실패 시 중단.
+- **훅 `stop_gate.py`**: `'use client'` 누락 검사 제거 → `.js` 안의 JSX(Vite 8 빌드 에러) 검사로 교체, `dist` 제외, 안내 문구 `apiBase.jsx`.
+- **문서·지침**: README, `frontend/README.md`·`frontend/AGENTS.md` 재작성, `copilot-instructions.md` 스택·금지 경로(`frontend/dist/`), `verification.instructions.md` 프런트 체크 항목·위험 트리거, plan/verify/principal/web-designer 에이전트, web-design-review 스킬.
+- **실측**: 빌드 3.3초(Next 34초), dist 910KB, 첫 화면 6파일 469KB(gzip 105KB), 차트 청크는 해당 페이지에서만 로드, node_modules 108MB·35패키지·취약점 0.
+- **검증**: e2e 23/23(dev·운영 서버), 서버 점검 27/27, Verify 지적 재현 테스트 15/15, ps1 재설치 판정 6케이스, PS5.1 파싱 오류 0, 훅 샘플(오탐 0·누락 0), 백엔드 다운 시 "서버에 연결할 수 없습니다".
+- **교차 검증**: Verify(GPT) 1차 Blocker 2(심볼릭 링크 경유 dist 밖 서빙, 대소문자 별칭 캐시 증식)·Major 3(시각 기반 재설치 판정, 훅 오탐·누락, Forwarded 위조 전달)·Minor 1(gzip q=0) → 수정 → 2차 Blocker 1·Major 2(스캔 후 상위 폴더 정션 교체, 재빌드 캐시 잔존, `)` 뒤 정규식 오탐) → 수정 → 3차 **Blocker 0·Major 0**. security-review: MEDIUM 이상 0, LOW 3 중 2 수정(프록시 보안 헤더, 403 문구), 1 보류(운영 서버 Host 검사 — FQDN·별칭 접속 차단 위험, 인증 쿠키가 실리지 않아 영향 제한).
+- **잔여 위험**: 실제 계정 로그인→로그아웃 전체 흐름·대용량 업로드 실측은 미실행(자격 증명 없음). 훅은 템플릿 문자열 `${}` 안 JSX 를 검사하지 않는다(최종 방어선 `npm run build`).

@@ -1,6 +1,6 @@
 # AOP Web Application
 
-AOP Web Application은 Flask 기반 백엔드 API와 Next.js 15 (App Router) 기반 프론트엔드 웹 인터페이스, 그리고 MS-SQL Server를 연동한 풀스택 웹 애플리케이션입니다.
+AOP Web Application은 Flask 기반 백엔드 API와 React + Vite 기반 프론트엔드 웹 인터페이스(CSR SPA), 그리고 MS-SQL Server를 연동한 풀스택 웹 애플리케이션입니다.
 
 ### 주요 기능
 
@@ -22,7 +22,7 @@ AOP Web Application은 Flask 기반 백엔드 API와 Next.js 15 (App Router) 기
 | 구성 요소 | 기술 스택 | 설명 |
 |-----------|-----------|------|
 | **Backend** | Python 3.10+, Flask, SQLAlchemy, pyodbc | REST API 및 데이터 처리 서비스 (Port: `5000`) |
-| **Frontend** | Next.js 15 (App Router), React 18, JavaScript | 사용자 웹 인터페이스 (Port: `3000`) |
+| **Frontend** | React 18 + Vite 8, react-router-dom 7, JavaScript(JSX) | 사용자 웹 인터페이스 (Port: `3000`, `/api` 는 백엔드로 프록시) |
 | **Database** | MS-SQL Server (ODBC Driver 17) | 데이터베이스 파이프라인 |
 
 ---
@@ -150,21 +150,19 @@ $env:COOKIE_SECURE = "true"
 
 ### 5.3 프론트엔드 환경 변수
 
-프론트엔드는 **API 주소를 자동으로 결정합니다.** `frontend\src\lib\apiBase.js` 가 브라우저가 실제로 접속한 호스트를 그대로 사용합니다.
+브라우저는 **자신이 접속한 주소(같은 출처)의 `/api/...`** 로 요청하고, 프론트엔드 서버가 이를 백엔드로 전달(프록시)합니다. 그래서 다른 PC 에서 `http://<서버IP>:3000` 으로 접속해도 백엔드 주소를 알 필요가 없고 CORS 도 거치지 않습니다.
 
-| 접속 주소 | 자동 산출되는 백엔드 주소 |
-|-----------|---------------------------|
-| `http://localhost:3000` | `http://localhost:5000` |
-| `http://<서버IP>:3000` | `http://<서버IP>:5000` |
+| 모드 | 프론트엔드 서버 | `/api` 전달 대상 |
+|------|----------------|------------------|
+| 개발(`npm run dev`) | Vite 개발 서버 (`frontend\vite.config.mjs`) | `AOP_BACKEND_URL` (기본 `http://localhost:5000`) |
+| 운영(`npm start`) | `frontend\server.mjs` (`dist\` 서빙 + 프록시) | `AOP_BACKEND_URL` (기본 `http://localhost:5000`) |
 
-| 파일 | 변수 | 용도 |
-|------|------|------|
-| `frontend\.env.development` | `NEXT_PUBLIC_API_BASE_URL` | (기본 미지정) 지정 시 자동 산출을 덮어씀 |
-| `frontend\.env.production` | `NEXT_PUBLIC_API_BASE_URL` | (기본 미지정) 지정 시 자동 산출을 덮어씀 |
+| 파일·변수 | 용도 |
+|------|------|
+| `AOP_BACKEND_URL` (프론트 서버 프로세스 환경변수) | 백엔드가 같은 PC 의 5000 이 아닐 때만 지정 |
+| `frontend\.env.*` 의 `VITE_API_BASE_URL` | (기본 미지정) 프록시 없이 브라우저가 백엔드를 **직접** 호출해야 할 때만 지정. 이 경우 백엔드 `ALLOWED_ORIGINS` 에 프론트엔드 Origin 을 추가해야 합니다 |
 
-> **주의**: 여기에 `http://localhost:5000` 을 지정하면 안 됩니다. `localhost` 는 서버가 아니라 **접속한 사용자의 PC** 를 가리키므로, 다른 PC 에서 서버 IP 로 접속한 사용자는 로그인부터 실패합니다.
->
-> 백엔드가 프론트엔드와 **다른 호스트/포트**에 있는 경우에만 위 변수를 명시하고, 백엔드 쪽 `ALLOWED_ORIGINS` 에 프론트엔드 Origin 을 추가하세요.
+> **주의**: `VITE_API_BASE_URL` 에 `http://localhost:5000` 을 지정하면 안 됩니다. `localhost` 는 서버가 아니라 **접속한 사용자의 PC** 를 가리키므로, 다른 PC 사용자는 로그인부터 실패합니다.
 
 ### 5.4 생성 파일 저장 위치
 
@@ -238,12 +236,13 @@ cd backend
 ```
 > 백엔드 서버 URL: `http://localhost:5000`
 
-### 프론트엔드 (Frontend - Next.js)
+### 프론트엔드 (Frontend - React + Vite)
 ```cmd
 cd frontend
-npm run dev
+npm run dev                  # 개발 서버(즉시 반영)
+npm run build && npm start   # 운영: dist\ 빌드 후 server.mjs 로 서빙
 ```
-> 프론트엔드 웹 URL: `http://localhost:3000`
+> 프론트엔드 웹 URL: `http://localhost:3000` (두 모드 모두 `/api` 를 백엔드 5000 으로 전달)
 
 ---
 
@@ -257,7 +256,7 @@ npx playwright install    # 최초 1회, 브라우저 바이너리 설치
 npm test
 ```
 
-- 테스트 파일: `frontend\tests\app.spec.js` (총 15 케이스)
+- 테스트 파일: `frontend\tests\app.spec.js` (총 23 케이스)
 - 설정: `frontend\playwright.config.js` (`baseURL`: `http://localhost:3000`)
 - `reuseExistingServer: true` 이므로 **개발 서버가 이미 떠 있으면 그대로 재사용**하고, 없으면 `npm run dev` 를 자동 기동합니다.
 - 테스트는 **비로그인 상태**를 전제로 합니다. 홈(`/`)은 인증 여부에 따라 화면이 달라지므로(비로그인: 로그인 안내 카드 / 로그인: 주간 일정 임베드), 로그인 세션이 남아 있으면 홈 관련 케이스가 실패할 수 있습니다.
@@ -269,7 +268,7 @@ cd frontend
 npm run build
 ```
 
-> 개발 서버가 실행 중이면 `.next` 디렉터리 잠금으로 빌드가 실패할 수 있습니다. 이 경우 `AOP_Web.bat stop` 후 빌드하세요.
+> 빌드 결과는 `frontend\dist\` 에 생성됩니다(약 3초). 운영 서버(`npm start`)는 실행 시점의 `dist\` 를 서빙하므로, 다시 빌드했다면 `AOP_Web.bat restart` 로 재기동하세요.
 
 ---
 
@@ -297,13 +296,16 @@ AOP_Web/
 │   ├── pkg_MeasSetGen/     # MeasSet 생성 · 파라미터 산출 · 온도상승 예측
 │   ├── pkg_MachineLearning/# 학습 파이프라인 · MLflow 연동
 │   └── .venv/              # Python 가상환경
-├── frontend/               # Next.js 프론트엔드 앱
-│   ├── src/app/            # App Router 페이지 (data-view, machine-learning 등)
+├── frontend/               # React + Vite 프론트엔드 앱 (CSR SPA)
+│   ├── index.html          # 진입 HTML (테마 깜빡임 방지 스크립트)
+│   ├── vite.config.mjs     # 개발 서버(3000)·/api 프록시·vendor 청크 분리
+│   ├── server.mjs          # 운영 서버: dist 서빙 + /api 프록시 + 압축·캐시
+│   ├── src/main.jsx        # 진입점 (bootstrap → globals.css → Router)
+│   ├── src/App.jsx         # 라우트 표 (경로·탭 제목·레이아웃)
+│   ├── src/app/            # 화면 (data-view, machine-learning 등)
 │   ├── src/components/     # 공통 컴포넌트 (Layout, Navbar, DataViewer)
 │   ├── src/globals.css     # 테마 토큰 (:root / [data-theme="dark"])
 │   ├── tests/              # Playwright E2E 테스트
-│   ├── .env.development    # 개발용 API 주소
-│   ├── .env.production     # 운영용 API 주소
 │   └── package.json
 ├── 1_uploads/              # 생성 CSV · 검증 리포트 저장소 (자동 생성)
 └── logs/                   # 구동/종료 로그 파일 보관 디렉토리 (자동 생성)
@@ -327,6 +329,7 @@ AOP_Web/
 | 갑자기 로그인이 풀림 | 백엔드 재시작 또는 유휴 TTL(`AUTH_EXPIRE_TIME`) 만료. 자격증명은 서버 메모리에만 보관됨 | 다시 로그인 (의도된 동작) |
 | API 응답이 401 | 인증 토큰 없음/만료 | 로그인 후 재시도. `status` 로 백엔드 기동 여부 확인 |
 | API 오류 메시지가 추상적임 | 예외 원문은 클라이언트에 노출하지 않고 서버 로그에만 기록 | `logs/` 의 백엔드 로그에서 상세 원인 확인 |
-| `npm run build` 가 `.next` 관련 권한 오류로 실패 | 개발 서버가 실행 중 | `AOP_Web.bat stop` 후 빌드 |
+| 화면에 "서버에 연결할 수 없습니다" | 프론트 서버의 `/api` 프록시가 백엔드(5000)에 닿지 못함(502) | `AOP_Web.bat status` 로 백엔드 기동 확인, 다른 호스트면 `AOP_BACKEND_URL` 지정 |
+| `git pull` 후 프론트 기동 실패(모듈 없음) | `node_modules` 가 이전 의존성 | 실행 스크립트가 `package-lock.json` 변경을 감지해 `npm ci` 를 자동 실행. 수동이면 `cd frontend && npm ci` |
 | `pip install -r requirements.txt` 가 파일을 읽지 못함 | 파일이 UTF-8 이외 인코딩으로 다시 저장됨 | UTF-8(BOM 없음)로 저장 |
 | 예전에 생성한 CSV 가 목록/조회에서 보이지 않음 | 구버전은 실행 위치 기준 상대 경로를 써서 `backend\1_uploads\` 에 저장했음 | 해당 파일을 루트 `1_uploads\` 의 같은 하위 경로로 옮기면 조회됩니다 |

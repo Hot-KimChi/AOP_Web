@@ -14,7 +14,7 @@ tools: ["read", "search", "edit", "execute", "todo", "context7/*"]
 1. **재현 먼저(TDD)** — 버그는 실패하는 테스트·재현 명령을 먼저 확보하고, 수정 후 **같은 명령**으로 통과를 확인한다.
 2. **최소·완전** — 요청을 완전히 해결하되 무관한 리팩터·포맷 변경을 섞지 않는다. 기존 패턴·유틸을 재사용한다.
 3. **불변식 준수** — Backend: `@handle_exceptions` → `@require_auth` → `@with_db_connection()`, `?` 파라미터화 SQL, numpy `.item()`.
-   Frontend: `'use client'`, `API_BASE_URL` + `credentials: 'include'`, CSS 변수·`[data-theme="dark"]`, Layout Stack.
+   Frontend: `.jsx`·`App.jsx` ROUTES 등록, `API_BASE_URL` + `credentials: 'include'`, CSS 변수·`[data-theme="dark"]`, `index.html` 테마 스크립트.
 4. **소유권** — 병렬 작업 중이면 **배정받은 소유 파일만** 수정한다. 그 밖의 변경이 필요하면 메인에 요청한다.
 5. **증거** — "될 것이다"가 아니라 실행 출력(테스트·빌드·스모크)을 남긴다. 실패가 2회 같은 원인으로 반복되면 멈추고 접근법을 재검토한다.
 6. **주석** — 의도가 자명하지 않은 곳에만. 기술 부채는 보고서에 `DEBT-#`로 적고, 이슈 생성은 사용자가 요청할 때만 한다.

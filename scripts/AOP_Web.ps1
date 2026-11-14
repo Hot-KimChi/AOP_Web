@@ -748,17 +748,7 @@ function Start-Services {
     }
 
     # 2. Frontend Setup
-    Write-Log "Setting up frontend..." "INFO"
-    $nodeModulesPath = Join-Path $frontendPath "node_modules"
-    if (!(Test-Path $nodeModulesPath)) {
-        Write-Log "Installing dependencies..." "INFO"
-        Set-Location $frontendPath
-        & npm ci
-        if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
-        Set-Location $projectPath
-    }
-
-    # Clear Port 3000 if occupied
+    # 실행 중인 프런트 서버가 node_modules 파일을 잡고 있으면 npm ci 가 실패하므로 먼저 포트를 비운다.
     $existingFrontend = @(Get-ProcessesOnPort -Port 3000)
     if ($existingFrontend.Count -gt 0) {
         Write-Log "Port 3000 is in use. Stopping existing process automatically..." "WARN"
@@ -766,6 +756,27 @@ function Start-Services {
             Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
         }
         Start-Sleep -Milliseconds 500
+    }
+
+    Write-Log "Setting up frontend..." "INFO"
+    $nodeModulesPath = Join-Path $frontendPath "node_modules"
+    # 설치에 성공한 package-lock.json 의 해시를 node_modules\.aop-lock.sha256 에 남기고,
+    # 현재 package-lock.json 해시와 다르면(예: git pull 로 의존성이 바뀜 — Next.js → Vite 전환 포함)
+    # 기존 node_modules 를 쓰지 않고 다시 설치한다. 파일 시각에 의존하지 않는다.
+    $projectLock = Join-Path $frontendPath "package-lock.json"
+    if (!(Test-Path $projectLock)) { throw "frontend\package-lock.json not found" }
+    $lockHash = (Get-FileHash -Path $projectLock -Algorithm SHA256).Hash
+    $installMarker = Join-Path $nodeModulesPath ".aop-lock.sha256"
+    $installedHash = ""
+    if (Test-Path $installMarker) { $installedHash = ([string](Get-Content -Path $installMarker -TotalCount 1)).Trim() }
+    $needsInstall = !(Test-Path $nodeModulesPath) -or ($installedHash -ne $lockHash)
+    if ($needsInstall) {
+        Write-Log "Installing dependencies (npm ci)..." "INFO"
+        Set-Location $frontendPath
+        & npm ci
+        if ($LASTEXITCODE -ne 0) { Set-Location $projectPath; throw "npm ci failed" }
+        Set-Content -Path $installMarker -Value $lockHash -Encoding ASCII
+        Set-Location $projectPath
     }
 
     Write-Log "Starting frontend server (Port 3000)..." "INFO"

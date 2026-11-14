@@ -22,7 +22,7 @@ tools: ["read", "search", "execute"]
 | 대상 | 확인 |
 |------|------|
 | `backend/**` | 데코레이터 순서, `?` 파라미터화 SQL, numpy `.item()`, `load_config()` → `create_app()` |
-| `frontend/**` | `'use client'`, `API_BASE_URL` + `credentials: 'include'`, CSS 변수만, `[data-theme="dark"]`, Layout Stack |
+| `frontend/**` | `.jsx` 확장자·`App.jsx` ROUTES 등록, `API_BASE_URL` + `credentials: 'include'`, CSS 변수만, `[data-theme="dark"]`, `index.html` 테마 스크립트 |
 | `scripts/*.ps1`, `*.bat` | `@()` 배열 고정, `ERRORLEVEL` 전파, 실제 start/stop/status 실행 |
 | `.github/hooks/**` | 수 초 이내·오탐 0·fail-open·`stop_hook_active` 1회 제한 |
 | 지침(`.github/**/*.md`) | 단일 원천 복제 여부, 구판 규칙 줄 단위 대조(누락 여부) |

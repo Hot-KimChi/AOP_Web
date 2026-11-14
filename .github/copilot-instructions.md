@@ -24,7 +24,7 @@
 | Layer | Stack |
 |-------|-------|
 | Backend | Python 3.10+, Flask, SQLAlchemy, pyodbc |
-| Frontend | Next.js 15 (App Router), React 18, JavaScript (JSX) |
+| Frontend | React 18 + Vite 8 (react-router-dom 7), JavaScript (JSX) |
 | Database | MS-SQL Server (ODBC Driver 17) |
 
 ---
@@ -133,7 +133,7 @@
 
 - **시점**: 논리적 변경 1건이 검증까지 끝나면 즉시 커밋. 무관한 변경을 섞지 않는다. `Implementation_list.md` 갱신을 같은 커밋에 담는다.
 - **스테이징**: 이번에 변경한 파일만 명시적으로 `git add`(`git add .`/`-A` 금지). 커밋 전 `git status --short` 확인.
-  - 금지: `logs/`, `1_uploads/`, `.next/`, `__pycache__/`, `node_modules/`, `backend/.venv/`, `backend/ML_Models/`, `*.pyc`, 시크릿·`.env*`
+  - 금지: `logs/`, `1_uploads/`, `frontend/dist/`, `.next/`, `__pycache__/`, `node_modules/`, `backend/.venv/`, `backend/ML_Models/`, `*.pyc`, 시크릿·`.env*`
 - **메시지(한글)**: 제목 50자 내외 + 접두사(`기능:` `수정:` `리팩터:` `문서:` `성능:` `스타일:`), 본문 2~4줄(무엇을·왜), 마지막 줄 트레일러:
   ```
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
@@ -143,6 +143,6 @@
 
 ## 8. Do-Not-Touch Zones
 
-- `logs/`, `1_uploads/`, `.next/`, `__pycache__/`, `node_modules/`
+- `logs/`, `1_uploads/`, `frontend/dist/`, `.next/`, `__pycache__/`, `node_modules/`
 - `backend/.venv/`, `backend/ML_Models/`
 - `*.lnk`, `*.bat` (unless explicitly requested)

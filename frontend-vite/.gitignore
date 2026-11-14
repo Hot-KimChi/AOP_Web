@@ -1,6 +1,0 @@
-# dependencies
-/node_modules
-# build output
-/dist
-/test-results
-/playwright-report

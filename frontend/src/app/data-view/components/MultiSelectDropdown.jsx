@@ -15,7 +15,6 @@
  *  - 연쇄 필터 반영: options는 이미 cascadedOptions 기준으로 전달됨
  */
 
-'use client';
 
 import React, {
   useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect,

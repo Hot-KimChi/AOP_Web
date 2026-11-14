@@ -13,7 +13,7 @@ tools: ["read", "search", "edit", "execute", "playwright/*"]
 
 - **기능·API·인증 동작을 바꾸지 않는다.** `fetch`·`credentials`·`AuthContext`·라우팅은 디자인 범위가 아니다.
 - 색·간격·radius·그림자는 `frontend/src/globals.css`의 **CSS 변수만** 사용. 새 토큰은 `:root`와 `[data-theme="dark"]` **양쪽**에 정의.
-- 테마 선택자는 `[data-theme="dark"]`(`.dark` 금지), Bootstrap 오버라이드는 `!important`, Layout Stack 순서 불변.
+- 테마 선택자는 `[data-theme="dark"]`(`.dark` 금지), Bootstrap 오버라이드는 `!important`, `index.html` 선적용 테마 스크립트·`Layout.jsx` 구성 불변.
 - 대규모 레이아웃 재구성은 하지 않는다. 필요하면 제안(D-ID)으로만 남기고 사용자 확인을 받는다.
 
 ## 작업 순서

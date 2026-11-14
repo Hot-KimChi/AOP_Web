@@ -5,7 +5,7 @@ description: '프론트엔드 UI를 디자인 시스템·WCAG 2.2 AA 접근성·
 
 # Web Design Review
 
-AOP_Web 프론트엔드(Next.js 15 + Bootstrap + CSS 변수 테마)의 UI 품질을 **측정 가능한 기준**으로 감사한다.
+AOP_Web 프론트엔드(React + Vite + Bootstrap + CSS 변수 테마)의 UI 품질을 **측정 가능한 기준**으로 감사한다.
 코드 규칙은 `frontend/AGENTS.md`가 우선한다. 기능·API·인증 동작은 범위 밖이다.
 
 ## 절차

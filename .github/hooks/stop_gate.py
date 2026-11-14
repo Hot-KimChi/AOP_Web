@@ -2,8 +2,8 @@
 
 - Python: 변경 .py 구문 오류.
 - Frontend(frontend/AGENTS.md Top 5 중 오탐 없이 감지 가능한 것만):
-  · app 라우트 엔트리(page/layout/template)가 React 훅을 쓰면서 'use client' 누락 → 빌드 에러
-  · 문자열 리터럴로 고정한 http(s)://localhost:5000 → 원격 사용자 API 호출 실패(apiBase.js 사용)
+  · .js 파일 안의 JSX(닫는 태그·프래그먼트·자기 닫기 태그; 템플릿 문자열 `${}` 안은 미검사) → Vite 8 빌드 에러(.jsx 사용)
+  · 문자열 리터럴로 고정한 http(s)://localhost:5000 → 원격 사용자 API 호출 실패(apiBase.jsx 사용)
   · CSS의 .dark 선택자 → 테마 미적용([data-theme="dark"] 사용)
 - 변경 파일만 검사(git diff HEAD + untracked)한다. 일반적으로 약 1초(파이썬 기동 포함), 1MB 초과 파일은 생략.
 - 프론트 검사는 완전한 파서가 아닌 경량 토크나이저(주석·문자열·정규식 리터럴 마스킹)다.
@@ -18,13 +18,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-EXCLUDED_PARTS = {".venv", "__pycache__", "node_modules", ".next", "ML_Models"}
+EXCLUDED_PARTS = {".venv", "__pycache__", "node_modules", "dist", ".next", "ML_Models"}
 FRONTEND_SRC = ("frontend", "src")
 JS_SUFFIXES = {".js", ".jsx", ".ts", ".tsx"}
-ROUTE_ENTRY_STEMS = {"page", "layout", "template"}
 MAX_SCAN_BYTES = 1_000_000  # 생성물·번들 등 대용량 파일은 건너뛰어 훅 시간을 수 초 이내로 유지
 
-REACT_HOOK_RE = re.compile(r"\buse(?:State|Effect|LayoutEffect|Ref|Context|Callback|Memo|Reducer|Router|SearchParams|Pathname|Auth)\s*\(")
+# 비교 연산자와 헷갈리지 않는 JSX 표식만 본다: 닫는 태그, 프래그먼트, 자기 닫기 태그.
+JSX_RE = re.compile(r"</[A-Za-z][\w.-]*\s*>|<>|</>|<[A-Za-z][\w.:-]*(?:\s[^<>]*)?/>")
 HARDCODED_API_RE = re.compile(r"https?://localhost:5000")
 DARK_CLASS_RE = re.compile(r"\.dark(?![\w-])")
 
@@ -36,8 +36,9 @@ _STRING_ALTS = (
 JS_TOKEN_RE = re.compile(
     r"/\*.*?(?:\*/|\Z)"
     r"|//[^\n]*"
-    # 정규식 리터럴: 연산자·여는 괄호·return 뒤의 '/'만 인정(나눗셈과 구분). 전체를 가린다.
-    r"|(?:(?<=[=(,:\[!&|?{;])|(?<=\breturn))\s*/(?![/*])(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n\[])+/[a-z]*"
+    # 정규식 리터럴: 연산자·괄호·=>·return 뒤의 '/'만 인정(나눗셈과 구분). 전체를 가린다.
+    # ')' 뒤(`if (x) /re/`)도 포함한다 — 나눗셈을 잘못 가리면 검출이 줄 뿐(오탐 아님)이다.
+    r"|(?:(?<=[=(),:\[!&|?{;])|(?<==>)|(?<=\breturn))\s*/(?![/*])(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n\[])+/[a-z]*"
     + _STRING_ALTS,
     re.S,
 )
@@ -58,15 +59,6 @@ def scan_source(text: str, css: bool = False) -> tuple[str, list[tuple[int, str,
         return token[0] + NON_NEWLINE_RE.sub(" ", token[1:])
 
     return (CSS_TOKEN_RE if css else JS_TOKEN_RE).sub(mask, text), strings
-
-
-def has_use_client_directive(code: str, strings: list[tuple[int, str, str]]) -> bool:
-    # 지시문은 주석·공백 뒤 첫 문장인 독립 따옴표 문자열이어야 한다(code 는 주석이 가려진 상태).
-    first = len(code) - len(code.lstrip())
-    if not strings or strings[0][0] != first or strings[0][1] not in "'\"" or strings[0][2] != "use client":
-        return False
-    rest = code[first + len("use client") + 2:].lstrip(" \t")
-    return not rest or rest[0] in ";\r\n"
 
 
 def changed_files(root: Path) -> list[Path]:
@@ -98,17 +90,15 @@ def frontend_errors(root: Path, path: Path) -> list[str]:
     errors = []
     if path.suffix in JS_SUFFIXES:
         code, strings = scan_source(text)
-        if (
-            "app" in rel.parts
-            and path.stem in ROUTE_ENTRY_STEMS
-            and REACT_HOOK_RE.search(code)
-            and not has_use_client_directive(code, strings)
-        ):
-            errors.append(f"{rel}: React 훅을 쓰는 라우트 엔트리에 'use client' 선언이 없습니다")
+        if path.suffix == ".js":
+            m = JSX_RE.search(code)
+            if m:
+                lineno = code.count("\n", 0, m.start()) + 1
+                errors.append(f"{rel}:{lineno}: .js 파일에 JSX 가 있습니다 — Vite 8 은 해석하지 못하므로 .jsx 로 바꾸세요")
         for offset, _quote, content in strings:
             if HARDCODED_API_RE.match(content):
                 lineno = text.count("\n", 0, offset) + 1
-                errors.append(f"{rel}:{lineno}: API 주소 하드코딩 금지 — lib/apiBase.js 의 API_BASE_URL 사용")
+                errors.append(f"{rel}:{lineno}: API 주소 하드코딩 금지 — lib/apiBase.jsx 의 API_BASE_URL 사용")
     elif path.suffix == ".css":
         code, _ = scan_source(text, css=True)
         for lineno, line in enumerate(code.splitlines(), 1):
