@@ -1437,3 +1437,12 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **검증**: e2e 23/23(dev·운영 서버), 서버 점검 27/27, Verify 지적 재현 테스트 15/15, ps1 재설치 판정 6케이스, PS5.1 파싱 오류 0, 훅 샘플(오탐 0·누락 0), 백엔드 다운 시 "서버에 연결할 수 없습니다".
 - **교차 검증**: Verify(GPT) 1차 Blocker 2(심볼릭 링크 경유 dist 밖 서빙, 대소문자 별칭 캐시 증식)·Major 3(시각 기반 재설치 판정, 훅 오탐·누락, Forwarded 위조 전달)·Minor 1(gzip q=0) → 수정 → 2차 Blocker 1·Major 2(스캔 후 상위 폴더 정션 교체, 재빌드 캐시 잔존, `)` 뒤 정규식 오탐) → 수정 → 3차 **Blocker 0·Major 0**. security-review: MEDIUM 이상 0, LOW 3 중 2 수정(프록시 보안 헤더, 403 문구), 1 보류(운영 서버 Host 검사 — FQDN·별칭 접속 차단 위험, 인증 쿠키가 실리지 않아 영향 제한).
 - **잔여 위험**: 실제 계정 로그인→로그아웃 전체 흐름·대용량 업로드 실측은 미실행(자격 증명 없음). 훅은 템플릿 문자열 `${}` 안 JSX 를 검사하지 않는다(최종 방어선 `npm run build`).
+
+### 전수 재점검 (#53 후속, 2026-11-14)
+
+- **정적 점검**: 소스·스크립트·지침에서 `next/*` import, `NEXT_PUBLIC_*`, `'use client'`, `frontend-vite`, 3001 잔존 0건(금지 규칙 문구·과거 이력 문서 제외). 사용자 가이드 `docs/AOP_Web_guide.html` 의 Next.js 표기 → React + Vite, 의존성 준비 `npm install` → `npm ci` + 자동 재설치 안내.
+- **클린 설치·빌드**: `npm ci` 34개 패키지 25초, 운영 의존성 취약점 0, `vite build` 1.7초.
+- **전 라우트(13 + 404) × 라이트·다크**, 개발·운영 서버 모두: 제목·테마·화면 표시 정상, React 경고 0. 비로그인 상태에서 `machine-learning`·`SSR_DocOut`·`viewer` 가 401 조회 실패를 콘솔에 남기는 것은 Next 원본과 로직이 동일한 기존 동작(diff 0)으로 확인.
+- **수정 1건 — 운영 서버 오탐 로그**: 브라우저가 `/api` 요청을 중도 취소하면 백엔드 요청 취소(ECONNRESET)가 "백엔드 연결 실패"로 기록되던 것을, 클라이언트가 먼저 끊은 경우는 기록하지 않도록 수정(실제 백엔드 다운은 502 + 로그 유지). Werkzeug 응답은 `Connection: close` 라 keep-alive 재사용 문제 없음(30/30).
+- **실행 스크립트 실측**: `AOP_Web.ps1 -Action Start -Production -Unattended`(작업 스케줄러 경로)로 백엔드·프런트 전체 재기동 16초, 설치 마커 일치로 `npm ci` 생략, 빌드→`npm start`→3000 수신, stderr 0바이트. `AOP_Web.bat status` 정상(자동 시작 작업 MISCONFIGURED 는 이번 변경과 무관한 기존 등록 상태).
+- **회귀**: 백엔드 pytest 187/187, 전체 `.py` 컴파일 오류 0, e2e 23/23(dev·운영·스크립트 기동 서버 3회), 서버 점검 27/27, Verify 지적 재현 15/15, PC 이름·IP 접속 200.

@@ -98,7 +98,7 @@
     <div class="wrap">
       <p>AOP Web 사용자 안내서</p>
       <h1>데이터 조회부터 검증 리포트까지</h1>
-      <p>Flask 백엔드, Next.js 웹 화면, MS-SQL Server를 연결해 측정 데이터 생성·조회·검증·문서화를 지원하는 업무용 애플리케이션입니다.</p>
+      <p>Flask 백엔드, React + Vite 웹 화면, MS-SQL Server를 연결해 측정 데이터 생성·조회·검증·문서화를 지원하는 업무용 애플리케이션입니다.</p>
     </div>
   </header>
 
@@ -121,7 +121,7 @@
         <p class="lead">AOP Web은 사용자가 브라우저에서 데이터베이스와 분석 기능을 안전하게 사용하도록 화면과 API를 분리한 풀스택 애플리케이션입니다.</p>
         <table>
           <tr><th>구성</th><th>역할</th></tr>
-          <tr><td>Next.js 15 / React 18</td><td>메뉴, 입력 화면, 데이터 표, 결과 다운로드를 제공합니다.</td></tr>
+          <tr><td>React 18 + Vite 8</td><td>메뉴, 입력 화면, 데이터 표, 결과 다운로드를 제공합니다.</td></tr>
           <tr><td>Flask / Python</td><td>인증, 데이터베이스 조회, 파일 처리, ML 및 리포트 API를 실행합니다.</td></tr>
           <tr><td>MS-SQL Server</td><td>업무 데이터와 측정·검증 대상 테이블을 저장합니다.</td></tr>
         </table>
@@ -365,7 +365,8 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 
 cd ..\frontend
-npm install</pre>
+npm ci</pre>
+        <p><code>AOP_Web.bat</code>은 <code>frontend\package-lock.json</code>이 바뀌면(예: <code>git pull</code>) 프론트엔드 의존성을 자동으로 다시 설치합니다.</p>
         <div class="note"><strong>운영 모드 주의:</strong> <code>AUTH_SECRET_KEY</code>, <code>FLASK_SECRET_KEY</code>, <code>ALLOWED_ORIGINS</code>를 사용자 또는 시스템 환경변수에 영구 등록해야 자동 시작 이후에도 정상 부팅됩니다.</div>
       </section>
 

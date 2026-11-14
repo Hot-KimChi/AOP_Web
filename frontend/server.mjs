@@ -255,7 +255,8 @@ function proxyApi(req, res) {
   // 대용량 업로드·장시간 ML 요청이 있으므로 프록시 구간에서 시간 제한을 두지 않는다.
   upstream.setTimeout(0);
   upstream.on('error', (err) => {
-    if (res.headersSent) {
+    if (res.headersSent || clientGone) {
+      // 브라우저가 먼저 끊어 백엔드 요청을 취소한 경우는 백엔드 장애가 아니므로 기록하지 않는다.
       res.destroy();
       return;
     }
@@ -266,8 +267,12 @@ function proxyApi(req, res) {
   });
 
   // 브라우저가 요청을 끊으면 백엔드 요청도 끊는다.
+  let clientGone = false;
   res.on('close', () => {
-    if (!res.writableFinished) upstream.destroy();
+    if (!res.writableFinished) {
+      clientGone = true;
+      upstream.destroy();
+    }
   });
   req.pipe(upstream);
 }
