@@ -55,10 +55,18 @@ export default function ExportForm({ database, probeId, rtpName, onClose }) {
     try {
       const list = await apiJson(`/api/interrogator/export/rtp-names?${query({ database, probeId: p })}`);
       if (my !== rtpGen.current) return;
-      setRtpNames(list || []);
+      const names = list || [];
+      // intExport_Load 는 목록을 채운 뒤 cboRtpName.Text = SelectedRtpName 을 다시 넣는다 → 메인에서
+      // <New...> 로 만든(아직 RTP_LUT 에 없는) 이름도 유지되어 Copy(rtp_M_duplicate)에 쓰인다.
+      if (keep && !names.includes(keep)) {
+        setRtpNames([...names, keep]);
+        setRtp(keep);
+        return;
+      }
+      setRtpNames(names);
       setRtp((cur) => {
         const want = keep ?? cur;
-        return (list || []).includes(want) ? want : '';
+        return names.includes(want) ? want : '';
       });
     } catch (e) {
       if (my === rtpGen.current) setError(e.message);

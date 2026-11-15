@@ -355,6 +355,18 @@ test.describe('MSI input · Interrogator', () => {
     await page.getByTestId('int-newname-ok').click();
     await expect(page.getByTestId('int-rtp-name')).toHaveValue('RTP_NEW');
 
+    // #59: 원본 intExport_Load 처럼 RTP_LUT 에 아직 없는 새 이름도 Export 에 유지(Copy 대상)
+    await page.route('**/api/interrogator/export/probes?*', (route) => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: ['7'] }),
+    }));
+    await page.route('**/api/interrogator/export/rtp-names?*', (route) => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: ['RTP_A'] }),
+    }));
+    await page.getByTestId('int-btn-export').click();
+    await expect(page.getByTestId('exp-rtp')).toHaveValue('RTP_NEW');
+    await page.getByTestId('exp-close').click();
+    await expect(page.getByTestId('int-export')).toBeHidden();
+
     await page.getByTestId('int-rtp-name').selectOption('RTP_A');
     await page.getByTestId('int-btn-display').click();
     await expect(page.getByTestId('int-rtp-display')).toBeVisible();

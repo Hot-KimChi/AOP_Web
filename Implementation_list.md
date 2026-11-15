@@ -1521,3 +1521,29 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - 검증: `npm run build` 통과, 운영 재기동 후 e2e 23/23 통과(팝업 URL·쿼리·뷰포트 크기·보기 모드 3종·Esc 닫힘 확인, 대상 테스트 3회 반복 통과).
 - 제약: 브라우저 보안상 OS 수준 "최대화" 상태 강제는 불가 → 화면 크기로 열어 동일 효과.
 - 교차 검증(Verify) 생략: UI 동작 변경만, 인증·SQL·스크립트 무관.
+
+## 59. 추가적으로 interrogator 기능이 11_소스_CompassTool_VB_2nd 의 interrogator의 기능을 충분히 수행하는지 다시 한번 확인해죠.
+
+### Agent 명세 (#59)
+
+- **목표**: VB 원본 Interrogator(intMain + 하위 폼) 대비 웹 이식의 기능 누락·결과 불일치를 전수 대조하고, Major 이상은 수정한다.
+- **분배(읽기 전용 대조, 병렬)**: ① Tank(frmTank·frmDetail·frmVoltageS) ② Power·Export·RTP Display/Analysis·NewName ③ Temp(frmTemp·Temp10·Wobbler·TempSetting). intMain은 메인이 직접 대조.
+- **판정 기준**: Major = 원본 작업 불가 또는 DB 저장값·계산값·Export 내용·필터 조건 상이. Minor = 메시지·표시 차이. 원본 비활성 기능과 기존 인정 차이(MATLAB→SciPy, 다운로드, 확인 창, 별도 창)는 결함 아님.
+- **구현(Implement)**: Major 항목만 최소 수정 + 재현 테스트(pytest/e2e). SQL·DB 쓰기 경로를 바꾸면 Verify + security-review 병렬.
+- **완료 조건**: Blocker 0, Major 0, pytest·build·e2e 통과, 결과 표를 수행 결과에 기록.
+
+### 수행 결과 (#59)
+
+| 영역 | 원본 | 대조 결과 |
+|---|---|---|
+| 메인 | intMain(frmMain.vb) | 버튼 10개·활성 규칙·`<New...>`·RTP_main/RTP_main_modified 일치(웹은 실행 전 확인 창 추가) |
+| Tank | frmTank·frmDetail·frmVoltageS | 핸들러 106/106 대응. VoltageS 저장 후 피드백 없음은 원본과 동일 |
+| Power | frmPower·autoPower | 30/30 대응. 저장 후 그리드 미재조회는 원본도 `rsPower.Requery` 주석 → 동일 |
+| Temp | frmTemp·Temp10·Wobbler | 57/14/25 대응. Wobbler 허용오차(1e-5/1e-3, plot 1e-3/1e-2) 원본과 동일, 2D aperture elevIndex DISTINCT 검사 동일. TempError는 원본 비활성(Handles 없음·Show 주석) |
+| Export·RTP | IntExport·intRtpDisplay1·intRTPanalysis·intNewName | 대응. **Major 1건 수정**(아래) |
+
+- **수정(Major)**: 원본 `intExport_Load`는 목록을 채운 뒤 `cboRtpName.Text = SelectedRtpName`을 다시 넣어, 메인에서 `<New...>`로 만든(아직 RTP_LUT에 없는) 이름을 유지하고 Copy(`rtp_M_duplicate`)에 쓴다. 웹은 목록에 없으면 빈 값으로 바꿔 이 흐름이 불가했다 → `ExportForm.jsx` 초기 로드에서 전달된 이름을 목록에 추가·유지(프로브 변경 시는 기존대로 비움).
+- **재현→수정**: e2e에 “새 이름 → Export 열기 → RTP Name 유지” 단계를 추가, 수정 전 빌드에서 `Received: \"\"` 실패 확인 → 수정 후 통과.
+- **검증**: pytest 191 passed, `npm run build` 성공, 운영 재기동 HTTP 200, e2e 23/23 통과.
+- **인정된 차이(유지)**: MATLAB fmincon → SciPy(모델·목적함수·초기값·경계 동일, 계수의 수치 완전 동일성은 실DB 미접속으로 미검증), 파일 출력→다운로드, 쓰기 전 확인 창.
+- 교차 검증(Verify) 생략: 프런트 표시값 유지 1건(SQL·인증·API 계약 변경 없음), e2e로 직접 확인.
