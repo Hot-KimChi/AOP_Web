@@ -328,10 +328,13 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
     setEdit(null);
     setSel(null);
     manualEditClear();
-    if (r.dip > 0 && await showConfirm(`Dips are found In ${prompt} vs. Voltage at z=${key}. Do you want To save fixes?`)) {
-      await post('/auto-check/save', { graph, resId: Number(ge.mri), key, confirm: true });
+    if (r.dip > 0) {
+      if (await showConfirm(`Dips are found In ${prompt} vs. Voltage at z=${key}. Do you want To save fixes?`)) {
+        await post('/auto-check/save', { graph, resId: Number(ge.mri), key, confirm: true });
+      }
+      // 원본: dip 이 있을 때만 다시 그린다(없으면 자동 점검 선을 화면에 남긴다).
+      await drawGraph([graph]);
     }
-    await drawGraph([graph]);
   };
 
   const cmdAutoCheck = () => {
@@ -362,6 +365,7 @@ export default function TankForm({ database, probeId, rtpName, onClose }) {
     if (ge.mri === '') { showAlert('Please select an edit MRI'); return; }
     run('Auto Editing', async (alive) => {
       const zRequest = await get('/zdis', { resId: ge.mri, kind: 'zloc', zloc: S.current.zloc });
+      if (blankFlag(zRequest)) showAlert(`No specified zDistance is found for resId =${ge.mri}`);
       const zs = await get('/z-locations', { resId: ge.mri });
       for (const z of zs || []) {
         if (!alive()) return;

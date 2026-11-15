@@ -1576,3 +1576,30 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **검증**: pytest 191 passed(MSI 엔진·Excel 테스트 포함), e2e 23/23(#45·#47·#49·#50 MSI 시나리오 포함) — 이번 세션 최신 빌드 기준.
 - **잔여**: 실제 DB 미접속으로 SQL Server 기본값·트리거, VB `Array.Sort`와 숫자 포맷 경계값의 런타임 동등성은 미검증.
 - 교차 검증(Verify) 생략: 코드 변경 없음(문서 기록만).
+
+## 61. measSetInput에서 여러 버튼과 temperature쪽에 여러 기능 및 버튼이 있는지 정상 동작하는지 다시 한번 완벽하게 확인해죠. 그리고 interrogator의 여러 버튼 및 데이터도 수정이 가능한 것으로보이는데 이러한 기능까지 포함하여 기능적으로 문제없는 지 완벽하게 확인해죠. (기존 테스트 및 원본 source code는 11_소스_CompassTool_VB_2nd 안에 포함)
+
+### Agent 명세 (#61)
+
+- **Tier L**. #59·#60은 VB 핸들러 대응(존재) 대조였다. 이번은 **동작(런타임) 검증**: 버튼마다 활성 조건 → 요청 경로·메서드·페이로드 키 → 백엔드 검증·SQL·응답 키 → 화면 상태 반영, 그리고 **데이터 편집(셀 수정·마크·포인트·저장) 왕복**이 원본과 같은 결과를 내는지.
+- **기준 명세**: `11_소스_CompassTool_VB_2nd` VB 소스(원본 자동 테스트는 0개 — CompassTool4.0_Guide.html §3.3). 실행 증거는 이 저장소 pytest·Playwright e2e.
+- **분배(읽기 전용 감사, 병렬 4)**: ① measSetInput 버튼 + Temperature(MsiExcelForm.jsx ↔ msi_excel.py·pkg_MsiInput/excel_* ↔ measSetInput.vb) ② Tank(TankForm·TankDetailForm·TankVoltageSForm·tankChart ↔ interrogator_tank.py ↔ frmTank·frmVoltageS) ③ Power·Export·RTP·메인(PowerForm·powerChart·ExportForm·Rtp*·interrogator/page ↔ interrogator_power/export/interrogator.py ↔ frmPower·IntExport·frmMain·frmRtp*·intRTPanalysis) ④ Temp·Temp10·Wobbler(TempForm·tempChart·Temp10Form·WobblerForm ↔ interrogator_temp.py·interrogator.py temp10 ↔ frmTemp·frmTemp10·frmWobbler).
+- **판정 기준**: Blocker = 버튼이 오류로 동작 불가. Major = 계약 불일치(키·형식), 편집값 미반영·잘못된 행 저장, 원본과 다른 DB 저장값·필터. Minor = 표시·메시지. #40·#41·#49~50·#59·#60에서 인정한 차이는 결함 아님.
+- **구현**: Major 이상만 재현 테스트(pytest 또는 e2e) → 최소 수정. 버튼 동작 증거가 없는 폼은 e2e 클릭 시나리오(모의 API) 추가. DB 쓰기·SQL 경로 변경 시 Verify + security-review 병렬.
+- **완료 조건**: Blocker 0, Major 0, pytest·build·e2e 통과, 버튼·편집 기능 대조표를 수행 결과에 기록.
+- **불변식(사용자 추가 요청)**: UI 배치·카드블록 위치·레이아웃·스타일은 현재 웹 디자인 그대로 유지한다. 레이아웃 차이는 결함이 아니며, 수정은 기능(동작·계약·계산·저장값)에 한정한다.
+
+### 수행 결과 (#61)
+
+- 감사 기준: 원본 폴더에 자동 테스트·샘플 데이터 없음(Guide §3.3) → VB 소스를 명세로 삼아 4개 영역 병렬 대조.
+- 영역별 결과: measSetInput 버튼 19/19·Temp 옵션 0/1/3/4/14 정상, Tank 104/104, Power·Export·RTP 46건(Major 1 수정), Temp·Temp10·Wobbler 전 기능 대응.
+- 수정 6건(UI 좌표·카드 위치 변경 없음):
+  1. [Major] RTP Display: 빈 RTP 이름을 400으로 거부 → 원본처럼 `LIKE '%%'` 조회 허용(`queries.rtp_display`, 길이 ≤128만 검사) + pytest 재현 테스트.
+  2. Power Grid On/Off 토글이 차트에 전달되지 않던 문제 연결(`powerChart.jsx` gridOn).
+  3. MSI Selected/Output RTP 셀을 비우면 `''` 전송 → Tank pulseBandwidthMHz·apexCm 가 0 저장되던 문제를 null(DBNull)로 교정 + e2e.
+  4. Tank Auto Check: dip=0 이면 다시 그리지 않음, Auto Check All 에서 zRequest NULL 경고 추가(frmTank.vb 2900-2986).
+  5. Temp10: SS 미선택 상태에서 Set 행·Get Sel/All Records 클릭 시 400 오류 → 빈 그리드·버튼 비활성(원본 tempSSId=0 빈 결과).
+  6. Temp·Wobbler: 드래그 후 저장 No → 편집 모드 종료 + 다시 그리기(원본 CancelEdit + DrawMyData/DrawNewData).
+- 인정 차이: Tank zDis NULL 단계 건너뜀, Temp Voltage SaveEdit 실제 UPDATE(원본 SQL 결함), Wobbler 각도 파싱 개선, Temp 옵션 타이핑(최종 상태 동일), Auto Check All zRequest NULL 시 표시 기준 z 가 0 대신 blank(V-001, 기존 차이·표시만).
+- 검증: pytest 192 passed, build 성공, 운영 재기동 후 e2e 24/24 통과, Verify Blocker 0·Major 0(Minor 1=V-001 인정), security-review 취약점 없음.
+- RESIDUAL: 실제 DB 접속 불가(18456)로 실데이터 SQL 결과 미확인, frmRtpList 는 호출처 없어 범위 밖.

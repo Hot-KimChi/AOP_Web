@@ -188,7 +188,7 @@ const vbPlotPlugin = {
  *  onPointerDown/Move/Up(button, px, py): picPowerGraph 좌표(px)   onContextMenu(clientX, clientY, px, py)
  */
 export default function PowerGraph({
-  range, lines, showNumbers, selection, editLabel, onPointerDown, onPointerMove, onPointerUp, onContextMenu,
+  range, lines, showNumbers, selection, editLabel, gridOn = true, onPointerDown, onPointerMove, onPointerUp, onContextMenu,
   title = 'Power', xLabel = 'Voltage', yLabel = 'PowerData', testId = 'power-graph',
 }) {
   const wrapRef = useRef(null);
@@ -231,10 +231,10 @@ export default function PowerGraph({
       legend: { display: false },
       tooltip: { enabled: false },
       vbPowerPlot: {
-        grid: true, range: valid ? range : null, showNumbers: showNumbers && valid, selection, title, xLabel, yLabel,
+        grid: gridOn, range: valid ? range : null, showNumbers: showNumbers && valid, selection, title, xLabel, yLabel,
       },
     },
-  }), [range, valid, showNumbers, selection, title, xLabel, yLabel, pixelRatio]);
+  }), [range, valid, showNumbers, selection, title, xLabel, yLabel, pixelRatio, gridOn]);
 
   const toPic = (e) => {
     const rect = wrapRef.current.getBoundingClientRect();

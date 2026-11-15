@@ -130,7 +130,8 @@ export default function WobblerForm({ database, probeId, onClose }) {
     if (await showConfirm('The dataset has been modified. Do you want to save your changes?')) {
       save(i, ep.s.allowX ? x : edit.points[i][1], y);
     } else {
-      ep.off();
+      // 원본 DataChanged No: CancelEdit + DrawNewData(Edit=False) — 편집 모드 종료.
+      stopEdit();
     }
   };
 

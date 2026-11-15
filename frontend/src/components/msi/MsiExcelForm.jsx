@@ -417,8 +417,10 @@ export default function MsiExcelForm({ database, onClose }) {
     }
   };
 
-  const onSelCellChange = (ri, ci, value) => {
-    if (ci === 1 && value !== '') setSelectedProbeId(value);
+  // DataGridView 처럼 빈 입력은 DBNull(null)로 커밋한다('' 로 보내면 Tank 저장에서 0 이 된다).
+  const onSelCellChange = (ri, ci, raw) => {
+    const value = raw === '' ? null : raw;
+    if (ci === 1 && value !== null) setSelectedProbeId(value);
     setSelRows((prev) => prev.map((x, i) => {
       if (i !== ri) return x;
       const v = [...x.v];
@@ -427,7 +429,8 @@ export default function MsiExcelForm({ database, onClose }) {
     }));
   };
 
-  const onOutCellChange = (ri, ci, value) => {
+  const onOutCellChange = (ri, ci, raw) => {
+    const value = raw === '' ? null : raw;
     setOut((prev) => ({ ...prev, rows: prev.rows.map((r, i) => (i === ri ? r.map((c, j) => (j === ci ? value : c)) : r)) }));
   };
 

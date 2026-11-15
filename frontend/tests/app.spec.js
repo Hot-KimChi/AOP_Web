@@ -317,6 +317,40 @@ test.describe('MSI input · Interrogator', () => {
     expect(checks).toBe(3);
   });
 
+  test('#61 Selected RTP 셀을 비우면 DataGridView 처럼 null(DBNull)로 저장 요청에 실린다', async ({ page }) => {
+    await page.route('**/api/msi-excel/parse', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 'success', data: { columns: ['probeName', 'probeId', 'FractionalBandwidth'], rows: [['P', 7, 0.5]] } }),
+    }));
+    await page.route('**/api/msi-excel/check-dup', (route) => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: { kind: 'tank', dupTotal: 0, duplicates: [], combos: [] } }),
+    }));
+    const saves = [];
+    await page.route('**/api/msi-excel/save-tank', (route) => {
+      saves.push(route.request().postDataJSON());
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: { messages: [], inserted: 1, updated: 0, setRange: '1:1' } }) });
+    });
+    await page.goto('/msi-input?database=DemoDB');
+    const dir = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'msi61-'));
+    require('fs').writeFileSync(require('path').join(dir, 'a.xlsx'), 'x');
+    await page.getByTestId('msi-excel-picker').setInputFiles(dir);
+    await page.getByTestId('msi-excel-files').getByText('a.xlsx').click();
+    await page.getByTestId('msi-excel-open').click();
+    await page.getByTestId('msi-excel-selectall').click();
+    const cell = page.locator('[data-testid="msi-excel-selected"] tbody tr:not(.vb-newrow)').first().locator('td').nth(2);
+    await expect(cell).toHaveText('0.5');
+    await cell.click();
+    await cell.click();
+    await cell.locator('input').fill('');
+    await cell.locator('input').press('Enter');
+    await expect(cell).toHaveText('');
+
+    await page.getByTestId('msi-excel-savedb').click();
+    await page.getByTestId('app-dialog-ok').click();
+    await expect.poll(() => saves.length).toBe(1);
+    expect(saves[0].rows[0]).toEqual(['P', 7, null]);
+  });
+
   test('Interrogator 메인 폼이 원본(intMain) 버튼·활성 규칙을 따른다', async ({ page }) => {
     await page.route('**/api/get_list_database', (route) => route.fulfill({
       status: 200, contentType: 'application/json', body: JSON.stringify({ databases: ['BizDb'] }),

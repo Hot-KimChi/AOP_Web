@@ -658,6 +658,7 @@ export default function PowerForm({ database, probeId, onClose }) {
         range={graph.range}
         lines={graph.lines}
         showNumbers={graph.showNumbers}
+        gridOn={gridOn}
         selection={selDraw}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

@@ -267,8 +267,10 @@ export default function TempForm({ database, probeId, onClose }) {
     if (await showConfirm('The dataset has been modified. Do you want to save your changes?')) {
       save(i, ep.s.allowX ? x : edit.points[i][1], y);
     } else {
-      ep.off();
-      setEdit((e) => (e ? { ...e } : e));
+      // 원본 DataChanged No: CancelEdit(Edit=False) + DrawMyData — 편집 모드를 끝내고 다시 그린다.
+      const g = edit?.graph;
+      stopEdit();
+      if (g) run(() => drawGraph(g, checkedItems()));
     }
   };
 

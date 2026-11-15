@@ -57,8 +57,15 @@ def _check_name(rtp_name: str) -> str:
 
 
 def rtp_display(sql_obj, probe_id: int, rtp_name: str) -> dict:
-    """intRtpDisplay1: 네 그리드를 원본 SELECT 열 순서 그대로 반환한다."""
-    name = _check_name(rtp_name)
+    """intRtpDisplay1: 네 그리드를 원본 SELECT 열 순서 그대로 반환한다.
+
+    원본처럼 RTP 이름이 비어도 조회한다(RTP_LUT 는 빈 결과, 온도 LUT 3종은 LIKE '%%' 로 probe 전체).
+    """
+    if rtp_name is None:
+        rtp_name = ""
+    if not isinstance(rtp_name, str) or len(rtp_name) > MAX_NAME_LEN:
+        raise InterrogatorInputError("RTP 이름이 올바르지 않습니다.")
+    name = rtp_name
     like = f"%{_escape_like(name)}%"
 
     def run(cur):

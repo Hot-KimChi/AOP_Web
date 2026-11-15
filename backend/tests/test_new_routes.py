@@ -105,6 +105,46 @@ def test_grid_keeps_column_order_and_truncates():
     assert out["truncated"] is True
 
 
+class _RecCursor:
+    def __init__(self):
+        self.executed = []
+        self.description = [("n",)]
+
+    def execute(self, sql, params=()):
+        self.executed.append((sql, list(params)))
+
+    def fetchall(self):
+        return [(0,)]
+
+    def fetchmany(self, n):
+        return [(0,)]
+
+
+def test_rtp_display_allows_empty_name_like_original(monkeypatch):
+    # intRtpDisplay1: RTP 이름이 비어도 LIKE '%%' 로 해당 probe 의 온도 LUT 3종을 조회한다.
+    from pkg_Interrogator import queries
+
+    cur = _RecCursor()
+
+    class _Conn:
+        def cursor(self):
+            return cur
+
+        def rollback(self):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(queries, "open_raw_connection", lambda sql_obj: _Conn())
+    out = queries.rtp_display(object(), 7, "")
+    assert set(out) == {"rtpLut", "tempPrbLut", "tempPrbVoltLut", "tempPulseLut", "problemCount"}
+    likes = [p for sql, p in cur.executed if "LIKE" in sql]
+    assert likes == [[7, "%%"]] * 3
+    with pytest.raises(queries.InterrogatorInputError):
+        queries.rtp_display(object(), 7, "x" * 129)
+
+
 def test_rtp_generate_requires_confirm_and_variant(client):
     assert client.post("/api/interrogator/rtp-generate", json={"database": "BizDb", "probeId": 1}).status_code == 400
     res = client.post("/api/interrogator/rtp-generate",

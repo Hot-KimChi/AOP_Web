@@ -96,6 +96,12 @@ export default function Temp10Form({ database, onClose }) {
     const ts = sets.rows[r]?.[0];
     setTempSetId(ts);
     setSetRow(r);
+    // 원본 SelectedTempSSId(Integer) 기본값 0 → "tempSSId = 0" 조회는 항상 빈 결과다.
+    if (tempSSId == null) {
+      setT10(EMPTY);
+      setEn((e) => ({ ...e, conv: false, plot: false, save: false }));
+      return;
+    }
     call('/rows', { tempSSId, tempSetId: ts }, (d) => {
       const g = asGrid(d.grid);
       setT10(g);
@@ -134,11 +140,18 @@ export default function Temp10Form({ database, onClose }) {
 
   const selectedSetIds = (flags) => sets.rows.filter((_, i) => flags[i]).map((r) => r[0]);
 
-  const getRecords = (flags) => call('/multi-rows', { tempSSId, tempSetIds: selectedSetIds(flags) }, (d) => {
-    const g = asGrid(d.grid);
-    setT10m(g);
-    setEn((e) => ({ ...e, multi: g.rows.length > 0 }));
-  });
+  const getRecords = (flags) => {
+    if (tempSSId == null) {
+      setT10m(EMPTY);
+      setEn((e) => ({ ...e, multi: false }));
+      return;
+    }
+    call('/multi-rows', { tempSSId, tempSetIds: selectedSetIds(flags) }, (d) => {
+      const g = asGrid(d.grid);
+      setT10m(g);
+      setEn((e) => ({ ...e, multi: g.rows.length > 0 }));
+    });
+  };
 
   const onAllRecords = () => {
     const all = new Array(sets.rows.length).fill(true);
