@@ -10,6 +10,7 @@ const HomePage = lazy(() => import('./app/(home)/page'));
 const LoginPage = lazy(() => import('./app/auth/login/page'));
 const DataViewPage = lazy(() => import('./app/data-view/page'));
 const InterrogatorPage = lazy(() => import('./app/interrogator/page'));
+const InterrogatorAnalysisPage = lazy(() => import('./app/interrogator/analysis/page'));
 const MachineLearningPage = lazy(() => import('./app/machine-learning/page'));
 const MeasSetGenerationPage = lazy(() => import('./app/measset-generation/page'));
 const MsiInputPage = lazy(() => import('./app/msi-input/page'));
@@ -27,6 +28,7 @@ const ROUTES = [
   { path: '/auth/login', title: 'AOP Web: Login', Page: LoginPage },
   { path: '/data-view', title: 'Data View — MeasSet', Page: DataViewPage },
   { path: '/interrogator', title: 'AOP Web: Interrogator', Page: InterrogatorPage, wrap: Layout },
+  { path: '/interrogator/analysis', title: 'AOP Web: Interrogator Analysis', Page: InterrogatorAnalysisPage, wrap: PopupLayout },
   { path: '/machine-learning', title: 'AOP Web: Machine Learning', Page: MachineLearningPage },
   { path: '/measset-generation', title: 'AOP Web: MeasSet Generation', Page: MeasSetGenerationPage, wrap: Layout },
   { path: '/msi-input', title: 'AOP Web: measSetInput', Page: MsiInputPage, wrap: PopupLayout },

@@ -1,6 +1,7 @@
 // 레거시 intMain(frmMain.vb, "Interrogator", 922x744) 화면의 버튼·활성 규칙을 재현한다. 페이지 헤더와 중복되는
 // 타이틀바·큰 제목 라벨은 빼고(원본 y 에서 150 위로), DB 선택은 카드 상단(toolbar)에 둔다.
-// 하위 폼은 원본처럼 창(모달)으로 띄우고, Tank/Power/Temp 분석 창은 화면 전체 최대창으로 연다.
+// 하위 폼은 원본처럼 창(모달)으로 띄우고, Tank/Power/Temp 분석은 화면 전체 크기의 별도 브라우저 창
+// (/interrogator/analysis)으로 연다.
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -9,12 +10,10 @@ import { VbButton, VbCombo, VbDbBar, VbForm, VbLabel, VbModal, VbText } from '..
 import NewNameForm from '../../components/interrogator/NewNameForm';
 import RtpDisplayForm from '../../components/interrogator/RtpDisplayForm';
 import RtpAnalysisForm from '../../components/interrogator/RtpAnalysisForm';
-import TankForm from '../../components/interrogator/TankForm';
-import PowerForm from '../../components/interrogator/PowerForm';
-import TempForm from '../../components/interrogator/TempForm';
 import ExportForm from '../../components/interrogator/ExportForm';
 import { apiJson, query } from '../../lib/apiJson';
 import { showAlert, showConfirm, showError } from '../../lib/dialog';
+import { openFullWindow } from '../../lib/openWindow';
 
 const NEW = '<New...>';
 const A975 = { size: 9.75, family: 'Arial' };
@@ -90,6 +89,11 @@ export default function InterrogatorPage() {
   };
 
   const close = () => setOpen('');
+  // 같은 DB·Probe·분석 종류는 같은 창 이름 → 다시 누르면 기존 창을 재사용·포커스한다.
+  const openAnalysis = (kind) => {
+    const q = query({ kind, database, probeId, probeName, rtpName });
+    openFullWindow(`/interrogator/analysis?${q}`, `int_${kind}_${database}_${probeId}`.replace(/\W/g, '_'));
+  };
   const ready = probeReady && !busy;
   const common = { database, probeId, probeName, rtpName, onClose: close };
 
@@ -116,9 +120,9 @@ export default function InterrogatorPage() {
           options={probeId ? [NEW, ...rtpNames] : []} disabled={!probeReady} testId="int-rtp-name" ariaLabel="RTP Name" />
 
         <VbLabel x={40} y={186} w={137} h={33} font={A975}>RTP data check-up:</VbLabel>
-        <VbButton x={216} y={178} {...B} disabled={!ready} onClick={() => setOpen('tank')} testId="int-btn-tank">Tank Data Analysis</VbButton>
-        <VbButton x={392} y={178} {...B} disabled={!ready} onClick={() => setOpen('power')} testId="int-btn-power">Power Data Analysis</VbButton>
-        <VbButton x={568} y={178} {...B} disabled={!ready} onClick={() => setOpen('temp')} testId="int-btn-temp">Temp Data Analysis</VbButton>
+        <VbButton x={216} y={178} {...B} disabled={!ready} onClick={() => openAnalysis('tank')} testId="int-btn-tank">Tank Data Analysis</VbButton>
+        <VbButton x={392} y={178} {...B} disabled={!ready} onClick={() => openAnalysis('power')} testId="int-btn-power">Power Data Analysis</VbButton>
+        <VbButton x={568} y={178} {...B} disabled={!ready} onClick={() => openAnalysis('temp')} testId="int-btn-temp">Temp Data Analysis</VbButton>
 
         <VbLabel x={40} y={274} w={121} h={33} font={A975}>RTP Generation:</VbLabel>
         <VbButton x={216} y={274} {...B} disabled testId="int-btn-simu">RTP Simulation</VbButton>
@@ -140,9 +144,6 @@ export default function InterrogatorPage() {
       )}
       {open === 'display' && <VbModal onClose={close}><RtpDisplayForm {...common} /></VbModal>}
       {open === 'analysis' && <VbModal onClose={close}><RtpAnalysisForm {...common} /></VbModal>}
-      {open === 'tank' && <VbModal maximized closeOnEsc onClose={close} testId="int-tank-modal"><TankForm {...common} /></VbModal>}
-      {open === 'power' && <VbModal maximized closeOnEsc onClose={close} testId="int-power-modal"><PowerForm {...common} /></VbModal>}
-      {open === 'temp' && <VbModal maximized closeOnEsc onClose={close} testId="int-temp-modal"><TempForm {...common} /></VbModal>}
       {open === 'export' && <VbModal onClose={close}><ExportForm {...common} /></VbModal>}
     </div>
   );

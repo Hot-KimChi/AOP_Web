@@ -43,9 +43,11 @@ frontend/
     ├── lib/
     │   ├── apiBase.jsx       # API_BASE_URL
     │   ├── dialog.jsx        # showAlert/showError/showConfirm (브라우저 alert/confirm 금지)
+    │   ├── openWindow.jsx    # openFullWindow(): 큰 폼을 화면 전체 크기 별도 창으로(팝업 차단 안내 포함)
     │   └── loginPopup.jsx    # APP_VERSION(버전 배지), openLoginPopup()
     └── app/**/page.jsx       # 화면 (home, auth/login, viewer, data-view, measset-generation,
-                              #       machine-learning, verification-report, SSR_DocOut, interrogator, msi-input)
+                              #       machine-learning, verification-report, SSR_DocOut, interrogator, msi-input,
+                              #       interrogator/analysis = Tank·Power·Temp 별도 창)
 ```
 
 ---

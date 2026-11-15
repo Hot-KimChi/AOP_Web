@@ -366,31 +366,39 @@ test.describe('MSI input · Interrogator', () => {
     await expect(page.getByTestId('int-main').locator('.vb-titlebar')).toHaveCount(0);
     await expect(page.getByTestId('int-main').locator('.vb-toolbar').getByTestId('int-db')).toBeVisible();
 
-    // Power 분석 창: 화면 전체 최대창 + 화면 맞춤 ↔ 원본 크기 전환 + Esc 닫기 + 배경 스크롤 잠금
-    await page.route('**/api/interrogator/power/sw-versions?*', (route) => route.fulfill({
+    // Power 분석: 화면 전체 크기의 별도 브라우저 창 + 보기 크기 전환 + Esc 로 창 닫기
+    const ctx = page.context();
+    await ctx.route('**/api/auth/status', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ authenticated: true, username: 'e2e', has_credentials: true }),
+    }));
+    await ctx.route('**/api/interrogator/power/sw-versions?*', (route) => route.fulfill({
       status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', data: ['1.0'] }),
     }));
-    await page.getByTestId('int-btn-power').click();
-    const modal = page.getByTestId('int-power-modal');
-    await expect(modal).toBeVisible();
-    const vp = page.viewportSize();
-    const box = await modal.boundingBox();
+    const [popup] = await Promise.all([page.waitForEvent('popup'), page.getByTestId('int-btn-power').click()]);
+    const url = new URL(popup.url());
+    expect(url.pathname).toBe('/interrogator/analysis');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      kind: 'power', database: 'BizDb', probeId: '7', probeName: 'C1-6', rtpName: 'RTP_A',
+    });
+    const win = popup.getByTestId('int-power-window');
+    await expect(win).toBeVisible();
+    const vp = popup.viewportSize() || await popup.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+    const box = await win.boundingBox();
     expect(Math.round(box.width)).toBe(vp.width);
     expect(Math.round(box.height)).toBe(vp.height);
-    await expect(page.locator('body')).toHaveCSS('overflow', 'hidden');
-    const win = await page.getByTestId('int-power').locator('.vb-window').boundingBox();
-    expect(win.height).toBeLessThanOrEqual(vp.height + 1);
-    await page.getByTestId('int-power-view-actual').click();
-    await expect(page.getByTestId('int-power-view-actual')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByTestId('int-power')).toHaveAttribute('data-zoom', '1.00');
-    await page.getByTestId('int-power-view-width').click();
-    await expect.poll(async () => (await page.getByTestId('int-power').locator('.vb-window').boundingBox()).width)
-      .toBeGreaterThan(vp.width - 40);
-    await page.getByTestId('int-power-view-page').click();
-    await expect.poll(async () => (await page.getByTestId('int-power').locator('.vb-window').boundingBox()).height)
-      .toBeLessThanOrEqual(vp.height + 1);
-    await page.keyboard.press('Escape');
-    await expect(modal).toBeHidden();
-    await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
+    const form = popup.getByTestId('int-power');
+    await expect.poll(async () => (await form.locator('.vb-window').boundingBox()).height).toBeLessThanOrEqual(vp.height + 1);
+    await popup.getByTestId('int-power-view-actual').click();
+    await expect(popup.getByTestId('int-power-view-actual')).toHaveAttribute('aria-pressed', 'true');
+    await expect(form).toHaveAttribute('data-zoom', '1.00');
+    await popup.getByTestId('int-power-view-width').click();
+    await expect.poll(async () => (await form.locator('.vb-window').boundingBox()).width).toBeGreaterThan(vp.width - 40);
+    await popup.getByTestId('int-power-view-page').click();
+    await expect.poll(async () => (await form.locator('.vb-window').boundingBox()).height).toBeLessThanOrEqual(vp.height + 1);
+    // Esc로 창이 즉시 닫히면 press 응답 전에 대상이 사라질 수 있다 → 닫힘 이벤트로만 판정
+    await Promise.all([popup.waitForEvent('close'), popup.keyboard.press('Escape').catch(() => {})]);
+    expect(popup.isClosed()).toBe(true);
+    await expect(page.getByTestId('int-main')).toBeVisible();
   });
 });

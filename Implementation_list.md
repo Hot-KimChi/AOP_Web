@@ -1502,3 +1502,22 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - 공용 `VbModal maximized`(Vb.jsx): 화면 전체 최대창, 배경 스크롤 잠금, Esc 닫기(가장 위 창만·입력 칸에서는 무시). 안의 `VbForm` 타이틀바에 배율 표시와 보기 크기 선택(**화면 맞춤**: 스크롤 없이 한 화면 / **폭 맞춤**: 창 폭 기준 확대·세로 스크롤 / **100%**). title·onClose 없는 VbForm은 타이틀바 생략. Tank·Power·Temp 분석 창에 적용.
 - 그래프 선명도: 조상 폼 배율을 곱한 값으로 Chart.js `devicePixelRatio` 보정(tankChart·powerChart) → 확대해도 캔버스가 흐려지지 않음(1920×960에서 화면 맞춤 1.09배·폭 맞춤 1.65배, 캔버스 해상도 동일 배율 확인). 미사용 `.vb-hero` CSS 제거.
 - 검증: `npm run build` 통과, e2e 23 passed(최대창 크기=뷰포트, 보기 모드 전환, Esc 닫기, 스크롤 잠금 해제 단언 추가), 1920×960 라이트·다크 스크린샷 확인(콘솔 오류 0). §4.1 위험 조건 미해당으로 Verify 생략.
+
+## 58. 버튼을 클릭하면 새로운 창이 전체창으로 오픈되도록 수정해죠.
+
+### Agent 명세 (#58)
+
+- **Tier·예산**: M | 라우트 1개 신설 + 메인 버튼 동작 변경 + 별도 창 헬퍼 공용화, API 불변 | 예산 30콜
+- **목표·완료 조건**: AC1 Interrogator 의 Tank·Power·Temp Data Analysis 버튼을 누르면 별도 브라우저 창이 화면 전체 크기(좌상단 0,0·availWidth×availHeight)로 열린다. AC2 새 창은 #57 최대창 UI(화면 맞춤/폭 맞춤/100%, Esc·닫기 → 창 닫기)를 그대로 쓴다. AC3 같은 DB·Probe·분석 종류를 다시 누르면 기존 창을 재사용·포커스한다. AC4 팝업 차단 시 안내. AC5 e2e(팝업 열림·창 내용·닫기) 통과, 빌드 통과.
+- **불변식**: 하위 폼(TankForm·PowerForm·TempForm) 내부 동작·API 불변, 인증 게이트(PopupLayout) 적용, 다른 하위 창(RTP Display 등)은 기존 모달 유지.
+- **범위 밖**: 다른 버튼의 창 방식 변경, 백엔드.
+- **하위작업**: T1 | 메인(Implement) | `frontend/src/app/interrogator/**`, `frontend/src/App.jsx`, `frontend/src/lib/openWindow.jsx`, `frontend/src/components/msi/MsiChoice.jsx`, `frontend/tests/app.spec.js`, `frontend/AGENTS.md` | - | AC1~AC5
+- **검증 계획**: `npm run build`, Playwright e2e, 운영 재기동 후 확인. §4.1 위험 조건 미해당(인증 로직 변경 없음, 기존 PopupLayout 재사용) → Verify 생략.
+- **가정·모호성**: "버튼" = #57에서 최대창으로 바꾼 Tank·Power·Temp 3개. "전체창" = 화면 크기의 별도 브라우저 창(브라우저 정책상 OS 최대화 상태는 스크립트로 강제 불가 → 화면 크기로 열고 위치·크기 재조정).
+
+### 수행 결과 (#58)
+- Tank·Power·Temp 버튼 → `openFullWindow()`로 화면 전체 크기(availWidth×availHeight, 0,0) 별도 브라우저 창 오픈. 새 라우트 `/interrogator/analysis?kind=…`(PopupLayout)에서 `VbModal maximized`로 렌더, 마운트 시 `fitWindowToScreen()`으로 moveTo/resizeTo 보정.
+- 공용 헬퍼 `frontend/src/lib/openWindow.jsx` 신설(팝업 차단 시 안내), MsiChoice 엑셀 창도 동일 헬퍼 사용. 닫기/Esc → `window.close()`, 실패 시 `/interrogator`로 이동.
+- 검증: `npm run build` 통과, 운영 재기동 후 e2e 23/23 통과(팝업 URL·쿼리·뷰포트 크기·보기 모드 3종·Esc 닫힘 확인, 대상 테스트 3회 반복 통과).
+- 제약: 브라우저 보안상 OS 수준 "최대화" 상태 강제는 불가 → 화면 크기로 열어 동일 효과.
+- 교차 검증(Verify) 생략: UI 동작 변경만, 인증·SQL·스크립트 무관.

@@ -3,21 +3,13 @@
 import { useState } from 'react';
 import { VbButton, VbDbBar, VbForm, VbModal } from '../vb/Vb';
 import MsiDumpForm from './MsiDumpForm';
-import { showAlert } from '../../lib/dialog';
+import { openFullWindow } from '../../lib/openWindow';
 
 const BOLD = { size: 9.75, bold: true };
 
 // measSetInput 은 큰 폼이라 별도 브라우저 창에서 연다.
 function openExcelWindow(database) {
-  const w = window.screen?.availWidth || 1600;
-  const h = window.screen?.availHeight || 1000;
-  const win = window.open(
-    `/msi-input?database=${encodeURIComponent(database)}`,
-    `msiSetInput_${database}`,
-    `width=${w},height=${h},left=0,top=0,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`,
-  );
-  if (win) win.focus();
-  else showAlert('팝업이 차단되었습니다. 브라우저에서 이 사이트의 팝업을 허용해 주세요.');
+  openFullWindow(`/msi-input?database=${encodeURIComponent(database)}`, `msiSetInput_${database}`);
 }
 
 export default function MsiChoice() {
