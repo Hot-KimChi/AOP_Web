@@ -1603,3 +1603,27 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - 인정 차이: Tank zDis NULL 단계 건너뜀, Temp Voltage SaveEdit 실제 UPDATE(원본 SQL 결함), Wobbler 각도 파싱 개선, Temp 옵션 타이핑(최종 상태 동일), Auto Check All zRequest NULL 시 표시 기준 z 가 0 대신 blank(V-001, 기존 차이·표시만).
 - 검증: pytest 192 passed, build 성공, 운영 재기동 후 e2e 24/24 통과, Verify Blocker 0·Major 0(Minor 1=V-001 인정), security-review 취약점 없음.
 - RESIDUAL: 실제 DB 접속 불가(18456)로 실데이터 SQL 결과 미확인, frmRtpList 는 호출처 없어 범위 밖.
+
+## 62. 서버 PC 재부팅 후 자동 기동 실패 해결
+
+> 현재 이 컴퓨터가 서버 역할을 하고 있어 클라이언트 컴퓨터에서 이 컴퓨터에 접속하는 데, 문제는 서버 컴퓨터가 업데이트로 인해서 다시 리스타트될때 정상적으로 해당 프로젝트가 실행되지 않는 부분이 확인되고 있다. 윈도우리스타트되면, 내가 서버컴퓨터에 리모트로 접속하여 몇번 클릭을 해야 프로젝트가 정상적으로 수행되는데, 이를 해결할 방안과 해당 해결책을 진행해죠.
+
+### Agent 명세 (#62)
+
+- Tier M, 위험: 서비스 구동·배포 스크립트 → Verify 필수(§4.1).
+- 진단(실측): ① 예약 작업 `AOP_Web_AutoStart` = 로그온 트리거·Interactive only → 로그인 전엔 미실행. ② 시작프로그램 바로가기 → 존재하지 않는 `D:\GitHub\AOP_Web\Start_AOP_Web_Production.bat`. ③ NSSM 서비스 `AOP_Web_Service`(LocalSystem·자동) → 삭제된 `Start_AOP_Web.ps1` 을 가리켜 약 4분마다 실패·PAUSED 반복. 스크립트의 부팅(S4U) 등록 코드는 관리자 권한이 필요해 실제로 적용된 적이 없음.
+- 구현(Implement): `scripts\AOP_Web.ps1`
+  1. `-Action EnsureRunning`: 3000·5000 모두 수신 중이면 로그 없이 즉시 종료, 아니면 재확인 후 Start. 동시 기동 방지 뮤텍스.
+  2. `RegisterStartup`: 부팅 트리거(지연 1분) + 5분 반복 감시, S4U(로그인·암호 저장 불필요), 배터리 조건 해제, 중복 인스턴스 무시. 동작 = EnsureRunning.
+  3. 레거시 정리: 대상 파일이 없는 NSSM 서비스 삭제, AOP 시작프로그램 바로가기 백업 이동. Status 에 레거시 경고 표시.
+- 불변식: 기존 Start/Stop/Restart 동작·로그 형식 유지, DB 인증(SQL 로그인)·포트 불변.
+- 검증: 구문 파싱, Status, EnsureRunning(정상 시 무동작·다운 시 복구), 관리자 등록 후 schtasks 결과 확인, Verify.
+
+### 수행 결과 (#62)
+
+- 원인 3건 확인: 로그온 전용 예약 작업, 존재하지 않는 경로의 시작프로그램 바로가기, 삭제된 스크립트를 가리켜 4분마다 실패하던 NSSM 서비스.
+- 조치(`scripts\AOP_Web.ps1`): `EnsureRunning` 액션 추가, 부팅 트리거(1분 지연) + 5분 반복 감시 S4U 작업으로 재등록, 배타 파일 잠금(`logs\aop_web_start.lock`)으로 수동 기동과 자동 복구의 동시 기동 방지, 레거시 자동 시작 정리, Status 판정 강화, Stop 시 자동 복구 경고.
+- 서버 PC 적용(관리자 승인): 작업 재등록 완료, NSSM 서비스 삭제, 바로가기는 `%LOCALAPPDATA%\AOP_Web\disabled_startup` 으로 백업 이동.
+- 검증(실측): 구문 오류 0, 정상 시 EnsureRunning 1.4초·로그 0건·기존 PID 유지, 서버 정지 후 EnsureRunning 약 40초 내 복구, `schtasks /run` 시 세션 0(로그인 없음)에서 python·node 기동·HTTP 200·Last Result 0, 작업 XML BootTrigger Delay PT1M·Repetition PT5M, Status=CONFIGURED.
+- Verify: 1차 Major 2(V-001 IPv6 전용 바인딩 미감지로 개발 모드 재기동 반복, V-002 바로가기 판정 과대)·Minor 5 → V-001(netstat 전체 프로토콜·개발 모드 start 의 자동 재등록 금지), V-002(`AOP_Web` 한정), V-003(finally 잠금 해제·건너뜀 로그), V-006(경로 판별 불가 시 미삭제·백업 덮어쓰기 방지), V-007(Stop 경고), V-005(README) 수정. V-004(한쪽 다운 시 양쪽 재기동)는 기존 Start 동작이라 인정.
+- RESIDUAL: 실제 Windows 재부팅은 운영 중이라 수행하지 않음(부팅 트리거와 동일한 S4U 세션 0 실행으로 대체 검증). 도메인 계정 S4U 는 부팅 시 도메인 컨트롤러 연결이 필요하며, 실패해도 5분 반복 감시가 재시도함.

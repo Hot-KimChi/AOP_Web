@@ -188,9 +188,17 @@ MeasSet 생성 결과와 검증 리포트는 **저장소 루트의 `1_uploads\`*
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\AOP_Web.ps1 -Action RegisterStartup -Production
 ```
 
-개발 모드를 쓰는 경우 `-Production`을 생략합니다. 트리거는 시스템 부팅 후 60초 지연이며, `StartWhenAvailable`과 최대 3회 재시작을 설정합니다. 실행 전 서버의 현재 IP로 CORS 허용 Origin을 갱신하고, 3000/5000 포트 준비를 최대 60초 기다립니다. 시작이 실패하면 `logs\start_*.log`, `logs\backend_stderr_*.log`, `logs\frontend_build_*.log`를 확인합니다.
+개발 모드를 쓰는 경우 `-Production`을 생략합니다. 트리거는 시스템 부팅 후 60초 지연이며 이후 **5분마다 상태를 확인**합니다(`-Action EnsureRunning`). 3000/5000 포트가 모두 열려 있으면 로그를 남기지 않고 즉시 끝나고, 하나라도 내려가 있으면 20초 뒤 다시 확인한 다음 서버를 기동합니다. 그래서 부팅 직후 네트워크 지연으로 기동에 실패하거나 실행 중 프로세스가 종료돼도 사람이 접속하지 않고 복구됩니다. `StartWhenAvailable`, 배터리 조건 해제, 중복 실행 무시, 최대 3회 재시작을 설정합니다. 수동 `start`/`restart`와 자동 복구는 `logs\aop_web_start.lock` 파일 잠금으로 동시에 기동하지 않습니다. 실행 전 서버의 현재 IP로 CORS 허용 Origin을 갱신하고, 3000/5000 포트 준비를 최대 60초 기다립니다. 시작이 실패하면 `logs\ensurerunning_*.log`, `logs\backend_stderr_*.log`, `logs\frontend_build_*.log`를 확인합니다.
 
-일반 사용자 권한으로 `start`/`prod`를 실행해도 서비스는 시작되지만, 자동 시작 작업 등록은 권한 부족 경고와 함께 건너뜁니다. 작업 스케줄러가 실행한 경로(`-Unattended`)에서는 재등록하지 않으며, 작업은 서비스를 분리 실행한 뒤 정상 종료되어 `Last Result`가 `0x0`으로 남습니다.
+등록할 때 예전 방식의 자동 시작 구성도 함께 정리합니다. NSSM 서비스 `AOP_Web_Service`가 이 프로젝트의 `.ps1`을 `-File`로 가리키는데 그 파일이 없을 때만 삭제하고(판별할 수 없으면 그대로 둠), 시작프로그램 폴더에서 이름이나 대상에 `AOP_Web`이 들어간 바로가기는 `%LOCALAPPDATA%\AOP_Web\disabled_startup`으로 옮깁니다(시각 접두사를 붙여 덮어쓰지 않음). `status`는 이런 항목이 남아 있으면 `Legacy auto-start found`로 표시합니다.
+
+유지보수 중 서버를 일부러 내려 두려면 자동 복구도 함께 멈춥니다(관리자 권한 필요). 끝나면 `/ENABLE`로 되돌립니다.
+
+```cmd
+schtasks /Change /TN AOP_Web_AutoStart /DISABLE
+```
+
+일반 사용자 권한으로 `start`/`prod`를 실행해도 서비스는 시작되지만, 자동 시작 작업 등록은 권한 부족 경고와 함께 건너뜁니다. 자동 등록은 운영 모드(`prod`)로 직접 기동할 때만 시도하므로, 개발 모드 `start`가 운영 자동 복구 작업을 개발 모드로 덮어쓰지 않습니다. 개발 모드로 등록하려면 `-Production` 없이 `RegisterStartup`을 명시적으로 실행합니다. `stop` 실행 시 자동 복구 작업이 켜져 있으면 약 5분 안에 다시 기동된다는 경고를 표시합니다. 작업 스케줄러가 실행한 경로(`-Unattended`)에서는 재등록하지 않으며, 작업은 서비스를 분리 실행한 뒤 정상 종료되어 `Last Result`가 `0x0`으로 남습니다.
 
 등록 상태와 마지막 실행 결과는 다음 명령으로 확인할 수 있습니다.
 
@@ -198,7 +206,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\AOP_Web.ps1 -A
 schtasks /Query /TN AOP_Web_AutoStart /FO LIST /V
 ```
 
-출력에서 트리거가 **At startup**이고, 마지막 결과가 `0x0`인지 확인합니다. 애플리케이션이 포트 3000/5000을 열었는지는 `AOP_Web.bat status`로 확인합니다.
+출력에서 트리거가 **At system start up**이고, 마지막 결과가 `0x0`인지 확인합니다(부팅 트리거의 5분 반복은 이 목록에 `N/A`로 보이므로 `schtasks /Query /TN AOP_Web_AutoStart /XML`의 `<Repetition><Interval>PT5M`으로 확인합니다). 애플리케이션이 포트 3000/5000을 열었는지는 `AOP_Web.bat status`로 확인합니다.
 `status`는 자동 시작 작업의 트리거와 로그온 유형도 함께 표시하며, 작업이 없거나 로그인 트리거로 등록된 경우 관리자 PowerShell에서 실행할 복구 명령을 안내합니다. 현재 서비스가 `RUNNING`이어도 부팅 트리거가 올바르게 등록됐다는 뜻은 아니므로 자동 시작 상태를 별도로 확인하세요.
 
 자동 시작을 해제하려면 다음 명령을 실행합니다. 작업이 없어도 오류 없이 종료됩니다.

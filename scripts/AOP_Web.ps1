@@ -3,12 +3,12 @@
 #  AOP Web Application - Unified Management Script
 #
 #  Purpose  : Start, Stop, Restart, Status 통합 관리 스크립트
-#  Usage    : .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose] [-Help]
+#  Usage    : .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|EnsureRunning|RegisterStartup|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose] [-Help]
 #  Created  : 2026-09-11
 # ============================================================
 
 param(
-    [ValidateSet("Start", "Stop", "Restart", "Status", "Help", "RegisterStartup", "UninstallStartup")]
+    [ValidateSet("Start", "Stop", "Restart", "Status", "Help", "EnsureRunning", "RegisterStartup", "UninstallStartup")]
     [string]$Action = "Start",
     [switch]$Production,
     [switch]$Force,
@@ -120,7 +120,8 @@ function Get-ProcessesOnPort {
     # 결과가 1건이면 PowerShell 이 배열을 스칼라로 언롤링해 .Count 가 $null 이 되고,
     # Count 기반 분기가 전부 오작동한다(프로세스 1개짜리 서비스가 미탐지됨).
     param([int]$Port)
-    $lines = netstat -ano -p tcp 2>$null | Select-String -Pattern ":$Port\s+.*LISTENING"
+    # -p tcp 는 IPv4 만 보여 준다. Vite 개발 서버처럼 [::] 에만 바인딩하면 놓치므로 전체 프로토콜을 본다.
+    $lines = netstat -ano 2>$null | Select-String -Pattern ":$Port\s+.*LISTENING"
     if (-not $lines) { return @() }
 
     $processIds = @()
@@ -147,7 +148,7 @@ function Get-ProcessesOnPort {
 
 function Test-PortListening {
     param([int]$Port)
-    $line = netstat -ano -p tcp 2>$null | Select-String -Pattern ":$Port\s+.*LISTENING"
+    $line = netstat -ano 2>$null | Select-String -Pattern ":$Port\s+.*LISTENING"
     return [bool]$line
 }
 
@@ -394,8 +395,66 @@ function Ensure-ProductionConfiguration {
     }
 }
 
+function Get-LegacyAutoStartItems {
+    # 예전 방식의 자동 시작 구성(깨진 NSSM 서비스, 시작프로그램 바로가기)을 찾는다.
+    # 부팅 작업과 함께 남아 있으면 실패 루프나 로그온 시 중복 기동을 만든다.
+    $items = @()
+    $serviceName = "AOP_Web_Service"
+    $serviceKey = "HKLM:\SYSTEM\CurrentControlSet\Services\$serviceName"
+    if (Test-Path $serviceKey) {
+        $parametersKey = Get-ItemProperty -Path "$serviceKey\Parameters" -ErrorAction SilentlyContinue
+        $appParameters = [string]$parametersKey.AppParameters
+        # 이 프로젝트 스크립트를 -File 로 가리키는데 그 파일이 없을 때만 깨진 서비스로 본다.
+        # 판별할 수 없는 구성은 건드리지 않는다.
+        if ($appParameters -match '-File\s+"?([^"]*AOP_Web[^"]*?\.ps1)') {
+            $targetScript = $Matches[1]
+            if (-not [System.IO.Path]::IsPathRooted($targetScript) -and $parametersKey.AppDirectory) {
+                $targetScript = Join-Path $parametersKey.AppDirectory $targetScript
+            }
+            if (-not (Test-Path $targetScript -PathType Leaf)) {
+                $items += [PSCustomObject]@{ Kind = "Service"; Name = $serviceName; Detail = "missing script: $targetScript" }
+            }
+        }
+    }
+
+    $startupDir = [Environment]::GetFolderPath("Startup")
+    if ($startupDir -and (Test-Path $startupDir)) {
+        foreach ($link in @(Get-ChildItem -Path $startupDir -Filter *.lnk -File -ErrorAction SilentlyContinue)) {
+            $target = ""
+            try {
+                $target = (New-Object -ComObject WScript.Shell).CreateShortcut($link.FullName).TargetPath
+            } catch { }
+            if ($link.Name -match 'AOP_Web' -or $target -match 'AOP_Web') {
+                $items += [PSCustomObject]@{ Kind = "StartupShortcut"; Name = $link.FullName; Detail = "target: $target" }
+            }
+        }
+    }
+    return $items
+}
+
+function Remove-LegacyAutoStart {
+    foreach ($item in @(Get-LegacyAutoStartItems)) {
+        if ($item.Kind -eq "Service") {
+            & sc.exe stop $item.Name | Out-Null
+            & sc.exe delete $item.Name | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Log "Removed broken legacy service $($item.Name) ($($item.Detail))" "INFO"
+            } else {
+                Write-Log "Failed to remove legacy service $($item.Name) (sc.exe exit $LASTEXITCODE)" "WARN"
+            }
+        } elseif ($item.Kind -eq "StartupShortcut") {
+            # 삭제하지 않고 백업 폴더로 옮겨 필요하면 되돌릴 수 있게 한다.
+            $backupDir = Join-Path $env:LOCALAPPDATA "AOP_Web\disabled_startup"
+            New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+            $destination = Join-Path $backupDir ("{0}_{1}" -f (Get-Date -Format 'yyyyMMdd_HHmmss'), (Split-Path $item.Name -Leaf))
+            Move-Item -LiteralPath $item.Name -Destination $destination
+            Write-Log "Moved legacy startup shortcut to $destination ($($item.Detail))" "INFO"
+        }
+    }
+}
+
 function Register-AutoStartTask {
-    # 부팅 시 로그인 전에도 같은 모드로 기동하도록 등록한다.
+    # 부팅 시 로그인 전에도 기동하고, 5분마다 내려간 서버를 복구하도록 등록한다.
     $taskName = "AOP_Web_AutoStart"
     if (!(Test-Path $scriptFilePath -PathType Leaf)) {
         throw "AOP_Web.ps1 not found at $scriptFilePath."
@@ -410,7 +469,7 @@ function Register-AutoStartTask {
     $modeSwitch = if ($Production) { " -Production" } else { "" }
     $currentUser = $currentIdentity.Name
     $escapedScriptPath = $scriptFilePath.Replace('"', '\"')
-    $taskArguments = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$escapedScriptPath`" -Action Start$modeSwitch -Unattended"
+    $taskArguments = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$escapedScriptPath`" -Action EnsureRunning$modeSwitch -Unattended"
 
     $taskAction = New-ScheduledTaskAction `
         -Execute (Join-Path $PSHOME "powershell.exe") `
@@ -419,9 +478,18 @@ function Register-AutoStartTask {
     $taskTrigger = New-ScheduledTaskTrigger `
         -AtStartup
     $taskTrigger.Delay = "PT1M"
+    # Duration 을 비우면 무기한 반복이다(부팅 기동 실패·프로세스 종료 시 자동 복구).
+    $repetitionClass = Get-CimClass -Namespace "Root/Microsoft/Windows/TaskScheduler" -ClassName MSFT_TaskRepetitionPattern
+    $taskTrigger.Repetition = New-CimInstance -CimClass $repetitionClass -ClientOnly -Property @{
+        Interval          = "PT5M"
+        StopAtDurationEnd = $false
+    }
     $taskSettings = New-ScheduledTaskSettingsSet `
         -Hidden `
         -StartWhenAvailable `
+        -AllowStartIfOnBatteries `
+        -DontStopIfGoingOnBatteries `
+        -MultipleInstances IgnoreNew `
         -RestartCount 3 `
         -RestartInterval (New-TimeSpan -Minutes 1) `
         -ExecutionTimeLimit ([TimeSpan]::Zero)
@@ -439,13 +507,16 @@ function Register-AutoStartTask {
         -Force `
         -ErrorAction Stop | Out-Null
 
+    Remove-LegacyAutoStart
+
     Write-Log "Auto-start task registered ($modeName mode): $taskName" "INFO"
     Write-Host "Windows auto-start task registered: $taskName" -ForegroundColor Green
     Write-Host "User: $currentUser" -ForegroundColor Cyan
-    Write-Host "Trigger: system startup (60 seconds delay; user login not required)" -ForegroundColor Cyan
-    Write-Host "Mode: $modeName (-Action Start$modeSwitch -Unattended)" -ForegroundColor Cyan
+    Write-Host "Trigger: system startup (60 seconds delay; user login not required), then health check every 5 minutes" -ForegroundColor Cyan
+    Write-Host "Mode: $modeName (-Action EnsureRunning$modeSwitch -Unattended)" -ForegroundColor Cyan
     Write-Host "Run level: current user, limited privileges, no stored password" -ForegroundColor Cyan
     Write-Host "Verify: schtasks /Query /TN $taskName /FO LIST /V" -ForegroundColor Yellow
+    Write-Host "Pause:  schtasks /Change /TN $taskName /DISABLE" -ForegroundColor Yellow
     Write-Host "Remove: AOP_Web.bat uninstall" -ForegroundColor Yellow
 
 }
@@ -477,14 +548,15 @@ if ($Help -or $Action -eq "Help") {
     Write-Host "AOP Web Application Unified Management Script" -ForegroundColor Green
     Write-Host "===============================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Usage: .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|RegisterStartup|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose] [-Help]" -ForegroundColor Yellow
+    Write-Host "Usage: .\scripts\AOP_Web.ps1 [-Action Start|Stop|Restart|Status|EnsureRunning|RegisterStartup|UninstallStartup] [-Production] [-Force] [-Unattended] [-Diagnose] [-Help]" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Actions:" -ForegroundColor Yellow
     Write-Host "  Start      Start Frontend & Backend servers (Default)"
     Write-Host "  Stop       Stop Frontend & Backend servers"
     Write-Host "  Restart    Stop and then Start servers"
     Write-Host "  Status     Display current running status of services"
-    Write-Host "  RegisterStartup  Register boot auto-start (run as Administrator)"
+    Write-Host "  EnsureRunning    Start servers only if port 5000 or 3000 is down (used by the auto-start task)"
+    Write-Host "  RegisterStartup  Register boot auto-start + 5 min health check (run as Administrator)"
     Write-Host "  Help       Display this help message"
     Write-Host "  UninstallStartup   Remove the Windows boot auto-start task"
     Write-Host ""
@@ -567,6 +639,7 @@ function Show-Status {
     $isS4ULogon = $false
     $isLimitedRunLevel = $false
     $isEnabled = $false
+    $isEnsureAction = $false
     $hasEnabledBootTrigger = $false
     if ($startupTaskQueryError) {
         Write-Host "  Status: UNKNOWN | Task query failed: $startupTaskQueryError" -ForegroundColor Red
@@ -584,6 +657,7 @@ function Show-Status {
         $isS4ULogon = $startupTask.Principal.LogonType.ToString() -eq "S4U"
         $isLimitedRunLevel = $startupTask.Principal.RunLevel.ToString() -eq "Limited"
         $isEnabled = $startupTask.State.ToString() -ne "Disabled"
+        $isEnsureAction = $startupArguments -match '-Action\s+EnsureRunning'
         $triggerDescription = if ($hasBootTrigger) {
             "system startup"
         } elseif ($hasLogonTrigger) {
@@ -592,16 +666,21 @@ function Show-Status {
             "other"
         }
 
-        if ($hasEnabledBootTrigger -and $isS4ULogon -and $isLimitedRunLevel -and $isEnabled) {
-            Write-Host "  Status: CONFIGURED | Trigger: $triggerDescription | Logon: S4U | Run level: Limited" -ForegroundColor Green
+        if ($hasEnabledBootTrigger -and $isS4ULogon -and $isLimitedRunLevel -and $isEnabled -and $isEnsureAction) {
+            Write-Host "  Status: CONFIGURED | Trigger: $triggerDescription + 5 min health check | Logon: S4U | Run level: Limited" -ForegroundColor Green
         } else {
-            Write-Host "  Status: MISCONFIGURED | Trigger: $triggerDescription | Boot trigger enabled: $hasEnabledBootTrigger | Logon: $($startupTask.Principal.LogonType) | Run level: $($startupTask.Principal.RunLevel) | Enabled: $isEnabled" -ForegroundColor Red
+            Write-Host "  Status: MISCONFIGURED | Trigger: $triggerDescription | Boot trigger enabled: $hasEnabledBootTrigger | Logon: $($startupTask.Principal.LogonType) | Run level: $($startupTask.Principal.RunLevel) | Enabled: $isEnabled | EnsureRunning: $isEnsureAction" -ForegroundColor Red
         }
     } else {
         Write-Host "  Status: NOT REGISTERED" -ForegroundColor Red
     }
 
-    if (-not $startupTaskQueryError -and (-not $startupTask -or -not $hasEnabledBootTrigger -or -not $isS4ULogon -or -not $isLimitedRunLevel -or -not $isEnabled)) {
+    $legacyItems = @(Get-LegacyAutoStartItems)
+    foreach ($item in $legacyItems) {
+        Write-Host "  Legacy auto-start found: $($item.Kind) $($item.Name) ($($item.Detail))" -ForegroundColor Red
+    }
+
+    if (-not $startupTaskQueryError -and (-not $startupTask -or -not $hasEnabledBootTrigger -or -not $isS4ULogon -or -not $isLimitedRunLevel -or -not $isEnabled -or -not $isEnsureAction -or $legacyItems.Count -gt 0)) {
         $modeSwitch = if ($startupProduction) { " -Production" } else { "" }
         Write-Host "  Fix (run in Administrator PowerShell):" -ForegroundColor Yellow
         Write-Host "  powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$scriptFilePath`" -Action RegisterStartup$modeSwitch" -ForegroundColor Yellow
@@ -841,9 +920,10 @@ function Start-Services {
     Write-Log "Backend:  http://localhost:5000" "INFO"
     Write-Log "Frontend: http://localhost:3000" "INFO"
 
-    # 서버를 직접 기동했을 때만 자동 시작 등록을 시도한다.
+    # 운영 모드로 직접 기동했을 때만 자동 시작 등록을 시도한다.
+    # 개발 모드 start 가 운영 자동 복구 작업을 개발 모드로 덮어쓰지 않게 한다(개발 모드 등록은 RegisterStartup 으로 명시).
     # -Unattended 는 작업 스케줄러가 실행한 경로이므로 재등록을 피한다.
-    if (-not $Unattended) {
+    if ($Production -and -not $Unattended) {
         try {
             Register-AutoStartTask
         } catch {
@@ -854,6 +934,9 @@ function Start-Services {
     }
 
     Save-JsonLog
+
+    # 감시 루프 동안 기동 잠금을 쥐고 있으면 다른 기동(작업 스케줄러 포함)이 영원히 막히므로 먼저 푼다.
+    Exit-StartLock
 
     # 무인 실행(작업 스케줄러)에서는 감시 루프를 돌지 않는다.
     # 루프를 돌면 작업이 영원히 Running 상태로 남아 다음 트리거·결과 판정이 불가능해진다.
@@ -869,19 +952,70 @@ function Start-Services {
 }
 #endregion
 
+function Enter-StartLock {
+    # 수동 Start 와 작업 스케줄러 EnsureRunning 이 동시에 포트를 정리·기동하지 않도록 한다.
+    # 세션 0(S4U)과 대화형 세션을 모두 가로지르도록 뮤텍스 대신 배타 파일 잠금을 쓴다(프로세스 종료 시 자동 해제).
+    param([int]$TimeoutSeconds = 0)
+    $lockPath = Join-Path $logDir "aop_web_start.lock"
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ($true) {
+        try {
+            $script:startLock = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::OpenOrCreate,
+                [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+            return $true
+        } catch [System.IO.IOException] {
+            if ((Get-Date) -ge $deadline) { return $false }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
+
+function Exit-StartLock {
+    if ($script:startLock) {
+        $script:startLock.Dispose()
+        $script:startLock = $null
+    }
+}
+
+function Invoke-EnsureRunning {
+    # 정상 상태에서는 로그 파일을 만들지 않고 바로 끝낸다(5분마다 실행되므로).
+    if ((Test-PortListening -Port 5000) -and (Test-PortListening -Port 3000)) { return }
+    # 수동 재기동의 짧은 공백과 겹치지 않도록 잠시 기다렸다가 다시 확인한다.
+    Start-Sleep -Seconds 20
+    if ((Test-PortListening -Port 5000) -and (Test-PortListening -Port 3000)) { return }
+    if (-not (Enter-StartLock -TimeoutSeconds 0)) {
+        Write-Log "Health check: services are down but another start holds the lock; skipped this round." "WARN"
+        return
+    }
+    if ((Test-PortListening -Port 5000) -and (Test-PortListening -Port 3000)) { return }
+    Write-Log "Health check: backend 5000 listening=$(Test-PortListening -Port 5000), frontend 3000 listening=$(Test-PortListening -Port 3000). Starting services." "WARN"
+    Start-Services
+}
+
 #region Main Entry Point
 try {
     switch ($Action) {
         "Status"  { Show-Status }
         # -Unattended 는 입력을 받을 수 없는 실행이므로 확인 질문 없이 정지한다(빈 입력이 '건너뜀'으로 처리되던 문제).
-        "Stop"    { Stop-Services -NonInteractive:($Force -or $Unattended) }
-        "Start"   { Start-Services }
+        "Stop"    {
+            Stop-Services -NonInteractive:($Force -or $Unattended)
+            $autoTask = Get-ScheduledTask -TaskName "AOP_Web_AutoStart" -ErrorAction SilentlyContinue
+            if ($autoTask -and $autoTask.State.ToString() -ne "Disabled" -and ($autoTask.Actions.Arguments -match 'EnsureRunning')) {
+                Write-Host "[WARN] Auto-recovery task is enabled; servers restart within about 5 minutes. To keep them stopped: schtasks /Change /TN AOP_Web_AutoStart /DISABLE (Administrator)" -ForegroundColor Yellow
+            }
+        }
+        "Start"   {
+            if (-not (Enter-StartLock -TimeoutSeconds 180)) { throw "Another AOP Web start is in progress." }
+            Start-Services
+        }
+        "EnsureRunning" { Invoke-EnsureRunning }
         "RegisterStartup" {
             Ensure-ProductionConfiguration
             Register-AutoStartTask
         }
         "UninstallStartup" { Uninstall-StartupTask }
         "Restart" {
+            if (-not (Enter-StartLock -TimeoutSeconds 180)) { throw "Another AOP Web start is in progress." }
             Stop-Services -NonInteractive:$true
             Start-Sleep -Seconds 1
             Start-Services
@@ -893,5 +1027,8 @@ try {
     Write-Host "`n[ERROR] $($_.Exception.Message)" -ForegroundColor Red
     Save-JsonLog
     Exit 1
+} finally {
+    # 대화형 셸에서 '&' 로 실행해 실패·Ctrl+C 로 끝나도 기동 잠금이 남지 않게 한다.
+    Exit-StartLock
 }
 #endregion
