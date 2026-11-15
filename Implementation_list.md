@@ -1547,3 +1547,32 @@ Windows 로그온 시 AOP Web 백엔드와 프론트엔드를 무인 자동 기�
 - **검증**: pytest 191 passed, `npm run build` 성공, 운영 재기동 HTTP 200, e2e 23/23 통과.
 - **인정된 차이(유지)**: MATLAB fmincon → SciPy(모델·목적함수·초기값·경계 동일, 계수의 수치 완전 동일성은 실DB 미접속으로 미검증), 파일 출력→다운로드, 쓰기 전 확인 창.
 - 교차 검증(Verify) 생략: 프런트 표시값 유지 1건(SQL·인증·API 계약 변경 없음), e2e로 직접 확인.
+
+## 60. 추가적으로 11_소스_CompassTool_VB_2nd의 MSI input기능도 제대로 나의 프로젝트에서 문제없이 기능이 수행되는지 모든 아이템을 리뷰하여 확인해죠. 즉, VB에서 python, react + vite로 convert하였다.
+
+### Agent 명세 (#60)
+
+- **대상(Compass2.vbproj 컴파일 포함분만)**: `MsiChoice`, `measSetInput.vb`(msiReader, 1945줄), `msiFromDump.vb`(619줄), `frmMeasSetting`(measSetting). `measSetReader.vb`·`MsiFromDumpGroup.vb`는 프로젝트 미포함 → 대상 외.
+- **분배(읽기 전용 대조, 병렬)**: ① Excel 경로(measSetInput·frmMeasSetting ↔ MsiExcelForm.jsx·msi_excel.py·excel_*.py) ② Dump 경로(msiFromDump ↔ MsiDumpForm.jsx·msi_input.py·calculator.py·store.py). MsiChoice는 메인이 직접 확인.
+- **판정 기준**: Major = 원본 작업 불가 또는 DB 저장값·계산값·필터·중복 판정 상이. Minor = 표시·메시지. 인정 차이(MATLAB 제거, Beamwidth Simulation 삭제 #40, 입력 2개 삭제 #41, Excel COM→업로드/다운로드, 확인 창, 중복 확인 창 #49~50)는 결함 아님.
+- **구현**: Major만 재현 테스트(pytest/e2e) → 최소 수정. DB 쓰기·SQL 경로를 바꾸면 Verify + security-review 병렬.
+- **완료 조건**: Blocker 0, Major 0, pytest·build·e2e 통과, 대조표를 수행 결과에 기록.
+
+### 수행 결과 (#60)
+
+| 원본(vbproj 포함) | 웹 | 대조 결과 |
+|---|---|---|
+| MsiChoice | `MsiChoice.jsx` | 버튼 2개(Excel→별도 창, Dump→창) 일치 |
+| measSetInput(msiReader) | `MsiExcelForm.jsx`·`msi_excel.py`·`excel_engine/io/store/vb.py` | 이벤트 19/19 대응. Tank/Power/Temp 저장·PRF 갱신·초점 보간·중복 조건·INSERT/UPDATE 컬럼 일치 |
+| frmMeasSetting(measSetting) | `excel_store.py:121` | `probeId = ? AND measSetId > ?` 동일 |
+| msiFromDump | `MsiDumpForm.jsx`·`msi_input.py`·`calculator.py`·`store.py` | 이벤트 8/8, SQL 5/5 대응. 조회 필터·단위 변환·분기·중복 판정·INSERT·저장 순서 일치 |
+
+- **Blocker 0 / Major 0** → 코드 수정 없음.
+- **Minor(유지)**
+  - 중복 후보 조회 `TOP (100)`(원본 전체): 실제 병합은 원본처럼 첫 레코드 1건만 사용하므로 저장값 동일. 중복 확인 창의 ID 표시만 100건 상한.
+  - Tank 결과의 measSetId 범위 표시: 원본은 `setIdMax = minSetId` 결함으로 최대값이 최소값과 같게 표시, 웹은 실제 MAX 표시(저장 무관).
+- **의도된 교정(유지)**: Dump Selected 그리드의 verifId 편집값 — 원본은 편집한 verifId로 purpose/reportTerm을 조회해 다른 Verification 값이 섞일 수 있음. 웹은 DB의 subVerif→verifId 연결과 Probe 일치를 검증해 사용(편집 불일치로 잘못된 분기 저장 방지).
+- **대상 외**: `measSetReader.vb`·`MsiFromDumpGroup.vb`는 Compass2.vbproj 미포함(빌드되지 않는 코드). Beamwidth Simulation(MATLAB)은 #40에서 삭제.
+- **검증**: pytest 191 passed(MSI 엔진·Excel 테스트 포함), e2e 23/23(#45·#47·#49·#50 MSI 시나리오 포함) — 이번 세션 최신 빌드 기준.
+- **잔여**: 실제 DB 미접속으로 SQL Server 기본값·트리거, VB `Array.Sort`와 숫자 포맷 경계값의 런타임 동등성은 미검증.
+- 교차 검증(Verify) 생략: 코드 변경 없음(문서 기록만).
